@@ -24,7 +24,8 @@ export function buildOpenApi(app: INestApplication): OpenAPIObject {
 export async function createApp(opts: { logger?: boolean } = {}): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   if (opts.logger !== false) app.useLogger(app.get(Logger));
-  app.set('trust proxy', 'loopback');
+  // Goal 10 (B-015): which upstream proxies may set X-Forwarded-For (Express syntax, e.g. 'loopback, 10.0.0.0/8').
+  app.set('trust proxy', process.env.KORA_API_TRUST_PROXY?.trim() || 'loopback');
   app.disable('x-powered-by');
   app.use(
     helmet({

@@ -8,4 +8,7 @@ export interface Principal {
   /** True when the session passed TOTP (amr contains "otp"). */
   mfa: boolean;
   tokenId: string | null;
+  /** Token issue / expiry time in epoch seconds (goal 10 session revocation). */
+  issuedAt?: number;
+  expiresAt?: number;
 }

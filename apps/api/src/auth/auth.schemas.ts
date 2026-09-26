@@ -30,3 +30,17 @@ export const MfaVerifySchema = z
     code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
   })
   .strict();
+
+/** B-902: a one-time recovery code instead of the TOTP code (format XXXXX-XXXXX, case-insensitive). */
+export const MfaRecoverySchema = z
+  .object({
+    mfaToken: z.string().min(10).max(4096),
+    recoveryCode: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z2-7]{5}-?[A-Za-z2-7]{5}$/, 'Enter a recovery code like ABCDE-23456'),
+  })
+  .strict();
+
+/** B-902: regenerating recovery codes needs a fresh TOTP code (step-up). */
+export const RecoveryCodesRegenerateSchema = z.object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') }).strict();

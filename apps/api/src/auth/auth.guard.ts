@@ -11,6 +11,7 @@ import { hasAnyRole, requiresMfa, type Role } from '@kora/domain';
 import type { KoraRequest } from '../common/request';
 import { ACCESS_COOKIE } from './cookies';
 import { IS_PUBLIC, ROLES } from './decorators';
+import { SessionsService } from './sessions.service';
 import { TokenService } from './token.service';
 import { UserProvisioner } from './user-provisioner.service';
 
@@ -23,6 +24,7 @@ export const CSRF_HEADER = 'x-kora-csrf';
  * 2. Authentication via Bearer header or the kora_at cookie.
  * 3. MFA: any non-novice role without amr=otp is rejected (global, cannot be forgotten per route).
  * 4. @Roles(): caller needs any one of the listed roles.
+ * Server-side session checks (goal 10): revoked token ids, sessions_valid_after, disabled users.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -30,6 +32,7 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly tokens: TokenService,
     private readonly provisioner: UserProvisioner,
+    private readonly sessions: SessionsService,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -53,6 +56,10 @@ export class AuthGuard implements CanActivate {
       principal = await this.tokens.verifyAccessToken(token);
     } catch {
       throw new UnauthorizedException({ error: 'invalid_token', message: 'Session expired or invalid. Sign in again.' });
+    }
+    // Goal 10: logout, role changes, MFA resets and disabled users end sessions server side.
+    if (!(await this.sessions.isActive(principal))) {
+      throw new UnauthorizedException({ error: 'session_revoked', message: 'This session has ended. Sign in again.' });
     }
     if (requiresMfa(principal.roles) && !principal.mfa) {
       throw new ForbiddenException({ error: 'mfa_required', message: 'This account needs two-factor authentication.' });

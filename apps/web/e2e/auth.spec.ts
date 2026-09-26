@@ -45,6 +45,10 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   const secret = (await page.getByTestId('mfa-secret').textContent())!.trim();
   await page.getByLabel('6-digit code').fill(totp(secret));
   await page.getByRole('button', { name: /Turn on two-factor/ }).click();
+  // B-902 (goal 10): ten one-time recovery codes are shown once after enrolment.
+  await expect(page.getByTestId('recovery-codes').getByRole('listitem')).toHaveCount(10);
+  const recoveryCode = (await page.getByTestId('recovery-codes').getByRole('listitem').first().textContent())!.trim();
+  await page.getByRole('button', { name: 'I have saved my codes' }).click();
 
   await expect(page).toHaveURL(/\/terminal/);
   await expect(page.getByTestId('pro-topbar')).toBeVisible();
@@ -63,6 +67,18 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByTestId('auth-error')).toContainText('not valid');
   await page.getByLabel('6-digit code').fill(totp(secret, 1));
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page).toHaveURL(/\/terminal/);
+
+  // Lost authenticator: a recovery code signs in once (B-902).
+  await page.getByTestId('user-menu').click();
+  await page.getByTestId('logout').click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: /Use a recovery code/ }).click();
+  await page.getByLabel('Recovery code').fill(recoveryCode);
   await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page).toHaveURL(/\/terminal/);
 });

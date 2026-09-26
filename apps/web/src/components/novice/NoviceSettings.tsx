@@ -25,6 +25,7 @@ export function NoviceSettings() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [codes, setCodes] = useState<string[] | null>(null);
   if (!novice) return null;
 
   const start = async () => {
@@ -49,10 +50,12 @@ export function NoviceSettings() {
     setBusy(true);
     setError(null);
     try {
-      await api.mfaVerify(enrol.mfaToken, code.trim());
+      const res = await api.mfaVerify(enrol.mfaToken, code.trim());
       toast.push(t('settings.twoStep.on'), 'success', 6000);
       setEnrol(null);
-      router.refresh();
+      // B-902: show the one-time recovery codes once; refresh after the user saved them.
+      if (res.recoveryCodes?.length) setCodes(res.recoveryCodes);
+      else router.refresh();
     } catch (e) {
       setError(e instanceof KoraApiError ? t('settings.twoStep.bad') : t('common.error'));
     } finally {
@@ -86,7 +89,26 @@ export function NoviceSettings() {
       </Panel>
       <Panel title={t('settings.twoStep.title')} data-testid="two-step">
         <p className="m-0">{t('settings.twoStep.body')}</p>
-        {me.mfa ? (
+        {codes ? (
+          <div className="flex flex-col gap-3 mt-3" data-testid="recovery-codes">
+            <p className="m-0 font-semibold">{t('settings.twoStep.codesTitle')}</p>
+            <p className="m-0">{t('settings.twoStep.codesBody')}</p>
+            <ul className="grid grid-cols-2 gap-2 m-0 p-0 list-none k-num">
+              {codes.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setCodes(null);
+                router.refresh();
+              }}
+            >
+              {t('settings.twoStep.codesDone')}
+            </Button>
+          </div>
+        ) : me.mfa ? (
           <p className="m-0 mt-2 font-semibold">{t('settings.twoStep.on')}</p>
         ) : enrol ? (
           <div className="flex flex-col gap-3 mt-3">

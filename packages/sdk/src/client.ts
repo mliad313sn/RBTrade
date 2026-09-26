@@ -35,6 +35,7 @@ import type {
   LoginResponse,
   MeResponse,
   MfaEnrollResponse,
+  MfaRecoveryResponse,
   MfaVerifyResponse,
   UpdatePreferences,
   UserPreferences,
@@ -130,6 +131,20 @@ export class KoraClient {
 
   mfaVerify(mfaToken: string, code: string) {
     return this.request<MfaVerifyResponse>('POST', '/auth/mfa/verify', { mfaToken, code });
+  }
+
+  /** B-902: second factor with a one-time recovery code. */
+  mfaRecovery(mfaToken: string, recoveryCode: string) {
+    return this.request<MfaRecoveryResponse>('POST', '/auth/mfa/recovery', { mfaToken, recoveryCode });
+  }
+
+  /** B-902: replace the recovery codes (needs a fresh 6-digit code). */
+  regenerateRecoveryCodes(code: string) {
+    return this.request<{ recoveryCodes: string[] }>('POST', '/auth/mfa/recovery-codes', { code });
+  }
+
+  recoveryCodesStatus() {
+    return this.request<{ remaining: number }>('GET', '/auth/mfa/recovery-codes');
   }
 
   logout() {

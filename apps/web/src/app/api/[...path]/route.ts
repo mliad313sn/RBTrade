@@ -1,5 +1,7 @@
 import type { NextRequest } from 'next/server';
 
+import { forwardedClient, trustedProxyHops } from '@/lib/forwarded';
+
 /**
  * Same-origin proxy to the API (read at runtime from API_INTERNAL_URL), so the session cookie stays
  * HttpOnly + SameSite=Strict and the browser never talks to the API origin directly.
@@ -34,10 +36,9 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     const v = req.headers.get(h);
     if (v) headers.set(h, v);
   }
-  // Forward only the nearest hop's address: a client-supplied X-Forwarded-For chain must not reach
-  // the API (rate limits and audit IPs key on it). Production puts a trusted edge proxy in front.
-  const hop = (req.headers.get('x-forwarded-for') ?? '').split(',').pop()?.trim();
-  headers.set('x-forwarded-for', hop || '127.0.0.1');
+  // B-015 (goal 10): only addresses appended by our own proxies are trusted (KORA_TRUSTED_PROXY_HOPS);
+  // a client-supplied X-Forwarded-For never reaches the API (rate limits and audit IPs key on it).
+  headers.set('x-forwarded-for', forwardedClient(req.headers.get('x-forwarded-for'), trustedProxyHops()));
   const hasBody = !['GET', 'HEAD'].includes(req.method);
   let upstream: Response;
   try {

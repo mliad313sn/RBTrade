@@ -16,6 +16,7 @@ import {
 } from '@kora/domain';
 
 import { AuditService } from '../audit/audit.service';
+import { SessionsService } from '../auth/sessions.service';
 import { UsersRepository } from '../auth/users.repository';
 import { DbService, type Queryable } from '../db/db.service';
 import { DbDisclosureRegistry } from '../disclosures/db-disclosure-registry';
@@ -36,6 +37,7 @@ export class FourEyesService {
     private readonly store: FourEyesStore,
     private readonly audit: AuditService,
     private readonly users: UsersRepository,
+    private readonly sessions: SessionsService,
     private readonly accounts: AccountsService,
     private readonly killSwitch: KillSwitchService,
     private readonly disclosures: DbDisclosureRegistry,
@@ -235,6 +237,9 @@ export class FourEyesService {
       }
       case 'mfa_reset': {
         const del = await c.query('DELETE FROM user_mfa WHERE user_id = $1', [r.subject_id]);
+        // Goal 10: old recovery codes and sessions end with the reset (B-902).
+        await c.query('DELETE FROM mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL', [r.subject_id]);
+        await this.sessions.invalidateAll(r.subject_id, c);
         await this.audit.record(
           {
             actorId: approver,

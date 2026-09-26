@@ -531,6 +531,10 @@ export const en = {
   'settings.twoStep.verify': 'Turn on',
   'settings.twoStep.on': 'Two-step sign-in is on.',
   'settings.twoStep.bad': 'That code did not work. Try the newest code.',
+  'settings.twoStep.codesTitle': 'Save your recovery codes',
+  'settings.twoStep.codesBody':
+    'If you lose your phone, each code lets you sign in once. Keep them somewhere safe. We show them only now.',
+  'settings.twoStep.codesDone': 'I have saved my codes',
 
   // ---- Offline shell ----
   'offline.title': 'Prices paused',

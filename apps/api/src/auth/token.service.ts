@@ -140,6 +140,8 @@ export class TokenService implements OnModuleInit {
       roles,
       mfa: amr.includes('otp') || amr.includes('mfa'),
       tokenId: typeof payload.jti === 'string' ? payload.jti : null,
+      issuedAt: typeof payload.iat === 'number' ? payload.iat : undefined,
+      expiresAt: typeof payload.exp === 'number' ? payload.exp : undefined,
     };
   }
 }

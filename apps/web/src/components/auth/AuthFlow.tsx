@@ -12,7 +12,8 @@ import { api } from '@/lib/api-browser';
 type Step =
   | { kind: 'credentials' }
   | { kind: 'enroll'; mfaToken: string; secret?: string; otpauthUrl?: string; qr?: string }
-  | { kind: 'verify'; mfaToken: string };
+  | { kind: 'verify'; mfaToken: string; recovery?: boolean }
+  | { kind: 'recovery-codes'; codes: string[] };
 
 function safeNext(next: string | null): string {
   return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
@@ -79,11 +80,18 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
 
   async function submitCode(e: FormEvent) {
     e.preventDefault();
-    if (step.kind === 'credentials') return;
+    if (step.kind === 'credentials' || step.kind === 'recovery-codes') return;
     setError(null);
     setBusy(true);
     try {
-      await api.mfaVerify(step.mfaToken, code.trim());
+      if (step.kind === 'verify' && step.recovery) {
+        await api.mfaRecovery(step.mfaToken, code.trim());
+        return done();
+      }
+      if (step.kind !== 'enroll' && step.kind !== 'verify') return;
+      const res = await api.mfaVerify(step.mfaToken, code.trim());
+      // B-902: show the one-time recovery codes once, right after enrolment.
+      if (res.recoveryCodes?.length) return setStep({ kind: 'recovery-codes', codes: res.recoveryCodes });
       done();
     } catch (err) {
       setError(message(err));
@@ -93,7 +101,18 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
   }
 
   const title =
-    step.kind === 'enroll' ? 'Set up two-factor authentication' : step.kind === 'verify' ? 'Enter your 6-digit code' : mode === 'signup' ? 'Create your KORA account' : 'Sign in to KORA';
+    step.kind === 'enroll'
+      ? 'Set up two-factor authentication'
+      : step.kind === 'recovery-codes'
+        ? 'Save your recovery codes'
+        : step.kind === 'verify'
+          ? step.recovery
+            ? 'Enter a recovery code'
+            : 'Enter your 6-digit code'
+          : mode === 'signup'
+            ? 'Create your KORA account'
+            : 'Sign in to KORA';
+  const recovering = step.kind === 'verify' && !!step.recovery;
 
   return (
     <div className="k-panel w-full max-w-md" data-testid="auth-card">
@@ -149,6 +168,23 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
               )}
             </p>
           </form>
+        ) : step.kind === 'recovery-codes' ? (
+          <div className="flex flex-col gap-4" data-testid="recovery-codes">
+            <p className="m-0">
+              If you lose your authenticator app, each of these codes lets you sign in once. Store them somewhere safe, like a password manager.
+              They are shown only now.
+            </p>
+            <ul className="grid grid-cols-2 gap-2 m-0 p-0 list-none k-num" aria-label="Recovery codes">
+              {step.codes.map((c) => (
+                <li key={c} className="k-panel px-2 py-1 text-center">
+                  {c}
+                </li>
+              ))}
+            </ul>
+            <Button variant="primary" size="lg" block onClick={done}>
+              I have saved my codes
+            </Button>
+          </div>
         ) : (
           <form className="flex flex-col gap-4" onSubmit={submitCode} noValidate>
             {step.kind === 'enroll' ? (
@@ -168,23 +204,49 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
                   </p>
                 ) : null}
               </div>
+            ) : recovering ? (
+              <p className="m-0">Enter one of the recovery codes you saved when you set up two-factor authentication. Each code works once.</p>
             ) : (
               <p className="m-0">Open your authenticator app and enter the current code for KORA.</p>
             )}
-            <Input
-              label="6-digit code"
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="\d{6}"
-              maxLength={6}
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            />
-            <Button type="submit" variant="primary" size="lg" block disabled={busy || code.length !== 6}>
+            {recovering ? (
+              <Input
+                label="Recovery code"
+                name="recoveryCode"
+                autoComplete="off"
+                maxLength={11}
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z2-7-]/g, ''))}
+              />
+            ) : (
+              <Input
+                label="6-digit code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{6}"
+                maxLength={6}
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              />
+            )}
+            <Button type="submit" variant="primary" size="lg" block disabled={busy || (recovering ? code.replace(/-/g, '').length !== 10 : code.length !== 6)}>
               {step.kind === 'enroll' ? 'Turn on two-factor and continue' : 'Verify'}
             </Button>
+            {step.kind === 'verify' ? (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCode('');
+                  setError(null);
+                  setStep({ kind: 'verify', mfaToken: step.mfaToken, recovery: !step.recovery });
+                }}
+              >
+                {step.recovery ? 'Use my authenticator app instead' : 'Lost your authenticator? Use a recovery code'}
+              </Button>
+            ) : null}
             <Button variant="ghost" onClick={() => setStep({ kind: 'credentials' })}>
               Start again
             </Button>

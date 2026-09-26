@@ -21,10 +21,11 @@ import { AuditService } from '../audit/audit.service';
 import { clientIp, type KoraRequest } from '../common/request';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
-import { LoginSchema, MfaEnrollSchema, MfaVerifySchema, SignupSchema } from './auth.schemas';
+import { LoginSchema, MfaEnrollSchema, MfaRecoverySchema, MfaVerifySchema, RecoveryCodesRegenerateSchema, SignupSchema } from './auth.schemas';
 import { clearAccessCookie, setAccessCookie } from './cookies';
 import { Public } from './decorators';
 import { AuthError, DevIdpService } from './dev-idp.service';
+import { SessionsService } from './sessions.service';
 import { TokenService } from './token.service';
 
 function mapAuthError(e: unknown): never {
@@ -43,7 +44,8 @@ function mapAuthError(e: unknown): never {
   throw e;
 }
 
-const authThrottle = () => ({ default: { limit: Number(process.env.KORA_AUTH_RATE_LIMIT ?? 20), ttl: 60_000 } });
+// Read per request (goal 10 tests change it at runtime).
+const authThrottle = () => ({ default: { limit: () => Number(process.env.KORA_AUTH_RATE_LIMIT ?? 20) || 20, ttl: 60_000 } });
 
 @ApiTags('auth')
 @Controller('auth')
@@ -53,6 +55,7 @@ export class AuthController {
     private readonly idp: DevIdpService,
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
+    private readonly sessions: SessionsService,
   ) {}
 
   private assertDevIdp(): void {
@@ -141,12 +144,52 @@ export class AuthController {
     return { status: 'ok' as const, ...out };
   }
 
+  @Public()
+  @Throttle(authThrottle())
+  @Post('mfa/recovery')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'B-902: second factor with a one-time recovery code (lost authenticator); issues the session.' })
+  @ApiBody({ schema: openApiSchema(MfaRecoverySchema) })
+  async recovery(
+    @Body(new ZodValidationPipe(MfaRecoverySchema)) body: z.infer<typeof MfaRecoverySchema>,
+    @Req() req: KoraRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.assertDevIdp();
+    const out = await this.idp.recover(body.mfaToken, body.recoveryCode, clientIp(req)).catch(mapAuthError);
+    setAccessCookie(res, out.accessToken, this.config);
+    return { status: 'ok' as const, ...out };
+  }
+
+  @Throttle(authThrottle())
+  @Post('mfa/recovery-codes')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'B-902: replace the recovery codes (needs a fresh 6-digit code); returns them once.' })
+  @ApiBody({ schema: openApiSchema(RecoveryCodesRegenerateSchema) })
+  async regenerateRecoveryCodes(
+    @Body(new ZodValidationPipe(RecoveryCodesRegenerateSchema)) body: z.infer<typeof RecoveryCodesRegenerateSchema>,
+    @Req() req: KoraRequest,
+  ) {
+    this.assertDevIdp();
+    const codes = await this.idp.regenerateRecoveryCodes(req.principal!.sub, body.code);
+    if (!codes) throw new UnauthorizedException({ error: 'invalid_code', message: 'That code is not valid. Check your authenticator app and try again.' });
+    return { recoveryCodes: codes };
+  }
+
+  @Get('mfa/recovery-codes')
+  @ApiOperation({ summary: 'B-902: how many unused recovery codes the signed-in user has left.' })
+  async recoveryCodesStatus(@Req() req: KoraRequest) {
+    this.assertDevIdp();
+    return { remaining: await this.idp.recoveryCodesRemaining(req.principal!.sub) };
+  }
+
   @Post('logout')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Clear the session cookie' })
+  @ApiOperation({ summary: 'End the session: clears the cookie and revokes the token server side (goal 10).' })
   async logout(@Req() req: KoraRequest, @Res({ passthrough: true }) res: Response) {
     clearAccessCookie(res, this.config);
     const p = req.principal!;
+    await this.sessions.revoke(p, 'logout');
     await this.audit.record({ actorId: p.sub, actorType: 'user', action: 'auth.logout', entity: 'user', entityId: p.sub, payload: {} });
     return { status: 'ok' };
   }

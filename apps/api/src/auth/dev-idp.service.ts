@@ -7,7 +7,9 @@ import { DbService } from '../db/db.service';
 import { CryptoBox } from './crypto-box';
 import { dummyPasswordHash, hashPassword, verifyPassword } from './password';
 import { TokenService } from './token.service';
+import { hashRecoveryCode, newRecoveryCode, RECOVERY_CODE_COUNT } from './recovery-codes';
 import { base32Decode, generateTotpSecret, otpauthUrl, verifyTotp } from './totp';
+import type { Queryable } from '../db/db.service';
 import { UsersRepository, type UserRow } from './users.repository';
 
 const MAX_FAILURES = 10;
@@ -165,7 +167,70 @@ export class DevIdpService {
     return ok;
   }
 
-  async verify(mfaToken: string, code: string, ip: string): Promise<{ accessToken: string; user: PublicUser; enrolled: boolean }> {
+  /**
+   * B-902: replaces the user's recovery codes with a fresh batch and returns them in clear once.
+   * Earlier unused codes stop working. Audited without the codes.
+   */
+  async issueRecoveryCodes(userId: string, c?: Queryable): Promise<string[]> {
+    const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
+    const run = async (q: Queryable) => {
+      await q.query('DELETE FROM mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL', [userId]);
+      const batch = (await q.query<{ id: string }>('SELECT gen_random_uuid() AS id')).rows[0]!.id;
+      await q.query(
+        `INSERT INTO mfa_recovery_codes (user_id, code_hash, batch) SELECT $1, h, $3 FROM unnest($2::text[]) AS h`,
+        [userId, codes.map((x) => hashRecoveryCode(userId, x)), batch],
+      );
+      await this.audit.record({ actorId: userId, actorType: 'user', action: 'auth.recovery_codes_issued', entity: 'user', entityId: userId, payload: { count: codes.length, batch } }, q);
+    };
+    if (c) await run(c);
+    else await this.db.tx(run);
+    return codes;
+  }
+
+  /** B-902: regenerate with a fresh TOTP code (step-up); null when the code is wrong. */
+  async regenerateRecoveryCodes(userId: string, totpCode: string): Promise<string[] | null> {
+    if (!(await this.verifyStepUp(userId, totpCode))) return null;
+    return this.issueRecoveryCodes(userId);
+  }
+
+  async recoveryCodesRemaining(userId: string): Promise<number> {
+    const rows = await this.db.query<{ n: number }>('SELECT count(*)::int AS n FROM mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL', [userId]);
+    return rows[0]?.n ?? 0;
+  }
+
+  /**
+   * B-902: second factor by a one-time recovery code (lost authenticator). Counts towards the login
+   * lockout like a wrong TOTP code. The session is MFA-level (`amr: pwd, mfa`). Replacing the
+   * authenticator itself stays the four-eyes `mfa_reset` for privileged roles (goal 09).
+   */
+  async recover(mfaToken: string, recoveryCode: string, ip: string): Promise<{ accessToken: string; user: PublicUser; remaining: number }> {
+    const { sub, stage } = await this.mfaSubject(mfaToken);
+    const user = await this.users.findById(sub);
+    const mfa = await this.users.mfa(sub);
+    if (!user || !mfa?.enabled_at || stage !== 'verify') throw new AuthError('mfa_not_enrolled', 'Two-factor authentication is not set up for this account');
+    if (user.locked_until && user.locked_until.getTime() > Date.now()) throw new AuthError('locked', 'Too many failed attempts. Try again later.');
+    const used = await this.db.query<{ id: string }>(
+      `UPDATE mfa_recovery_codes SET used_at = now() WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL RETURNING id`,
+      [sub, hashRecoveryCode(sub, recoveryCode)],
+    );
+    if (!used[0]) {
+      await this.users.recordLoginFailure(sub, MAX_FAILURES, LOCK_MINUTES);
+      await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.mfa_failed', entity: 'user', entityId: sub, payload: { method: 'recovery_code', ip } });
+      throw new AuthError('invalid_code', 'That recovery code is not valid or was already used.');
+    }
+    const remaining = await this.recoveryCodesRemaining(sub);
+    const roles = await this.users.roles(sub);
+    const accessToken = await this.tokens.issueAccessToken({ sub, email: user.email, roles, amr: ['pwd', 'mfa'] });
+    await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.mfa_recovery_used', entity: 'user', entityId: sub, payload: { remaining, ip } });
+    await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.login', entity: 'user', entityId: sub, payload: { amr: ['pwd', 'mfa'], ip } });
+    return { accessToken, user: this.publicUser(user, roles), remaining };
+  }
+
+  async verify(
+    mfaToken: string,
+    code: string,
+    ip: string,
+  ): Promise<{ accessToken: string; user: PublicUser; enrolled: boolean; recoveryCodes?: string[] }> {
     const { sub } = await this.mfaSubject(mfaToken);
     const user = await this.users.findById(sub);
     const mfa = await this.users.mfa(sub);
@@ -183,10 +248,12 @@ export class DevIdpService {
     }
     const roles = await this.users.roles(sub);
     const accessToken = await this.tokens.issueAccessToken({ sub, email: user.email, roles, amr: ['pwd', 'otp'] });
+    let recoveryCodes: string[] | undefined;
     if (!wasEnabled) {
       await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.mfa_enrolled', entity: 'user', entityId: sub, payload: { method: 'totp' } });
+      recoveryCodes = await this.issueRecoveryCodes(sub); // B-902: shown once, right after enrolment
     }
     await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.login', entity: 'user', entityId: sub, payload: { amr: ['pwd', 'otp'], ip } });
-    return { accessToken, user: this.publicUser(user, roles), enrolled: !wasEnabled };
+    return { accessToken, user: this.publicUser(user, roles), enrolled: !wasEnabled, ...(recoveryCodes ? { recoveryCodes } : {}) };
   }
 }

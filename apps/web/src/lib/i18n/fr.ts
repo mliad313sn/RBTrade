@@ -559,6 +559,10 @@ export const fr: Record<MessageKey, string> = {
   'settings.twoStep.verify': 'Activer',
   'settings.twoStep.on': 'La connexion en deux étapes est activée.',
   'settings.twoStep.bad': 'Ce code n’a pas marché. Essayez le plus récent.',
+  'settings.twoStep.codesTitle': 'Gardez vos codes de secours',
+  'settings.twoStep.codesBody':
+    'Si vous perdez votre téléphone, chaque code permet de vous connecter une fois. Rangez-les en lieu sûr. Nous ne les montrons qu’une fois.',
+  'settings.twoStep.codesDone': 'J’ai gardé mes codes',
 
   // ---- Offline shell ----
   'offline.title': 'Prix en pause',

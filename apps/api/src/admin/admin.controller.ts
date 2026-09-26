@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
 import { CurrentPrincipal, Roles } from '../auth/decorators';
 import type { Principal } from '../auth/principal';
+import { SessionsService } from '../auth/sessions.service';
 import { UsersRepository } from '../auth/users.repository';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { DbService } from '../db/db.service';
@@ -20,6 +21,7 @@ export class AdminController {
     private readonly db: DbService,
     private readonly users: UsersRepository,
     private readonly audit: AuditService,
+    private readonly sessions: SessionsService,
   ) {}
 
   @Get()
@@ -53,6 +55,8 @@ export class AdminController {
       if (!user) throw new NotFoundException({ error: 'not_found', message: 'User not found' });
       const before = await this.users.roles(id, c);
       await this.users.setRoles(c, id, roles, p.sub);
+      // Goal 10: tokens issued before the change carry the old roles; end them.
+      await this.sessions.invalidateAll(id, c);
       await this.audit.record({ actorId: p.sub, actorType: 'user', action: 'admin.roles_changed', entity: 'user', entityId: id, payload: { before, after: roles } }, c);
       return { id, roles };
     });

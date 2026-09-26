@@ -70,6 +70,16 @@ export interface MfaVerifyResponse {
   accessToken: string;
   user: PublicUser;
   enrolled: boolean;
+  /** B-902: ten one-time recovery codes, returned once right after enrolment. */
+  recoveryCodes?: string[];
+}
+
+/** B-902: sign-in with a recovery code instead of the TOTP code. */
+export interface MfaRecoveryResponse {
+  status: 'ok';
+  accessToken: string;
+  user: PublicUser;
+  remaining: number;
 }
 
 export interface Capabilities {
