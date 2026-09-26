@@ -88,4 +88,45 @@ Full gate before finishing: build, lint, typecheck, test, test:integration (twic
 
 ## 6. Results
 
-_(filled in at the end of the goal)_
+Measured on 2026-09-26 in the goal 08 worktree (own databases `kora_novice_test`, `kora_novice_e2e`; e2e ports 4018/3018/8018/4118).
+
+### 6.1 Acceptance criteria
+
+| Criterion | Result | Evidence |
+|---|---|---|
+| A novice cannot place an order without a stop | **Pass** | `apps/api/test/novice-guardrails.int.test.ts`: `NOVICE_STOP_REQUIRED` on `/orders`, on a limit order and on the robot path (API level). |
+| A novice cannot use leverage | **Pass** | Same file: `NOVICE_LEVERAGE` at 1×; `PUT /novice/leverage` → 403 `knowledge_check_required` without the check; after passing, still pending (refused) for 24 h; after 24 h allowed only up to `KORA_NOVICE_MAX_LEVERAGE`. |
+| A novice cannot open the strategy builder | **Pass** | Same file: 403 on `/robots/builder`, `POST /strategies`, `POST /strategies/validate`, `POST /backtests`, `POST /robots`; e2e `rbac.spec.ts` shows the friendly page. Template robots only through `/novice/auto-invest` (B-614, `novice-autoinvest.int.test.ts`). |
+| A novice cannot loosen a limit without the 24 h wait | **Pass** | Same file: loosening goes to `pending`, the old limit still rejects; after 24 h (faked app clock) it applies; tightening is immediate; first limit set counts as a tightening. |
+| Cooling-off after 3 losing trades / 5 % day loss | **Pass** | Same file (`NOVICE_COOLING_OFF`, closing still allowed) + domain tests `novice.test.ts`, `risk.test.ts`. |
+| "Most you could lose" = preview incl. fees, 20 randomised cases | **Pass** | `apps/api/test/novice-ticket.int.test.ts`: seeded PRNG, 20 cases over 10 assets, both directions; `/novice/ticket` total equals a direct `/orders/preview` of the returned body, `total = price + costs`, entry fees > 0, and the web formatter shows exactly that value (`apps/web/src/lib/novice/novice.test.ts`). |
+| e2e: onboard → limits → trade → reach limit → cooling-off → Pro and back, state kept | **Pass** | `apps/web/e2e/novice.spec.ts` (plus French, auto-invest and Learn flows). |
+| Mobile Lighthouse: PWA installable, perf ≥ 85, a11y ≥ 95; axe clean | **Pass** | Lighthouse 13.5 mobile, production build, authenticated: `/home` perf **0.96**, a11y **1.00**, best practices 0.96 (LCP 2.5 s, TBT 130 ms, CLS 0.038); `/practice` 0.94 / 1.00; `/learn` 0.94 / 1.00. Lighthouse 11.7 (has the PWA category): PWA **1**, `installable-manifest` 1, perf 0.92. Chromium `Page.getInstallabilityErrors` = `[]` (`pwa.spec.ts`). axe clean (serious/critical 0, contrast included) on every novice page at 390 px and 1440 px (`novice-mobile.spec.ts`, `novice.spec.ts`). The last Lighthouse run preceded a CSS specificity-only fix for 44 px segmented buttons; not re-measured (B-805 puts Lighthouse in CI). |
+| EN/FR complete (CI check), readability report committed | **Pass** | `fr.ts` typed `Record<MessageKey, string>`; `pnpm --filter @kora/web i18n:check` (CI step) checks keys, variables, glossary links, used keys and knowledge-check copy. `docs/novice/readability-report.md`: EN Flesch–Kincaid grade **2.0** overall, 2.3 on 12+ word strings, max 7.6 (target ≤ 8); FR Kandel–Moles ease 94. |
+| STATUS updated | **Pass** | `docs/STATUS.md` G8 row and goal 08 section. |
+
+Other requirements: onboarding 5 screens + versioned disclosure with `[XX]%` from `KORA_DISCLOSURE_RETAIL_LOSS_PCT` + acknowledgement bound to version/hash/values (`novice-onboarding.int.test.ts`); auto-invest templates only, risk 1–5, OOS/paper results only, "past results are not a promise", live refused (`novice-autoinvest.int.test.ts`, `novice.spec.ts`); ~10 global assets from the registry (`novice_rank`), amounts in the account currency; 44 px targets, bottom tab bar, no sideways scroll at 390 px; offline "Prices paused" shell (`sw.test.ts` VM test + cache check); no push/notification prompt (`pwa.spec.ts`); ESLint gamification rule with fixtures; "Explain this to me" slot behind `KORA_EXPLAIN_THIS` (`explain-slot.test.tsx`).
+
+### 6.2 Gate
+
+| Step | Result |
+|---|---|
+| `pnpm build` | pass |
+| `pnpm lint` | pass (incl. `eslint.novice.mjs`) |
+| `pnpm typecheck` | pass |
+| `pnpm test` | pass: domain 171, ui 113, market-data 60, web 51, api 45, sdk 14, bot-runner 11 |
+| `pnpm test:integration` ×2 | 163/163 and 163/163 (second run bypassing the cache) |
+| `pnpm test:e2e` | 47/47 |
+| `pnpm py:check` | pass: 124 tests, coverage 97.7 % |
+
+Fixed along the way: a race in `kill-switch.spec.ts` (touch hold dispatched before hydration; the kill switch now exposes `data-ready` after mount and the spec waits for it).
+
+### 6.3 Decisions recorded
+
+- **B-614**: guarded `/novice/auto-invest` path (template strategy unchanged, PAPER robot `origin = 'novice_template'`, 1–25 % allocation, 1× exposure, limits from the user's daily limit, live always refused with an audited checklist). ADR 0008 §6.
+- **OQ-Q1**: Practice shows the retail-loss line from the same disclosure registry (`[XX]` until OQ-R1). `docs/open-questions.md`.
+- New open questions OQ-N1 (guardrail thresholds), OQ-N2 (borrowing cap), OQ-N3 (suggested limits), OQ-N4 (knowledge-check content).
+
+### 6.4 Deferred
+
+B-801 server-side "acknowledged before first order" gate (goal 09) · B-802 Pro simulator scenario UI · B-803 customer time zones for cooling-off/day boundaries · B-804 security/limit alerts · B-805 Lighthouse in CI · B-806 localise remaining shared screens · B-807 scheduled template backtests · B-808 human plain-language copy review sign-off (pack in `docs/novice/copy-review.md`) · B-809 offline-navigation e2e · B-810 risk-officer view of guardrail events.
