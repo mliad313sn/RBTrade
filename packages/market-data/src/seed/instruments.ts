@@ -30,6 +30,8 @@ interface Row {
   venueSymbol?: string;
   isin?: string;
   sessions?: InstrumentSessions;
+  /** B-202: minor-unit quotation (e.g. GBX = pence) and its factor to the quote currency. */
+  unit?: [string, string];
 }
 
 const US_INDEX_CFD_SESSIONS: InstrumentSessions = {
@@ -418,7 +420,8 @@ const ROWS: Row[] = [
   ),
   eq('BHP.XASX', 'BHP Group Ltd.', 'XASX', 'AUD', '0.01', 2, 'AU000000BHP4', '1', 'BHP'),
   eq('AIR.XNZE', 'Air New Zealand Ltd.', 'XNZE', 'NZD', '0.005', 3, undefined, '1', 'AIR'),
-  eq('HSBA.XLON', 'HSBC Holdings plc', 'XLON', 'GBP', '0.001', 3, 'GB0005405286', '1', 'HSBA'),
+  // B-202: London equities are quoted in pence (GBX); SIMULATED tick of 0.1p.
+  { ...eq('HSBA.XLON', 'HSBC Holdings plc', 'XLON', 'GBP', '0.1', 1, 'GB0005405286', '1', 'HSBA'), unit: ['GBX', '0.01'] },
   eq('SAP.XETR', 'SAP SE', 'XETR', 'EUR', '0.02', 2, 'DE0007164600', '1', 'SAP'),
   eq(
     'MC.XPAR',
@@ -575,6 +578,7 @@ export const SEED_INSTRUMENTS: InstrumentSpec[] = ROWS.map((r) => ({
   underlyingClass: r.under ?? null,
   baseCcy: r.base ?? null,
   quoteCcy: r.quote,
+  ...(r.unit ? { priceUnit: r.unit[0], priceUnitFactor: r.unit[1] } : {}),
   tickSize: r.tick,
   pricePrecision: r.prec,
   pipSize: r.pip ?? null,

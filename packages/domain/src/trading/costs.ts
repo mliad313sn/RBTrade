@@ -56,19 +56,17 @@ export type TradingSpec = Pick<
   | 'qtyPrecision'
 >;
 
-/** Value of one price point per unit of qty, in quote currency. */
+/**
+ * Value of one price point per unit of qty, in quote currency. B-202: instruments quoted in a minor
+ * unit (GBX, ZAc) multiply by `priceUnitFactor` (0.01), so notional and P&L land in the major currency.
+ */
 export function priceMultiplier(
-  spec: Pick<InstrumentSpec, 'contractSize'>,
+  spec: Pick<InstrumentSpec, 'contractSize'> & Partial<Pick<InstrumentSpec, 'priceUnitFactor'>>,
   mode: MultiplierMode,
 ): Decimal {
-  switch (mode) {
-    case 'unit':
-      return new Decimal(1);
-    case 'contract':
-      return dec(spec.contractSize);
-    case 'percent_of_par':
-      return new Decimal('0.01');
-  }
+  const base =
+    mode === 'unit' ? new Decimal(1) : mode === 'contract' ? dec(spec.contractSize) : new Decimal('0.01');
+  return spec.priceUnitFactor ? base.mul(dec(spec.priceUnitFactor)) : base;
 }
 
 /** Notional in quote currency. */

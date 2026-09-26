@@ -14,6 +14,8 @@ interface InstrumentRow {
   underlying_class: AssetClass | null;
   base_ccy: string | null;
   quote_ccy: string;
+  price_unit?: string | null;
+  price_unit_factor?: string | null;
   tick_size: string;
   price_precision: number;
   pip_size: string | null;
@@ -62,6 +64,7 @@ const toSpec = (r: InstrumentRow): InstrumentSpec => ({
   underlyingClass: r.underlying_class,
   baseCcy: r.base_ccy,
   quoteCcy: r.quote_ccy,
+  ...(r.price_unit ? { priceUnit: r.price_unit, priceUnitFactor: r.price_unit_factor ?? null } : {}),
   tickSize: r.tick_size,
   pricePrecision: r.price_precision,
   pipSize: r.pip_size,

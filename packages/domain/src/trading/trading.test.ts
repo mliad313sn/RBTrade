@@ -323,6 +323,10 @@ describe('costs and execution', () => {
     expect(priceMultiplier({ contractSize: '100000' }, 'unit').toFixed()).toBe('1');
     expect(priceMultiplier({ contractSize: '50' }, 'contract').toFixed()).toBe('50');
     expect(priceMultiplier({ contractSize: '1000' }, 'percent_of_par').toFixed()).toBe('0.01');
+    // B-202: minor-unit quotes (GBX pence, ZAc cents) convert to the major currency.
+    expect(priceMultiplier({ contractSize: '1', priceUnitFactor: '0.01' }, 'unit').toFixed()).toBe('0.01');
+    expect(priceMultiplier({ contractSize: '10', priceUnitFactor: '0.01' }, 'contract').toFixed()).toBe('0.1');
+    expect(priceMultiplier({ contractSize: '1', priceUnitFactor: null }, 'unit').toFixed()).toBe('1');
     expect(notional(dec('-2'), dec('10'), dec('50')).toFixed()).toBe('1000');
   });
 

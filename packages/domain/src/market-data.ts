@@ -220,6 +220,13 @@ export interface InstrumentSpec {
   baseCcy: string | null;
   /** Trading (quote) currency. */
   quoteCcy: string;
+  /**
+   * B-202: minor-unit quotation. When set (e.g. `GBX` pence for GBP, `ZAc` cents for ZAR), prices
+   * and ticks are in this unit and `priceUnitFactor` converts one price unit to the quote currency
+   * (0.01). Notional, P&L and fees are always in `quoteCcy`.
+   */
+  priceUnit?: string | null;
+  priceUnitFactor?: string | null;
   tickSize: string;
   pricePrecision: number;
   pipSize: string | null;

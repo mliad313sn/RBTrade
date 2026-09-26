@@ -229,6 +229,8 @@ export interface PreviewResponse {
     tickSize: string;
     qtyStep: string;
     minQty: string;
+    /** B-202: minor quotation unit (e.g. GBX) when prices are not in the quote currency. */
+    priceUnit?: string | null;
     multiplier: string;
     feeScheduleId: string;
     feesSimulated: boolean;

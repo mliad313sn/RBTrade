@@ -317,6 +317,8 @@ export class OmsService {
       instrument: {
         assetClass: s.assetClass,
         quoteCcy: s.quoteCcy,
+        /** B-202: prices are in this minor unit (e.g. GBX) when set; money stays in quoteCcy. */
+        priceUnit: s.priceUnit ?? null,
         pricePrecision: s.pricePrecision,
         tickSize: s.tickSize,
         qtyStep: s.qtyStep,

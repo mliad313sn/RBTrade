@@ -225,7 +225,10 @@ export function TicketPanel() {
 
   const precision = inst?.pricePrecision ?? 5;
   const tick = inst?.tickSize ?? '0.00001';
-  const multiplier = preview?.instrument.multiplier ?? inst?.contractSize ?? '1';
+  // B-202: minor-unit quotes (GBX, ZAc) scale prices to the quote currency until the preview answers.
+  const multiplier =
+    preview?.instrument.multiplier ??
+    (inst?.priceUnitFactor ? dec(inst.contractSize).mul(dec(inst.priceUnitFactor)).toFixed() : (inst?.contractSize ?? '1'));
   const needsLimit = type === 'limit' || type === 'stop_limit' || (type === 'bracket' && entryType === 'limit');
   const needsStop = type === 'stop' || type === 'stop_limit';
   const marketRef = quote ? (side === 'buy' ? quote.ask : quote.bid) : null;
@@ -425,7 +428,10 @@ export function TicketPanel() {
           <div className="text-[11px] text-muted self-end pb-1">Two legs: one cancels the other.</div>
         ) : (
           <div>
-            <FieldHead>{needsStop && !needsLimit ? 'Stop price' : 'Limit price'}</FieldHead>
+            <FieldHead>
+              {needsStop && !needsLimit ? 'Stop price' : 'Limit price'}
+              {inst?.priceUnit ? <span data-testid="ticket-price-unit"> ({inst.priceUnit}, amounts in {inst.quoteCcy})</span> : null}
+            </FieldHead>
             {needsStop && !needsLimit ? (
               <NumberInput label="Stop price" hideLabel value={stopPrice} onValueChange={setStopPrice} precision={precision} step={tick} min="0" data-testid="ticket-stop" />
             ) : (
