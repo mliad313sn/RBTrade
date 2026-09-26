@@ -30,11 +30,11 @@ export function LanguageSwitch() {
           lang={l}
           className="k-seg__opt"
           aria-pressed={l === locale}
-          aria-label={LOCALE_NAMES[l]}
           disabled={pending}
           onClick={() => choose(l)}
         >
           {l.toUpperCase()}
+          <span className="k-sr-only"> {LOCALE_NAMES[l]}</span>
         </button>
       ))}
     </div>

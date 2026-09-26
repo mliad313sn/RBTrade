@@ -32,7 +32,11 @@ export function UserMenu() {
         className={`k-btn k-btn--ghost rounded-full! p-0! bg-raised! ${novice ? 'w-11 h-11' : 'w-9 h-9'}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={tx(`Account menu for ${me.user.displayName}`, 'user.menu', { name: me.user.displayName })}
+        aria-label={
+          novice
+            ? `${initials(me.user.displayName) || 'ME'}: ${t('user.menu', { name: me.user.displayName })}`
+            : `Account menu for ${me.user.displayName}`
+        }
         onClick={() => setOpen((o) => !o)}
         data-testid="user-menu"
       >

@@ -1,7 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { createContext, Fragment, useContext, useMemo, type ReactNode } from 'react';
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useMemo,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 
 import { fmtDate, fmtDateTime, fmtMoney, fmtPctNumber, fmtTime } from './format';
 import {
@@ -30,20 +37,27 @@ interface I18n {
   time: (iso: string) => string;
 }
 
-function build(locale: Locale, novice: boolean): I18n {
+/**
+ * Dates and times are formatted in the browser only (after hydration): the server's ICU data and
+ * time zone can differ from the viewer's, which would otherwise break hydration.
+ */
+function build(locale: Locale, novice: boolean, mounted: boolean): I18n {
+  const when = (f: (iso: string) => string) => (iso: string) => (mounted ? f(iso) : '');
   return {
     locale,
     novice,
     t: makeT(locale),
     money: (a, c, o) => fmtMoney(a, c, locale, o),
     pct: (p, o) => fmtPctNumber(p, locale, o),
-    dateTime: (iso) => fmtDateTime(iso, locale),
-    date: (iso) => fmtDate(iso, locale),
-    time: (iso) => fmtTime(iso, locale),
+    dateTime: when((iso) => fmtDateTime(iso, locale)),
+    date: when((iso) => fmtDate(iso, locale)),
+    time: when((iso) => fmtTime(iso, locale)),
   };
 }
 
-const Ctx = createContext<I18n>(build(DEFAULT_LOCALE, false));
+const noop = () => () => undefined;
+
+const Ctx = createContext<I18n>(build(DEFAULT_LOCALE, false, true));
 
 export function I18nProvider({
   locale,
@@ -54,7 +68,12 @@ export function I18nProvider({
   novice?: boolean;
   children: ReactNode;
 }) {
-  const value = useMemo(() => build(locale, novice), [locale, novice]);
+  const mounted = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
+  const value = useMemo(() => build(locale, novice, mounted), [locale, novice, mounted]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
