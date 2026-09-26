@@ -222,6 +222,9 @@ export class AccountsService {
     };
   }
 
+  /** Period-start equity per (account, period, start); written once, then served from memory. */
+  private readonly periodCache = new Map<string, Decimal>();
+
   private async periodStart(
     accountId: string,
     period: 'day' | 'week',
@@ -229,6 +232,9 @@ export class AccountsService {
     equity: Decimal,
     c?: Queryable,
   ): Promise<Decimal> {
+    const key = `${accountId}:${period}:${start}`;
+    const hit = this.periodCache.get(key);
+    if (hit) return hit;
     const q = c ?? this.db.pool;
     const r = await q.query<{ equity: string }>(
       `INSERT INTO account_equity_snapshots (account_id, period, period_start, equity) VALUES ($1, $2, $3::date, $4::numeric)
@@ -236,7 +242,10 @@ export class AccountsService {
        RETURNING equity::text AS equity`,
       [accountId, period, start, equity.toFixed()],
     );
-    return dec(r.rows[0]!.equity);
+    const v = dec(r.rows[0]!.equity);
+    if (this.periodCache.size > 50_000) this.periodCache.clear();
+    this.periodCache.set(key, v);
+    return v;
   }
 
   /** Wire view of the account for GET /accounts/me and the `account:{id}` channel. */

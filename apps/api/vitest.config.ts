@@ -7,7 +7,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/auth/totp.ts', 'src/auth/password.ts', 'src/auth/crypto-box.ts', 'src/common/zod.ts', 'src/config/config.ts', 'src/market-data/md-config.ts'],
+      include: ['src/auth/totp.ts', 'src/auth/password.ts', 'src/auth/crypto-box.ts', 'src/common/zod.ts', 'src/config/config.ts', 'src/market-data/md-config.ts', 'src/trading/trading-config.ts', 'src/trading/broker/broker.ts'],
       thresholds: { lines: 85, functions: 85, branches: 80, statements: 85 },
     },
   },

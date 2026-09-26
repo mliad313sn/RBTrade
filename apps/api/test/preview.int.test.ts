@@ -111,6 +111,20 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
     expect(r.preview.fx).toMatchObject({ from: 'USD', to: 'JPY', rate: '148.215' });
   });
 
+  it('pre-trade risk evaluation stays under the 5 ms target (200 previews)', async () => {
+    const risk: number[] = [];
+    const total: number[] = [];
+    for (let i = 0; i < 200; i++) {
+      if (i % 50 === 0) await md.touch();
+      const r = await preview({ symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '100000', limitPrice: '1.08300', stopLossPrice: '1.08100' });
+      risk.push(r.timings.riskMs);
+      total.push(r.timings.totalMs);
+    }
+    const p = (xs: number[], q: number) => [...xs].sort((a, b) => a - b)[Math.floor(q * (xs.length - 1))]!;
+    process.stdout.write(`[risk timing ms] rules p50 ${p(risk, 0.5)} p95 ${p(risk, 0.95)} max ${Math.max(...risk)}; with context load p50 ${p(total, 0.5)} p95 ${p(total, 0.95)}\n`);
+    expect(p(risk, 0.95)).toBeLessThan(5);
+  });
+
   it('reports risk violations without persisting anything', async () => {
     const r = await preview({ symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '100000', limitPrice: '1.20000' });
     expect(r.risk.ok).toBe(false);
