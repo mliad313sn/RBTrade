@@ -1,7 +1,7 @@
 import { hasAnyRole, ROBOT_BUILDER_ROLES, type Role } from '@kora/domain';
 
 /** Routes reachable without a session. */
-export const PUBLIC_PATHS = ['/login', '/signup', '/forbidden'];
+export const PUBLIC_PATHS = ['/login', '/signup', '/forbidden', '/reliability'];
 
 export function isPublicPath(pathname: string): boolean {
   return (

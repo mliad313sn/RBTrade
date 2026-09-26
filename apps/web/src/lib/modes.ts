@@ -7,6 +7,7 @@ export interface NavItem {
 
 export const PRO_NAV: NavItem[] = [
   { href: '/terminal', label: 'Terminal' },
+  { href: '/radar', label: 'Market Radar' },
   { href: '/simulator', label: 'Simulator' },
   { href: '/robots', label: 'Robots' },
   { href: '/portfolio', label: 'Portfolio' },
@@ -21,6 +22,7 @@ export const NOVICE_NAV: NavItem[] = [
 
 const TO_NOVICE: Record<string, string> = {
   '/terminal': '/home',
+  '/radar': '/home',
   '/simulator': '/practice',
   '/robots': '/auto-invest',
   '/portfolio': '/home',

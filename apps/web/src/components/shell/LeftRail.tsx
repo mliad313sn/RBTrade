@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, CandlestickChart, PieChart, Settings, Sigma } from 'lucide-react';
+import { Bot, CandlestickChart, PieChart, Radar, Settings, Sigma } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -8,6 +8,7 @@ import { useShell } from './ShellContext';
 
 const ITEMS = [
   { href: '/terminal', label: 'Terminal', Icon: CandlestickChart },
+  { href: '/radar', label: 'Market Radar', Icon: Radar },
   { href: '/simulator', label: 'Simulator', Icon: Sigma },
   { href: '/robots', label: 'Robots', Icon: Bot, needs: 'robotBuilder' as const },
   { href: '/portfolio', label: 'Portfolio', Icon: PieChart },
