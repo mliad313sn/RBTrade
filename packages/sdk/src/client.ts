@@ -118,7 +118,7 @@ export class KoraClient {
 
   /** Everyone signs up as novice (B-018); Pro trading needs the appropriateness assessment. */
   signup(input: { email: string; password: string; displayName: string }) {
-    return this.request<{ user: PublicUser; mfaRequired: boolean }>('POST', '/auth/signup', input);
+    return this.request<{ accepted: true; mfaRequired: boolean; next: 'sign_in' }>('POST', '/auth/signup', input);
   }
 
   login(email: string, password: string) {

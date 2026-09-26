@@ -65,11 +65,17 @@ export class DevIdpService {
     return { id: u.id, email: u.email, displayName: u.display_name, roles };
   }
 
+  /**
+   * B-014: the answer is the same whether or not the e-mail is already registered (no account
+   * enumeration). The password is always hashed, so timing matches too; a duplicate is audited.
+   * Production sign-up runs through Keycloak's verify-email flow (B-001).
+   */
   async signup(input: { email: string; password: string; displayName: string; accountType: 'novice' }, ip: string) {
     const passwordHash = await hashPassword(input.password, this.config.auth.scryptN);
     const roles: Role[] = [input.accountType];
+    const generic = { accepted: true as const, mfaRequired: requiresMfa(roles), next: 'sign_in' as const };
     try {
-      const user = await this.db.tx(async (c) => {
+      await this.db.tx(async (c) => {
         const u = await this.users.create(c, { email: input.email, displayName: input.displayName, passwordHash, roles });
         await this.audit.record(
           { actorId: u.id, actorType: 'user', action: 'auth.signup', entity: 'user', entityId: u.id, payload: { accountType: input.accountType, ip } },
@@ -77,11 +83,19 @@ export class DevIdpService {
         );
         return u;
       });
-      return { user: this.publicUser(user, roles), mfaRequired: requiresMfa(roles) };
     } catch (e) {
-      if ((e as { constraint?: string }).constraint === 'users_email_lower_uq') throw new AuthError('email_taken', 'An account with this email already exists');
-      throw e;
+      if ((e as { constraint?: string }).constraint !== 'users_email_lower_uq') throw e;
+      const existing = await this.users.findByEmail(input.email);
+      await this.audit.record({
+        actorId: existing?.id ?? 'anonymous',
+        actorType: 'user',
+        action: 'auth.signup_duplicate',
+        entity: 'user',
+        entityId: existing?.id ?? null,
+        payload: { ip },
+      });
     }
+    return generic;
   }
 
   async login(email: string, password: string, ip: string): Promise<LoginOutcome> {
