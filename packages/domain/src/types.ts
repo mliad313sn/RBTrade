@@ -1,4 +1,5 @@
 import type { Decimal } from './decimal.js';
+import type { InstrumentSpec } from './market-data.js';
 
 /** Shared domain types. Money fields are decimal strings on the wire and Decimal in memory. */
 export type DecimalString = string;
@@ -6,21 +7,8 @@ export type DecimalString = string;
 export const ENVIRONMENTS = ['PAPER', 'LIVE'] as const;
 export type TradingEnvironment = (typeof ENVIRONMENTS)[number];
 
-export type AssetClass = 'fx' | 'metal' | 'crypto' | 'index_cfd' | 'equity' | 'energy';
-
-export interface Instrument {
-  symbol: string; // e.g. EURUSD
-  displayName: string; // e.g. EUR/USD
-  assetClass: AssetClass;
-  baseCurrency: string;
-  quoteCurrency: string;
-  /** Decimal places for prices (EURUSD = 5). From the registry, never hard-coded in UI. */
-  pricePrecision: number;
-  /** Decimal places for quantities. */
-  qtyPrecision: number;
-  tickSize: DecimalString;
-  lotSize: DecimalString;
-}
+/** Registry instrument (goal 02). See `InstrumentSpec` in market-data.ts. */
+export type Instrument = InstrumentSpec;
 
 export type Side = 'buy' | 'sell';
 export type OrderType = 'market' | 'limit' | 'stop' | 'stop_limit' | 'trailing' | 'bracket' | 'oco';

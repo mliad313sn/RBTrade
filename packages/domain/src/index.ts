@@ -4,3 +4,5 @@ export * from './preferences.js';
 export * from './kill-switch.js';
 export * from './audit.js';
 export * from './types.js';
+export * from './sessions.js';
+export * from './market-data.js';
