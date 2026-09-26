@@ -8587,6 +8587,534 @@
           "internal"
         ]
       }
+    },
+    "/ai/status": {
+      "get": {
+        "operationId": "AiController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Is the copilot available, and today’s token usage against the budgets.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/chat": {
+      "post": {
+        "operationId": "AiController_chat",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "context": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "panel": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,32}$"
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                      },
+                      "timeframe": {
+                        "type": "string",
+                        "enum": [
+                          "1s",
+                          "1m",
+                          "5m",
+                          "15m",
+                          "1h",
+                          "4h",
+                          "1D"
+                        ]
+                      },
+                      "robotId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "signalId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "strategyId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "pro",
+                      "novice"
+                    ]
+                  },
+                  "surface": {
+                    "default": "chat",
+                    "type": "string",
+                    "enum": [
+                      "chat",
+                      "robots"
+                    ]
+                  },
+                  "untrusted": {
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "news",
+                            "note",
+                            "calendar",
+                            "strategy",
+                            "robot",
+                            "other"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Ask the copilot with the focused panel as context. Streams with Accept: text/event-stream. Draft-only; never executes.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/explain": {
+      "post": {
+        "operationId": "AiController_explain",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "screenText": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "question": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "context": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "panel": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,32}$"
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                      },
+                      "timeframe": {
+                        "type": "string",
+                        "enum": [
+                          "1s",
+                          "1m",
+                          "5m",
+                          "15m",
+                          "1h",
+                          "4h",
+                          "1D"
+                        ]
+                      },
+                      "robotId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "signalId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "strategyId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "topic"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Novice \"Explain this to me\": plain words (grade ≤ 8), no trade suggestions, no drafts. Any signed-in role.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/strip": {
+      "get": {
+        "operationId": "AiController_stripView",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Terminal AI strip: bias, calibrated confidence or \"No edge after costs\", drivers, event risk. Data only.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/strip/draft": {
+      "post": {
+        "operationId": "AiController_stripDraft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                  },
+                  "timeframe": {
+                    "default": "15m",
+                    "type": "string",
+                    "enum": [
+                      "1s",
+                      "1m",
+                      "5m",
+                      "15m",
+                      "1h",
+                      "4h",
+                      "1D"
+                    ]
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Draft to ticket from the strip: an audited order DRAFT the user previews and confirms. Never submits.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/signals/{id}/why": {
+      "post": {
+        "operationId": "AiController_why",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Why did this trade happen: explanation grounded in the stored features (the chart comes from GET /signals/:id/features).",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/robots/{id}/insights": {
+      "get": {
+        "operationId": "AiController_robotInsights",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Copilot drawer: calibrated confidence for the robot’s strategy and data-derived suggestions.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/robots/{id}/suggestions/draft": {
+      "post": {
+        "operationId": "AiController_suggestionDraft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "param": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,31}$"
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "rationale": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "param",
+                  "value",
+                  "rationale"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Create an UNAPPROVED strategy draft from a suggestion. Validated, never saved as a version.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/scan/no-edge": {
+      "get": {
+        "operationId": "AiController_scan",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Scan my robots for no edge after costs (calibration table, out-of-sample trades).",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/calibration": {
+      "get": {
+        "operationId": "AiController_calibrationView",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Calibration table of a model: reliability bins, edge after costs, confidence for a raw score.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/calibration/strategies/{id}/rebuild": {
+      "post": {
+        "operationId": "AiController_rebuild",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rebuild a strategy’s calibration bins from the OOS trades of its latest backtest.",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/drafts/{id}": {
+      "get": {
+        "operationId": "AiController_draft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One of my AI drafts (order or strategy).",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/ai/drafts/{id}/decision": {
+      "post": {
+        "operationId": "AiController_decide",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "accepted",
+                      "rejected"
+                    ]
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "versionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "decision"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Record my decision on an AI draft: accepted (with the order I placed / version I saved) or rejected. Audited.",
+        "tags": [
+          "ai"
+        ]
+      }
     }
   },
   "info": {
