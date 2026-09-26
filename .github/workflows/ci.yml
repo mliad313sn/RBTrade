@@ -1,0 +1,155 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LIVE_TRADING_ENABLED: "false"
+  TURBO_TELEMETRY_DISABLED: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  node:
+    name: lint · typecheck · unit · integration · build · e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: timescale/timescaledb:2.17.2-pg16
+        env:
+          POSTGRES_PASSWORD: postgres_ci_only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.pw-browsers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: CI env (service-container ports)
+        run: |
+          cp .env.example .env
+          sed -i 's/127.0.0.1:55432/127.0.0.1:5432/g; s/^KORA_PG_PORT=.*/KORA_PG_PORT=5432/; s/127.0.0.1:56379/127.0.0.1:6379/; s#^PLAYWRIGHT_BROWSERS_PATH=.*#PLAYWRIGHT_BROWSERS_PATH=${{ github.workspace }}/.pw-browsers#' .env
+          node scripts/gen-dev-secrets.mjs .env
+      - name: Bootstrap database roles
+        run: |
+          set -a; source .env; set +a
+          PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres_ci_only bash scripts/db-bootstrap.sh
+      - name: Build
+        run: pnpm build
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests (TS + Python)
+        run: pnpm test
+      - name: Contrast check (both themes)
+        run: pnpm contrast
+      - name: API integration tests (real Postgres + Redis)
+        run: pnpm --filter @kora/api test:integration
+      - name: Storybook build
+        run: pnpm --filter @kora/ui build-storybook
+      - name: Playwright browsers
+        run: pnpm --filter @kora/web exec playwright install --with-deps chromium
+      - name: Playwright e2e
+        run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
+  python:
+    name: quant (py${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: ruff · mypy --strict · pytest
+        run: PYTHON=python bash scripts/py-check.sh
+      - name: pip-audit
+        run: services/quant/.venv/bin/pip install pip-audit && services/quant/.venv/bin/pip-audit --skip-editable
+
+  security:
+    name: dependency audit · Trivy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: pnpm audit (prod, high+)
+        run: pnpm audit --prod --audit-level high
+      - name: Trivy filesystem scan (deps, secrets, misconfig)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-dirs: design,docs
+
+  images:
+    name: image build + Trivy (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    needs: [node]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            dockerfile: apps/api/Dockerfile
+            context: .
+          - image: web
+            dockerfile: apps/web/Dockerfile
+            context: .
+          - image: bot-runner
+            dockerfile: services/bot-runner/Dockerfile
+            context: .
+          - image: quant
+            dockerfile: services/quant/Dockerfile
+            context: services/quant
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -f ${{ matrix.dockerfile }} -t kora-${{ matrix.image }}:ci ${{ matrix.context }}
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: kora-${{ matrix.image }}:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"

@@ -1,0 +1,12 @@
+{
+  "name": "@kora/quant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "pnpm/turbo wrapper around the Python quant service (see pyproject.toml).",
+  "scripts": {
+    "dev": "bash ../../scripts/py-run.sh python -m uvicorn kora_quant.app:app --host 127.0.0.1 --port ${QUANT_PORT:-8000} --reload --app-dir src",
+    "lint": "bash ../../scripts/py-run.sh ruff check . && bash ../../scripts/py-run.sh ruff format --check .",
+    "typecheck": "bash ../../scripts/py-run.sh mypy",
+    "test": "bash ../../scripts/py-run.sh pytest"
+  }
+}
