@@ -522,15 +522,17 @@ export function TicketPanel() {
           {previewError ? <li className="k-error">{previewError}</li> : null}
         </ul>
       ) : null}
-      <Button variant={side === 'buy' ? 'buy' : 'sell'} block disabled={!canSubmit} onClick={review} data-testid="place-order" aria-keyshortcuts="Control+Enter">
-        Review {side === 'buy' ? 'Buy' : 'Sell'} {qtyLabel} {displayName}
-      </Button>
-      {result ? (
-        <p className={`m-0 text-xs ${result.tone === 'error' ? 'k-error' : ''}`} role="status" data-testid="ticket-result">
-          {result.text}
-        </p>
-      ) : null}
       <p className="tk-foot">PAPER · simulated fills. Fees are SIMULATED placeholders{preview?.instrument.feesSimulated === false ? '' : ' (pending broker schedule)'}.</p>
+      <div className="tk-submit">
+        <Button variant={side === 'buy' ? 'buy' : 'sell'} block disabled={!canSubmit} onClick={review} data-testid="place-order" aria-keyshortcuts="Control+Enter">
+          Review {side === 'buy' ? 'Buy' : 'Sell'} {qtyLabel} {displayName}
+        </Button>
+        {result ? (
+          <p className={`m-0 text-xs ${result.tone === 'error' ? 'k-error' : ''}`} role="status" data-testid="ticket-result">
+            {result.text}
+          </p>
+        ) : null}
+      </div>
       <Dialog open={confirm} onOpenChange={setConfirm} title={`Confirm ${side} ${qtyLabel} ${displayName}`} description="Paper order with simulated market data. Esc to go back." data-testid="confirm-order">
         {p ? (
           <ul className="m-0 pl-4 text-sm">

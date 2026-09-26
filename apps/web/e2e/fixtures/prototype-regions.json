@@ -1,0 +1,15 @@
+{
+  "source": "design/prototype/Main.png (1440x900), panel borders measured with pngjs (see docs/plans/04-pro-terminal.md §6.3)",
+  "viewport": { "width": 1440, "height": 900 },
+  "regions": {
+    "topbar": [0, 0, 1440, 41],
+    "rail": [0, 41, 48, 877],
+    "watchlist": [55, 49, 280, 586],
+    "calendar": [55, 586, 280, 676],
+    "chart": [287, 49, 1085, 676],
+    "orderbook": [1092, 49, 1432, 291],
+    "ticket": [1092, 298, 1432, 676],
+    "blotter": [55, 683, 1432, 869],
+    "statusbar": [0, 877, 1440, 900]
+  }
+}

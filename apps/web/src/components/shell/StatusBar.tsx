@@ -76,7 +76,7 @@ export function StatusBar() {
         </span>
         <span className="text-text">{LABEL[conn.state]}</span>
       </span>
-      <span className="inline-block min-w-[11ch]">Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}</span>
+      <span className="inline-block min-w-[11ch]" data-testid="status-latency">Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}</span>
       <span className="hidden md:inline" data-testid="status-feed">
         Feed: simulated{feed.feed ? ` · ${feed.feed}` : ''}
         {feed.socket === 'reconnecting' ? ' · reconnecting' : ''}

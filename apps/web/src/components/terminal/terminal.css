@@ -559,6 +559,18 @@
   border-radius: 3px;
   color: var(--k-text);
 }
+.tk-submit {
+  position: sticky;
+  bottom: -6px;
+  margin: 0 -10px -6px;
+  padding: 6px 10px;
+  background: var(--k-panel);
+  border-top: 1px solid var(--k-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
 .tk-note {
   margin: 0;
   font-size: 11px;
