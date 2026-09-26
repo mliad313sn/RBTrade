@@ -31,6 +31,17 @@ test('pro shell and novice shell pass axe in Chromium', async ({ page }) => {
   await scan(page, '/home (novice-light)');
 });
 
+test('appropriateness assessment and the halted banner pass axe', async ({ page }) => {
+  await apiSignIn(page, 'novice');
+  await page.goto('/appropriateness');
+  await expect(page.getByTestId('appropriateness')).toBeVisible();
+  await scan(page, '/appropriateness (novice-light)');
+  await page.request.post('/api/kill-switch', { headers: { 'x-kora-csrf': '1' }, data: { scope: 'robots', source: 'rest_fallback' } });
+  await page.goto('/home');
+  await expect(page.getByTestId('halt-banner')).toBeVisible();
+  await scan(page, '/home halted (novice-light)');
+});
+
 test('forbidden page passes axe', async ({ page }) => {
   await apiSignIn(page, 'novice');
   await page.goto('/robots/builder');

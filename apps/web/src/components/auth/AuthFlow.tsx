@@ -35,7 +35,6 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [accountType, setAccountType] = useState<'novice' | 'trader'>('novice');
   const [code, setCode] = useState('');
 
   const done = () => {
@@ -69,7 +68,7 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
     setError(null);
     setBusy(true);
     try {
-      if (mode === 'signup') await api.signup({ email, password, displayName, accountType });
+      if (mode === 'signup') await api.signup({ email, password, displayName });
       handleLogin(await api.login(email, password));
     } catch (err) {
       setError(message(err));
@@ -130,23 +129,10 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
               onChange={(e) => setPassword(e.target.value)}
             />
             {mode === 'signup' ? (
-              <fieldset className="flex flex-col gap-2 border-0 p-0 m-0">
-                <legend className="k-label mb-2">Account type</legend>
-                <label className="flex gap-3 items-start k-panel p-3 cursor-pointer">
-                  <input type="radio" name="accountType" value="novice" checked={accountType === 'novice'} onChange={() => setAccountType('novice')} />
-                  <span>
-                    <strong>Simple</strong>
-                    <span className="block text-muted text-sm">Plain language, protective limits on, no borrowing.</span>
-                  </span>
-                </label>
-                <label className="flex gap-3 items-start k-panel p-3 cursor-pointer">
-                  <input type="radio" name="accountType" value="trader" checked={accountType === 'trader'} onChange={() => setAccountType('trader')} />
-                  <span>
-                    <strong>Pro trader</strong>
-                    <span className="block text-muted text-sm">Full terminal. Two-factor authentication is required.</span>
-                  </span>
-                </label>
-              </fieldset>
+              <p className="m-0 text-sm text-muted" data-testid="signup-appropriateness-note">
+                Everyone starts in the Simple view with practice money: plain language, protective limits on, no borrowing. To unlock the Pro
+                terminal, take a short appropriateness assessment after signing up; Pro accounts then set up two-factor authentication.
+              </p>
             ) : null}
             <Button type="submit" variant="primary" size="lg" block disabled={busy}>
               {mode === 'signup' ? 'Create account' : 'Sign in'}

@@ -40,6 +40,11 @@ export function UserMenu() {
             {me.user.email} · {me.roles.join(', ')}
             {me.mfa ? ' · 2FA on' : ''}
           </p>
+          {!me.roles.includes('trader') ? (
+            <Link role="menuitem" className="block px-2 py-2 rounded hover:bg-raised no-underline text-accent" href="/appropriateness" onClick={() => setOpen(false)} data-testid="unlock-pro">
+              Unlock Pro trading
+            </Link>
+          ) : null}
           <Link role="menuitem" className="block px-2 py-2 rounded hover:bg-raised no-underline" href="/settings" onClick={() => setOpen(false)}>
             Settings
           </Link>

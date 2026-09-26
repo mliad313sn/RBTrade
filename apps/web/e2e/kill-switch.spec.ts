@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { apiSignIn } from './helpers';
 
 async function killEvents(page: Page) {
-  const r = await page.request.get('/api/audit?action=kill_switch.*');
+  const r = await page.request.get('/api/audit?action=kill_switch.requested');
   return (await r.json()).events as Array<{ entityId: string; payload: { scope: string; source: string } }>;
 }
 
@@ -29,7 +29,8 @@ test('a short press does not open the menu; a 1.5 s mouse hold does, and a scope
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('button')).toHaveCount(4); // 3 scopes + cancel
   await menu.getByTestId('kill-scope-robots_cancel_flatten').click();
-  await expect(page.getByText(/Kill switch recorded: Halt, cancel \+ flatten\. Audit event #\d+/)).toBeVisible();
+  await expect(page.getByText(/Kill switch: Halt, cancel \+ flatten\. Robots halted\. 0 orders cancelled\. 0 positions closed\. Audit event #\d+/)).toBeVisible();
+  await expect(page.getByTestId('halt-banner')).toContainText('Trading halted: Halt, cancel + flatten');
   const events = await killEvents(page);
   expect(events[0]).toMatchObject({ entityId: 'robots_cancel_flatten', payload: { scope: 'robots_cancel_flatten', source: 'ui_button' } });
 });

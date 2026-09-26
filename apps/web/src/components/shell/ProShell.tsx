@@ -5,29 +5,14 @@ import { Search, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { AccountSummary } from './AccountSummary';
 import { KillSwitch } from './KillSwitch';
 import { LeftRail } from './LeftRail';
 import { ModeToggle } from './ModeToggle';
 import { StatusBar } from './StatusBar';
+import { TradingHaltBanner } from './TradingHaltBanner';
 import { UserMenu } from './UserMenu';
 import { WhatChangedNote } from './WhatChangedNote';
-
-function AccountSummary() {
-  // Values come from the paper engine in goal 03. Until then they are explicitly unavailable.
-  const items = ['Equity', 'Day P&L', 'Margin used', 'Daily loss limit'];
-  return (
-    <dl className="hidden xl:flex items-center gap-6 m-0" aria-label="Account summary (available with the trading core)" data-testid="account-summary">
-      {items.map((label) => (
-        <div key={label} className="flex flex-col">
-          <dt className="text-[10px] uppercase tracking-wider text-muted">{label}</dt>
-          <dd className="m-0 k-num text-sm" title="Available once the paper engine is connected">
-            —
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 export function ProShell({ children }: { children: ReactNode }) {
   return (
@@ -65,6 +50,7 @@ export function ProShell({ children }: { children: ReactNode }) {
         <LeftRail />
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           <WhatChangedNote />
+          <TradingHaltBanner className="px-2 pt-2" />
           <main id="main" className="flex-1 min-h-0 overflow-auto p-2">
             {children}
           </main>

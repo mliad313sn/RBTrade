@@ -10,6 +10,7 @@ import { NOVICE_NAV } from '@/lib/modes';
 
 import { KillSwitch } from './KillSwitch';
 import { ModeToggle } from './ModeToggle';
+import { TradingHaltBanner } from './TradingHaltBanner';
 import { UserMenu } from './UserMenu';
 import { WhatChangedNote } from './WhatChangedNote';
 
@@ -64,6 +65,7 @@ export function NoviceShell({ children }: { children: ReactNode }) {
         </Banner>
       </div>
       <WhatChangedNote className="px-4 md:px-10 pt-3" />
+      <TradingHaltBanner className="px-4 md:px-10 pt-3" />
       <main id="main" className="flex-1 px-4 md:px-10 py-5">
         {children}
       </main>

@@ -1,6 +1,7 @@
-import { Banner, Panel, Tabs } from '@kora/ui';
+import { Banner, Panel } from '@kora/ui';
 
 import { OrderTicketPreview } from '@/components/OrderTicketPreview';
+import { Blotter } from '@/components/terminal/Blotter';
 import { LiveWatchlist } from '@/components/terminal/LiveWatchlist';
 import { apiWsPort } from '@/lib/market-ws';
 import { DEFAULT_SYMBOL } from '@/lib/modes';
@@ -8,7 +9,7 @@ import { DEFAULT_SYMBOL } from '@/lib/modes';
 export const metadata = { title: 'Terminal' };
 
 export default async function TerminalPage({ searchParams }: { searchParams: Promise<{ symbol?: string }> }) {
-  const symbol = ((await searchParams).symbol ?? DEFAULT_SYMBOL).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  const symbol = ((await searchParams).symbol ?? DEFAULT_SYMBOL).toUpperCase().replace(/[^A-Z0-9._-]/g, '').slice(0, 32);
   return (
     <div className="grid gap-2 h-full grid-cols-1 lg:grid-cols-[240px_1fr_320px] lg:grid-rows-[1fr_220px]">
       <h1 className="k-sr-only">Pro terminal — {symbol}</h1>
@@ -24,14 +25,7 @@ export default async function TerminalPage({ searchParams }: { searchParams: Pro
         <OrderTicketPreview symbol={symbol} />
       </Panel>
       <Panel className="lg:col-span-2" aria-label="Blotter">
-        <Tabs
-          label="Blotter"
-          items={['Positions', 'Orders', 'Fills', 'Alerts', 'Risk'].map((t) => ({
-            value: t.toLowerCase(),
-            label: t,
-            content: <p className="text-muted text-sm px-2">No {t.toLowerCase()} yet. The paper engine arrives in goal 03.</p>,
-          }))}
-        />
+        <Blotter />
       </Panel>
     </div>
   );

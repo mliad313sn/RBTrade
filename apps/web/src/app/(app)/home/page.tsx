@@ -1,6 +1,7 @@
 import { Panel } from '@kora/ui';
 
 import { NoviceTradeCard } from '@/components/NoviceTradeCard';
+import { PracticeBalance } from '@/components/PracticeBalance';
 import { DEFAULT_SYMBOL } from '@/lib/modes';
 
 export const metadata = { title: 'Home' };
@@ -12,8 +13,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <h1 className="k-sr-only">Home</h1>
       <div className="flex flex-col gap-5">
         <Panel title="Your practice account">
-          <p className="font-display text-5xl m-0" aria-label="Balance not available yet">—</p>
-          <p className="text-muted">Your practice balance appears once the practice engine is connected.</p>
+          <PracticeBalance />
         </Panel>
         <Panel title="What you own">
           <p className="text-muted m-0">Nothing yet.</p>

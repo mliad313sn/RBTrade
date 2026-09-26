@@ -49,7 +49,7 @@ export function NoviceTradeCard({ symbol }: { symbol: string }) {
       <div className="mt-4 p-4 rounded-lg bg-raised border border-border">
         <p className="m-0 font-semibold">Safety net: sell automatically if it moves against me</p>
         <p className="m-0 mt-2 text-muted text-sm">
-          Most you could lose: shown here once the practice engine is connected. Every trade has a safety net.
+          Most you could lose: shown here when the simple trade flow arrives (the practice engine and its preview are ready). Every trade has a safety net.
         </p>
       </div>
       <Button variant="primary" size="lg" block className="mt-4" disabled>

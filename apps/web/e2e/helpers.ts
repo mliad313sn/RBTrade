@@ -1,4 +1,6 @@
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
@@ -35,13 +37,49 @@ export function totp(secretB32: string, stepOffset = 0): string {
 
 const CSRF = { 'x-kora-csrf': '1' };
 
-/** Creates and signs in a user through the API (cookies land in the page context). */
+interface QuestionnaireData {
+  id: string;
+  version: number;
+  questions: Array<{ id: string; options: Array<{ id: string; points: number }> }>;
+}
+
+/** The reviewed questionnaire data (apps/api); tests answer through the real API and web page. */
+export const QUESTIONNAIRE: QuestionnaireData = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../api/src/appropriateness/questionnaires/appropriateness.v1.json', import.meta.url)), 'utf8'),
+) as QuestionnaireData;
+
+export function answerKey(best = true): Record<string, string> {
+  return Object.fromEntries(
+    QUESTIONNAIRE.questions.map((q) => [q.id, [...q.options].sort((a, b) => (best ? b.points - a.points : a.points - b.points))[0]!.id]),
+  );
+}
+
+/** Option labels are shown in the page; map the key to the option index for clicking radios. */
+export function answerIndex(best = true): Record<string, number> {
+  const key = answerKey(best);
+  return Object.fromEntries(QUESTIONNAIRE.questions.map((q) => [q.id, q.options.findIndex((o) => o.id === key[q.id])]));
+}
+
+/**
+ * Creates and signs in a user through the API (cookies land in the page context). Everyone signs up
+ * as novice (B-018); a `trader` passes the appropriateness assessment through the API, then logs in
+ * again, which forces TOTP enrolment.
+ */
 export async function apiSignIn(page: Page, accountType: 'novice' | 'trader'): Promise<{ email: string; secret?: string }> {
   const req: APIRequestContext = page.request;
   const email = uniqueEmail(accountType);
-  expect((await req.post('/api/auth/signup', { headers: CSRF, data: { email, password: PASSWORD, displayName: `E2E ${accountType}`, accountType } })).status()).toBe(201);
+  expect((await req.post('/api/auth/signup', { headers: CSRF, data: { email, password: PASSWORD, displayName: `E2E ${accountType}` } })).status()).toBe(201);
+  const first = await (await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
+  expect(first.status).toBe('ok');
+  if (accountType === 'novice') return { email };
+  const attempt = await req.post('/api/appropriateness/attempts', {
+    headers: CSRF,
+    data: { questionnaireId: QUESTIONNAIRE.id, version: QUESTIONNAIRE.version, answers: answerKey() },
+  });
+  expect(attempt.status()).toBe(200);
+  expect((await attempt.json()).passed).toBe(true);
   const login = await (await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
-  if (login.status === 'ok') return { email };
+  expect(login.status).toBe('mfa_enrollment_required');
   const enr = await (await req.post('/api/auth/mfa/enroll', { headers: CSRF, data: { mfaToken: login.mfaToken } })).json();
   const v = await req.post('/api/auth/mfa/verify', { headers: CSRF, data: { mfaToken: login.mfaToken, code: totp(enr.secret) } });
   expect(v.status()).toBe(200);

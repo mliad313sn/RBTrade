@@ -53,8 +53,22 @@ export class QuestionnaireService implements OnApplicationBootstrap {
     }
   }
 
+  private synced = false;
+
   async onApplicationBootstrap(): Promise<void> {
-    await this.sync();
+    try {
+      await this.sync();
+    } catch (e) {
+      // Schema not migrated yet (e.g. e2e starts the api before its global setup migrates):
+      // retry on first use. Integrity errors (a changed published version) still fail loudly.
+      if ((e as { code?: string }).code !== '42P01') throw e;
+      this.log.warn('questionnaires table missing; will publish questionnaires on first use');
+    }
+  }
+
+  /** Publishes the definitions if boot could not (idempotent). */
+  async ensureSynced(): Promise<void> {
+    if (!this.synced) await this.sync();
   }
 
   static checksum(def: QuestionnaireDefinition): string {

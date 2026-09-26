@@ -47,6 +47,7 @@ export class AppropriatenessController {
   ) {}
 
   private def() {
+    void this.q.ensureSynced().catch(() => undefined);
     const d = this.q.get(ID);
     if (!d)
       throw new NotFoundException({
@@ -116,6 +117,7 @@ export class AppropriatenessController {
         unknown: g.unknown,
       });
     }
+    await this.q.ensureSynced();
     const out = await this.db.tx(async (c) => {
       await c.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [p.sub]); // one attempt at a time per user
       const roles = await this.users.roles(p.sub, c);

@@ -4,12 +4,13 @@ import { KILL_SWITCH_HOLD_MS, KILL_SWITCH_SCOPE_LABELS, KILL_SWITCH_SCOPES, type
 import { Button, Dialog, HoldToConfirmButton, Kbd, useToast, type HoldHandle } from '@kora/ui';
 import { useEffect, useRef, useState } from 'react';
 
+import { refreshAccount } from '@/lib/account';
 import { api } from '@/lib/api-browser';
 
 /**
- * Kill-switch entry point (goal 01): 1.5 s hold (mouse, touch, keyboard Space/Enter, or the
- * Ctrl+Shift+K hotkey held) → three-scope menu → REST call that writes an audit event.
- * Goal 03 wires the engine; this REST route doubles as the websocket-down fallback.
+ * Kill switch: 1.5 s hold (mouse, touch, keyboard Space/Enter, or the Ctrl+Shift+K hotkey held) →
+ * three-scope menu → REST call to the goal 03 engine (halt robots, cancel orders, flatten), which
+ * works without the websocket. The result (orders cancelled, positions closed) is shown and audited.
  */
 export function KillSwitch({ compact = false }: { compact?: boolean }) {
   const hold = useRef<HoldHandle>(null);
@@ -45,7 +46,15 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
     try {
       const r = await api.killSwitch(scope, source.current);
       setOpen(false);
-      toast.push(`Kill switch recorded: ${r.label}. Audit event #${r.auditEventId}. Engine actions arrive with the trading core.`, 'success', 8000);
+      const parts = [`Kill switch: ${r.label}.`, 'Robots halted.'];
+      if (scope !== 'robots') parts.push(`${r.ordersCancelled} order${r.ordersCancelled === 1 ? '' : 's'} cancelled.`);
+      if (scope === 'robots_cancel_flatten') {
+        parts.push(`${r.positionsFlattened} position${r.positionsFlattened === 1 ? '' : 's'} closed.`);
+        if (r.flattenPending.length) parts.push(`${r.flattenPending.length} waiting for a safe market.`);
+      }
+      parts.push(`Audit event #${r.auditEventId}.`);
+      toast.push(parts.join(' '), 'success', 10000);
+      refreshAccount();
     } catch {
       toast.push('Kill switch request failed. Try again or use the REST fallback.', 'critical', 10000);
     } finally {
