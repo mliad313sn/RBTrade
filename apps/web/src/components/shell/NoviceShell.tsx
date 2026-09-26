@@ -1,11 +1,16 @@
 'use client';
 
+import type { DisclosureDocument } from '@kora/sdk';
 import { Banner, Chip } from '@kora/ui';
-import { BookOpen, Home, Repeat, Sprout } from 'lucide-react';
+import { BookOpen, Bot, Home, Sprout } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { LanguageSwitch } from '@/components/novice/LanguageSwitch';
+import { PricesPausedBanner, PwaRegister } from '@/components/novice/Pwa';
+import type { MessageKey } from '@/lib/i18n';
+import { useI18n } from '@/lib/i18n/react';
 import { NOVICE_NAV } from '@/lib/modes';
 
 import { KillSwitch } from './KillSwitch';
@@ -14,28 +19,44 @@ import { TradingHaltBanner } from './TradingHaltBanner';
 import { UserMenu } from './UserMenu';
 import { WhatChangedNote } from './WhatChangedNote';
 
-const ICONS: Record<string, typeof Home> = { '/home': Home, '/practice': Sprout, '/auto-invest': Repeat, '/learn': BookOpen };
+const ICONS: Record<string, typeof Home> = { '/home': Home, '/practice': Sprout, '/auto-invest': Bot, '/learn': BookOpen };
+const LABELS: Record<string, MessageKey> = {
+  '/home': 'nav.home',
+  '/practice': 'nav.practice',
+  '/auto-invest': 'nav.autoInvest',
+  '/learn': 'nav.learn',
+};
 
 function useActive() {
   const pathname = usePathname();
   return (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function NoviceShell({ children }: { children: ReactNode }) {
+/**
+ * Novice shell (goal 01, localised and made mobile-first in goal 08): 390 px-first, bottom tab bar
+ * on phones, 44 px targets, the regulatory banner from the disclosures registry, and the
+ * "prices paused" offline state. No streaks, badges, confetti or trading nudges.
+ */
+export function NoviceShell({ children, disclosure }: { children: ReactNode; disclosure: DisclosureDocument | null }) {
   const active = useActive();
+  const { t } = useI18n();
   return (
-    <div className="min-h-screen flex flex-col pb-20 md:pb-0">
+    <div className="min-h-screen flex flex-col pb-24 md:pb-0">
+      <PwaRegister />
       <a href="#main" className="skip-link">
-        Skip to content
+        {t('shell.skip')}
       </a>
-      <header className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 md:px-10 py-3 md:min-h-18 border-b border-border bg-panel" data-testid="novice-topbar">
-        <Link href="/home" className="flex items-center gap-2 no-underline" aria-label="Kora home">
+      <header
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-10 py-2 md:py-3 md:min-h-18 border-b border-border bg-panel"
+        data-testid="novice-topbar"
+      >
+        <Link href="/home" className="flex items-center gap-2 no-underline min-h-11" aria-label={t('shell.homeLink')}>
           <span className="text-accent text-xl" aria-hidden="true">
             ↗
           </span>
           <span className="font-display text-2xl">Kora</span>
         </Link>
-        <nav aria-label="Main" className="hidden md:block">
+        <nav aria-label={t('shell.nav.main')} className="hidden md:block">
           <ul className="flex gap-2 list-none m-0 p-0">
             {NOVICE_NAV.map((n) => (
               <li key={n.href}>
@@ -44,32 +65,50 @@ export function NoviceShell({ children }: { children: ReactNode }) {
                   aria-current={active(n.href) ? 'page' : undefined}
                   className={`inline-flex items-center h-11 px-4 rounded-full no-underline text-[15px] ${active(n.href) ? 'bg-up-surface text-accent font-semibold' : 'text-text hover:bg-raised'}`}
                 >
-                  {n.label}
+                  {t(LABELS[n.href] ?? 'nav.home')}
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-          <Chip tone="paper" role="status" aria-label="Trading environment: practice money (paper)" data-testid="env-chip">
-            Practice money
+        {/* Phones: row 1 = logo, language, account; row 2 = view and stop (always visible). The
+            practice-money chip shows from 640 px; on phones the banner below says it. */}
+        <div className="ml-auto md:ml-0 flex items-center gap-2 md:order-last">
+          <Chip tone="paper" role="status" aria-label={t('shell.envAria')} data-testid="env-chip" className="max-sm:hidden!">
+            {t('shell.env')}
           </Chip>
-          <ModeToggle />
-          <KillSwitch compact />
+          <LanguageSwitch />
           <UserMenu />
         </div>
+        <div className="flex items-center gap-2 md:gap-3 md:ml-auto max-md:basis-full max-md:justify-between">
+          <ModeToggle />
+          <KillSwitch compact />
+        </div>
       </header>
-      <div className="px-4 md:px-10 pt-5">
-        <Banner tone="warn" title="Trading can lose you money." action={<Link href="/learn" className="text-accent font-semibold whitespace-nowrap">Read the risks</Link>}>
-          [XX]% of retail accounts lose money trading with this provider. You&apos;re using practice money, so nothing real is at risk yet.
+      <div className="px-4 md:px-10 pt-4 md:pt-5" data-testid="risk-banner">
+        <Banner
+          tone="warn"
+          title={t('shell.banner.title')}
+          action={
+            <Link href="/learn#risks" className="text-accent font-semibold whitespace-nowrap inline-flex items-center min-h-11">
+              {t('shell.banner.read')}
+            </Link>
+          }
+        >
+          {disclosure?.banner ?? t('shell.banner.placeholder')}
         </Banner>
       </div>
+      <PricesPausedBanner className="px-4 md:px-10 pt-3" />
       <WhatChangedNote className="px-4 md:px-10 pt-3" />
       <TradingHaltBanner className="px-4 md:px-10 pt-3" />
-      <main id="main" className="flex-1 px-4 md:px-10 py-5">
+      <main id="main" className="flex-1 px-4 md:px-10 py-4 md:py-5">
         {children}
       </main>
-      <nav aria-label="Main (mobile)" className="md:hidden fixed bottom-0 inset-x-0 border-t border-border bg-panel" data-testid="mobile-tabbar">
+      <nav
+        aria-label={t('shell.nav.mobile')}
+        className="md:hidden fixed bottom-0 inset-x-0 border-t border-border bg-panel pb-[env(safe-area-inset-bottom)]"
+        data-testid="mobile-tabbar"
+      >
         <ul className="grid grid-cols-4 list-none m-0 p-0">
           {NOVICE_NAV.map((n) => {
             const Icon = ICONS[n.href] ?? Home;
@@ -81,7 +120,7 @@ export function NoviceShell({ children }: { children: ReactNode }) {
                   className={`flex flex-col items-center justify-center gap-1 min-h-16 no-underline text-[13px] ${active(n.href) ? 'text-accent font-semibold' : 'text-muted'}`}
                 >
                   <Icon size={20} aria-hidden="true" />
-                  {n.label}
+                  {t(LABELS[n.href] ?? 'nav.home')}
                 </Link>
               </li>
             );

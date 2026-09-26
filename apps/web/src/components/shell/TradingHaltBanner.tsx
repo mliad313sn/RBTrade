@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { refreshAccount, useAccount } from '@/lib/account';
 import { api } from '@/lib/api-browser';
+import { useI18n } from '@/lib/i18n/react';
 
 import { useShell } from './ShellContext';
 
@@ -24,9 +25,13 @@ export function TradingHaltBanner({ className }: { className?: string }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t, novice } = useI18n();
   if (!account?.halt.halted || !account.halt.scope) return null;
   const canResume = hasAnyRole(me.roles, RESUME_ROLES);
   const since = account.halt.haltedAt ? new Date(account.halt.haltedAt).toISOString().slice(11, 16) : null;
+  const scope = account.halt.scope;
+  // Goal 08: plain, localised wording in the Novice view for someone who cannot resume.
+  const plainNovice = novice && !canResume;
 
   const resume = async () => {
     setBusy(true);
@@ -48,7 +53,11 @@ export function TradingHaltBanner({ className }: { className?: string }) {
     <div className={className} data-testid="halt-banner">
       <Banner
         tone="critical"
-        title={`Trading halted: ${KILL_SWITCH_SCOPE_LABELS[account.halt.scope].title}${since ? ` since ${since} UTC` : ''}.`}
+        title={
+          plainNovice
+            ? t('halt.title', { scope: t(`kill.scope.${scope}.title`) })
+            : `Trading halted: ${KILL_SWITCH_SCOPE_LABELS[scope].title}${since ? ` since ${since} UTC` : ''}.`
+        }
         action={
           canResume ? (
             <Button size="sm" onClick={() => setOpen(true)} data-testid="resume-trading">
@@ -57,8 +66,18 @@ export function TradingHaltBanner({ className }: { className?: string }) {
           ) : null
         }
       >
-        Robots are stopped and cannot place orders.{account.halt.reason ? ` Reason: ${account.halt.reason}.` : ''}{' '}
-        {canResume ? 'Resuming needs a written reason and is audited.' : 'A trader, risk officer or admin must resume trading.'}
+        {plainNovice ? (
+          <>
+            {since ? `${t('halt.since', { time: since })} ` : ''}
+            {t('halt.body')}
+            {account.halt.reason ? ` ${t('halt.reason', { reason: account.halt.reason })}` : ''} {t('halt.who')}
+          </>
+        ) : (
+          <>
+            Robots are stopped and cannot place orders.{account.halt.reason ? ` Reason: ${account.halt.reason}.` : ''}{' '}
+            {canResume ? 'Resuming needs a written reason and is audited.' : 'A trader, risk officer or admin must resume trading.'}
+          </>
+        )}
       </Banner>
       <Dialog
         open={open}
