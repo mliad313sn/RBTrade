@@ -9,6 +9,10 @@ describe('market data config and helpers', () => {
     const c = loadMdConfig({}, 'http://localhost:3000');
     expect(c).toMatchObject({ feed: 'inprocess', stepMs: 100, conflatePerSec: 10, backfill: true, respectSessions: false, prefix: 'kora:md:', symbols: [] });
     expect(c.wsOrigins).toEqual(['http://localhost:3000']);
+    // B-208: the simulator follows venue sessions by default outside dev/test.
+    expect(loadMdConfig({ KORA_ENV: 'staging' }).respectSessions).toBe(true);
+    expect(loadMdConfig({ KORA_ENV: 'production', KORA_MD_RESPECT_SESSIONS: 'false' }).respectSessions).toBe(false);
+    expect(loadMdConfig({ KORA_ENV: 'test', KORA_MD_RESPECT_SESSIONS: '1' }).respectSessions).toBe(true);
   });
 
   it('parses overrides and rejects bad values', () => {

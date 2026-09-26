@@ -15,7 +15,9 @@ const Schema = z.object({
   KORA_MD_SYMBOLS: z.string().optional().default(''),
   KORA_MD_BACKFILL: bool(true),
   KORA_MD_HISTORY_DAYS: z.coerce.number().int().min(1).max(60).default(10),
-  KORA_MD_RESPECT_SESSIONS: bool(false),
+  /** Unset: follow venue sessions outside dev/test (B-208); dev and test simulate 24/7 by default. */
+  KORA_MD_RESPECT_SESSIONS: z.enum(['true', 'false', '1', '0', '']).optional(),
+  KORA_ENV: z.enum(['dev', 'test', 'staging', 'production']).default('dev'),
   KORA_MD_DEPTH_LEVELS: z.coerce.number().int().min(1).max(50).default(10),
   KORA_MD_HEARTBEAT_MS: z.coerce.number().int().min(100).max(10_000).default(1000),
   /** Gateway declares the feed lost when no status heartbeat arrives for this long. */
@@ -43,7 +45,10 @@ export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = '
     symbols: e.KORA_MD_SYMBOLS.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
     backfill: e.KORA_MD_BACKFILL,
     historyDays: e.KORA_MD_HISTORY_DAYS,
-    respectSessions: e.KORA_MD_RESPECT_SESSIONS,
+    respectSessions:
+      e.KORA_MD_RESPECT_SESSIONS === undefined || e.KORA_MD_RESPECT_SESSIONS === ''
+        ? e.KORA_ENV !== 'dev' && e.KORA_ENV !== 'test'
+        : e.KORA_MD_RESPECT_SESSIONS === 'true' || e.KORA_MD_RESPECT_SESSIONS === '1',
     depthLevels: e.KORA_MD_DEPTH_LEVELS,
     heartbeatMs: e.KORA_MD_HEARTBEAT_MS,
     feedTimeoutMs: e.KORA_MD_FEED_TIMEOUT_MS,
