@@ -18,7 +18,11 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
   const source = useRef<'ui_button' | 'hotkey'>('ui_button');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<KillSwitchScope | null>(null);
+  // Set once the handlers are attached (after hydration), so tests do not press a server-rendered button.
+  const [ready, setReady] = useState(false);
   const toast = useToast();
+
+  useEffect(() => setReady(true), []);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -87,6 +91,7 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
         onConfirm={() => setOpen(true)}
         description={plainNovice ? t('kill.help') : 'Opens the kill-switch scope menu. Hotkey: hold Control, Shift and K.'}
         data-testid="kill-switch"
+        data-ready={ready ? 'true' : undefined}
       >
         {compact ? (novice ? t('kill.button') : 'Stop everything') : '■ KILL SWITCH'}
       </HoldToConfirmButton>
