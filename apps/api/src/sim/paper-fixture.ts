@@ -1,14 +1,15 @@
 import type { Fill } from '@kora/domain';
 
 /**
- * SIMULATED paper fills used until the goal 03 paper engine exists (BACKLOG B-501).
+ * SIMULATED paper fills shown only for accounts with no paper fills yet (B-501: accounts with fills
+ * use their real goal 03 engine fills; see SimController.paperAnalytics). Labelled in the API and UI.
  *
  * Deterministic (seeded mulberry32, integer price arithmetic in 1e-5 units): 80 round trips on
  * EURUSD and GBPUSD, 10,000 units each, stop 100 pips ($100), target 160 pips ($160), 48% hit rate,
  * $0.70 fee and $0.50 embedded slippage per fill. Not market data; not a real account.
  */
 export const PAPER_FIXTURE_LABEL =
-  'SIMULATED fills (fixture) · the paper engine arrives in goal 03';
+  'SIMULATED fills (fixture) · no paper fills on this account yet';
 export const PAPER_FIXTURE_STARTING_CAPITAL = '10000';
 export const PAPER_FIXTURE_TRADES = 80;
 

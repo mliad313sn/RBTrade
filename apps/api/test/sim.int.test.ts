@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { paperFixtureFills, PAPER_FIXTURE_TRADES } from '../src/sim/paper-fixture';
 import { quantBaseUrl } from '../src/sim/quant.client';
 import { bearer, createUser, startApp, type TestUser } from './helpers';
+import { MarketFixture } from './market-fixture';
 
 interface Seen {
   path: string;
@@ -197,12 +198,12 @@ describe('gain simulator proxy (/sim)', () => {
       .expect(400);
   });
 
-  it('paper analytics and "project from my paper results" use the SIMULATED fixture until goal 03', async () => {
+  it('paper analytics and "project from my paper results" use the labelled SIMULATED fixture for an account with no fills', async () => {
     const a = await request(http())
       .get('/sim/paper/analytics')
       .set(bearer(trader.token))
       .expect(200);
-    expect(a.body.source).toMatchObject({ kind: 'fixture', simulated: true });
+    expect(a.body.source).toMatchObject({ kind: 'fixture', simulated: true, label: expect.stringContaining('no paper fills on this account yet') });
     expect(seen[0]!.path).toBe('/analytics/paper?simulated_source=true');
     expect((seen[0]!.body.fills as unknown[]).length).toBe(2 * PAPER_FIXTURE_TRADES);
 
@@ -232,6 +233,33 @@ describe('gain simulator proxy (/sim)', () => {
     expect(
       audit.body.events.some((e: { id: string }) => e.id === p.body.projection.auditEventId),
     ).toBe(true);
+  });
+
+  it('B-501: an account with paper fills sends its real fills, fees in base currency and registry multipliers', async () => {
+    const md = new MarketFixture();
+    await md.standard();
+    const u = await createUser(app, 'trader');
+    await md.touch();
+    const buy = await request(http()).post('/orders').set(bearer(u.token)).send({ clientOrderId: `b501-${process.pid}`, symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.5' }).expect(201);
+    await md.quote('BTCUSD', '65811.5', '65813.5');
+    await request(http()).post('/positions/BTCUSD/close').set(bearer(u.token)).expect(201);
+    seen = [];
+    const a = await request(http()).get('/sim/paper/analytics').set(bearer(u.token)).expect(200);
+    expect(a.body.source).toMatchObject({ kind: 'paper_account', simulated: true, fills: 2, currency: 'USD' });
+    expect(seen[0]!.path).toBe('/analytics/paper');
+    const sent = seen[0]!.body as { startingCapital: string; fills: Array<Record<string, string>>; contractMultipliers: Record<string, string> };
+    expect(sent.startingCapital).toBe('100000');
+    expect(sent.contractMultipliers).toEqual({ BTCUSD: '1' });
+    expect(sent.fills).toHaveLength(2);
+    expect(sent.fills[0]).toMatchObject({ orderId: buy.body.order.id, symbol: 'BTCUSD', side: 'buy', qty: '0.5', price: '64813.5', fee: '32.41', slippage: '0' });
+    expect(sent.fills[1]).toMatchObject({ side: 'sell', qty: '0.5' });
+    for (const f of sent.fills) expect(f.ts).toMatch(/Z$/);
+    seen = [];
+    const p = await request(http()).post('/sim/paper/project').set(bearer(u.token)).send({ horizonPeriods: 12, paths: 2000 }).expect(200);
+    expect(p.body.source.kind).toBe('paper_account');
+    const audit = await request(http()).get('/audit?action=sim.paper_projection_run').set(bearer(u.token)).expect(200);
+    expect(audit.body.events[0].payload).toMatchObject({ source: 'paper_account' });
+    await md.close();
   });
 
   it('maps quant validation errors to 400 with issues, and quant failures to 502/503', async () => {

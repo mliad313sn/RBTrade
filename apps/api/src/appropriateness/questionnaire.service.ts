@@ -158,8 +158,9 @@ export class QuestionnaireService implements OnApplicationBootstrap {
   }
 
   cooldownUntil(def: QuestionnaireDefinition, last: AttemptRow | null): Date | null {
-    if (!last || last.passed) return null;
-    const until = last.created_at.getTime() + this.settings(def).cooldownMinutes * 60_000;
+    const minutes = this.settings(def).cooldownMinutes;
+    if (!last || last.passed || minutes === 0) return null;
+    const until = last.created_at.getTime() + minutes * 60_000;
     return until > Date.now() ? new Date(until) : null;
   }
 }
