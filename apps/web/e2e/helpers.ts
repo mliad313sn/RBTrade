@@ -61,17 +61,38 @@ export function answerIndex(best = true): Record<string, number> {
 }
 
 /**
+ * Goal 08 onboarding through the API: acknowledge the current risk warning, set the loss limits
+ * (suggested defaults unless given), complete. The UI path is covered by novice.spec.ts.
+ */
+export async function apiOnboard(req: APIRequestContext, limits?: { dailyLossLimit: string; monthlyLossLimit: string }): Promise<void> {
+  const doc = (await (await req.get('/api/disclosures/risk-warning?locale=en')).json()).document as { version: string; contentHash: string };
+  expect((await req.post('/api/disclosures/risk-warning/acknowledgements', { headers: CSRF, data: { version: doc.version, contentHash: doc.contentHash, locale: 'en' } })).status()).toBe(201);
+  const profile = await (await req.get('/api/novice/profile')).json();
+  const l = limits ?? { dailyLossLimit: profile.suggestedLimits.daily, monthlyLossLimit: profile.suggestedLimits.monthly };
+  expect((await req.put('/api/novice/limits', { headers: CSRF, data: l })).status()).toBe(200);
+  expect((await req.post('/api/novice/onboarding/complete', { headers: CSRF })).status()).toBe(200);
+}
+
+/**
  * Creates and signs in a user through the API (cookies land in the page context). Everyone signs up
  * as novice (B-018); a `trader` passes the appropriateness assessment through the API, then logs in
  * again, which forces TOTP enrolment.
  */
-export async function apiSignIn(page: Page, accountType: 'novice' | 'trader'): Promise<{ email: string; secret?: string }> {
+export async function apiSignIn(
+  page: Page,
+  accountType: 'novice' | 'trader',
+  opts: { onboarded?: boolean } = {},
+): Promise<{ email: string; secret?: string }> {
   const req: APIRequestContext = page.request;
   const email = uniqueEmail(accountType);
   expect((await req.post('/api/auth/signup', { headers: CSRF, data: { email, password: PASSWORD, displayName: `E2E ${accountType}` } })).status()).toBe(201);
   const first = await (await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
   expect(first.status).toBe('ok');
-  if (accountType === 'novice') return { email };
+  if (accountType === 'novice') {
+    // Goal 08: novice-only users land on onboarding until it is done; most specs start after it.
+    if (opts.onboarded !== false) await apiOnboard(req);
+    return { email };
+  }
   const attempt = await req.post('/api/appropriateness/attempts', {
     headers: CSRF,
     data: { questionnaireId: QUESTIONNAIRE.id, version: QUESTIONNAIRE.version, answers: answerKey() },

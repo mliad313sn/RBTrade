@@ -10,6 +10,7 @@ async function killEvents(page: Page) {
 test.beforeEach(async ({ page }) => {
   await apiSignIn(page, 'trader');
   await page.goto('/terminal');
+  await expect(page.getByTestId('kill-switch')).toHaveAttribute('data-ready', 'true');
 });
 
 test('a short press does not open the menu; a 1.5 s mouse hold does, and a scope writes an audit event', async ({ page }) => {

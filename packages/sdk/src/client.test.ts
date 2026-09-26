@@ -96,4 +96,58 @@ describe('KoraClient', () => {
     ]);
     expect(JSON.parse(String(f.mock.calls[11]![1]!.body))).toEqual({ scope: 'robots', source: 'hotkey', reason: 'why' });
   });
+
+  it('goal 08: typed sim (B-506), scenarios (B-505), novice, disclosure and MFA opt-in routes', async () => {
+    const f = mockFetch(200, {});
+    const c = new KoraClient({ baseUrl: '/api', fetch: f as unknown as typeof fetch });
+    await c.simProject({} as never);
+    await c.simFromTrades({ trades: [1] });
+    await c.simPaperAnalytics();
+    await c.simPaperProject({ tradesPerPeriod: 1, horizonPeriods: 1, ruinFloorPct: 50, seed: 1, paths: 100 });
+    await c.simScenarios('practice');
+    await c.saveSimScenario({ kind: 'practice', name: 'A', input: {} });
+    await c.deleteSimScenario('id/1');
+    await c.noviceProfile();
+    await c.completeOnboarding();
+    await c.setNoviceLimits({ dailyLossLimit: '150' });
+    await c.setNoviceLeverage(false);
+    await c.noviceSummary();
+    await c.noviceAssets();
+    await c.noviceTicket({ symbol: 'EURUSD', direction: 'up', amount: '500', safetyNetPct: '3' });
+    await c.knowledgeCheck();
+    await c.submitKnowledgeCheck('knowledge-check', 1, { a: 'b' });
+    await c.autoInvest();
+    await c.startAutoInvest('trend-x', '1000');
+    await c.pauseAutoInvest('r1');
+    await c.resumeAutoInvest('r1');
+    await c.disclosure('risk-warning', 'fr');
+    await c.acknowledgeDisclosure('risk-warning', { version: '1', contentHash: 'h', locale: 'fr' });
+    await c.mfaOptIn();
+    expect(f.mock.calls.map(([u, i]) => [i?.method, u])).toEqual([
+      ['POST', '/api/sim/project'],
+      ['POST', '/api/sim/from-trades'],
+      ['GET', '/api/sim/paper/analytics'],
+      ['POST', '/api/sim/paper/project'],
+      ['GET', '/api/sim/scenarios?kind=practice'],
+      ['POST', '/api/sim/scenarios'],
+      ['DELETE', '/api/sim/scenarios/id%2F1'],
+      ['GET', '/api/novice/profile'],
+      ['POST', '/api/novice/onboarding/complete'],
+      ['PUT', '/api/novice/limits'],
+      ['PUT', '/api/novice/leverage'],
+      ['GET', '/api/novice/summary'],
+      ['GET', '/api/novice/assets'],
+      ['POST', '/api/novice/ticket'],
+      ['GET', '/api/novice/knowledge-check'],
+      ['POST', '/api/novice/knowledge-check/attempts'],
+      ['GET', '/api/novice/auto-invest'],
+      ['POST', '/api/novice/auto-invest'],
+      ['POST', '/api/novice/auto-invest/r1/pause'],
+      ['POST', '/api/novice/auto-invest/r1/resume'],
+      ['GET', '/api/disclosures/risk-warning?locale=fr'],
+      ['POST', '/api/disclosures/risk-warning/acknowledgements'],
+      ['POST', '/api/auth/mfa/opt-in'],
+    ]);
+    expect(JSON.parse(String(f.mock.calls[10]![1]!.body))).toEqual({ enabled: false });
+  });
 });

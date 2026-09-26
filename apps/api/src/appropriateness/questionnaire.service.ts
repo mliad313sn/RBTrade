@@ -13,12 +13,13 @@ import {
 
 import { DbService, type Queryable } from '../db/db.service';
 import appropriatenessV1 from './questionnaires/appropriateness.v1.json';
+import knowledgeCheckV1 from './questionnaires/knowledge-check.v1.json';
 
 /**
  * Every published questionnaire version, as reviewed data. Adding a version = adding a file here;
  * editing a published file fails the boot (versions are immutable, see `sync`).
  */
-export const QUESTIONNAIRE_FILES: unknown[] = [appropriatenessV1];
+export const QUESTIONNAIRE_FILES: unknown[] = [appropriatenessV1, knowledgeCheckV1];
 
 export interface AttemptRow {
   id: string;
@@ -167,11 +168,23 @@ export class QuestionnaireService implements OnApplicationBootstrap {
     userId: string,
     def: QuestionnaireDefinition,
     g: GradeResult & { passMarkPct: number },
+    /** Optional attempt time on the application clock (the cool-down is computed on it). */
+    at?: Date,
   ): Promise<AttemptRow> {
     const r = await c.query<AttemptRow>(
-      `INSERT INTO questionnaire_attempts (user_id, questionnaire_id, version, score, max_score, score_pct, pass_mark_pct, passed)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [userId, def.id, def.version, g.score, g.maxScore, g.scorePct, g.passMarkPct, g.passed],
+      `INSERT INTO questionnaire_attempts (user_id, questionnaire_id, version, score, max_score, score_pct, pass_mark_pct, passed, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::timestamptz, clock_timestamp())) RETURNING *`,
+      [
+        userId,
+        def.id,
+        def.version,
+        g.score,
+        g.maxScore,
+        g.scorePct,
+        g.passMarkPct,
+        g.passed,
+        at ?? null,
+      ],
     );
     return r.rows[0]!;
   }

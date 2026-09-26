@@ -1,6 +1,6 @@
 # KORA — delivery status
 
-Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B market intelligence).
+Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B market intelligence; goal 08 Novice view merged with 07 and 07B).
 
 | Gate | Goal | State |
 |---|---|---|
@@ -13,6 +13,7 @@ Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B m
 | G6 | 06 robot trader (+ B-301, B-502) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/06-robot-trader.md` §6 (deferred items in §6.3) |
 | G7 | 07 AI copilot (+ B-602) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07-ai-copilot.md` §6 (live-provider eval pending a key, OQ-A2; deferred items in §6.3) |
 | G7B | 07B market intelligence (+ B-601, B-701) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07b-market-intelligence.md` §6 (all data SIMULATED, providers flagged stubs, OQ-M3/OQ-M4; live-provider evals pending a key, OQ-A2; deferred items in §6.3) |
+| G8 | 08 Novice view (+ B-013, B-017, B-306, B-505, B-506, B-614; B-504 prep) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/08-novice-view.md` §6 (deferred items in §6.4) |
 
 ## What shipped in goal 01
 
@@ -407,3 +408,41 @@ B-751 … B-761 (see BACKLOG); B-708 moved to goal 10; OQ-A4 (publishing the tra
 - **Risk & compliance (09):** review OQ-A4 (public `/reliability` page and novice exposure), the plain-language copy, and translations shown to users (B-756); alerts only notify (B-757 for delivery). Audit actions: `intel.scan`, `intel.alert_created|deleted`, `ai.request` (surface `news`/`radar`), `ai.draft` (surface `radar`).
 - **QA/SRE (10):** scan scale-out and a true incremental kernel (B-753), Grafana panels (B-758), live-provider evals (B-759), radar visual baseline (B-761). The quant perf test runs 10,000 × 500 bars in CI (`test_scanner_perf.py`).
 - **Env:** `KORA_INTEL_SCAN`, `KORA_INTEL_SCAN_CHECK_MS`, `KORA_INTEL_TIMEFRAME`, `KORA_INTEL_BARS`, `KORA_INTEL_HORIZONS`, `KORA_INTEL_MIN_TRAIN`, `KORA_INTEL_GUARD_CHECKPOINTS`, `KORA_INTEL_TIMEOUT_MS`, `KORA_INTEL_NEWS`, `KORA_INTEL_NEWS_INTERVAL_MS`, `KORA_AI_REGIME`, `KORA_NEWS_ADAPTER_*` (see `.env.example`). Integration tests and e2e run with scans and news timers off and trigger them through the API.
+
+## Goal 08: Novice view (G8: done, with deferrals)
+
+Plan and evidence: `docs/plans/08-novice-view.md` §6. ADR 0008. Lead seats S1, S6, S8. Built in a worktree in parallel with goal 07 (migrations `0080+`).
+
+### What shipped
+
+- **Guardrails (server-side, for novice-only users and anyone in the Novice view):** market + stop only; no borrowing (1×) unless the 5-question knowledge check is passed and a 24 h wait is over (cap `KORA_NOVICE_MAX_LEVERAGE`, SIMULATED 2×); loosened limits wait 24 h, tightening is immediate (`accounts.risk_limits.pending`, applied by `AccountsService.limits(account, now)`, no scheduler); cooling-off until the next UTC day after 3 losing trades, a 5 % day loss or the daily limit (`NOVICE_COOLING_OFF`); optional monthly loss limit (`MONTHLY_LOSS_LIMIT`, month snapshots). Pure rules in `@kora/domain` (`novice/*`, `trading/risk.ts`).
+- **API (`apps/api/src/novice`, `apps/api/src/disclosures`):** `/novice/profile|onboarding/complete|limits|leverage|summary|assets|ticket|knowledge-check(/attempts)|auto-invest(/:id/pause|resume|go-live)`, `/disclosures/:id(/acknowledgements)`, `/sim/scenarios` (B-505), `/auth/mfa/opt-in` (B-017). Migrations `0080_novice.sql` (registry `novice_rank` + `novice_name` for 10 instruments on five continents, month snapshots, append-only `disclosure_acknowledgements`, `novice_profiles`, `robots.origin/template_id`), `0081_sim_scenarios.sql`. Knowledge check `knowledge-check.v1.json` (kind `knowledge_check`, 5 questions, 80 %, SIMULATED).
+- **B-614 decision:** guarded `/novice/auto-invest` path: goal 06 templates unchanged, PAPER robot `origin = 'novice_template'`, allocation 1–25 % of the balance, 1× exposure, limits from the user's daily limit, OOS/paper results only, live always refused (audited checklist). The runner accepts a novice owner only for that origin; orders pass the novice guardrails.
+- **Web:** `/onboarding` (5 screens → versioned risk warning with `[XX]%` → loss limits with suggested defaults), `/home` per `Novice.png` (balance in Fraunces, change since start, SVG area chart, worst dip, holdings in words, 3-step trade with "most you could lose" from the preview, review sheet with gain/loss scenario and the "I understand I could lose up to $X" tick, limits with pending loosenings and borrowing, cooling-off card, auto-invest and learn cards), `/auto-invest`, `/learn` (5 lessons, 13-term glossary, risks, `/learn/check`), Practice localised with saved plans and the retail-loss line (OQ-Q1), Settings (language, colours, optional two-step sign-in). EN + FR (`apps/web/src/lib/i18n`), 390 px-first, bottom tab bar, 44 px targets, installable PWA (manifest, icons, offline "prices paused" service worker, no push). "Explain this to me" slot (`lib/novice/explain-slot.tsx`, `KORA_EXPLAIN_THIS`). ESLint forbids confetti/streak/leaderboard in novice files.
+- **SDK (B-506):** typed `/sim/*`, scenarios, novice, disclosure and MFA opt-in methods; sim types in `packages/sdk/src/sim-types.ts`.
+
+### Stubbed or placeholder
+
+- Retail-loss figure `[XX]` (OQ-R1), guardrail thresholds and suggested limits (OQ-N1, OQ-N3), borrowing cap (OQ-N2), knowledge-check content (OQ-N4) are SIMULATED placeholders. Template OOS numbers come from a best-effort SIMULATED backtest on first adoption (B-807). Cooling-off/day boundaries are UTC (B-803).
+
+### Deferred
+
+B-801 server-side "acknowledged before first order" gate, B-802 Pro simulator scenario UI, B-803 time zones, B-804 security/limit alerts, B-805 Lighthouse in CI, B-806 localise remaining shared screens, B-807 scheduled template backtests, B-808 human copy review sign-off, B-809 offline-navigation e2e, B-810 risk-officer view of guardrail events.
+
+### Integrated with goals 07 and 07B (merge)
+
+Goal 08 was built in a worktree next to goals 07 and 07B; the merge wired them together:
+
+- **"Explain this to me":** goal 07's `ExplainThis` fills goal 08's typed slot through `lib/novice/explain-copilot.tsx` (`NoviceExplainThis`, registered once in `NoviceShell`): the typed topic becomes plain topic words, the on-screen values go as untrusted screen text, `context.panel = novice_<topic>`, labels from `explain.*` (EN/FR). Shown only in the Novice shell and with `KORA_EXPLAIN_THIS=on` (now on in `.env.example` and e2e): Home (most you could lose, cooling-off), the trade review sheet (new `spread_and_fees` slot), Learn (lessons, word list), Practice and Auto-invest. The server keeps grade ≤ 8, no suggestions, no drafts; answers are English for now and French viewers are told so (B-706).
+- **"What's moving and why":** goal 07B's `WhatsMovingCard` sits on the novice Home (phones: after holdings), worded through the goal 08 i18n (`moving.*`, EN/FR, readability report updated) from new structured fields on `GET /intel/whats-moving` items (`move`, `news`, `odds`; the English strings stay), with the localised novice instrument names.
+- **Novice-only accounts:** one definition, `isNoviceOnly(roles)` / `PRO_ROLES` in `@kora/domain`, now used by the OMS guardrails (`OmsService.isNovice`), the copilot and intel novice mode, and the Home onboarding redirect. A novice-only account may still look at the Pro view (goal 08 acceptance), stays guarded there, and the terminal AI strip tells it the Pro copilot needs a trader account instead of calling `GET /ai/strip` (403).
+- **No gamification:** `eslint.novice.mjs` now also covers `components/ai/ExplainThis.tsx` and `components/intel/WhatsMovingCard.tsx`; the lint unit test checks them.
+- **Tests added:** web unit +3 (card in French, slot adapter ×2), domain +1 (`isNoviceOnly`), api unit assertion on the structured fields, e2e +1 (explain answer on a lesson, the card in EN and FR).
+
+### What goals 07, 09 and 10 need to know
+
+- **Goal 07 (copilot, novice mode):** done in the merge (see above). For reference: call `registerExplainThis(Component)` once (client side) and set `KORA_EXPLAIN_THIS=on`. The component gets `ExplainSlotProps {topic: 'most_you_could_lose' | 'safety_net' | 'spread_and_fees' | 'borrowing' | 'cooling_off' | 'loss_limits' | 'robot_risk_level' | 'past_results' | 'practice_year' | 'glossary_term' | 'lesson', context: Record<string, string> (values already on screen), locale: 'en' | 'fr', mode: 'novice'}`. It must not place orders or change limits; use `useI18n()` for the viewer's language.
+- **Goal 09 (disclosures):** provide `DISCLOSURE_REGISTRY` (`current(id, locale) → {id, version, locale, title, banner, body[], acknowledge, values, placeholder, simulated, reviewStatus, contentHash}`) from the Compliance-owned registry; callers (`DisclosureAcknowledgements`, the Novice banner, onboarding, Learn, Practice) stay unchanged. Acknowledgements (`disclosure_acknowledgements`: user, id, version, content hash, rendered values, locale, context, time; audit `disclosure.acknowledged`) are bound to the exact rendered text; a new version or figure means everyone acknowledges again. Add the server-side first-order gate (B-801).
+- **Goal 09 (questionnaires / suitability):** the engine now holds `appropriateness` v1 and `knowledge-check` v1; add `suitability` the same way (`QUESTIONNAIRE_FILES`). `QuestionnaireService.record(c, user, def, grade, at?)` takes an optional app-clock time. Knowledge-check status: `NoviceService.knowledgeStatus(userId)`; audit `knowledge_check.passed|failed`.
+- **Goal 09 (limits):** guarded loosening lives in `@kora/domain` `applyLimitChanges/effectiveOwnLimits/pendingChanges`; Pro loosening policy (OQ-R5) can reuse it by passing a delay. Audit `account.settings_updated` carries `{guarded, limitsApplied, limitsPending}`.
+- **Env:** `KORA_DISCLOSURE_RETAIL_LOSS_PCT`, `KORA_NOVICE_*`, `KORA_RISK_MONTHLY_LOSS_LIMIT`, `KORA_EXPLAIN_THIS` (see `.env.example`). e2e helpers: `apiSignIn(page, 'novice')` now completes onboarding through the API (`{onboarded: false}` to skip); `apiOnboard(request)`.

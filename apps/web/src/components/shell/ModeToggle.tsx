@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { api } from '@/lib/api-browser';
+import { useI18n } from '@/lib/i18n/react';
 import { counterpartPath } from '@/lib/modes';
 
 import { useShell } from './ShellContext';
@@ -19,6 +20,7 @@ export function ModeToggle() {
   const toast = useToast();
   const [pending, start] = useTransition();
   const mode = me.preferences.viewMode;
+  const { t } = useI18n();
 
   const change = (target: ViewMode) => {
     if (target === mode || pending) return;
@@ -29,7 +31,7 @@ export function ModeToggle() {
         router.push(counterpartPath(pathname, target, search.toString()));
         router.refresh();
       } catch {
-        toast.push('Could not switch view. Please try again.', 'critical');
+        toast.push(mode === 'novice' ? t('mode.error') : 'Could not switch view. Please try again.', 'critical');
       }
     });
   };
@@ -37,14 +39,14 @@ export function ModeToggle() {
   return (
     <SegmentedControl
       data-testid="mode-toggle"
-      label="View mode"
+      label={mode === 'novice' ? t('mode.label') : 'View mode'}
       value={mode}
       onChange={change}
       options={
         mode === 'novice'
           ? [
-              { value: 'novice', label: 'Simple' },
-              { value: 'pro', label: 'Pro' },
+              { value: 'novice', label: t('mode.simple') },
+              { value: 'pro', label: t('mode.pro') },
             ]
           : [
               { value: 'pro', label: 'Pro' },

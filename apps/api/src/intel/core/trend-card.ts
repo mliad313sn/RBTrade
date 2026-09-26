@@ -244,7 +244,17 @@ export interface MovingItem {
   why: string | null;
   whySource: { id: string; source: string; url: string } | null;
   confidence: string | null;
+  /**
+   * The same facts as structured fields, so the novice Home can word them in the viewer's language
+   * (goal 08 i18n): the kind of move, the cited news and the calibrated odds (null unless calibrated).
+   */
+  move: MoveKind;
+  news: { title: string; source: string } | null;
+  odds: { per100: number; n: number } | null;
 }
+
+/** Plain-word kind of move shown to novices. */
+export type MoveKind = 'up' | 'down' | 'choppy' | 'turned' | 'quiet';
 
 /** "Toyota Motor Corporation" → "Toyota Motor": plain-word headlines for novices. */
 export function shortName(name: string): string {
@@ -258,25 +268,37 @@ export function shortName(name: string): string {
   return s || name;
 }
 
+const HEADLINES: Record<MoveKind, (name: string) => string> = {
+  up: (n) => `${n} has gone up more than usual. That is a big move for it.`,
+  down: (n) => `${n} has gone down more than usual. That is a big move for it.`,
+  choppy: (n) => `${n} is moving up and down a lot. Prices can jump fast now.`,
+  turned: (n) => `${n} has turned around. It went the other way after a big move.`,
+  quiet: (n) => `${n} has stayed in a small range. It has not moved much.`,
+};
+
 export function movingItem(card: TrendCard): MovingItem {
   const k = card.trend?.kind;
   const name = shortName(card.name);
-  const headline =
+  const move: MoveKind =
     k === 'up' || k === 'breakout_up'
-      ? `${name} has gone up more than usual. That is a big move for it.`
+      ? 'up'
       : k === 'down' || k === 'breakout_down'
-        ? `${name} has gone down more than usual. That is a big move for it.`
+        ? 'down'
         : k === 'vol_regime'
-          ? `${name} is moving up and down a lot. Prices can jump fast now.`
+          ? 'choppy'
           : k === 'reversal'
-            ? `${name} has turned around. It went the other way after a big move.`
-            : `${name} has stayed in a small range. It has not moved much.`;
+            ? 'turned'
+            : 'quiet';
+  const headline = HEADLINES[move](name);
   const top = card.news[0] ?? null;
   const why = top ? `In the news: "${top.translatedTitle ?? top.title}" (${top.source}).` : null;
-  const confidence =
+  const odds =
     card.probability.status === 'calibrated'
-      ? `In the past, forecasts like this came true about ${Math.round(card.probability.value * 100)} times out of 100 (${card.probability.n} cases).`
+      ? { per100: Math.round(card.probability.value * 100), n: card.probability.n }
       : null;
+  const confidence = odds
+    ? `In the past, forecasts like this came true about ${odds.per100} times out of 100 (${odds.n} cases).`
+    : null;
   return {
     symbol: card.symbol,
     name,
@@ -284,5 +306,8 @@ export function movingItem(card: TrendCard): MovingItem {
     why,
     whySource: top ? { id: top.id, source: top.source, url: top.url } : null,
     confidence,
+    move,
+    news: top ? { title: top.translatedTitle ?? top.title, source: top.source } : null,
+    odds,
   };
 }

@@ -1,7 +1,8 @@
 import { hasAnyRole, ROBOT_BUILDER_ROLES, type Role } from '@kora/domain';
 
-/** Routes reachable without a session. */
-export const PUBLIC_PATHS = ['/login', '/signup', '/forbidden', '/reliability'];
+/** Routes reachable without a session (goal 07B: public reliability page; goal 08: PWA offline shell and assets). */
+export const PUBLIC_PATHS = ['/login', '/signup', '/forbidden', '/reliability', '/offline'];
+export const PWA_PUBLIC_FILES = ['/sw.js', '/manifest.webmanifest'];
 
 export function isPublicPath(pathname: string): boolean {
   return (
@@ -9,7 +10,9 @@ export function isPublicPath(pathname: string): boolean {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
     pathname === '/favicon.ico' ||
-    pathname === '/icon.svg'
+    pathname === '/icon.svg' ||
+    PWA_PUBLIC_FILES.includes(pathname) ||
+    pathname.startsWith('/icons/')
   );
 }
 

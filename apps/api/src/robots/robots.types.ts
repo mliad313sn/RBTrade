@@ -24,6 +24,9 @@ export interface RobotRow {
   last_heartbeat_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  /** Goal 08: 'novice_template' robots come from the guarded /novice/auto-invest path (B-614). */
+  origin: 'builder' | 'novice_template';
+  template_id: string | null;
 }
 
 export interface RobotJoinRow extends RobotRow {
@@ -53,6 +56,8 @@ export function robotDto(r: RobotJoinRow) {
     mode: r.mode,
     status: r.status,
     allocation: r.allocation,
+    origin: r.origin,
+    templateId: r.template_id,
     limits: r.limits,
     limitsHash: r.limits_hash,
     pauseReason: r.pause_reason,

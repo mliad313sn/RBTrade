@@ -2,8 +2,10 @@
 
 import './ai.css';
 
+import { isNoviceOnly } from '@kora/domain';
 import { useCallback, useEffect, useState } from 'react';
 
+import { useShell } from '@/components/shell/ShellContext';
 import { aiApi, type DraftRef, type StripData } from '@/lib/ai/client';
 import type { AiStripSlotProps } from '@/lib/terminal/ai-strip';
 import type { TicketDraft } from '@/lib/terminal/store';
@@ -41,7 +43,27 @@ function toTicketDraft(prefill: Record<string, string>): Omit<TicketDraft, 'orig
  * event risk, "Draft to ticket" and a "Why?" disclosure. Every figure comes from `GET /ai/strip`
  * (data and the calibration table); the model is only used when the user asks a question.
  */
-export function CopilotStrip({ symbol, timeframe, prefillTicket }: AiStripSlotProps) {
+export function CopilotStrip(props: AiStripSlotProps) {
+  const { me } = useShell();
+  // A novice-only account may look at the Pro view (goal 08), but it stays guarded and the copilot
+  // always answers it in novice mode (goal 07): the Pro strip (bias, drafts) is not for it.
+  if (isNoviceOnly(me.roles)) {
+    return (
+      <>
+        <span className="ai-strip__mark" aria-hidden="true">
+          ✦
+        </span>
+        <span className="ai-strip__label">Copilot</span>
+        <span className="ai-strip__text" data-testid="ai-strip-novice">
+          The Pro copilot needs a trader account. In the Simple view, use “Explain this to me”.
+        </span>
+      </>
+    );
+  }
+  return <ProCopilotStrip {...props} />;
+}
+
+function ProCopilotStrip({ symbol, timeframe, prefillTicket }: AiStripSlotProps) {
   const [data, setData] = useState<StripData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);

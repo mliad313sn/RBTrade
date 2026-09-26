@@ -13,7 +13,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ASSET_CLASSES, hasAnyRole, SYMBOL_RE, type Role } from '@kora/domain';
+import { ASSET_CLASSES, isNoviceOnly, PRO_ROLES, SYMBOL_RE, type Role } from '@kora/domain';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
@@ -29,7 +29,7 @@ import { IntelReadService } from './intel-read.service';
 import { NewsService } from './news.service';
 import { ScanService } from './scan.service';
 
-const PRO: Role[] = ['trader', 'quant', 'risk_officer', 'admin'];
+const PRO: Role[] = [...PRO_ROLES];
 const horizon = z
   .string()
   .regex(/^[0-9a-z]{1,8}$/)
@@ -67,7 +67,7 @@ const IngestSchema = z
 const Symbol = z.string().regex(SYMBOL_RE);
 
 function modeFor(p: Principal, requested?: AiMode): AiMode {
-  if (!hasAnyRole(p.roles, PRO)) return 'novice';
+  if (isNoviceOnly(p.roles)) return 'novice';
   return requested ?? 'pro';
 }
 

@@ -62,14 +62,16 @@ export class AccountsController {
   @Put('accounts/me/settings')
   @ApiOperation({
     summary:
-      'Confirmation thresholds, tighter risk limits, and the base currency (only before any activity). Audited.',
+      'Confirmation thresholds, own risk limits (never looser than the platform; in the Novice view a loosening waits 24 h, tightening is immediate), and the base currency (only before any activity). Audited.',
   })
   @ApiBody({ schema: openApiSchema(AccountSettingsSchema) })
   async settings(
     @CurrentPrincipal() p: Principal,
     @Body(new ZodValidationPipe(AccountSettingsSchema)) body: AccountSettingsPatch,
   ) {
-    return this.accounts.view(await this.accounts.updateSettings(p.sub, body));
+    // Goal 08: guarded users (novice-only, or anyone in the Novice view) loosen limits after 24 h.
+    const guarded = await this.oms.isNovice(p.sub, p.roles);
+    return this.accounts.view(await this.accounts.updateSettings(p.sub, body, { guarded }));
   }
 
   @Get('accounts/me/ledger')

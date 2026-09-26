@@ -853,6 +853,113 @@
         ]
       }
     },
+    "/sim/scenarios": {
+      "get": {
+        "operationId": "SimScenariosController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "practice",
+                "pro"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Your saved scenarios (newest first).",
+        "tags": [
+          "sim"
+        ]
+      },
+      "post": {
+        "operationId": "SimScenariosController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "practice",
+                      "pro"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "input": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {}
+                  },
+                  "overwrite": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name",
+                  "input"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Save (or overwrite) a named scenario. 409 when the name exists or the limit is reached. Audited.",
+        "tags": [
+          "sim"
+        ]
+      }
+    },
+    "/sim/scenarios/{id}": {
+      "delete": {
+        "operationId": "SimScenariosController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete one of your scenarios (audited).",
+        "tags": [
+          "sim"
+        ]
+      }
+    },
     "/sim/project": {
       "post": {
         "operationId": "SimController_project",
@@ -1809,6 +1916,10 @@
                         "type": "string",
                         "pattern": "^\\d+(\\.\\d+)?$"
                       },
+                      "monthlyLossLimit": {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d+)?$"
+                      },
                       "maxOrdersPerMinute": {
                         "type": "integer",
                         "minimum": 1,
@@ -1828,7 +1939,7 @@
             "description": ""
           }
         },
-        "summary": "Confirmation thresholds, tighter risk limits, and the base currency (only before any activity). Audited.",
+        "summary": "Confirmation thresholds, own risk limits (never looser than the platform; in the Novice view a loosening waits 24 h, tightening is immediate), and the base currency (only before any activity). Audited.",
         "tags": [
           "accounts"
         ]
@@ -9503,6 +9614,501 @@
         "summary": "Public track record per model and region, from stored predictions and outcomes.",
         "tags": [
           "intel"
+        ]
+      }
+    },
+    "/disclosures/{id}": {
+      "get": {
+        "operationId": "DisclosuresController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "en",
+                "fr"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The disclosure in force (rendered with the Compliance-set values, e.g. the retail-loss %) and whether you acknowledged this version.",
+        "tags": [
+          "disclosures"
+        ]
+      }
+    },
+    "/disclosures/{id}/acknowledgements": {
+      "post": {
+        "operationId": "DisclosuresController_acknowledge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "contentHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "fr"
+                    ]
+                  },
+                  "context": {
+                    "default": "onboarding",
+                    "type": "string",
+                    "enum": [
+                      "onboarding",
+                      "banner",
+                      "settings",
+                      "reconfirm"
+                    ]
+                  }
+                },
+                "required": [
+                  "version",
+                  "contentHash",
+                  "locale"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Acknowledge the version you read (version + content hash). 409 when the text changed since. Stored append-only and audited.",
+        "tags": [
+          "disclosures"
+        ]
+      }
+    },
+    "/novice/profile": {
+      "get": {
+        "operationId": "NoviceController_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Onboarding state, loss limits (used / limit / pending loosenings), cooling-off, borrowing state and the knowledge check. PAPER.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/onboarding/complete": {
+      "post": {
+        "operationId": "NoviceController_complete",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Finish onboarding. Requires the current risk warning acknowledged and both loss limits set (409 otherwise). Audited.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/limits": {
+      "put": {
+        "operationId": "NoviceController_limits",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dailyLossLimit": {
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,8})?$"
+                  },
+                  "monthlyLossLimit": {
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,8})?$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Daily and monthly loss limits. In the Novice view tightening applies now and loosening waits 24 h. Audited.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/leverage": {
+      "put": {
+        "operationId": "NoviceController_leverage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "enabled"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Ask to turn borrowing on (needs a passed knowledge check; waits 24 h; capped by KORA_NOVICE_MAX_LEVERAGE) or turn it off (immediate).",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/summary": {
+      "get": {
+        "operationId": "NoviceController_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Home numbers: balance, change since start, balance series, worst dip so far, holdings in words. SIMULATED.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/assets": {
+      "get": {
+        "operationId": "NoviceController_assets",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Curated novice instruments from the registry (novice_rank), with session state and the minimum amount in the account currency.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/ticket": {
+      "post": {
+        "operationId": "NoviceController_ticket",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "up",
+                      "down"
+                    ]
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,8})?$"
+                  },
+                  "safetyNetPct": {
+                    "type": "string",
+                    "pattern": "^\\d{1,2}(\\.\\d{1,2})?$"
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "direction",
+                  "amount",
+                  "safetyNetPct"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Build the novice market order from an amount (account currency) and a safety net (%), and return the unchanged /orders/preview answer for it. Place exactly `order` with POST /orders.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/knowledge-check": {
+      "get": {
+        "operationId": "NoviceController_knowledge",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The 5-question knowledge check (no answer key) and your status.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/knowledge-check/attempts": {
+      "post": {
+        "operationId": "NoviceController_knowledgeAttempt",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "questionnaireId": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "answers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    }
+                  }
+                },
+                "required": [
+                  "questionnaireId",
+                  "version",
+                  "answers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Submit answers (graded server-side; pass mark 4/5; cool-down after a fail). Answers are never stored. Audited.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/auto-invest": {
+      "get": {
+        "operationId": "NoviceController_autoInvestList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Ready-made robots (templates only) with a 1–5 risk level, out-of-sample test results and your own paper results. Never in-sample numbers.",
+        "tags": [
+          "novice"
+        ]
+      },
+      "post": {
+        "operationId": "NoviceController_autoInvestCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "templateId": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,8})?$"
+                  }
+                },
+                "required": [
+                  "templateId",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Start a ready-made robot with practice money (PAPER): unchanged template, capped amount, limits from your loss limits. Audited.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/auto-invest/{id}/pause": {
+      "post": {
+        "operationId": "NoviceController_autoInvestPause",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Pause one of your ready-made robots (audited).",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/auto-invest/{id}/resume": {
+      "post": {
+        "operationId": "NoviceController_autoInvestResume",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Restart one of your ready-made robots (not while cooling off or halted).",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/novice/auto-invest/{id}/go-live": {
+      "post": {
+        "operationId": "NoviceController_autoInvestLive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": ""
+          }
+        },
+        "summary": "Always refused from the Novice view today (403 with the checklist: knowledge check, promotion rules, LIVE flag). Audited.",
+        "tags": [
+          "novice"
+        ]
+      }
+    },
+    "/auth/mfa/opt-in": {
+      "post": {
+        "operationId": "MfaOptInController_optIn",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Start optional TOTP enrolment for the signed-in user (novices). Returns the secret, otpauth URI and an enrolment token for POST /auth/mfa/verify.",
+        "tags": [
+          "auth"
         ]
       }
     }

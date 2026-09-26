@@ -15,6 +15,9 @@ export interface FanChartProps {
   title: string;
   periodLabel?: (k: number) => string;
   height?: number;
+  /** Goal 08: localised text alternative and watermark for the Novice view (EN defaults otherwise). */
+  summaryText?: string;
+  watermark?: string;
 }
 
 const W = 760;
@@ -25,7 +28,7 @@ const PAD = { top: 18, right: 58, bottom: 30, left: 12 };
  * Colours are CSS variables so the PNG export can inline the live theme values.
  */
 export const FanChart = forwardRef<SVGSVGElement, FanChartProps>(function FanChart(
-  { result, compare, simple = false, title, periodLabel = (k) => `M${k}`, height = 460 },
+  { result, compare, simple = false, title, periodLabel = (k) => `M${k}`, height = 460, summaryText, watermark = 'SIMULATED' },
   ref,
 ) {
   const titleId = useId();
@@ -51,6 +54,7 @@ export const FanChart = forwardRef<SVGSVGElement, FanChartProps>(function FanCha
   const xTicks = periodTicks(n - 1, 5);
   const last = n - 1;
   const summary =
+    summaryText ??
     `${title}. After ${last} ${simple ? 'months' : 'periods'}: middle outcome ${fmtCompact(b.p50[last]!)}, ` +
     `9 in 10 ${simple ? 'made-up years' : 'paths'} between ${fmtCompact(b.p5[last]!)} and ${fmtCompact(b.p95[last]!)}; start ${fmtCompact(result.startingCapital)}` +
     (simple ? '.' : `; ruin floor ${fmtCompact(result.ruinFloor)}. Simulated, not a forecast.`);
@@ -191,7 +195,7 @@ export const FanChart = forwardRef<SVGSVGElement, FanChartProps>(function FanCha
         fillOpacity="0.07"
         data-testid="simulated-watermark"
       >
-        SIMULATED
+        {watermark}
       </text>
     </svg>
   );

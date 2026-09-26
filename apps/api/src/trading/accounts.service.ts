@@ -1,8 +1,16 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  applyLimitChanges,
   CONFIRM_MODES,
+  coolingOff,
   CURRENCY_RE,
   dec,
+  effectiveOwnLimits,
+  nextUtcDay,
+  pendingChanges,
+  type CoolingOffState,
+  type GuardedLimitField,
+  type StoredLimits,
   depositJournal,
   formatAmount,
   formatPct,
@@ -46,6 +54,7 @@ export const AccountSettingsSchema = z
         maxLeverage: decimal.optional(),
         dailyLossLimit: decimal.optional(),
         weeklyLossLimit: decimal.optional(),
+        monthlyLossLimit: decimal.optional(),
         maxOrdersPerMinute: z.number().int().min(1).max(100_000).optional(),
       })
       .strict()
@@ -60,8 +69,17 @@ export interface Valuation {
   positions: Array<ValuedPosition & { row: PositionRow; quoteCcy: string; stale: boolean }>;
   dayStartEquity: Decimal;
   weekStartEquity: Decimal;
+  monthStartEquity: Decimal;
   dayPnl: Decimal;
   weekPnl: Decimal;
+  monthPnl: Decimal;
+}
+
+/** Guarded (Novice) state for the risk check and the Novice view (goal 08). */
+export interface GuardState {
+  coolingOff: CoolingOffState & { until: string | null };
+  /** Borrowing cap as a multiple of equity: "1" = no leverage. */
+  noviceMaxLeverage: string;
 }
 
 const utcDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -70,6 +88,8 @@ const weekStart = (ms: number) => {
   const dow = (d.getUTCDay() + 6) % 7; // Monday = 0
   return utcDate(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - dow));
 };
+const monthStart = (ms: number) => utcDate(ms).slice(0, 8) + '01';
+const dayStartMs = (ms: number) => Date.parse(`${utcDate(ms)}T00:00:00Z`);
 
 /** Paper accounts: one per user, created on first use with SIMULATED starting cash. */
 @Injectable()
@@ -159,12 +179,19 @@ export class AccountsService {
     };
   }
 
-  /** Platform limits, tightened (never loosened) by the account's own limits. */
-  limits(a: AccountRow): RiskLimits {
+  /**
+   * Platform limits, tightened (never loosened) by the account's own limits in effect at `now`
+   * (goal 08: a pending loosening applies itself once its wait is over).
+   */
+  limits(a: AccountRow, now = Date.now()): RiskLimits {
     const d = this.cfg.riskDefaults;
-    const own = a.risk_limits as Partial<RiskLimits>;
+    const own = effectiveOwnLimits(a.risk_limits as StoredLimits, now);
     const tighter = (p: string, o: string | undefined) =>
       o !== undefined && dec(o).lt(dec(p)) ? o : p;
+    const monthly =
+      d.monthlyLossLimit !== undefined
+        ? tighter(d.monthlyLossLimit, own.monthlyLossLimit)
+        : own.monthlyLossLimit;
     return {
       maxOrderNotional: tighter(d.maxOrderNotional, own.maxOrderNotional),
       maxPositionNotional: tighter(d.maxPositionNotional, own.maxPositionNotional),
@@ -173,8 +200,52 @@ export class AccountsService {
       weeklyLossLimit: tighter(d.weeklyLossLimit, own.weeklyLossLimit),
       maxOrdersPerMinute: Math.min(
         d.maxOrdersPerMinute,
-        own.maxOrdersPerMinute ?? d.maxOrdersPerMinute,
+        own.maxOrdersPerMinute !== undefined
+          ? Number(own.maxOrdersPerMinute)
+          : d.maxOrdersPerMinute,
       ),
+      ...(monthly !== undefined ? { monthlyLossLimit: monthly } : {}),
+    };
+  }
+
+  /** Novice borrowing cap in effect ("1" = off), never above the configured novice maximum. */
+  noviceMaxLeverage(a: AccountRow, now = Date.now()): string {
+    const own = effectiveOwnLimits(a.risk_limits as StoredLimits, now).noviceMaxLeverage;
+    if (own === undefined || dec(own).lte(1)) return '1';
+    const cap = this.cfg.novice.maxLeverage;
+    return dec(own).gt(dec(cap)) ? cap : own;
+  }
+
+  /** Closing orders today (UTC) whose realised P&L net of fees is below zero. */
+  async losingTradesToday(accountId: string, now = Date.now(), c?: Queryable): Promise<number> {
+    const r = await (c ?? this.db.pool).query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM (
+         SELECT order_id FROM fills WHERE account_id = $1 AND ts >= $2 AND realized_pnl <> 0
+         GROUP BY order_id HAVING sum(realized_pnl - commission - fx_conversion_cost) < 0) x`,
+      [accountId, new Date(dayStartMs(now))],
+    );
+    return Number(r.rows[0]!.n);
+  }
+
+  /** Cooling-off and borrowing cap for a guarded account (goal 08 §4). */
+  async guardState(
+    a: AccountRow,
+    v: Valuation,
+    now = Date.now(),
+    c?: Queryable,
+  ): Promise<GuardState> {
+    const state = coolingOff(
+      {
+        losingTradesToday: await this.losingTradesToday(a.id, now, c),
+        dayPnl: v.dayPnl,
+        dayStartEquity: v.dayStartEquity,
+        dailyLossLimit: this.limits(a, now).dailyLossLimit,
+      },
+      this.cfg.novice.coolingOff,
+    );
+    return {
+      coolingOff: { ...state, until: state.active ? nextUtcDay(now) : null },
+      noviceMaxLeverage: this.noviceMaxLeverage(a, now),
     };
   }
 
@@ -212,13 +283,22 @@ export class AccountsService {
     const summary = summarizeAccount(dec(a.cash), positions);
     const dayStartEquity = await this.periodStart(a.id, 'day', utcDate(now), summary.equity, c);
     const weekStartEquity = await this.periodStart(a.id, 'week', weekStart(now), summary.equity, c);
+    const monthStartEquity = await this.periodStart(
+      a.id,
+      'month',
+      monthStart(now),
+      summary.equity,
+      c,
+    );
     return {
       summary,
       positions,
       dayStartEquity,
       weekStartEquity,
+      monthStartEquity,
       dayPnl: summary.equity.sub(dayStartEquity),
       weekPnl: summary.equity.sub(weekStartEquity),
+      monthPnl: summary.equity.sub(monthStartEquity),
     };
   }
 
@@ -227,7 +307,7 @@ export class AccountsService {
 
   private async periodStart(
     accountId: string,
-    period: 'day' | 'week',
+    period: 'day' | 'week' | 'month',
     start: string,
     equity: Decimal,
     c?: Queryable,
@@ -253,7 +333,8 @@ export class AccountsService {
     const v = await this.value(a, c);
     const ccy = a.base_currency;
     const m = (d: Decimal) => formatAmount(d, ccy);
-    const limits = this.limits(a);
+    const now = Date.now();
+    const limits = this.limits(a, now);
     const dailyLoss = v.dayPnl.isNegative() ? v.dayPnl.neg() : dec(0);
     return {
       id: a.id,
@@ -268,6 +349,7 @@ export class AccountsService {
       unrealizedPnl: m(v.summary.unrealizedPnl),
       dayPnl: m(v.dayPnl),
       weekPnl: m(v.weekPnl),
+      monthPnl: m(v.monthPnl),
       marginUsed: m(v.summary.marginUsed),
       marginFree: m(v.summary.marginFree),
       marginUsedPct: v.summary.equity.gt(0)
@@ -287,6 +369,9 @@ export class AccountsService {
         reason: a.halt_reason,
       },
       limits,
+      /** Goal 08: loosened limits waiting for their 24 h (guarded accounts). */
+      pendingLimits: pendingChanges(a.risk_limits as StoredLimits, now),
+      noviceMaxLeverage: this.noviceMaxLeverage(a, now),
       settings: { ...this.confirmSettingsView(a) },
       asOf: new Date().toISOString(),
     };
@@ -327,7 +412,19 @@ export class AccountsService {
     };
   }
 
-  async updateSettings(userId: string, patch: AccountSettingsPatch): Promise<AccountRow> {
+  /**
+   * Settings and own risk limits. `guarded` (novice-only users and anyone in the Novice view):
+   * tightening applies now, loosening waits `KORA_NOVICE_LOOSEN_DELAY_HOURS` (goal 08 §4).
+   * `extraLimits` carries server-only fields (the novice borrowing cap, set by /novice/leverage).
+   */
+  async updateSettings(
+    userId: string,
+    patch: AccountSettingsPatch,
+    opts: {
+      guarded?: boolean;
+      extraLimits?: Partial<Record<GuardedLimitField, string>>;
+    } = {},
+  ): Promise<AccountRow> {
     const acct = await this.ensure(userId);
     return this.db.tx(async (c) => {
       const a = await this.lock(c, acct.id);
@@ -335,7 +432,22 @@ export class AccountsService {
       if (patch.confirmMode) settings.confirmMode = patch.confirmMode;
       if (patch.confirmNotionalAbove) settings.confirmNotionalAbove = patch.confirmNotionalAbove;
       if (patch.confirmLossPctAbove) settings.confirmLossPctAbove = patch.confirmLossPctAbove;
-      const riskLimits = { ...a.risk_limits, ...(patch.riskLimits ?? {}) };
+      const now = Date.now();
+      const eff = this.limits(a, now);
+      const requested = { ...(patch.riskLimits ?? {}), ...(opts.extraLimits ?? {}) };
+      const change = applyLimitChanges(
+        a.risk_limits as StoredLimits,
+        requested,
+        (f) =>
+          f === 'noviceMaxLeverage'
+            ? this.noviceMaxLeverage(a, now)
+            : f === 'maxOrdersPerMinute'
+              ? String(eff.maxOrdersPerMinute)
+              : (eff as unknown as Record<string, string | undefined>)[f],
+        now,
+        opts.guarded ? this.cfg.novice.loosenDelayMs : 0,
+      );
+      const riskLimits = change.stored;
       let base = a.base_currency;
       if (patch.baseCurrency && patch.baseCurrency !== a.base_currency) {
         const fills = await c.query('SELECT 1 FROM fills WHERE account_id = $1 LIMIT 1', [a.id]);
@@ -364,7 +476,13 @@ export class AccountsService {
           entity: 'account',
           entityId: a.id,
           payload: JSON.parse(
-            JSON.stringify({ changed: patch, previousBaseCurrency: a.base_currency }),
+            JSON.stringify({
+              changed: patch,
+              previousBaseCurrency: a.base_currency,
+              guarded: !!opts.guarded,
+              limitsApplied: change.applied,
+              limitsPending: change.pending,
+            }),
           ) as Record<string, never>,
         },
         c,

@@ -17,3 +17,4 @@ Numbering:
 | [0006](0006-robot-trader.md) | Robot trader: DSL, single evaluator, backtester, bot runner ↔ OMS, promotion | Accepted |
 | [0007](0007-ai-copilot.md) | AI copilot: gateway, read-only/draft tools, calibration table, safety, evals, threat model | Accepted |
 | [0007B](0007b-market-intelligence.md) | Market intelligence: scanner, regime filter, calibrated trend forecasts, news pipeline, Market Radar, threat model additions | Accepted |
+| [0008](0008-novice-view.md) | Novice view: server-side guardrails, server-built ticket, disclosures interface, i18n, PWA | Accepted |

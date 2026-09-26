@@ -282,6 +282,10 @@ export interface AccountView {
   limits: RiskLimits;
   settings: { confirmMode: ConfirmMode; confirmNotionalAbove: string; confirmLossPctAbove: string };
   asOf: string;
+  /** Goal 08: month-to-date P&L, loosened limits waiting 24 h, and the novice borrowing cap. */
+  monthPnl?: string;
+  pendingLimits?: Array<{ field: string; value: string; requestedAt: string; effectiveAt: string }>;
+  noviceMaxLeverage?: string;
 }
 
 export interface AccountSettingsPatch {

@@ -12,9 +12,11 @@ import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
+import { DisclosuresModule } from './disclosures/disclosures.module';
 import { HealthController } from './health/health.controller';
 import { IntelModule } from './intel/intel.module';
 import { MarketDataModule } from './market-data/market-data.module';
+import { NoviceModule } from './novice/novice.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { RobotsModule } from './robots/robots.module';
 import { SimModule } from './sim/sim.module';
@@ -59,6 +61,9 @@ import { TradingModule } from './trading/trading.module';
     RobotsModule,
     AiModule,
     IntelModule,
+    // Goal 08: Novice view and the disclosures interface (goal 09 owns the registry).
+    DisclosuresModule,
+    NoviceModule,
   ],
   controllers: [HealthController, AdminController],
   providers: [

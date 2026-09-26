@@ -13,6 +13,9 @@ function csp(nonce: string, dev: boolean, wsHost: string): string {
     "font-src 'self' data:",
     // The market data WebSocket lives on the api port of the same host (goal 02).
     `connect-src 'self' ws://${wsHost} wss://${wsHost}${dev ? ' ws: wss:' : ''}`,
+    // Goal 08 PWA: the offline-shell service worker and the web app manifest (same origin only).
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

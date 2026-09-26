@@ -85,6 +85,15 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - Web: Pro `/radar` (Market Radar), public `/reliability`; `WhatsMovingCard` for the novice Home.
 - Every data and news provider is a flagged stub until licensed (OQ-M3, OQ-M4). Design: ADR 0007B. Results: `docs/plans/07b-market-intelligence.md`.
 
+## Novice view (goal 08, PAPER only)
+
+- Routes: `/onboarding` (5 short screens, the risk warning acknowledged against its version, daily and monthly loss limits), `/home` (balance, holdings in words, the 3-step trade with "most you could lose", limits), `/practice`, `/auto-invest` (ready-made robots only), `/learn` (lessons, word list, `/learn/check` 5-question check). EN and FR (switch in the top bar); installable PWA with an offline "prices paused" shell.
+- Guardrails are server-side for novice-only users and anyone in the Novice view: market orders with a stop only, no borrowing (1×) unless the knowledge check is passed and a 24 h wait is over, loosened limits wait 24 h (tightening is immediate), cooling-off until the next day after 3 losing trades, a 5 % day loss or the daily limit, and an optional monthly loss limit.
+- API: `/novice/profile`, `/novice/onboarding/complete`, `/novice/limits`, `/novice/leverage`, `/novice/summary`, `/novice/assets` (curated list from the registry), `/novice/ticket` (builds the order and returns the unchanged `/orders/preview`), `/novice/knowledge-check(/attempts)`, `/novice/auto-invest(/:id/pause|resume|go-live)`, `/disclosures/:id(/acknowledgements)`, `/sim/scenarios`, `/auth/mfa/opt-in`.
+- Checks: `pnpm --filter @kora/web i18n:check` (EN/FR keys), `pnpm --filter @kora/web readability` (writes `docs/novice/readability-report.md`), ESLint forbids confetti/streak/leaderboard components in novice files.
+- With goals 07/07B: "Explain this to me" (novice copilot, `KORA_EXPLAIN_THIS=on`) on Home, the trade review, Learn, Practice and Auto-invest; "What's moving and why" on Home, in EN and FR.
+- Design: ADR 0008. Results: `docs/plans/08-novice-view.md`.
+
 ## Layout
 
 ```

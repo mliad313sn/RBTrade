@@ -1,38 +1,25 @@
-import { Panel } from '@kora/ui';
+import { isNoviceOnly } from '@kora/domain';
+import { redirect } from 'next/navigation';
 
-import { NoviceTradeCard } from '@/components/NoviceTradeCard';
-import { PracticeBalance } from '@/components/PracticeBalance';
+import { NoviceHome } from '@/components/novice/NoviceHome';
+import { requireMe, serverClient } from '@/lib/api-server';
 import { DEFAULT_SYMBOL } from '@/lib/modes';
 
 export const metadata = { title: 'Home' };
 
+/**
+ * Novice home (goal 08). Data is fetched on the server so the balance is in the first paint
+ * (mobile LCP). Novice-only users who have not finished onboarding go there first.
+ */
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ symbol?: string }> }) {
   const symbol = ((await searchParams).symbol ?? DEFAULT_SYMBOL).toUpperCase();
-  return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr_0.9fr]">
-      <h1 className="k-sr-only">Home</h1>
-      <div className="flex flex-col gap-5">
-        <Panel title="Your practice account">
-          <PracticeBalance />
-        </Panel>
-        <Panel title="What you own">
-          <p className="text-muted m-0">Nothing yet.</p>
-        </Panel>
-      </div>
-      <NoviceTradeCard symbol={symbol} />
-      <div className="flex flex-col gap-5">
-        <Panel title="Your limits">
-          <p className="m-0 text-muted">You set these. Loosening one takes 24 hours. Borrowed money (leverage): Off.</p>
-        </Panel>
-        <Panel title="Learn in 2 minutes">
-          <p className="m-0">
-            <strong>Spread</strong>: the small gap between the buy and sell price. It&apos;s a cost you pay on every trade.
-          </p>
-          <p className="mb-0">
-            <strong>Stop (safety net)</strong>: an automatic sell that limits how much you can lose.
-          </p>
-        </Panel>
-      </div>
-    </div>
-  );
+  const [me, client] = await Promise.all([requireMe(), serverClient()]);
+  const [profile, summary, assets, autoInvest] = await Promise.all([
+    client.noviceProfile().catch(() => null),
+    client.noviceSummary().catch(() => null),
+    client.noviceAssets().catch(() => null),
+    client.autoInvest().catch(() => null),
+  ]);
+  if (profile && !profile.onboarding.completed && isNoviceOnly(me.roles)) redirect('/onboarding');
+  return <NoviceHome initial={{ profile, summary, assets, autoInvest }} symbol={symbol} />;
 }

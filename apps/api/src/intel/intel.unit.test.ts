@@ -358,7 +358,10 @@ describe('trend cards', () => {
       headline: 'Toyota Motor has gone up more than usual. That is a big move for it.',
       confidence: null,
       whySource: { id: 'n1' },
+      move: 'up',
+      odds: null,
     });
+    expect(it1.news?.source).toBeTruthy();
     for (const kind of ['down', 'vol_regime', 'reversal', 'range'] as const)
       expect(
         movingItem(buildTrendCard(row({ trend: { kind, score: 0.5 } }), '1d', null, null, [], 'k'))

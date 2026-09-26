@@ -13,7 +13,8 @@ import {
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   AUDIT_READ_ALL_ROLES,
-  hasAnyRole,
+  isNoviceOnly,
+  PRO_ROLES,
   ROBOT_BUILDER_ROLES,
   SYMBOL_RE,
   TIMEFRAMES,
@@ -35,7 +36,7 @@ import { StripService } from './strip.service';
 import { AiToolBackend } from './tool-backend.service';
 
 const RESEARCH: Role[] = [...ROBOT_BUILDER_ROLES, ...AUDIT_READ_ALL_ROLES];
-const PRO: Role[] = ['trader', 'quant', 'risk_officer', 'admin'];
+const PRO: Role[] = [...PRO_ROLES];
 
 const ContextSchema = z
   .strictObject({
@@ -98,7 +99,7 @@ const WhySchema = z.strictObject({ question: z.string().trim().max(500).optional
 
 /** Novice-only accounts (and anyone asking in novice mode) get the plain-language mode. */
 function modeFor(p: Principal, requested?: AiMode): AiMode {
-  if (!hasAnyRole(p.roles, PRO)) return 'novice';
+  if (isNoviceOnly(p.roles)) return 'novice';
   return requested ?? 'pro';
 }
 

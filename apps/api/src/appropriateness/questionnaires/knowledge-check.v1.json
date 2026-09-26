@@ -1,0 +1,64 @@
+{
+  "id": "knowledge-check",
+  "version": 1,
+  "kind": "knowledge_check",
+  "title": "5-question check",
+  "intro": "SIMULATED placeholder questions pending Compliance review (OQ-C1). Five short questions about the risks of borrowing and robots. Get 4 right to unlock the next step. Your answers are checked on our server and not stored; only your score is kept.",
+  "locale": "en",
+  "simulated": true,
+  "reviewStatus": "placeholder_pending_compliance_review",
+  "passMarkPct": 80,
+  "cooldownMinutes": 60,
+  "questions": [
+    {
+      "id": "borrowing",
+      "topic": "Borrowing (leverage)",
+      "prompt": "You borrow so your trade is twice as big as your money. The price falls 10%. About how much of your own money do you lose?",
+      "options": [
+        { "id": "a", "label": "About 10%.", "points": 0 },
+        { "id": "b", "label": "About 20%.", "points": 1 },
+        { "id": "c", "label": "Nothing, the borrowed money takes the loss.", "points": 0 }
+      ]
+    },
+    {
+      "id": "safety_net",
+      "topic": "Safety net",
+      "prompt": "Your safety net is set 3% below your buy price. The market opens 8% lower after the weekend. What is most likely?",
+      "options": [
+        { "id": "a", "label": "The trade closes at exactly 3% down.", "points": 0 },
+        { "id": "b", "label": "The trade closes near 8% down, because the price jumped past the safety net.", "points": 1 },
+        { "id": "c", "label": "The trade stays open until the price comes back.", "points": 0 }
+      ]
+    },
+    {
+      "id": "fees",
+      "topic": "Spread and fees",
+      "prompt": "You buy and sell straight away at the same market price. What happens?",
+      "options": [
+        { "id": "a", "label": "I end up with the same money.", "points": 0 },
+        { "id": "b", "label": "I end up with a bit less, because of the spread and fees.", "points": 1 },
+        { "id": "c", "label": "I end up with a bit more.", "points": 0 }
+      ]
+    },
+    {
+      "id": "robot_results",
+      "topic": "Robot results",
+      "prompt": "A robot made money in a test on past prices. What does that tell you?",
+      "options": [
+        { "id": "a", "label": "It will make money from now on.", "points": 0 },
+        { "id": "b", "label": "It worked on those past prices. It can still lose money in the future.", "points": 1 },
+        { "id": "c", "label": "It cannot lose more than it made in the test.", "points": 0 }
+      ]
+    },
+    {
+      "id": "losing_streak",
+      "topic": "Losses are normal",
+      "prompt": "You lost three trades in a row today. What is the safest next step?",
+      "options": [
+        { "id": "a", "label": "Take a break and look at what happened.", "points": 1 },
+        { "id": "b", "label": "Trade bigger to win it back quickly.", "points": 0 },
+        { "id": "c", "label": "Remove the safety net so trades have more room.", "points": 0 }
+      ]
+    }
+  ]
+}

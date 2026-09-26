@@ -14,6 +14,11 @@ export interface ExplainThisProps {
   screenText?: string;
   context?: AiContext;
   label?: string;
+  /** Localised copy from the caller (goal 08 i18n); English defaults. */
+  busyLabel?: string;
+  failedText?: string;
+  /** Short line shown under the answer (e.g. that the answer is in English). */
+  note?: string;
 }
 
 /**
@@ -25,6 +30,9 @@ export function ExplainThis({
   screenText,
   context,
   label = 'Explain this to me',
+  busyLabel = 'Explaining…',
+  failedText = 'The explainer is not available right now.',
+  note,
 }: ExplainThisProps) {
   const [text, setText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +48,7 @@ export function ExplainThis({
       const a = await aiApi.explain({ topic, screenText, context });
       setText(a.status === 'ok' ? a.answer : a.message);
     } catch {
-      setText('The explainer is not available right now.');
+      setText(failedText);
     } finally {
       setBusy(false);
     }
@@ -57,7 +65,7 @@ export function ExplainThis({
         disabled={busy}
       >
         <span aria-hidden="true">✦ </span>
-        {busy ? 'Explaining…' : label}
+        {busy ? busyLabel : label}
       </Button>
       {text !== null ? (
         <div
@@ -68,6 +76,7 @@ export function ExplainThis({
           data-testid="explain-this-text"
         >
           {text.split('\n').map((l, i) => (l.trim() ? <p key={i}>{l}</p> : null))}
+          {note ? <p className="ai-explain__note">{note}</p> : null}
         </div>
       ) : null}
     </div>

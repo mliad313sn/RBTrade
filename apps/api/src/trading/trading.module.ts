@@ -44,6 +44,9 @@ import { TradingRegistryService } from './trading-registry.service';
     FxService,
     KillSwitchService,
     EngineLoopService,
+    // Goal 08 (novice ticket and guardrails).
+    MarketViewService,
+    TRADING_CONFIG,
   ],
 })
 export class TradingModule {}

@@ -72,3 +72,83 @@ select:focus-visible,
   height: 3px;
   background: repeating-linear-gradient(135deg, var(--k-warn) 0 10px, var(--k-bg) 10px 20px);
 }
+
+/* ---- Goal 08: Novice view, 390 px first ------------------------------------------------------
+ * Metric-matched fallback for Figtree while it loads (measured in Chromium: Arial is 0.85 %
+ * narrower; Figtree ascent 0.95 em, descent 0.25 em), so the banner and headline do not reflow
+ * when the web font swaps in (mobile CLS). */
+@font-face {
+  font-family: 'Figtree Fallback';
+  src: local('Arial'), local('Liberation Sans'), local('Helvetica');
+  size-adjust: 100.85%;
+  ascent-override: 94.2%;
+  descent-override: 24.8%;
+  line-gap-override: 0%;
+}
+/* Same for the Fraunces headline: Times New Roman is 12.6 % narrower (ascent 0.98, descent 0.26). */
+@font-face {
+  font-family: 'Fraunces Fallback';
+  src: local('Times New Roman'), local('Liberation Serif'), local('Times');
+  size-adjust: 114.4%;
+  ascent-override: 85.7%;
+  descent-override: 22.7%;
+  line-gap-override: 0%;
+}
+[data-theme='novice-light'][data-theme] {
+  --k-font-ui: 'Figtree', 'Figtree Fallback', system-ui, sans-serif;
+  --k-font-display: 'Fraunces Variable', 'Fraunces', 'Fraunces Fallback', serif;
+}
+/* Every interactive target is at least 44 × 44 px (goal 08 §8). Dialogs portal to <body>, and
+ * <html> carries the novice theme, so these selectors match them too. */
+[data-theme='novice-light'] .k-btn.k-btn,
+[data-theme='novice-light'] .k-btn--sm.k-btn--sm,
+[data-theme='novice-light'] .k-seg__opt.k-seg__opt,
+[data-theme='novice-light'] .k-input.k-input,
+[data-theme='novice-light'] .k-select.k-select {
+  min-height: 44px;
+}
+[data-theme='novice-light'] .k-seg__opt.k-seg__opt {
+  min-width: 44px;
+}
+[data-theme='novice-light'] .k-select.k-select {
+  width: 100%;
+  max-width: 100%;
+}
+[data-theme='novice-light'] .k-seg__opt.k-seg__opt[aria-pressed='true'] {
+  background: var(--k-primary);
+  color: var(--k-on-primary);
+}
+/* Prototype: card titles in the sans face; only the balance and "Make a trade" use the display face. */
+[data-theme='novice-light'] .k-panel__title.k-panel__title {
+  font-family: var(--k-font-ui);
+  font-weight: 600;
+  font-size: 17px;
+}
+[data-theme='novice-light'] .k-dialog__title.k-dialog__title {
+  font-size: 22px;
+}
+[data-theme='novice-light'] .k-dialog__desc.k-dialog__desc {
+  font-size: 15px;
+}
+/* The review sheet and other dialogs slide up from the bottom on phones. */
+@media (max-width: 640px) {
+  [data-theme='novice-light'] .k-dialog.k-dialog {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100vw;
+    max-height: 92vh;
+    border-radius: var(--k-radius-lg) var(--k-radius-lg) 0 0;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  [data-theme='novice-light'] .k-dialog__actions.k-dialog__actions {
+    flex-direction: column-reverse;
+  }
+  [data-theme='novice-light'] .k-dialog__actions.k-dialog__actions > * {
+    width: 100%;
+  }
+}
+[data-theme='novice-light'] input[type='range'][type='range'] {
+  min-height: 44px;
+}

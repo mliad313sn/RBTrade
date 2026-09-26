@@ -40,6 +40,21 @@ import type {
   UpdatePreferences,
   UserPreferences,
 } from './types.js';
+import type { PaperAnalytics, PaperProjection, PaperProjectRequest, ProjectRequest, SavedScenario, SimResult } from './sim-types.js';
+import type {
+  AutoInvestList,
+  DisclosureAcknowledgement,
+  DisclosureLocale,
+  DisclosureResponse,
+  KnowledgeAttemptResponse,
+  KnowledgeCheckResponse,
+  MfaOptInResponse,
+  NoviceAsset,
+  NoviceProfile,
+  NoviceSummary,
+  NoviceTicketRequest,
+  NoviceTicketResponse,
+} from './novice-types.js';
 
 export class KoraApiError extends Error {
   constructor(
@@ -299,6 +314,114 @@ export class KoraClient {
 
   verifyAudit() {
     return this.request<AuditVerifyResponse>('GET', '/audit/verify');
+  }
+
+  // ---- gain simulator (goal 05; typed in goal 08, B-506) ----
+
+  simProject(body: ProjectRequest) {
+    return this.request<SimResult>('POST', '/sim/project', body);
+  }
+
+  /** Block bootstrap of a trade list (goal 06 backtests send their OOS R multiples here). */
+  simFromTrades(body: Record<string, unknown>) {
+    return this.request<SimResult>('POST', '/sim/from-trades', body);
+  }
+
+  simPaperAnalytics() {
+    return this.request<{ source: PaperProjection['source']; analytics: PaperAnalytics }>('GET', '/sim/paper/analytics');
+  }
+
+  simPaperProject(body: PaperProjectRequest) {
+    return this.request<PaperProjection>('POST', '/sim/paper/project', body);
+  }
+
+  /** B-505: saved, named scenarios. */
+  simScenarios(kind?: 'practice' | 'pro') {
+    return this.request<{ scenarios: SavedScenario[]; max: number }>('GET', `/sim/scenarios${query({ kind })}`);
+  }
+
+  saveSimScenario(body: { kind: 'practice' | 'pro'; name: string; input: Record<string, unknown>; overwrite?: boolean }) {
+    return this.request<SavedScenario>('POST', '/sim/scenarios', body);
+  }
+
+  deleteSimScenario(id: string) {
+    return this.request<{ deleted: true; id: string }>('DELETE', `/sim/scenarios/${encodeURIComponent(id)}`);
+  }
+
+  // ---- Novice view (goal 08) ----
+
+  noviceProfile() {
+    return this.request<NoviceProfile>('GET', '/novice/profile');
+  }
+
+  completeOnboarding() {
+    return this.request<NoviceProfile>('POST', '/novice/onboarding/complete');
+  }
+
+  /** Tightening applies now; in the Novice view a loosening waits 24 h (server rule). */
+  setNoviceLimits(body: { dailyLossLimit?: string; monthlyLossLimit?: string }) {
+    return this.request<NoviceProfile>('PUT', '/novice/limits', body);
+  }
+
+  setNoviceLeverage(enabled: boolean) {
+    return this.request<NoviceProfile>('PUT', '/novice/leverage', { enabled });
+  }
+
+  noviceSummary() {
+    return this.request<NoviceSummary>('GET', '/novice/summary');
+  }
+
+  noviceAssets() {
+    return this.request<{ currency: string; assets: NoviceAsset[]; simulated: true }>('GET', '/novice/assets');
+  }
+
+  /** Builds the novice order and returns the unchanged /orders/preview answer for it. */
+  noviceTicket(body: NoviceTicketRequest) {
+    return this.request<NoviceTicketResponse>('POST', '/novice/ticket', body);
+  }
+
+  knowledgeCheck() {
+    return this.request<KnowledgeCheckResponse>('GET', '/novice/knowledge-check');
+  }
+
+  submitKnowledgeCheck(questionnaireId: string, version: number, answers: Record<string, string>) {
+    return this.request<KnowledgeAttemptResponse>('POST', '/novice/knowledge-check/attempts', { questionnaireId, version, answers });
+  }
+
+  autoInvest() {
+    return this.request<AutoInvestList>('GET', '/novice/auto-invest');
+  }
+
+  startAutoInvest(templateId: string, amount: string) {
+    return this.request<AutoInvestList>('POST', '/novice/auto-invest', { templateId, amount });
+  }
+
+  pauseAutoInvest(robotId: string) {
+    return this.request<AutoInvestList>('POST', `/novice/auto-invest/${encodeURIComponent(robotId)}/pause`);
+  }
+
+  resumeAutoInvest(robotId: string) {
+    return this.request<AutoInvestList>('POST', `/novice/auto-invest/${encodeURIComponent(robotId)}/resume`);
+  }
+
+  disclosure(id: string, locale: DisclosureLocale = 'en') {
+    return this.request<DisclosureResponse>('GET', `/disclosures/${encodeURIComponent(id)}${query({ locale })}`);
+  }
+
+  acknowledgeDisclosure(
+    id: string,
+    body: { version: string; contentHash: string; locale: DisclosureLocale; context?: DisclosureAcknowledgement['context'] },
+  ) {
+    return this.request<{ acknowledgement: DisclosureAcknowledgement; acknowledged: true }>(
+      'POST',
+      `/disclosures/${encodeURIComponent(id)}/acknowledgements`,
+      body,
+    );
+  }
+
+  /** B-017: optional two-step sign-in; finish with mfaVerify(mfaToken, code). */
+  mfaOptIn() {
+    return this.request<MfaOptInResponse>('POST', '/auth/mfa/opt-in');
   }
 }
 

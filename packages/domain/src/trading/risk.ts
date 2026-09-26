@@ -32,6 +32,9 @@ export const RISK_CODES = [
   'TAKE_PROFIT_WRONG_SIDE',
   'TRADING_HALTED',
   'FOK_INSUFFICIENT_DEPTH',
+  // Goal 08 (novice guardrails and the monthly loss limit).
+  'MONTHLY_LOSS_LIMIT',
+  'NOVICE_COOLING_OFF',
 ] as const;
 export type RiskCode = (typeof RISK_CODES)[number];
 
@@ -48,7 +51,12 @@ export interface RiskLimits {
   dailyLossLimit: string;
   weeklyLossLimit: string;
   maxOrdersPerMinute: number;
+  /** Optional (goal 08): no platform default; set by the account holder. */
+  monthlyLossLimit?: string;
 }
+
+/** Why a guarded (Novice) account is cooling off until the next day (goal 08). */
+export type CoolingOffReason = 'losing_trades' | 'daily_loss_pct' | 'daily_loss_limit';
 
 export type MarketDataState = 'ok' | 'no_quote' | 'stale' | 'feed_not_ok';
 
@@ -86,6 +94,12 @@ export interface RiskContext {
   ordersLastMinute: number;
   limits: RiskLimits;
   novice: boolean;
+  /** Novice borrowing cap as a multiple of equity: 1 = no leverage (the default). */
+  noviceMaxLeverage?: Decimal;
+  /** Set when a guarded account is cooling off (goal 08); only reducing orders pass. */
+  coolingOff?: CoolingOffReason | null;
+  /** Month-to-date P&L in base currency (goal 08 monthly loss limit). */
+  monthPnl?: Decimal;
   halted: boolean;
   previewIssues: RiskViolation[];
   /** FOK: size available now within the limit. */
@@ -168,10 +182,22 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
         'NOVICE_STOP_REQUIRED',
         'Add a stop loss. In the simple view every new trade needs one so the loss is capped.',
       );
-    if (!reducing && ctx.grossExposureAfter.gt(ctx.equity))
+    const cap = ctx.noviceMaxLeverage ?? new Decimal(1);
+    if (!reducing && ctx.grossExposureAfter.gt(ctx.equity.mul(cap)))
       add(
         'NOVICE_LEVERAGE',
-        'This trade would need borrowing (leverage), which is off in the simple view. Reduce the size.',
+        cap.lte(1)
+          ? 'This trade would need borrowing (leverage), which is off in the simple view. Reduce the size.'
+          : `This trade would borrow more than ${cap.toFixed()}× your balance, the most allowed in the simple view. Reduce the size.`,
+      );
+    if (!reducing && ctx.coolingOff)
+      add(
+        'NOVICE_COOLING_OFF',
+        ctx.coolingOff === 'losing_trades'
+          ? 'Time for a break: you had several losing trades today. New trades open again tomorrow; you can still close trades.'
+          : ctx.coolingOff === 'daily_loss_pct'
+            ? 'Time for a break: today’s loss is large for your balance. New trades open again tomorrow; you can still close trades.'
+            : 'Time for a break: you reached your daily loss limit. New trades open again tomorrow; you can still close trades.',
       );
   }
 
@@ -223,6 +249,15 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
       add(
         'DAILY_LOSS_LIMIT',
         `Today's loss has reached the ${money(dec(ctx.limits.dailyLossLimit))} daily limit. Only orders that reduce positions are allowed until tomorrow.`,
+      );
+    if (
+      ctx.limits.monthlyLossLimit !== undefined &&
+      ctx.monthPnl &&
+      ctx.monthPnl.neg().gte(dec(ctx.limits.monthlyLossLimit))
+    )
+      add(
+        'MONTHLY_LOSS_LIMIT',
+        `This month's loss has reached the ${money(dec(ctx.limits.monthlyLossLimit))} monthly limit. Only orders that reduce positions are allowed.`,
       );
     if (ctx.weekPnl.neg().gte(dec(ctx.limits.weeklyLossLimit)))
       add(

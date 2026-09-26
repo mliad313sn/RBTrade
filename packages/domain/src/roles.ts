@@ -7,6 +7,17 @@ export const MFA_REQUIRED_ROLES: readonly Role[] = ['trader', 'quant', 'risk_off
 /** Roles allowed to use the strategy builder (/robots/*). */
 export const ROBOT_BUILDER_ROLES: readonly Role[] = ['trader', 'quant', 'admin'];
 
+/**
+ * Roles that unlock the Pro tools. An account with none of them is **novice-only**: it is always
+ * guarded (goal 03/08 `OmsService.isNovice`, whatever view it is in), and the copilot and market
+ * intelligence always answer it in novice mode (goals 07/07B). One definition for all of them.
+ */
+export const PRO_ROLES: readonly Role[] = ['trader', 'quant', 'risk_officer', 'admin'];
+
+export function isNoviceOnly(roles: readonly Role[]): boolean {
+  return !roles.some((r) => PRO_ROLES.includes(r));
+}
+
 /** Roles that can read the full audit log (others see their own events). */
 export const AUDIT_READ_ALL_ROLES: readonly Role[] = ['risk_officer', 'admin'];
 

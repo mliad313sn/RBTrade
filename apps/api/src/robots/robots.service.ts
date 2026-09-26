@@ -86,6 +86,8 @@ export class RobotsService {
     userId: string,
     roles: Role[],
     body: { name: string; versionId: string; allocation: string; limits: RobotLimits },
+    /** Goal 08 (B-614): template robots created through the guarded Novice path. */
+    opts: { origin?: 'builder' | 'novice_template'; templateId?: string } = {},
   ) {
     const { version, strategy } = await this.strategies.version(userId, roles, body.versionId);
     if (strategy.owner_id !== userId)
@@ -94,8 +96,8 @@ export class RobotsService {
     const id = await this.db.tx(async (c) => {
       const r = (
         await c.query<RobotRow>(
-          `INSERT INTO robots (owner_id, account_id, strategy_id, version_id, name, allocation, limits, limits_hash)
-           VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8) RETURNING *`,
+          `INSERT INTO robots (owner_id, account_id, strategy_id, version_id, name, allocation, limits, limits_hash, origin, template_id)
+           VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10) RETURNING *`,
           [
             userId,
             account.id,
@@ -105,6 +107,8 @@ export class RobotsService {
             body.allocation,
             JSON.stringify(body.limits),
             limitsHash(body.limits),
+            opts.origin ?? 'builder',
+            opts.templateId ?? null,
           ],
         )
       ).rows[0]!;
@@ -124,6 +128,8 @@ export class RobotsService {
             allocation: body.allocation,
             limits: limitsPayload(body.limits),
             mode: 'PAPER',
+            origin: opts.origin ?? 'builder',
+            ...(opts.templateId ? { templateId: opts.templateId } : {}),
           },
         },
         c,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasAnyRole, isRole, requiresMfa, ROBOT_BUILDER_ROLES } from './roles.js';
+import { hasAnyRole, isNoviceOnly, isRole, requiresMfa, ROBOT_BUILDER_ROLES } from './roles.js';
 
 describe('roles', () => {
   it('requires MFA for every non-novice role', () => {
@@ -18,5 +18,13 @@ describe('roles', () => {
     expect(isRole('admin')).toBe(true);
     expect(isRole('root')).toBe(false);
     expect(isRole(3)).toBe(false);
+  });
+  it('novice-only means no Pro role (guardrails and the copilot novice mode share it)', () => {
+    expect(isNoviceOnly(['novice'])).toBe(true);
+    expect(isNoviceOnly([])).toBe(true);
+    for (const r of ['trader', 'quant', 'risk_officer', 'admin'] as const) {
+      expect(isNoviceOnly([r])).toBe(false);
+      expect(isNoviceOnly(['novice', r])).toBe(false);
+    }
   });
 });

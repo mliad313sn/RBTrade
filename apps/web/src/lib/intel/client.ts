@@ -106,6 +106,10 @@ export interface MovingItem {
   why: string | null;
   whySource: { id: string; source: string; url: string } | null;
   confidence: string | null;
+  /** Structured facts for localised wording (goal 08 i18n); older servers omit them. */
+  move?: 'up' | 'down' | 'choppy' | 'turned' | 'quiet';
+  news?: { title: string; source: string } | null;
+  odds?: { per100: number; n: number } | null;
 }
 
 export interface AlertRule {
