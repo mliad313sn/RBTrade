@@ -467,7 +467,7 @@ export function TicketPanel() {
             <option value="gtd">GTD</option>
           </select>
         </div>
-        <div className="flex flex-col justify-end gap-1 pb-0.5 text-xs">
+        <div className="tk-check">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} data-testid="ticket-reduce-only" /> Reduce-only
           </label>

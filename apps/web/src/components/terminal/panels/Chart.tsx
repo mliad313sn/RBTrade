@@ -145,6 +145,8 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
   const [lastPrice, setLastPrice] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const dayOpen = useRef<string | null>(null);
+  /** Prices that must stay visible (working orders, drawn lines): folded into the autoscale range. */
+  const keepVisible = useRef<number[]>([]);
   const precision = spec?.pricePrecision ?? 5;
   const tick = spec?.tickSize ?? '0.00001';
 
@@ -172,6 +174,12 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       wickDownColor: c.down,
       priceLineColor: c.accent,
       priceLineStyle: LineStyle.Dotted,
+      autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null } | null) => {
+        const r = original();
+        const extra = keepVisible.current;
+        if (!r?.priceRange || extra.length === 0) return r;
+        return { ...r, priceRange: { minValue: Math.min(r.priceRange.minValue, ...extra), maxValue: Math.max(r.priceRange.maxValue, ...extra) } };
+      },
     });
     const vol = chart.addSeries(HistogramSeries, { priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
@@ -412,6 +420,7 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     const p = palette();
     const lines = orderLinesRef.current;
     const seen = new Set<string>();
+    keepVisible.current = [...symbolOrders.map((o) => Number(orderLine(o)!.price)), ...drawings.h];
     for (const o of symbolOrders) {
       const l = orderLine(o)!;
       const price = drag?.id === o.id ? drag.price : l.price;
@@ -428,7 +437,7 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       }
     }
     layoutOverlay();
-  }, [symbolOrders, drag, layoutOverlay, dataVersion]);
+  }, [symbolOrders, drag, layoutOverlay, dataVersion, drawings.h]);
 
   // ---- drawings ----
   useEffect(() => {
@@ -555,7 +564,6 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
           —
         </span>
         <span ref={chgRef} className="ch-chg k-num" />
-        <span ref={readoutRef} className="ch-ohlc k-num" data-testid="chart-ohlc" aria-label="Candle open, high, low, close" />
         <div className="ch-tfs" role="radiogroup" aria-label="Timeframe">
           {CHART_TIMEFRAMES.map((t) => (
             <button key={t} type="button" role="radio" aria-checked={tf === t} className={`ch-tf ${tf === t ? 'is-on' : ''}`} onClick={() => setTf(t)} data-testid={`tf-${t}`}>
@@ -593,6 +601,7 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
         </details>
       </div>
       <div className="ch-legend">
+        <span ref={readoutRef} className="ch-ohlc k-num" data-testid="chart-ohlc" aria-label="Candle open, high, low, close" />
         {legend.map((l) => (
           <span key={l}>— {l}</span>
         ))}

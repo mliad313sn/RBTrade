@@ -109,6 +109,7 @@ function LayoutDialog({ dock, onClose }: { dock: DockviewApi; onClose: () => voi
     if (!isCompleteLayout(l.layout)) return toast.push('That layout is from an older version; reset and save it again.', 'critical');
     try {
       dock.fromJSON(l.layout as unknown as SerializedDockview);
+      saveLocalLayout(dock.toJSON());
       toast.push(`Layout "${l.name}" loaded`, 'success', 3000);
       onClose();
     } catch {
@@ -206,13 +207,14 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
   }, [dock, positionsCount]);
 
   const focusPanel = useCallback(
-    (target: PanelTarget) => {
+    (target: PanelTarget, focusRoot = true) => {
       const id: PanelId = FOCUS_PANELS[target];
       const panel = dock?.getPanel(id);
       if (!panel) return;
       panel.api.setActive();
+      if (!focusRoot) return;
+      if (target === 'ticket') return requestFocus('ticket');
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-panel-root="${id}"]`)?.focus());
-      if (target === 'ticket') requestFocus('ticket');
     },
     [dock, requestFocus],
   );
@@ -245,7 +247,7 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
       if (typing || dialogOpen) return;
       if (is('ticketBuy') || is('ticketSell')) {
         e.preventDefault();
-        focusPanel('ticket');
+        focusPanel('ticket', false);
         requestFocus(is('ticketBuy') ? 'ticket-buy' : 'ticket-sell');
       } else if (is('cheatSheet')) {
         e.preventDefault();

@@ -76,12 +76,12 @@ export function StatusBar() {
         </span>
         <span className="text-text">{LABEL[conn.state]}</span>
       </span>
-      <span>Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}</span>
+      <span className="inline-block min-w-[11ch]">Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}</span>
       <span className="hidden md:inline" data-testid="status-feed">
         Feed: simulated{feed.feed ? ` · ${feed.feed}` : ''}
         {feed.socket === 'reconnecting' ? ' · reconnecting' : ''}
       </span>
-      {feed.tickP95 !== null ? <span className="hidden lg:inline">Tick→paint p95 {Math.round(feed.tickP95)} ms</span> : null}
+      <span className="hidden lg:inline-block min-w-[17ch]" data-testid="status-tick">{feed.tickP95 !== null ? `Tick→paint p95 ${Math.round(feed.tickP95)} ms` : ''}</span>
       <span className="hidden lg:inline">Robots: none</span>
       <span className="ml-auto" aria-label={`${clockLabel(mode)} time ${utc}`} data-testid="status-clock">
         {clockLabel(mode)} {utc}

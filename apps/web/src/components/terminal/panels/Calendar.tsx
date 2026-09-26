@@ -40,7 +40,7 @@ export function CalendarPanel({ onTitle }: { onTitle?: (t: string) => void }) {
   }, []);
 
   return (
-    <div className="cal h-full overflow-auto" data-testid="calendar" data-panel-root="calendar" tabIndex={-1}>
+    <div className="cal h-full overflow-auto" data-testid="calendar" data-panel-root="calendar" tabIndex={0} aria-label="Economic calendar">
       {events === null ? (
         <p className="text-muted text-xs m-0">Loading…</p>
       ) : events.length === 0 ? (
