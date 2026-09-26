@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from . import __version__
+from .bt.routes import router as bt_router
 from .config import Settings, load_settings
 from .sim.engine import warm_up
 from .sim.routes import router as sim_router
@@ -47,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(sim_router)
+    app.include_router(bt_router)
     return app
 
 
