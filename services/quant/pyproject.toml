@@ -17,7 +17,6 @@ dev = [
   "mypy>=1.13",
   "pytest>=8.3",
   "pytest-cov>=6.0",
-  "pytest-benchmark>=4.0",
   "ruff>=0.8",
 ]
 
@@ -31,11 +30,13 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "tests"]
+src = ["src", "tests", "bench"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "S", "A", "C4", "DTZ", "PT", "RET", "SIM", "RUF"]
 ignore = []
+# maths notation in docstrings and user-facing messages is intentional
+allowed-confusables = ["×", "−", "–"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
@@ -44,7 +45,7 @@ ignore = []
 python_version = "3.11"
 strict = true
 warn_unreachable = true
-files = ["src", "tests"]
+files = ["src", "tests", "bench"]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
