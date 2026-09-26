@@ -109,6 +109,17 @@ export function RiskConsole({ wsPort }: { wsPort: string }) {
     }
   };
 
+  const logIncident = async (a: AlertView) => {
+    const category = a.kind.startsWith('reconciliation.') ? 'reconciliation_break' : a.kind.startsWith('kill_switch.') ? 'kill_switch_fired' : 'other';
+    try {
+      const inc = await governanceApi.logIncident({ title: `${a.kind}: ${a.message}`.slice(0, 160), description: a.message, category, alertId: a.id });
+      toast.push(`Incident ${inc.ref} logged from the alert. Classify it next (impact × urgency).`, 'success', 8000);
+      void load();
+    } catch (e) {
+      toast.push(e instanceof Error ? e.message : 'Could not log the incident.', 'critical');
+    }
+  };
+
   const decide = async () => {
     if (!decision) return;
     try {
@@ -157,6 +168,11 @@ export function RiskConsole({ wsPort }: { wsPort: string }) {
                   {a.accountId ? <span className="text-xs text-muted"> · account {short(a.accountId)}</span> : null}
                   {a.receivedAt ? <span className="text-xs text-muted"> · live</span> : null}
                 </span>
+                {a.severity === 'critical' ? (
+                  <Button size="sm" variant="ghost" onClick={() => void logIncident(a)} data-testid="log-incident">
+                    Log incident
+                  </Button>
+                ) : null}
                 {a.acknowledgedAt ? (
                   <span className="text-xs text-muted">acknowledged</span>
                 ) : (

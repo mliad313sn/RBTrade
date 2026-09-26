@@ -36,7 +36,6 @@ import type {
   MeResponse,
   MfaEnrollResponse,
   MfaVerifyResponse,
-  PublicUser,
   UpdatePreferences,
   UserPreferences,
 } from './types.js';
