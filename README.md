@@ -46,6 +46,15 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - WebSocket: `ws://<host>:4000/ws`, with channels `quotes:{symbol}`, `depth:{symbol}`, `candles:{symbol}:{tf}` and `status`. Use `MarketDataSocket` from `@kora/sdk`.
 - Design: ADR 0002. Results: `docs/plans/02-market-data.md`.
 
+## Trading core (goal 03, PAPER only)
+
+- Everyone signs up as `novice`. Pro trading (`trader`) needs the appropriateness assessment (`/appropriateness` in the web, `GET /appropriateness/questionnaire` + `POST /appropriateness/attempts`), then TOTP enrolment at the next login.
+- Paper account per user (base currency, SIMULATED starting cash): `GET /accounts/me`, `PUT /accounts/me/settings`, `GET /accounts/me/ledger`.
+- Orders: `POST /orders/preview` (notional, fees + spread, FX conversion, margin, loss if the stop is hit, reward:risk, risk verdict), `POST /orders` (idempotent on `clientOrderId`), `GET/PATCH/DELETE /orders/:id`, `GET /positions`, `POST /positions/:symbol/close`, `GET /fills`.
+- Kill switch: `POST /kill-switch {scope, source, reason?}`, `POST /kill-switch/resume {reason}`, `GET /kill-switch`. Reconciliation: `POST /reconciliation/run`, alerts at `GET /alerts`.
+- WebSocket private channels: `orders:{accountId}`, `positions:{accountId}`, `account:{accountId}`.
+- `LIVE_TRADING_ENABLED` stays `false`; the LIVE broker is a refusing stub. Design: ADR 0003. Results: `docs/plans/03-oms.md`.
+
 ## Layout
 
 ```

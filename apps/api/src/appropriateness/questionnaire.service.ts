@@ -117,8 +117,13 @@ export class QuestionnaireService implements OnApplicationBootstrap {
   }
 
   settings(def: QuestionnaireDefinition): { passMarkPct: number; cooldownMinutes: number } {
-    const pass = Number(process.env[this.envKey(def.id, 'PASS_MARK_PCT')]);
-    const cool = Number(process.env[this.envKey(def.id, 'COOLDOWN_MINUTES')]);
+    // Empty or missing env values mean "use the reviewed data" (never a pass mark of 0).
+    const read = (what: string): number => {
+      const raw = process.env[this.envKey(def.id, what)]?.trim();
+      return raw && /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+    };
+    const pass = read('PASS_MARK_PCT');
+    const cool = read('COOLDOWN_MINUTES');
     return {
       passMarkPct: Number.isInteger(pass) && pass >= 0 && pass <= 100 ? pass : def.passMarkPct,
       cooldownMinutes: Number.isInteger(cool) && cool >= 0 ? cool : def.cooldownMinutes,
