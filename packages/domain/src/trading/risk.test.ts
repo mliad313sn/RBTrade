@@ -102,6 +102,10 @@ const NEGATIVE: Record<RiskCode, () => RiskContext> = {
   TRADING_HALTED: () =>
     ctx({ halted: true }, { source: 'robot:0b3c9a4e-1f2d-4c5b-9a8e-7d6c5b4a3f21' }),
   FOK_INSUFFICIENT_DEPTH: () => ctx({ availableNow: dec('50000') }, { tif: 'fok' }),
+  MONTHLY_LOSS_LIMIT: () =>
+    ctx({ limits: { ...limits, monthlyLossLimit: '600' }, monthPnl: dec('-600') }),
+  NOVICE_COOLING_OFF: () =>
+    ctx({ novice: true, grossExposureAfter: dec('1000'), coolingOff: 'losing_trades' }),
 };
 
 describe('pre-trade risk rules', () => {
@@ -120,6 +124,39 @@ describe('pre-trade risk rules', () => {
       expect(hit!.message).not.toMatch(/undefined|NaN|\[object/);
     },
   );
+
+  it('goal 08: novice leverage cap, cooling-off reasons and the monthly limit', () => {
+    const small = { novice: true, grossExposureAfter: dec('150000') };
+    expect(codes(ctx(small))).toContain('NOVICE_LEVERAGE');
+    expect(codes(ctx({ ...small, noviceMaxLeverage: dec('2') }))).not.toContain('NOVICE_LEVERAGE');
+    const over = evaluateRisk(
+      ctx({ novice: true, grossExposureAfter: dec('200001'), noviceMaxLeverage: dec('2') }),
+    );
+    expect(over.find((v) => v.code === 'NOVICE_LEVERAGE')?.message).toContain('2×');
+    for (const reason of ['losing_trades', 'daily_loss_pct', 'daily_loss_limit'] as const) {
+      const v = evaluateRisk(
+        ctx({ novice: true, grossExposureAfter: dec('1000'), coolingOff: reason }),
+      );
+      expect(v.find((x) => x.code === 'NOVICE_COOLING_OFF')?.message).toMatch(/^Time for a break/);
+    }
+    // Cooling-off never blocks closing, and is a novice rule only.
+    const closing = {
+      positionQtyBefore: dec('1000'),
+      positionQtyAfter: dec('0'),
+      grossExposureAfter: dec('0'),
+    };
+    expect(codes(ctx({ novice: true, coolingOff: 'losing_trades', ...closing }))).not.toContain(
+      'NOVICE_COOLING_OFF',
+    );
+    expect(codes(ctx({ novice: false, coolingOff: 'losing_trades' }))).not.toContain(
+      'NOVICE_COOLING_OFF',
+    );
+    // Monthly limit: at-limit − 0.01 passes; no limit set means no check.
+    expect(
+      codes(ctx({ limits: { ...limits, monthlyLossLimit: '600' }, monthPnl: dec('-599.99') })),
+    ).toEqual([]);
+    expect(codes(ctx({ monthPnl: dec('-99999') }))).not.toContain('MONTHLY_LOSS_LIMIT');
+  });
 
   it('covers every code with a negative case', () => {
     expect(Object.keys(NEGATIVE).sort()).toEqual([...RISK_CODES].sort());
@@ -159,16 +196,31 @@ describe('pre-trade risk rules', () => {
     // A reduce-only order larger than the position is clipped by the engine, so it is allowed.
     expect(
       codes(
-        ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('-100'), grossExposureAfter: dec('9999999') }, { reduceOnly: true }),
+        ctx(
+          {
+            positionQtyBefore: dec('100'),
+            positionQtyAfter: dec('-100'),
+            grossExposureAfter: dec('9999999'),
+          },
+          { reduceOnly: true },
+        ),
       ),
     ).toEqual([]);
     // A plain flip is not reducing: exposure rules apply.
     expect(
-      codes(ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('-100'), grossExposureAfter: dec('9999999') })),
+      codes(
+        ctx({
+          positionQtyBefore: dec('100'),
+          positionQtyAfter: dec('-100'),
+          grossExposureAfter: dec('9999999'),
+        }),
+      ),
     ).toContain('MAX_LEVERAGE');
     // Reduce-only in the same direction as the position increases it.
     expect(
-      codes(ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('200') }, { reduceOnly: true })),
+      codes(
+        ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('200') }, { reduceOnly: true }),
+      ),
     ).toContain('REDUCE_ONLY_WOULD_INCREASE');
   });
 

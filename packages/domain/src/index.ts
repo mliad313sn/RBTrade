@@ -12,3 +12,4 @@ export * from './indicators.js';
 export * from './terminal.js';
 export * from './risk-analytics.js';
 export * from './strategy/index.js';
+export * from './novice/index.js';
