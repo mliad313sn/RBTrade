@@ -6,6 +6,8 @@ const file = process.argv[2] ?? '.env';
 let env = readFileSync(file, 'utf8');
 const generators = {
   KORA_MFA_ENC_KEY: () => randomBytes(32).toString('base64'),
+  // Bot runner ↔ api service token (goal 06, B-301).
+  KORA_SERVICE_TOKEN: () => randomBytes(32).toString('base64url'),
   KORA_DEV_IDP_PRIVATE_JWK: () => {
     const jwk = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ format: 'jwk' });
     return JSON.stringify({ ...jwk, kid: `kora-dev-${Date.now()}` });
