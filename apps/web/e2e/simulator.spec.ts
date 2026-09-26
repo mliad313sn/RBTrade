@@ -125,13 +125,12 @@ test('PNG export carries the chart and its SIMULATED watermark', async ({ page }
   expect(png.length).toBeGreaterThan(10_000);
 });
 
-test('import from backtest names goal 06; reality checks flag an implausible, oversized edge', async ({
+test('import from backtest explains what is missing; reality checks flag an implausible, oversized edge', async ({
   page,
 }) => {
-  const backtest = page.getByTestId('import-backtest');
-  await expect(backtest).toHaveAttribute('aria-disabled', 'true'); // announced as unavailable
-  await backtest.click({ force: true }); // still explains why when pressed
-  await expect(page.getByTestId('sim-note')).toContainText('goal 06');
+  // Goal 06 enabled the import (B-502); a new trader has no backtest yet and is told how to get one.
+  await page.getByTestId('import-backtest').click();
+  await expect(page.getByTestId('sim-note')).toContainText('No backtest yet');
   await setRange(page.getByTestId('win-rate'), 65);
   await setRange(page.getByTestId('avg-win'), 2.5);
   await setRange(page.getByTestId('risk-pct'), 3);

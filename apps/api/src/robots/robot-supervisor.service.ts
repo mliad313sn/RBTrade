@@ -49,7 +49,10 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     const ms = supervisorMs();
     if (ms > 0) {
-      this.timer = setInterval(() => void this.tick(), ms);
+      this.timer = setInterval(
+        () => void this.tick().catch((e: Error) => this.log.warn(`supervision failed: ${e.message}`)),
+        ms,
+      );
       this.timer.unref();
     }
     if (process.env.KORA_ROBOT_SUPERVISOR_CONTROL !== 'off') {
@@ -57,7 +60,9 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
       void this.sub
         .subscribe(ROBOT_CONTROL_CHANNEL)
         .catch((e: Error) => this.log.warn(`subscribe failed: ${e.message}`));
-      this.sub.on('message', (_ch: string, raw: string) => void this.onControl(raw));
+      this.sub.on('message', (_ch: string, raw: string) =>
+        void this.onControl(raw).catch((e: Error) => this.log.warn(`control message failed: ${e.message}`)),
+      );
     }
   }
 
