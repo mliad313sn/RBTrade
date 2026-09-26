@@ -108,32 +108,43 @@ class FakeClock implements ConflatorClock {
   }
 }
 
-describe('Conflator (≤ 10 updates/s per channel)', () => {
-  it('passes a steady 10 Hz stream through with no delay', () => {
+describe('Conflator (token bucket: 10/s sustained, burst 2)', () => {
+  it('passes a steady 10 Hz stream through with no delay, even with jitter', () => {
     const clock = new FakeClock();
     const out: Array<[number, number]> = [];
-    const c = new Conflator<number>((_, v) => out.push([clock.t, v]), 10, 1000, clock);
-    for (let i = 0; i < 50; i++) {
-      c.offer('q', i);
-      clock.advance(100);
+    const c = new Conflator<number>((_, v) => out.push([clock.t, v]), 10, 2, clock);
+    const arrivals: number[] = [];
+    let t = 0;
+    for (let i = 0; i < 100; i++) {
+      t = i * 100 + (i % 3 === 0 ? 40 : i % 3 === 1 ? -40 : 0); // ±40 ms jitter
+      arrivals.push(t);
     }
-    expect(out).toHaveLength(50);
-    expect(out.every(([t, v]) => t === v * 100)).toBe(true);
+    for (const [i, at] of arrivals.entries()) {
+      clock.advance(at - clock.t);
+      c.offer('q', i);
+    }
+    expect(out).toHaveLength(100);
+    expect(out.every(([sentAt, v]) => sentAt === arrivals[v])).toBe(true);
     expect(c.conflated).toBe(0);
   });
 
-  it('property: never more than 10 sends in any 1 s window and the last value is always delivered', () => {
+  it('property: never more than 10·T/1000 + 2 sends in any window T, and the last value is always delivered', () => {
     fc.assert(
-      fc.property(fc.array(fc.integer({ min: 0, max: 120 }), { minLength: 1, maxLength: 300 }), (gaps) => {
+      fc.property(fc.array(fc.integer({ min: 0, max: 150 }), { minLength: 1, maxLength: 300 }), (gaps) => {
         const clock = new FakeClock();
         const sends: Array<[number, number]> = [];
-        const c = new Conflator<number>((_, v) => sends.push([clock.t, v]), 10, 1000, clock);
+        const c = new Conflator<number>((_, v) => sends.push([clock.t, v]), 10, 2, clock);
         gaps.forEach((g, i) => {
           clock.advance(g);
           c.offer('q', i);
         });
         clock.advance(2000);
-        for (let i = 10; i < sends.length; i++) if (sends[i]![0] - sends[i - 10]![0] < 1000) return false;
+        for (let i = 0; i < sends.length; i++) {
+          for (let j = i + 1; j < sends.length; j++) {
+            const count = j - i + 1;
+            if (count > (10 * (sends[j]![0] - sends[i]![0])) / 1000 + 2 + 1e-9) return false;
+          }
+        }
         const vals = sends.map((s) => s[1]);
         return vals.at(-1) === gaps.length - 1 && vals.every((v, i) => i === 0 || v > vals[i - 1]!);
       }),
@@ -144,7 +155,7 @@ describe('Conflator (≤ 10 updates/s per channel)', () => {
   it('drop() cancels pending values; close() clears all; rejects bad config', () => {
     const clock = new FakeClock();
     const out: number[] = [];
-    const c = new Conflator<number>((_, v) => out.push(v), 1, 1000, clock);
+    const c = new Conflator<number>((_, v) => out.push(v), 1, 1, clock);
     c.offer('a', 1);
     c.offer('a', 2);
     c.offer('a', 3);
@@ -156,8 +167,18 @@ describe('Conflator (≤ 10 updates/s per channel)', () => {
     clock.advance(5000);
     expect(out).toEqual([1, 1]);
     expect(() => new Conflator(() => undefined, 0)).toThrow(RangeError);
+    expect(() => new Conflator(() => undefined, 10, 0)).toThrow(RangeError);
     expect(typeof systemClock.now()).toBe('number');
     const h = systemClock.setTimeout(() => undefined, 1000);
     systemClock.clearTimeout(h);
+  });
+
+  it('a held value is flushed as soon as a token refills', () => {
+    const clock = new FakeClock();
+    const out: Array<[number, number]> = [];
+    const c = new Conflator<number>((_, v) => out.push([clock.t, v]), 10, 2, clock);
+    for (let i = 0; i < 5; i++) c.offer('q', i); // burst of 5 at t=0
+    clock.advance(1000);
+    expect(out).toEqual([[0, 0], [0, 1], [100, 4]]);
   });
 });

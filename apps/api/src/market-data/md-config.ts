@@ -25,6 +25,9 @@ const Schema = z.object({
   KORA_MD_WS_MAX_CHANNELS: z.coerce.number().int().min(1).max(5000).default(300),
   KORA_MD_WS_ORIGINS: z.string().optional().default(''),
   KORA_MD_CONFLATE_PER_SEC: z.coerce.number().int().min(1).max(100).default(10),
+  KORA_MD_CONFLATE_BURST: z.coerce.number().int().min(1).max(20).default(2),
+  /** Per-client write coalescing window (ms); 0 = flush at the end of the event-loop turn. */
+  KORA_MD_WS_FLUSH_MS: z.coerce.number().int().min(0).max(50).default(0),
   /** Redis namespace (tests use their own so they never cross-talk with a dev api). */
   KORA_MD_REDIS_PREFIX: z.string().regex(/^[a-z0-9:_-]{1,64}:$/).default('kora:md:'),
 });
@@ -49,7 +52,9 @@ export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = '
     wsMaxChannels: e.KORA_MD_WS_MAX_CHANNELS,
     wsOrigins: [webOrigin, ...e.KORA_MD_WS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)],
     conflatePerSec: e.KORA_MD_CONFLATE_PER_SEC,
+    conflateBurst: e.KORA_MD_CONFLATE_BURST,
     prefix: e.KORA_MD_REDIS_PREFIX,
+    wsFlushMs: e.KORA_MD_WS_FLUSH_MS,
   };
 }
 

@@ -9,6 +9,7 @@ import { busChannel, lastKey, MD_CONFIG, type MdConfig } from './md-config';
 export interface HubClient {
   readonly id: number;
   readonly bufferedAmount: number;
+  /** Writes a complete, pre-built WebSocket frame (see `wsTextFrame`). */
   send(frame: Buffer): void;
   close(code: number, reason: string): void;
 }
@@ -50,7 +51,7 @@ export class ChannelHub implements OnModuleDestroy {
     @Inject(APP_CONFIG) private readonly app: AppConfig,
     @Inject(MD_CONFIG) private readonly cfg: MdConfig,
   ) {
-    this.conflator = new Conflator<string>((ch, payload) => this.fanOut(ch, payload), cfg.conflatePerSec, 1000);
+    this.conflator = new Conflator<string>((ch, payload) => this.fanOut(ch, payload), cfg.conflatePerSec, cfg.conflateBurst);
   }
 
   async init(): Promise<void> {
@@ -180,7 +181,30 @@ export class ChannelHub implements OnModuleDestroy {
 
 /** Channel names are validated (no quotes), payloads are JSON produced by the feed. */
 export function frame(channel: string, payload: string, snapshot: boolean): Buffer {
-  return Buffer.from(`{"ch":"${channel}"${snapshot ? ',"snapshot":true' : ''},"data":${payload}}`);
+  return wsTextFrame(Buffer.from(`{"ch":"${channel}"${snapshot ? ',"snapshot":true' : ''},"data":${payload}}`));
+}
+
+/**
+ * RFC 6455 server→client text frame (FIN, unmasked, no extensions). Built once per message and
+ * written as-is to every subscriber, so fan-out cost is a buffer reference per client.
+ */
+export function wsTextFrame(payload: Buffer): Buffer {
+  const n = payload.length;
+  let header: Buffer;
+  if (n < 126) {
+    header = Buffer.from([0x81, n]);
+  } else if (n < 65_536) {
+    header = Buffer.alloc(4);
+    header[0] = 0x81;
+    header[1] = 126;
+    header.writeUInt16BE(n, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x81;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(n), 2);
+  }
+  return Buffer.concat([header, payload]);
 }
 
 function markStale(payload: string): string {

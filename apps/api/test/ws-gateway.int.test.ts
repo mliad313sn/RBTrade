@@ -104,7 +104,7 @@ describe('market data WebSocket gateway', () => {
     a.close();
   });
 
-  it('conflates to at most 10 updates per second per channel and always delivers the latest', async () => {
+  it('conflates to 10 updates/s sustained (burst 2) per channel and always delivers the latest', async () => {
     await pub('status', status());
     const c = await TestWs.authed(url, token, ['quotes:EURUSD']);
     const from = c.messages.length;
@@ -116,7 +116,8 @@ describe('market data WebSocket gateway', () => {
     await c.waitFor((m) => m.ch === 'quotes:EURUSD' && m.data.seq === 1060, 3000, from);
     const got = c.messages.slice(from).filter((m) => m.msg.ch === 'quotes:EURUSD' && !m.msg.snapshot);
     const times = got.map((m) => m.at);
-    for (let i = 10; i < times.length; i++) expect(times[i]! - times[i - 10]!).toBeGreaterThanOrEqual(950);
+    // token bucket: 13 sends need ≥ (13 − 2) × 100 ms
+    for (let i = 12; i < times.length; i++) expect(times[i]! - times[i - 12]!).toBeGreaterThanOrEqual(1050);
     expect(got.length).toBeLessThan(25);
     expect(hub.stats().conflated).toBeGreaterThan(0);
     c.close();

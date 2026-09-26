@@ -1,8 +1,14 @@
 /**
- * Server-side conflation for UI channels (goal 02): at most `maxPerWindow` sends per channel in
- * any sliding `windowMs` window (default 10 per 1000 ms). A steady stream at or under the limit
- * passes straight through with no added latency; above it, only the latest value is kept and sent
- * as soon as the window frees, so the final value is never lost.
+ * Server-side conflation for UI channels (goal 02): a per-channel token bucket, refilled at
+ * `ratePerSec` (default 10) with a small `burst` capacity (default 2). Guarantees: never more than
+ * `ratePerSec` updates per second sustained, and at most `ratePerSec·T/1000 + burst` in any window
+ * of T ms (≤ 12 in any second at the defaults). Above the rate only the latest value is kept and it
+ * is sent as soon as a token is available, so the final value is never lost.
+ *
+ * Why not a strict "10 in any sliding second" window: fed at exactly 10 Hz, a sliding window echoes
+ * every jitter or GC pause forward (each late send shifts the window for the send ten messages
+ * later), and the measured median delay grew to ~16 ms under load. The burst of 2 absorbs up to
+ * 200 ms of jitter, so a 10 Hz feed passes through undelayed.
  */
 
 export interface ConflatorClock {
@@ -18,29 +24,32 @@ export const systemClock: ConflatorClock = {
 };
 
 interface ChannelState<T> {
-  sent: number[]; // ring of the last maxPerWindow send times
-  head: number;
+  tokens: number;
+  refilledAt: number;
   pending: T | undefined;
   timer: unknown;
 }
 
 export class Conflator<T> {
   private readonly channels = new Map<string, ChannelState<T>>();
+  private readonly msPerToken: number;
   conflated = 0;
 
   constructor(
     private readonly send: (channel: string, value: T) => void,
-    private readonly maxPerWindow = 10,
-    private readonly windowMs = 1000,
+    private readonly ratePerSec = 10,
+    private readonly burst = 2,
     private readonly clock: ConflatorClock = systemClock,
   ) {
-    if (maxPerWindow < 1) throw new RangeError('maxPerWindow must be >= 1');
+    if (ratePerSec <= 0) throw new RangeError('ratePerSec must be > 0');
+    if (burst < 1) throw new RangeError('burst must be >= 1');
+    this.msPerToken = 1000 / ratePerSec;
   }
 
   offer(channel: string, value: T): void {
     let st = this.channels.get(channel);
     if (!st) {
-      st = { sent: [], head: 0, pending: undefined, timer: undefined };
+      st = { tokens: this.burst, refilledAt: this.clock.now(), pending: undefined, timer: undefined };
       this.channels.set(channel, st);
     }
     if (st.timer !== undefined) {
@@ -48,14 +57,14 @@ export class Conflator<T> {
       st.pending = value;
       return;
     }
-    const now = this.clock.now();
-    const wait = this.waitMs(st, now);
-    if (wait <= 0) {
-      this.emit(channel, st, value, now);
+    this.refill(st);
+    if (st.tokens >= 1) {
+      st.tokens -= 1;
+      this.send(channel, value);
       return;
     }
     st.pending = value;
-    st.timer = this.clock.setTimeout(() => this.flush(channel), wait);
+    this.schedule(channel, st);
   }
 
   /** Drops state (and any pending value) for a channel nobody listens to any more. */
@@ -69,34 +78,30 @@ export class Conflator<T> {
     for (const ch of [...this.channels.keys()]) this.drop(ch);
   }
 
+  private refill(st: ChannelState<T>): void {
+    const now = this.clock.now();
+    st.tokens = Math.min(this.burst, st.tokens + (now - st.refilledAt) / this.msPerToken);
+    st.refilledAt = now;
+  }
+
+  private schedule(channel: string, st: ChannelState<T>): void {
+    const wait = Math.max(1, Math.ceil((1 - st.tokens) * this.msPerToken));
+    st.timer = this.clock.setTimeout(() => this.flush(channel), wait);
+  }
+
   private flush(channel: string): void {
     const st = this.channels.get(channel);
     if (!st) return;
     st.timer = undefined;
+    this.refill(st);
     const value = st.pending;
-    st.pending = undefined;
     if (value === undefined) return;
-    const now = this.clock.now();
-    const wait = this.waitMs(st, now);
-    if (wait <= 0) this.emit(channel, st, value, now);
-    else {
-      st.pending = value;
-      st.timer = this.clock.setTimeout(() => this.flush(channel), wait);
+    if (st.tokens >= 1 - 1e-9) {
+      st.tokens = Math.max(0, st.tokens - 1);
+      st.pending = undefined;
+      this.send(channel, value);
+    } else {
+      this.schedule(channel, st);
     }
-  }
-
-  private waitMs(st: ChannelState<T>, now: number): number {
-    if (st.sent.length < this.maxPerWindow) return 0;
-    const oldest = st.sent[st.head]!;
-    return oldest + this.windowMs - now;
-  }
-
-  private emit(channel: string, st: ChannelState<T>, value: T, now: number): void {
-    if (st.sent.length < this.maxPerWindow) st.sent.push(now);
-    else {
-      st.sent[st.head] = now;
-      st.head = (st.head + 1) % this.maxPerWindow;
-    }
-    this.send(channel, value);
   }
 }

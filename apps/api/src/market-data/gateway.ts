@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server } from 'node:http';
+import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
@@ -38,26 +39,73 @@ class Connection implements HubClient {
   chain: Promise<void> = Promise.resolve();
   ops: number[] = [];
   timers: NodeJS.Timeout[] = [];
+  corked = false;
+  readonly socket: Socket;
 
   constructor(
     readonly id: number,
     readonly ws: WebSocket,
-  ) {}
+    private readonly flusher: Flusher,
+  ) {
+    // ws keeps the upgraded TCP socket here; with per-message deflate off its own sends are
+    // synchronous writes to the same socket, so frame order is preserved.
+    this.socket = (ws as unknown as { _socket: Socket })._socket;
+  }
 
   get bufferedAmount(): number {
     return this.ws.bufferedAmount;
   }
 
+  /** Pre-built frame; frames within the flush window are corked into a single writev. */
   send(frame: Buffer): void {
-    if (this.ws.readyState === WebSocket.OPEN) this.ws.send(frame, { binary: false });
+    if (this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.corked) {
+      this.corked = true;
+      this.socket.cork();
+      this.flusher.mark(this);
+    }
+    this.socket.write(frame);
+  }
+
+  uncork(): void {
+    if (!this.corked) return;
+    this.corked = false;
+    this.socket.uncork();
   }
 
   json(msg: unknown): void {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+    this.uncork(); // control replies are never delayed
   }
 
   close(code: number, reason: string): void {
     this.ws.close(code, reason);
+  }
+}
+
+/**
+ * Write coalescing. Profiling showed fan-out is bound by one write syscall per frame per client
+ * (loopback TCP does receive-side work inside the sender's syscall), so corked sockets are flushed
+ * together once per window: one writev per client per window instead of one write per frame.
+ */
+class Flusher {
+  private readonly dirty = new Set<Connection>();
+  private scheduled = false;
+
+  constructor(private readonly windowMs: number) {}
+
+  mark(c: Connection): void {
+    this.dirty.add(c);
+    if (this.scheduled) return;
+    this.scheduled = true;
+    if (this.windowMs > 0) setTimeout(() => this.flush(), this.windowMs);
+    else setImmediate(() => this.flush());
+  }
+
+  flush(): void {
+    this.scheduled = false;
+    for (const c of this.dirty) c.uncork();
+    this.dirty.clear();
   }
 }
 
@@ -74,6 +122,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
   private readonly conns = new Set<Connection>();
   private nextId = 1;
   private pingTimer: NodeJS.Timeout | null = null;
+  private flusher: Flusher;
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -81,7 +130,9 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     private readonly tokens: TokenService,
     private readonly repo: InstrumentsRepository,
     @Inject(MD_CONFIG) private readonly cfg: MdConfig,
-  ) {}
+  ) {
+    this.flusher = new Flusher(cfg.wsFlushMs);
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     await this.hub.init();
@@ -122,7 +173,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
   };
 
   private onConnection(ws: WebSocket, cookieToken: string | null): void {
-    const conn = new Connection(this.nextId++, ws);
+    const conn = new Connection(this.nextId++, ws, this.flusher);
     this.conns.add(conn);
     ws.on('pong', () => (conn.alive = true));
     ws.on('close', () => this.cleanup(conn));
@@ -130,7 +181,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     ws.on('message', (data: RawData, isBinary: boolean) => {
       conn.chain = conn.chain.then(() => this.onMessage(conn, data, isBinary)).catch((e: Error) => this.log.warn(`ws ${conn.id}: ${e.message}`));
     });
-    conn.json({ type: 'welcome', protocol: 1, simulated: true, conflation: { maxPerSecond: this.cfg.conflatePerSec } });
+    conn.json({ type: 'welcome', protocol: 1, simulated: true, conflation: { maxPerSecond: this.cfg.conflatePerSec, burst: this.cfg.conflateBurst } });
     if (cookieToken) conn.chain = conn.chain.then(() => this.authenticate(conn, cookieToken));
     else {
       const t = setTimeout(() => {
@@ -211,6 +262,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
 
   private cleanup(conn: Connection): void {
     if (!this.conns.delete(conn)) return;
+    conn.uncork();
     for (const t of conn.timers) clearTimeout(t);
     for (const ch of conn.channels) this.hub.unsubscribe(conn, ch);
     conn.channels.clear();

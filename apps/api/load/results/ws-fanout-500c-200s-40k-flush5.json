@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-26T14:33:39.843Z",
+  "host": {
+    "cpus": 4,
+    "node": "v22.22.2"
+  },
+  "scenario": {
+    "clients": 500,
+    "symbols": 200,
+    "rate": 10,
+    "perClient": 40,
+    "duration": 30,
+    "warmup": 5,
+    "workers": 3,
+    "port": 4020,
+    "wsFlushMs": 5,
+    "conflation": "10/s token bucket, burst 2",
+    "ingressPerSec": 2000,
+    "egressPerSecTarget": 200000
+  },
+  "connectSeconds": 1.1,
+  "measuredSeconds": 30.02,
+  "published": 71930,
+  "received": 6002274,
+  "deliveredRatio": 0.9998,
+  "egressPerSec": 199969,
+  "latencyMs": {
+    "mean": 8.75,
+    "p50": 8.7,
+    "p95": 15,
+    "p99": 17.65,
+    "max": 25.43
+  },
+  "gateway": {
+    "cpuPercent": 61.4,
+    "rssMb": 237,
+    "channels": 200,
+    "subscriptions": 20000,
+    "messagesIn": 71884,
+    "framesOut": 7112619,
+    "dropped": 0,
+    "slowClosed": 0,
+    "conflated": 0,
+    "feedLost": false,
+    "connections": 500
+  },
+  "loadGenerator": {
+    "clientWorkerEventLoopUtilization": [
+      0.29,
+      0.29,
+      0.29
+    ],
+    "hostLoadAvg1m": 2.23
+  },
+  "clientErrors": 0,
+  "clientClosesDuringRun": 0,
+  "pass": true
+}
