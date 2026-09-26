@@ -13,8 +13,9 @@ import type { RobotRow } from './robots.types';
 export const MISSED_BEATS = 3;
 
 export function supervisorMs(env: NodeJS.ProcessEnv = process.env): number {
-  const n = Number(env.KORA_ROBOT_SUPERVISOR_MS ?? '');
-  return Number.isInteger(n) && n >= 0 ? n : 1000;
+  const raw = env.KORA_ROBOT_SUPERVISOR_MS?.trim() ?? '';
+  const n = Number(raw);
+  return raw !== '' && Number.isInteger(n) && n >= 0 ? n : 1000;
 }
 
 const isoWeekStart = (d: Date): string => {
