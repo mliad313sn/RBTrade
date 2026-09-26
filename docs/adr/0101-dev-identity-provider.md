@@ -29,7 +29,7 @@ The API accepts a JWT verified against a JWKS. The claims it uses are:
 
 ### Dev IdP (`AUTH_PROVIDER=dev`, default in dev/test)
 
-- `POST /auth/signup` takes `{email, password, displayName, accountType: novice|trader}`. `quant`, `risk_officer` and `admin` can only be granted by an admin through `PUT /admin/users/:id/roles` (audited).
+- `POST /auth/signup` takes `{email, password, displayName}` and creates a `novice` (amended by ADR 0003 / B-018: no self-service `trader`; the role is granted by passing the appropriateness assessment). `quant`, `risk_officer` and `admin` can only be granted by an admin through `PUT /admin/users/:id/roles` (audited).
 - Passwords: scrypt (N = 2^17 by default, configurable via `KORA_SCRYPT_N` for tests), per-user salt, constant-time compare. Minimum length 12.
 - Login is a two-step flow when MFA applies:
   - `POST /auth/login` returns `{status: "ok"}` (novice), `{status: "mfa_required", mfaToken}` or `{status: "mfa_enrollment_required", mfaToken}`.

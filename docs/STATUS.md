@@ -1,13 +1,14 @@
 # KORA — delivery status
 
-Last updated: 2026-09-26 (goals 02 and 05 merged).
+Last updated: 2026-09-26 (goal 03 done; goals 02 and 05 merged earlier).
 
 | Gate | Goal | State |
 |---|---|---|
 | G0 | 00 master plan | **Done**: `docs/plans/00-master.md`, ADR 0000/0001, charter |
 | G1 | 01 foundation | **Done, with deferrals**: see `docs/plans/01-foundation.md` §4 and §6 |
 | G2 | 02 market data | **Done, with deferrals**: see `docs/plans/02-market-data.md` §7 and §8 |
-| G5 | 05 gain simulator | **Done, with deferrals**: see `docs/plans/05-gain-simulator.md` (paper import uses a SIMULATED fixture until goal 03; human copy review owed) |
+| G3 | 03 OMS, paper engine, risk, kill switch (+ B-018 appropriateness, B-501) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/03-oms.md` §6 (deferred items in §6.3) |
+| G5 | 05 gain simulator | **Done, with deferrals**: see `docs/plans/05-gain-simulator.md` (paper import now uses real fills, B-501 done in goal 03; human copy review owed) |
 
 ## What shipped in goal 01
 
@@ -43,8 +44,7 @@ Last updated: 2026-09-26 (goals 02 and 05 merged).
 
 ## Stubbed or placeholder (explicit in the UI)
 
-- Account summary values, watchlist, chart, order preview numbers and blotter are shown as "—" or as "arrives in goal NN".
-- The kill switch records intent only (`engine: not_wired_goal_03`).
+- Chart is shown as "arrives in goal 04". (Account summary, order preview, blotter and the kill switch engine are live since goal 03.)
 - The robot builder, simulator, practice, auto-invest and learn pages are placeholders.
 - The command palette is an entry point only.
 
@@ -64,13 +64,13 @@ Last updated: 2026-09-26 (goals 02 and 05 merged).
   - Action names look like `kill_switch.requested`, matching the regex `^[a-z0-9_]+(\.[a-z0-9_]+)*$`.
 - **Auth in the API:** every route is authenticated by default. Use `@Public()` to opt out and `@Roles(...)` to restrict. Non-novice roles always need `amr: otp`. `@CurrentPrincipal()` gives `{sub, roles, mfa}`.
 - **Auth in tests:** use the real flow (`apps/api/test/helpers.ts`):
-  - `createUser(app, 'novice' | 'trader', extraRoles?)` signs up, logs in and does TOTP enrolment/verify, then returns a bearer token.
+  - `createUser(app, 'novice' | 'trader', extraRoles?)` signs up (always `novice`, B-018), and for `trader` passes the appropriateness assessment through `POST /appropriateness/attempts`, then logs in again with TOTP enrolment/verify; returns a bearer token. `passingAnswers()` / `failingAnswers()` derive from the questionnaire data file.
   - `nextTotpWindow()` advances the faked `Date` 31 s, so repeated logins don't hit TOTP replay protection.
   - Extra roles are granted with a direct owner SQL insert.
   - Send `x-kora-csrf: 1` on unsafe requests unless you use `Authorization: Bearer`.
-  - e2e uses `apiSignIn(page, type)` in `apps/web/e2e/helpers.ts`.
+  - e2e uses `apiSignIn(page, type)` in `apps/web/e2e/helpers.ts` (same assessment flow; `answerKey()`/`answerIndex()` for the web page).
 - **Decimals:** `import { dec, quantize, roundToTick, Decimal } from '@kora/domain'`. `dec(0.1)` throws by design. The UI formats via `formatPrice(value, precision)` and `formatMoney` from `@kora/ui`.
-- **Kill switch:** the web calls `POST /kill-switch {scope, source}` with scopes `robots | robots_cancel | robots_cancel_flatten`. Goal 03 replaces the intent-only handler with the engine and audits each child action.
+- **Kill switch:** the web calls `POST /kill-switch {scope, source, reason?}` with scopes `robots | robots_cancel | robots_cancel_flatten`; since goal 03 it runs the engine and audits each child action (see the goal 03 section).
 - **Order types:** the server capability is `GET /me → capabilities.orderTypes` (novice view = `['market']`). The goal 03 OMS must enforce role guardrails server-side (goal 08).
 - **Ports:**
   - dev: web 3000, api 4000, quant 8000, bot-runner 4100;
@@ -173,7 +173,7 @@ Plan and evidence: `docs/plans/05-gain-simulator.md`. ADR 0005. Built in paralle
 
 ### Stubbed or placeholder
 
-- Paper fills come from a deterministic **SIMULATED fixture** (`apps/api/src/sim/paper-fixture.ts`, 80 round trips). It is labelled in the API response and the UI until the goal 03 engine exists (B-501).
+- Paper analytics use the account's real fills since goal 03 (B-501). The deterministic SIMULATED fixture (`apps/api/src/sim/paper-fixture.ts`) is only used, and labelled, for accounts with no fills yet.
 - "Import from backtest" is an `aria-disabled` button that names goal 06 (B-502).
 
 ### What goals 03, 06 and 08 need to know
@@ -183,3 +183,42 @@ Plan and evidence: `docs/plans/05-gain-simulator.md`. ADR 0005. Built in paralle
 - **Goal 08:** the Practice mapping lives in `apps/web/src/lib/sim/practice.ts`, and the glossary and jargon list in `apps/web/src/lib/sim/glossary.ts`. Human copy review is B-504, and the product stance on the skill-free edge is OQ-Q1.
 - **Env:** `QUANT_URL` (default `http://127.0.0.1:$QUANT_PORT`), `QUANT_TIMEOUT_MS`, `KORA_SIM_RATE_LIMIT`. Playwright starts uvicorn on `E2E_QUANT_PORT` (default 8010), and the api gets `QUANT_URL` automatically.
 - **Numbers:** simulation outputs are float estimates, always labelled SIMULATED and never booked. Paper P&L is Decimal (ADR 0005 §4).
+
+## Goal 03: OMS, paper engine, pre-trade risk, kill switch (G3: done, with deferrals)
+
+Plan and evidence: `docs/plans/03-oms.md` §6. ADR 0003. Lead seats S4, S2, S8.
+
+### What shipped
+
+- **Appropriateness (B-018, Sponsor decision OQ-S2):** sign-up creates `novice` only (API, web, SDK, tests). Generic questionnaire engine (`@kora/domain` `questionnaire.ts` + `QuestionnaireService`), versioned JSON data (SIMULATED placeholders, OQ-C1), `GET /appropriateness/questionnaire`, `POST /appropriateness/attempts` (server-graded, pass mark 75 % and 24 h cool-down from data with env overrides, audited with version and score, answers never stored). A pass grants `trader`, switches the view to Pro and signs the user out; the next login forces TOTP enrolment. Web page `/appropriateness` (link "Unlock Pro trading" in the user menu).
+- **Domain (`packages/domain/src/trading`):** order schemas (market, limit, stop, stop-limit, trailing, bracket, OCO; DAY/GTC/IOC/FOK/GTD; SL/TP; reduce-only; post-only), exhaustive state machine, positions (average cost), double-entry ledger, registry-driven costs (commission, spread, swap, FX conversion) and depth-walk slippage, account valuation, preview, 23 risk rules. fast-check properties for the ledger, positions and P&L.
+- **API (`apps/api/src/trading`):** migrations 0003/0004; `OmsService` (idempotent submit, amend, cancel), `PaperEngineService` (fill safety, triggers, partial fills, brackets/OCO, reduce-only hygiene, daily roll), `EngineLoopService` (Redis-driven matching, sweeps, expiries), pre-trade risk (`evaluateRisk` called from `OmsService.evaluate`), `KillSwitchService`, `ReconciliationService` (60 s + on demand, critical alerts), FX service, base-currency accounts, private WS channels, `BrokerExecutionAdapter` + refusing LIVE stub. `AuditService.recordMany`. Paper analytics from real fills (B-501).
+- **Web:** top-bar equity / day P&L / margin used / daily loss-limit meter; kill switch shows engine results; halted banner with a resume dialog (reason required); minimal ticket wired to preview/place and a minimal blotter (positions, open orders, fills; close/cancel); Novice home shows the practice balance.
+- **Results:** 1,000 open orders + 4 positions halted/cancelled/flattened in 178 ms; risk rules p95 0.14 ms (4.9 ms with context load); integration 118 tests, e2e 26, all green.
+
+### Stubbed or placeholder
+
+- Fees, swaps, FX conversion fee, margin rates, risk limits, starting cash and the questionnaire content are SIMULATED placeholders (OQ-M1, OQ-M5, OQ-R5, OQ-R6, OQ-C1).
+- Robots do not exist yet: the halt blocks `robot:*` orders and a `kora:ctl:robots` message is published for goal 06 (B-301).
+- LIVE: stub only, refuses; `LIVE_TRADING_ENABLED=false`.
+- The ticket, blotter and Novice trade card are minimal (goals 04 and 08).
+
+### Deferred
+
+B-301 robot runner wiring, B-302 matching-loop scale-out, B-303 owner access to system audit events, B-304 paper realism, B-305 Pro ticket and streaming blotter, B-306 Novice trade flow, B-307 margin close-out (OQ-B3), B-308 scheduled equity snapshots, B-309 multi-currency cash, B-310 bid/ask FX conversion, B-311 LIVE reconciliation, B-312 OpenAPI response schemas, B-313 questionnaire content, B-314 global kill switch, B-315 distributed rate limits.
+
+### What goals 04, 06 and 08 need to know
+
+- **REST (all PAPER, decimal strings, base currency):**
+  - `POST /orders/preview` → `{instrument{assetClass, quoteCcy, pricePrecision, tickSize, qtyStep, minQty, multiplier, feeScheduleId, feesSimulated}, market{bid, ask, session, dataState, dataReason}, novice, preview{estimatedPrice, exceedsVisibleDepth, currency, notional{quote, quoteCcy, base}, fees{commission, spread, fxConversion, total}, margin{rate, required, change, usedAfter, freeAfter, equity}, lossIfStopHit{stopPrice, price, costs, total, pctEquity} | null, rewardIfTargetHit{targetPrice, amount} | null, rewardRisk ("2.00" = 1:2) | null, fx{from, to, rate, conversionBps, conversionCost} | null, confirmation{required, reasons[]}, issues[]}, risk{ok, violations[{code, message}]}, timings}`. Same body as `POST /orders` without `clientOrderId`. Show `confirmation.reasons` in the confirm dialog; novices always confirm.
+  - `POST /orders` (`clientOrderId` required; 201 new, 200 replay, 409 reused, 422 `{error:'risk_rejected', code, message, violations, order}`), `GET /orders?status=open|all`, `GET /orders/:id` (with `children`), `PATCH /orders/:id {qty|limitPrice|stopPrice|trailAmount}`, `DELETE /orders/:id`, `GET /positions`, `POST /positions/:symbol/close`, `GET /fills`, `GET /accounts/me`, `PUT /accounts/me/settings {confirmMode, confirmNotionalAbove, confirmLossPctAbove, baseCurrency (before activity), riskLimits (tighten only)}`, `GET /accounts/me/ledger`, `GET /alerts`, `POST /reconciliation/run`.
+  - Kill switch: `POST /kill-switch {scope, source, reason?}` → `{accepted, scope, label, auditEventId, engine:'paper', killSwitchId, accountId, halted, alreadyHalted, robotsHalted, ordersCancelled, positionsFlattened, flattenPending[], durationMs}`; `POST /kill-switch/resume {reason}` (trader/quant/risk_officer/admin; `?accountId=` for risk officers/admins); `GET /kill-switch`.
+  - SDK: `KoraClient.previewOrder/placeOrder/orders/order/amendOrder/cancelOrder/positions/closePosition/fills/account/updateAccountSettings/killSwitch/killSwitchState/resumeTrading/appropriateness/submitAppropriateness`.
+- **WebSocket (same `/ws` gateway):** `orders:{accountId}` → `{type:'orders', accountId, orders: OrderDto[]}` per committed transaction, never conflated; `positions:{accountId}` → `{type:'positions', positions: PositionDto[]}`; `account:{accountId}` → `{type:'account', account: AccountView}` (coalesced 50 ms). Owner only (risk officers/admins may read any); others get `forbidden`. The account id is `GET /accounts/me → id`.
+- **Risk codes** (machine code + plain message): `MAX_ORDER_NOTIONAL, FAT_FINGER, MAX_POSITION, MAX_LEVERAGE, INSUFFICIENT_MARGIN, DAILY_LOSS_LIMIT, WEEKLY_LOSS_LIMIT, ORDER_RATE_LIMIT, SESSION_CLOSED, INSTRUMENT_NOT_TRADABLE, NO_MARKET_DATA, MARKET_DATA_STALE, FEED_NOT_OK, FX_RATE_UNAVAILABLE, NOVICE_ORDER_TYPE, NOVICE_STOP_REQUIRED, NOVICE_LEVERAGE, REDUCE_ONLY_WOULD_INCREASE, POST_ONLY_WOULD_TAKE, STOP_LOSS_WRONG_SIDE, TAKE_PROFIT_WRONG_SIDE, TRADING_HALTED, FOK_INSUFFICIENT_DEPTH` (`RISK_CODES` in `@kora/domain`).
+- **Robots (goal 06):** submit through `OmsService.submit({userId, roles, actor: {type: 'robot', id: robotId}, source: 'robot:<uuid>'}, PlaceOrderRequest)`, the same path as REST (risk, audit, idempotency on `clientOrderId`). While the account is halted, robot orders get `TRADING_HALTED`; listen to Redis `kora:ctl:robots` (`{action:'halt'|'resume', accountId, scope, reason, auditEventId, ts}`) to stop/restart runners. Audit actor type is `robot`.
+- **Questionnaire engine (goals 08, 09):** add a JSON definition (`id`, `version`, `kind: knowledge_check | suitability`, `passMarkPct`, `cooldownMinutes`, questions with option `points`) to `QUESTIONNAIRE_FILES` in `apps/api/src/appropriateness/questionnaire.service.ts`; use `QuestionnaireService.get/view/grade/record/lastAttempt/cooldownUntil` and `@kora/domain` `grade()`/`publicView()`. Published versions are immutable (bump the version). Env overrides: `KORA_<ID>_PASS_MARK_PCT`, `KORA_<ID>_COOLDOWN_MINUTES`.
+- **Novice (goal 08):** guardrails are server-side (`NOVICE_*` codes) for novice-only users and anyone in the Novice view; closing a position never needs a stop. Use `POST /orders/preview` for "most you could lose" (`lossIfStopHit.total`) and `GET /accounts/me` for the balance.
+- **Numbers:** quantities follow the registry grid (`qtyStep`, `minQty`); prices the `tickSize`; `multiplier` comes from `asset_class_trading.multiplier_mode` (FX/metals/crypto/equities in units). Marks are exit-side (bid for longs, ask for shorts). FX sessions close at weekends, so day-independent tests use BTC/USD.
+- **Env:** `KORA_PAPER_*`, `KORA_RISK_*`, `KORA_ORDER_RATE_LIMIT`, `KORA_ENGINE_*`, `KORA_TRADING_*`, `KORA_RECONCILIATION_INTERVAL_MS`, `KORA_APPROPRIATENESS_*` (see `.env.example`). Integration tests set `KORA_ENGINE_ENABLED=false` and drive matching with `EngineLoopService.matchSymbol`; `test/market-fixture.ts` writes quotes/depth/status into Redis.
+

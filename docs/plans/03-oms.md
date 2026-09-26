@@ -78,6 +78,56 @@ Inputs: master goal (including the 2026-09-26 scope amendment), goal 03, STATUS 
 9. Reconciliation mismatch raises a critical alert. WS `orders/positions/account` channels are private.
 10. Full gate: build, lint, typecheck, test, test:integration, test:e2e.
 
-## 6. Results
+## 6. Results (verified 2026-09-26 on the working branch)
 
-_Filled in after verification._
+### 6.1 Acceptance criteria
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | Same `client_order_id` sent twice creates exactly one order (50 parallel requests) | **Pass** | `apps/api/test/orders.int.test.ts` "50 times in parallel": 1 × 201 + 49 × 200, one row, one `order.new` audit event; reuse with another body → 409 |
+| 2 | Property tests: ledger always balances; position qty = Σ signed fills; realised + unrealised reconciles to equity change net of fees | **Pass** | `packages/domain/src/trading/ledger.property.test.ts` (fast-check, 300–400 runs each, multipliers 0.01–100,000, FX rates, flips). Found and fixed a real bug: 40-digit precision could unbalance a journal → ledger amounts quantised to 10 dp; DB trigger refuses unbalanced journals (`trading-integrity.int.test.ts`) |
+| 3 | Gapped stop fills worse than the stop and reports slippage; bracket and OCO cancel siblings | **Pass** | `orders.int.test.ts`: gap 1.08000 → 1.07500 fills below the stop with `referencePrice 1.08`, slippage ≥ 0.005, `order.triggered` audited; bracket TP fill cancels SL and SL fill cancels TP; OCO leg fill cancels the other leg and fills the group; group cancel cancels legs |
+| 4 | Each risk rule has a positive test, a negative test and a clear message; novice orders without a stop are rejected | **Pass** | `packages/domain/src/trading/risk.test.ts`: every one of the 23 codes has a negative case and message checks, clean positive case, at-limit edges; `apps/api/test/risk.int.test.ts` end to end (notional, fat-finger, position, leverage, margin, daily loss, rate, novice ×3, post-only, SL side, stale, feed, heartbeat, session, FX) incl. `NOVICE_STOP_REQUIRED` |
+| 5 | Kill switch scope 3 halts robots, cancels all working orders and flattens all positions within 2 s under 1,000 open orders; audit shows each child action | **Pass** | `apps/api/test/kill-switch.int.test.ts` against Postgres: **178 ms** end to end (server 172 ms) for 1,000 orders + 4 positions; audit: 1 requested, 1 robots_halted, 1,000 `order.cancelled`, 4 flatten orders new/accepted/working/filled, 1 completed; chain valid; reconciliation clean |
+| 6 | Preview numbers match hand-computed fixtures for EUR/USD, XAU/USD, BTC/USD and one equity | **Pass** | `packages/domain/src/trading/preview.test.ts` (arithmetic in comments) and the same numbers through `POST /orders/preview` in `apps/api/test/preview.int.test.ts` (plus SAP in EUR → USD and AAPL in a JPY account) |
+| 7 | OpenAPI published, ADR 0003 written, STATUS updated | **Pass** | `packages/sdk/openapi.json` (45 paths incl. 15 new), `/docs` in dev; `docs/adr/0003-oms.md`; `docs/STATUS.md` G3 |
+
+Additional mandatory scope:
+
+| Scope | Result | Evidence |
+|---|---|---|
+| B-018 appropriateness (novice-only sign-up, questionnaire engine, API, web page, tests) | **Done** | `auth.int.test.ts`, `appropriateness.int.test.ts` (no answer key served, fail → cool-down 429, audit with version/score and no answers, pass → trader + cookie cleared + forced TOTP enrolment, version immutability, pass mark/cool-down overrides); e2e `auth.spec.ts` (full web flow and failed attempt); test helpers pass the assessment through the API |
+| B-501 real paper fills | **Done** | `sim.int.test.ts`: account fills → `/analytics/paper` with base-currency fees and registry multipliers; accounts with no fills keep the labelled fixture |
+| Global coverage (registry-driven, base currency, FX) | **Done** | multiplier modes, fee schedules and execution params are registry rows; SAP (EUR) in USD and AAPL (USD) in JPY previews; `FX_RATE_UNAVAILABLE` blocks when no fresh rate |
+| Kill switch wired to web, halted banner, resume; top-bar account figures | **Done** | e2e `trading.spec.ts`, `kill-switch.spec.ts`, `a11y.spec.ts` (axe on the halted banner and the assessment page) |
+| Fill safety from goal 02 | **Done** | `risk.int.test.ts` fill-safety tests; resting orders held then filled when safe; kill-switch flatten held when the feed is down |
+| LIVE stub, never enabled | **Done** | `trading-integrity.int.test.ts`, `trading.unit.test.ts` |
+
+### 6.2 Gate run
+
+| Command | Result |
+|---|---|
+| `pnpm build` | 7/7 tasks successful |
+| `pnpm lint` | 12/12 tasks, 0 warnings |
+| `pnpm typecheck` | 12/12 tasks |
+| `pnpm test` | domain 102, api 37, sdk 11, web 15, market-data 60, ui 113, bot-runner 5 — all pass; coverage thresholds met (domain `src/trading` 98.6 % lines) |
+| `pnpm test:integration` | 17 files, 118 tests pass (was 10 files / 70 tests) |
+| `pnpm test:e2e` | 26 tests pass (was 21) |
+| `pnpm py:check` | 85 passed, 98.9 % coverage (quant unchanged) |
+
+Measured:
+
+```
+[kill-switch] scope 3 with 1,000 open orders + 4 positions: 178 ms end-to-end (server 172 ms)
+[risk timing ms] rules p50 0.064 p95 0.141 max 0.224; with context load p50 3.609 p95 4.911
+```
+
+### 6.3 Deferred (with reason)
+
+| Item | Reason | Backlog |
+|---|---|---|
+| Robot runner consuming `kora:ctl:robots` and submitting through the OMS | Goal 06 builds the robots; the interface (`OmsService.submit` with `actor.type='robot'`, `source='robot:{id}'`, halt refusal `TRADING_HALTED`) is implemented and tested | B-301 |
+| Matching-loop scale-out across api replicas | Single writer is enough for goal 03 volumes | B-302 |
+| Queue-position / trade-print matching, triple-swap days, margin close-out | Paper realism beyond the goal; placeholders need Sponsor values (OQ-B3) | B-304, B-307 |
+| Full Pro ticket and streaming blotter; Novice trade flow | Goals 04 and 08 (minimal wiring shipped so the engine is usable end to end) | B-305, B-306 |
+| SDK generation from OpenAPI, response schemas | Still hand-written types mirrored by the spec | B-004, B-209, B-312 |
