@@ -24,7 +24,8 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/home/);
+  // Goal 08: a new novice lands on onboarding (inside the simple view) until it is done.
+  await expect(page).toHaveURL(/\/(home|onboarding)/);
 
   await page.getByTestId('user-menu').click();
   await page.getByTestId('unlock-pro').click();
@@ -87,7 +88,8 @@ test('sign-up as novice lands in the simple view without MFA', async ({ page }) 
   await page.getByLabel('Email').fill(uniqueEmail('ui-novice'));
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/home/);
+  // Goal 08: a new novice lands on onboarding (inside the simple view) until it is done.
+  await expect(page).toHaveURL(/\/(home|onboarding)/);
   await expect(page.getByTestId('novice-topbar')).toBeVisible();
   await expect(page.getByText('[XX]% of retail accounts lose money')).toBeVisible();
 });
