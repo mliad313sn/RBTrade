@@ -123,9 +123,9 @@ check, channel validation and ref-counting.
 | # | Criterion | Result | Evidence |
 |---|---|---|---|
 | 1 | Same seed → identical sequence (snapshot test) | **Pass** | `simulated-market.test.ts`: committed snapshot (SHA-256 digest of 2 000 steps × EURUSD/XAUUSD/BTCUSD/7203.XTKS with a US CPI shock, first/last quotes, counts 8 000 quotes / 8 000 depth / 2 393 trades); same seed twice identical; different seed differs; per-symbol streams independent of the instrument set. |
-| 2 | `GET /candles?symbol=EURUSD&tf=15m&limit=500` < 150 ms p95 locally, correct OHLCV vs hand-computed bars | **Pass** | `candles.int.test.ts`: nine hand-crafted 1 s bars through the SQL rollup equal hand-computed 1m/5m/15m/1h/4h/1D bars; idempotent refresh + late bar; history/live bucket merge; registry precision (`1.0831` → `1.08310`). Latency over 200 sequential requests (after 20 warm-up) on 5 000 history + 1 000 live 15m candles: **p50 11.9 ms, p95 18.4 ms, p99 20.5 ms**. Unit + fast-check: `bars.test.ts` (hierarchical = direct aggregation, invariants, volume conservation). |
+| 2 | `GET /candles?symbol=EURUSD&tf=15m&limit=500` < 150 ms p95 locally, correct OHLCV vs hand-computed bars | **Pass** | `candles.int.test.ts`: nine hand-crafted 1 s bars through the SQL rollup equal hand-computed 1m/5m/15m/1h/4h/1D bars; idempotent refresh + late bar; history/live bucket merge; registry precision (`1.0831` → `1.08310`). Latency over 200 sequential requests (after 20 warm-up) on 5 000 history + 1 000 live 15m candles: **p50 11.8 ms, p95 16.9 ms, p99 17.9 ms** (final run; earlier runs p95 16.7–18.4 ms). Unit + fast-check: `bars.test.ts` (hierarchical = direct aggregation, invariants, volume conservation). |
 | 3 | 200 symbols × 10 msg/s to 500 clients, p99 fan-out < 50 ms (script + results committed) | **Pass** | `apps/api/load/ws-fanout.mjs` (Node generator; k6 blocked by the proxy, reference `ws-fanout.k6.js` committed). 500 clients × 20 of 200 symbols, 60 s: **p99 13.1 ms** (p50 3.0, p95 8.8, max 38.5), 6.0 M frames at 99 987/s, 99.99 % delivered, 0 errors. Results in `apps/api/load/results/*.json`; table in §7.3. |
-| 4 | Kill adapter → `status` `degraded` within 3 s, quotes `stale:true`; restart → gap resync (integration test) | **Pass** | `feed-resilience.int.test.ts` over a real WebSocket: admin `POST /market-data/feeds/simulated/stop` (audited, trader gets 403) → `degraded` and EURUSD `stale:true` after **7 ms**; REST `/quotes` also stale; restart → first quote seq jumps (missed steps never delivered), gap recorded `{expected, got}`, resync from snapshot, `resyncs ≥ 1`, status back to `ok`, no stale symbols. Also a silent-stall drill: FX stale after **2.19 s**, equity after **5.20 s** (per-asset-class thresholds), while the adapter stays `up`. Gateway heartbeat loss → `down` + stale quotes (`ws-gateway.int.test.ts`). |
+| 4 | Kill adapter → `status` `degraded` within 3 s, quotes `stale:true`; restart → gap resync (integration test) | **Pass** | `feed-resilience.int.test.ts` over a real WebSocket: admin `POST /market-data/feeds/simulated/stop` (audited, trader gets 403) → `degraded` and EURUSD `stale:true` after **5–7 ms**; REST `/quotes` also stale; restart → first quote seq jumps (missed steps never delivered), gap recorded `{expected, got}`, resync from snapshot, `resyncs ≥ 1`, status back to `ok`, no stale symbols. Also a silent-stall drill: FX stale after **2.18 s**, equity after **5.19 s** (per-asset-class thresholds), while the adapter stays `up`. Gateway heartbeat loss → `down` + stale quotes (`ws-gateway.int.test.ts`). |
 | 5 | Precision and tick rounding from the registry, never hard-coded (fast-check) | **Pass** | `precision.property.test.ts`: 150 arbitrary registry rows (ticks 0.00001…5, 0.25, 0.0025, 0.015625; extra precision; qty steps) × seeds → every bid/ask/depth/trade price is a tick multiple with exactly `price_precision` decimals, sizes on the qty grid ≥ min qty, ask > bid, depth sorted; rounding helpers property-tested; a source scan forbids literal `toFixed(<n>)`/`toDecimalPlaces(<n>)`; DB CHECKs (tick fits precision, step fits qty precision); registry drift test DB = catalog; stub adapters round vendor JSON numbers through the registry (`118.915` → `118.92`). |
 | 6 | `docs/adr/0002-market-data.md` and STATUS written | **Pass** | ADR 0002, this plan, `docs/STATUS.md`, BACKLOG B-201…B-210, OQ-M1/OQ-M2. |
 | + | Sponsor scope update: global registry, sessions across DST | **Pass** | `venues` (19, all continents), extended asset classes (13, each seeded), ISIN (check digits verified)/FIGI, aliases; `sessions.test.ts` + `seed.test.ts`: XNYS, XLON, XTKS, XHKG, XJSE, BVMF, XASX across DST, lunch breaks, holidays, early closes, XCME maintenance break, FX 24×5, crypto 24/7; simulator runs every registry row. |
@@ -146,14 +146,15 @@ $ pnpm test --force →  Tasks: 12 successful, 12 total
   @kora/quant        11 passed, coverage 90.91%
 $ pnpm --filter @kora/api test:integration   (real Postgres 16 + Redis 7)
   ✓ test/ws-gateway.int.test.ts (8 tests)
-  ✓ test/feed-resilience.int.test.ts (3 tests)
-      [resilience] degraded after 7 ms, stale after 7 ms
-      [stall] FX stale after 2190 ms, equity stale after 5195 ms
+  ✓ test/feed-resilience.int.test.ts (4 tests, incl. SIMULATED backfill ending at the live start price)
+      [resilience] degraded after 5 ms, stale after 5 ms
+      [stall] FX stale after 2183 ms, equity stale after 5187 ms
   ✓ test/candles.int.test.ts (10 tests)
-      [candles latency ms] {"n":200,"p50":11.9,"p95":18.4,"p99":20.5,"max":21.9}
+      [candles latency ms] {"n":200,"p50":11.8,"p95":16.9,"p99":17.9,"max":22.6}
   ✓ test/market-data-registry.int.test.ts (5 tests)
   ✓ auth (9) · audit (7) · preferences-killswitch (6) · lockout (1) · health (2)
-  Tests 51 passed (51)
+  Tests 52 passed (52)
+$ pnpm build       →  Tasks: 7 successful, 7 total
 $ pnpm --filter @kora/web build && pnpm test:e2e   (api :4010 with in-process SIMULATED feed, next start :3010)
   ✓ 14 market-data › pro terminal watchlist streams SIMULATED quotes over the WebSocket with registry precision
   ✓ a11y (4, incl. /terminal with the live watchlist) · auth (4) · kill-switch (5) · mode (1) · rbac (2)
