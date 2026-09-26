@@ -19,7 +19,8 @@ export interface OhlcvBar {
 export type Series = Array<number | null>;
 
 function assertPeriod(n: number): void {
-  if (!Number.isInteger(n) || n < 1) throw new RangeError(`period must be a positive integer, got ${n}`);
+  if (!Number.isInteger(n) || n < 1)
+    throw new RangeError(`period must be a positive integer, got ${n}`);
 }
 
 /** Simple moving average over `n` values. */
@@ -144,7 +145,10 @@ export const utcDayAnchor = (t: number): number => Math.floor(t / 86_400_000);
  * Volume-weighted average price of the typical price (H + L + C) / 3, reset whenever `anchor(t)`
  * changes (a new session). Bars with no volume yet carry the previous VWAP (null at session start).
  */
-export function vwapSeries(bars: readonly OhlcvBar[], anchor: (t: number) => number = utcDayAnchor): Series {
+export function vwapSeries(
+  bars: readonly OhlcvBar[],
+  anchor: (t: number) => number = utcDayAnchor,
+): Series {
   const out: Series = new Array<number | null>(bars.length).fill(null);
   let session: number | null = null;
   let pv = 0;
@@ -169,7 +173,10 @@ export const INDICATOR_IDS = ['ema', 'sma', 'vwap', 'bollinger', 'rsi', 'atr'] a
 export type IndicatorId = (typeof INDICATOR_IDS)[number];
 
 /** Default periods used by the terminal (prototype legend: "EMA 20", "VWAP"). */
-export const INDICATOR_DEFAULTS: Record<IndicatorId, { period: number; label: string; pane: 'price' | 'own' }> = {
+export const INDICATOR_DEFAULTS: Record<
+  IndicatorId,
+  { period: number; label: string; pane: 'price' | 'own' }
+> = {
   ema: { period: 20, label: 'EMA 20', pane: 'price' },
   sma: { period: 50, label: 'SMA 50', pane: 'price' },
   vwap: { period: 0, label: 'VWAP', pane: 'price' },

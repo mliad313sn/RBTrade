@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { atr, bollinger, ema, rsi, sma, trueRange, vwapSeries as vwap, type OhlcvBar } from './indicators.js';
+import {
+  atr,
+  bollinger,
+  ema,
+  rsi,
+  sma,
+  trueRange,
+  vwapSeries as vwap,
+  type OhlcvBar,
+} from './indicators.js';
 
 /**
  * Reference series. The SMA/EMA and RSI series are the widely reproduced StockCharts
@@ -11,21 +20,32 @@ import { atr, bollinger, ema, rsi, sma, trueRange, vwapSeries as vwap, type Ohlc
 
 // StockCharts EMA/SMA example: 30 closes, 10-day SMA and EMA.
 const CLOSES_EMA = [
-  22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29, 22.15, 22.39, 22.38, 22.61, 23.36, 24.05, 23.75, 23.83, 23.95, 23.63,
-  23.82, 23.87, 23.65, 23.19, 23.1, 23.33, 22.68, 23.1, 22.4, 22.17,
+  22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29, 22.15, 22.39, 22.38, 22.61,
+  23.36, 24.05, 23.75, 23.83, 23.95, 23.63, 23.82, 23.87, 23.65, 23.19, 23.1, 23.33, 22.68, 23.1,
+  22.4, 22.17,
 ];
-const SMA10 = [22.22, 22.21, 22.23, 22.26, 22.3, 22.42, 22.61, 22.77, 22.91, 23.08, 23.21, 23.38, 23.53, 23.65, 23.71, 23.68, 23.61, 23.51, 23.43, 23.28, 23.13];
-const EMA10 = [22.22, 22.21, 22.24, 22.27, 22.33, 22.52, 22.8, 22.97, 23.13, 23.28, 23.34, 23.43, 23.51, 23.54, 23.47, 23.4, 23.39, 23.26, 23.23, 23.08, 22.92];
+const SMA10 = [
+  22.22, 22.21, 22.23, 22.26, 22.3, 22.42, 22.61, 22.77, 22.91, 23.08, 23.21, 23.38, 23.53, 23.65,
+  23.71, 23.68, 23.61, 23.51, 23.43, 23.28, 23.13,
+];
+const EMA10 = [
+  22.22, 22.21, 22.24, 22.27, 22.33, 22.52, 22.8, 22.97, 23.13, 23.28, 23.34, 23.43, 23.51, 23.54,
+  23.47, 23.4, 23.39, 23.26, 23.23, 23.08, 22.92,
+];
 
 // StockCharts RSI example (Wilder, 14 periods): 33 closes, RSI from index 14.
 const CLOSES_RSI = [
-  44.3389, 44.0902, 44.1497, 43.6124, 44.3278, 44.8264, 45.0955, 45.4245, 45.8433, 46.0826, 45.8931, 46.0328, 45.614, 46.282, 46.282, 46.0028,
-  46.0328, 46.4116, 46.2222, 45.6439, 46.2122, 46.2521, 45.7137, 46.4515, 45.7835, 45.3548, 44.0288, 44.1783, 44.2181, 44.5672, 43.4205, 42.6628,
-  43.1314,
+  44.3389, 44.0902, 44.1497, 43.6124, 44.3278, 44.8264, 45.0955, 45.4245, 45.8433, 46.0826, 45.8931,
+  46.0328, 45.614, 46.282, 46.282, 46.0028, 46.0328, 46.4116, 46.2222, 45.6439, 46.2122, 46.2521,
+  45.7137, 46.4515, 45.7835, 45.3548, 44.0288, 44.1783, 44.2181, 44.5672, 43.4205, 42.6628, 43.1314,
 ];
-const RSI14 = [70.53, 66.32, 66.55, 69.41, 66.36, 57.97, 62.93, 63.26, 56.06, 62.38, 54.71, 50.42, 39.99, 41.46, 41.87, 45.46, 37.3, 33.08, 37.77];
+const RSI14 = [
+  70.53, 66.32, 66.55, 69.41, 66.36, 57.97, 62.93, 63.26, 56.06, 62.38, 54.71, 50.42, 39.99, 41.46,
+  41.87, 45.46, 37.3, 33.08, 37.77,
+];
 
-const tail = (s: Array<number | null>, from: number) => s.slice(from).map((v) => (v === null ? null : Math.round(v * 100) / 100));
+const tail = (s: Array<number | null>, from: number) =>
+  s.slice(from).map((v) => (v === null ? null : Math.round(v * 100) / 100));
 
 describe('sma / ema (StockCharts reference)', () => {
   it('10-day SMA matches the published values', () => {
@@ -88,11 +108,23 @@ describe('bollinger', () => {
   });
 });
 
-const bar = (t: number, high: number, low: number, close: number, volume = 0): OhlcvBar => ({ t, high, low, close, volume });
+const bar = (t: number, high: number, low: number, close: number, volume = 0): OhlcvBar => ({
+  t,
+  high,
+  low,
+  close,
+  volume,
+});
 
 describe('atr', () => {
   // TR: bar0 = 2 (12-10); bar1 = max(13-11, |13-11|, |11-11|) = 2; bar2 = max(1, |12-12.5|... ) see below
-  const bars = [bar(0, 12, 10, 11), bar(1, 13, 11, 12.5), bar(2, 12, 11, 11.5), bar(3, 15, 12, 14), bar(4, 14, 13, 13.5)];
+  const bars = [
+    bar(0, 12, 10, 11),
+    bar(1, 13, 11, 12.5),
+    bar(2, 12, 11, 11.5),
+    bar(3, 15, 12, 14),
+    bar(4, 14, 13, 13.5),
+  ];
   it('true range uses the previous close', () => {
     // bar2: H-L 1, |H-pc| = |12-12.5| = .5, |L-pc| = |11-12.5| = 1.5 → 1.5
     // bar3: H-L 3, |15-11.5| = 3.5, |12-11.5| = .5 → 3.5
@@ -114,7 +146,12 @@ describe('atr', () => {
 describe('vwap', () => {
   it('cumulative typical price × volume, reset each UTC day', () => {
     const day = 86_400_000;
-    const bars = [bar(0, 11, 9, 10, 100), bar(60_000, 12, 10, 11, 300), bar(day, 20, 18, 19, 50), bar(day + 60_000, 21, 19, 20, 0)];
+    const bars = [
+      bar(0, 11, 9, 10, 100),
+      bar(60_000, 12, 10, 11, 300),
+      bar(day, 20, 18, 19, 50),
+      bar(day + 60_000, 21, 19, 20, 0),
+    ];
     const v = vwap(bars);
     // tp0 = 10, tp1 = 11 → (1000 + 3300) / 400 = 10.75
     expect(v[0]).toBeCloseTo(10, 10);

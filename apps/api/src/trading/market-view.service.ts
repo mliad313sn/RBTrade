@@ -59,7 +59,9 @@ export class MarketViewService {
     const depth = d ? (JSON.parse(d) as DepthSnapshot) : null;
     const status = s ? (JSON.parse(s) as FeedStatus) : null;
     const tz = inst.spec.tradingSessions?.timezone ?? inst.venue.timezone;
-    const session = sessionStatus(inst.spec.tradingSessions ?? inst.venue.calendar, tz, now).state;
+    const session = this.cfg.sessionOverride.has(sym)
+      ? 'open'
+      : sessionStatus(inst.spec.tradingSessions ?? inst.venue.calendar, tz, now).state;
     const { safety, reason } = this.safety(quote, status, inst.staleAfterMs, now);
     const bid = quote ? dec(quote.bid) : null;
     const ask = quote ? dec(quote.ask) : null;

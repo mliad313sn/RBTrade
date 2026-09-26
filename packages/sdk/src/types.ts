@@ -26,6 +26,9 @@ import type {
   Role,
   UpdatePreferences,
   UserPreferences,
+  CurrencyExposure,
+  HistoricalVarResult,
+  CorrelationResult,
 } from '@kora/domain';
 
 export type { UpdatePreferences, UserPreferences };
@@ -304,3 +307,23 @@ export interface QuestionnaireResponse {
 export type AttemptResponse =
   | { passed: true; scorePct: number; passMarkPct: number; questionnaire: { id: string; version: number }; roleGranted: 'trader'; next: 'sign_in_again'; message: string }
   | { passed: false; scorePct: number; passMarkPct: number; questionnaire: { id: string; version: number }; cooldownUntil: string | null; topicsToReview: string[]; message: string };
+
+// ---- Pro terminal (goal 04) ------------------------------------------------------------------
+
+export interface SavedLayout {
+  name: string;
+  layout: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface RiskSummary {
+  accountId: string;
+  currency: string;
+  simulated: true;
+  source: 'api' | 'quant';
+  asOf: string;
+  exposure: CurrencyExposure[];
+  var: HistoricalVarResult & { pctEquity: string | null; note: string };
+  correlation: CorrelationResult;
+  dailyLoss: { dayPnl: string; limit: string; usedPct: string };
+}

@@ -25,15 +25,24 @@ export const SaveLayoutSchema = z
 
 export const MAX_WATCHLISTS_PER_USER = 20;
 export const MAX_WATCHLIST_SYMBOLS = 500;
-const watchlistName = z.string().trim().regex(LAYOUT_NAME_RE, 'Use up to 40 letters, digits, spaces, dot, dash or underscore');
+const watchlistName = z
+  .string()
+  .trim()
+  .regex(LAYOUT_NAME_RE, 'Use up to 40 letters, digits, spaces, dot, dash or underscore');
 const symbolList = z
   .array(z.string().regex(SYMBOL_RE))
   .max(MAX_WATCHLIST_SYMBOLS, `A watchlist holds at most ${MAX_WATCHLIST_SYMBOLS} symbols`)
   .refine((a) => new Set(a).size === a.length, 'Symbols must be unique');
 
-export const CreateWatchlistSchema = z.object({ name: watchlistName, symbols: symbolList.default([]) }).strict();
+export const CreateWatchlistSchema = z
+  .object({ name: watchlistName, symbols: symbolList.default([]) })
+  .strict();
 export const UpdateWatchlistSchema = z
-  .object({ name: watchlistName.optional(), symbols: symbolList.optional(), position: z.number().int().min(0).max(1000).optional() })
+  .object({
+    name: watchlistName.optional(),
+    symbols: symbolList.optional(),
+    position: z.number().int().min(0).max(1000).optional(),
+  })
   .strict();
 
 export interface WatchlistDto {
@@ -52,7 +61,11 @@ export const CreateAlertSchema = z
   .object({
     symbol: z.string().regex(SYMBOL_RE),
     condition: z.enum(ALERT_CONDITIONS),
-    threshold: z.string().trim().regex(DECIMAL_STRING).refine((v) => !v.startsWith('-') && /[1-9]/.test(v), 'Must be greater than zero'),
+    threshold: z
+      .string()
+      .trim()
+      .regex(DECIMAL_STRING)
+      .refine((v) => !v.startsWith('-') && /[1-9]/.test(v), 'Must be greater than zero'),
     /** Indicator alerts only (RSI 14 on this timeframe). */
     timeframe: z.enum(ALERT_TIMEFRAMES).optional(),
     note: z.string().trim().max(120).optional(),
@@ -60,8 +73,14 @@ export const CreateAlertSchema = z
   .strict()
   .superRefine((a, ctx) => {
     const indicator = a.condition.startsWith('rsi_');
-    if (indicator && Number(a.threshold) >= 100) ctx.addIssue({ code: 'custom', path: ['threshold'], message: 'RSI is between 0 and 100' });
-    if (!indicator && a.timeframe) ctx.addIssue({ code: 'custom', path: ['timeframe'], message: 'Only indicator alerts take a timeframe' });
+    if (indicator && Number(a.threshold) >= 100)
+      ctx.addIssue({ code: 'custom', path: ['threshold'], message: 'RSI is between 0 and 100' });
+    if (!indicator && a.timeframe)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['timeframe'],
+        message: 'Only indicator alerts take a timeframe',
+      });
   });
 export type CreateAlert = z.infer<typeof CreateAlertSchema>;
 
@@ -79,7 +98,11 @@ export interface PriceAlertDto {
 }
 
 /** Pure trigger rule shared by the evaluator and its tests. */
-export function alertTriggered(condition: AlertCondition, threshold: string, value: Decimal | number): boolean {
+export function alertTriggered(
+  condition: AlertCondition,
+  threshold: string,
+  value: Decimal | number,
+): boolean {
   const v = typeof value === 'number' ? new Decimal(value) : value;
   const t = dec(threshold);
   return condition.endsWith('_above') ? v.gte(t) : v.lte(t);
@@ -123,7 +146,9 @@ export function unitsFromQtyInput(i: {
   if (v.lte(0)) return null;
   if (i.mode === 'units') return roundQtyDown(v, i.qtyStep);
   if (!i.price) return null;
-  const perUnit = dec(i.price).mul(dec(i.multiplier)).mul(dec(i.fxRate ?? '1'));
+  const perUnit = dec(i.price)
+    .mul(dec(i.multiplier))
+    .mul(dec(i.fxRate ?? '1'));
   if (perUnit.lte(0)) return null;
   let notional = v;
   if (i.mode === 'pct_equity') {
@@ -159,7 +184,11 @@ export function protectivePrice(i: {
 }
 
 /** Distance between two prices in pips (for labels such as "20.0 pips"). */
-export function pipsBetween(a: string, b: string, spec: Pick<InstrumentSpec, 'pipSize' | 'tickSize'>): Decimal {
+export function pipsBetween(
+  a: string,
+  b: string,
+  spec: Pick<InstrumentSpec, 'pipSize' | 'tickSize'>,
+): Decimal {
   return dec(a).sub(dec(b)).abs().div(pipSizeOf(spec));
 }
 
@@ -182,9 +211,13 @@ export function ticketWarnings(i: {
 }): TicketWarning[] {
   const out: TicketWarning[] = [];
   if (i.lossPctEquity !== null && dec(i.lossPctEquity).gt(dec(i.perTradeRiskPct))) {
-    out.push({ code: 'RISK_ABOVE_RULE', message: `Risk ${i.lossPctEquity}% of equity is above your per-trade rule of ${i.perTradeRiskPct}%.` });
+    out.push({
+      code: 'RISK_ABOVE_RULE',
+      message: `Risk ${i.lossPctEquity}% of equity is above your per-trade rule of ${i.perTradeRiskPct}%.`,
+    });
   }
-  if (!i.hasStop) out.push({ code: 'NO_STOP', message: 'No stop loss: the loss on this trade is not capped.' });
+  if (!i.hasStop)
+    out.push({ code: 'NO_STOP', message: 'No stop loss: the loss on this trade is not capped.' });
   const windowMs = (i.windowMinutes ?? 60) * 60_000;
   const soon = i.events
     .filter((e) => i.currencies.includes(e.currency))
@@ -193,15 +226,29 @@ export function ticketWarnings(i: {
     .sort((a, b) => a.at - b.at)[0];
   if (soon) {
     const mins = Math.max(1, Math.round((soon.at - i.now) / 60_000));
-    out.push({ code: 'EVENT_SOON', message: `${soon.e.currency} ${soon.e.title} in ${mins} min: spreads and slippage can widen.` });
+    out.push({
+      code: 'EVENT_SOON',
+      message: `${soon.e.currency} ${soon.e.title} in ${mins} min: spreads and slippage can widen.`,
+    });
   }
-  if (i.session && i.session !== 'open') out.push({ code: 'SESSION_NOT_OPEN', message: `Market ${i.session === 'closed' ? 'closed' : i.session}: the order will wait for the session to open.` });
-  if (i.dataState && i.dataState !== 'ok') out.push({ code: 'DATA_NOT_OK', message: `Market data ${i.dataState.replace('_', ' ')}: no fills until the feed is healthy.` });
+  if (i.session && i.session !== 'open')
+    out.push({
+      code: 'SESSION_NOT_OPEN',
+      message: `Market ${i.session === 'closed' ? 'closed' : i.session}: the order will wait for the session to open.`,
+    });
+  if (i.dataState && i.dataState !== 'ok')
+    out.push({
+      code: 'DATA_NOT_OK',
+      message: `Market data ${i.dataState.replace('_', ' ')}: no fills until the feed is healthy.`,
+    });
   return out;
 }
 
 /** Session badge text (B-208): "market closed" is not "stale". */
-export function sessionBadge(state: string | null | undefined): { label: string; tone: 'open' | 'closed' } {
+export function sessionBadge(state: string | null | undefined): {
+  label: string;
+  tone: 'open' | 'closed';
+} {
   switch (state) {
     case 'open':
       return { label: 'Open', tone: 'open' };
@@ -217,7 +264,10 @@ export function sessionBadge(state: string | null | undefined): { label: string;
 }
 
 /** Show the Stale badge only when the market is open; a closed market's last quote is simply old. */
-export function quoteBadge(i: { stale: boolean; session: string | null | undefined }): 'stale' | 'closed' | null {
+export function quoteBadge(i: {
+  stale: boolean;
+  session: string | null | undefined;
+}): 'stale' | 'closed' | null {
   if (i.session && i.session !== 'open') return 'closed';
   return i.stale ? 'stale' : null;
 }

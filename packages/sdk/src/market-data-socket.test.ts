@@ -227,4 +227,60 @@ describe('MarketDataSocket', () => {
       '/api/calendar',
     ]);
   });
+
+  it('typed helpers for time and sales and the private trading channels (goal 04)', async () => {
+    const { s, ws } = make();
+    s.connect();
+    ws().open();
+    await flush();
+    const id = '0b3c9a4e-1f2d-4c5b-9a8e-7d6c5b4a3f21';
+    const got: string[] = [];
+    s.trades('BTCUSD', (b) => got.push(`t${b.trades.length}`));
+    s.orders(id, (m) => got.push(`o${m.orders.length}`));
+    s.positions(id, (m) => got.push(`p${m.positions.length}`));
+    s.account(id, () => got.push('a'));
+    expect(s.channels()).toEqual(['trades:BTCUSD', `orders:${id}`, `positions:${id}`, `account:${id}`]);
+    ws().push({ ch: 'trades:BTCUSD', data: { type: 'trades', symbol: 'BTCUSD', trades: [{}, {}] } });
+    ws().push({ ch: `orders:${id}`, data: { type: 'orders', accountId: id, orders: [{}] } });
+    ws().push({ ch: `positions:${id}`, data: { type: 'positions', positions: [] } });
+    ws().push({ ch: `account:${id}`, data: { type: 'account', account: {} } });
+    expect(got).toEqual(['t2', 'o1', 'p0', 'a']);
+  });
+
+  it('REST client covers the terminal endpoints (goal 04)', async () => {
+    const calls: string[] = [];
+    const f = (async (url: string, init: RequestInit) => {
+      calls.push(`${init.method} ${url}`);
+      return new Response(init.method === 'DELETE' && url.includes('layouts') ? '' : '{}', { status: 200 });
+    }) as unknown as typeof fetch;
+    const c = new KoraClient({ baseUrl: '/api', fetch: f });
+    await c.layouts();
+    await c.saveLayout('My desk', { a: 1 });
+    await c.deleteLayout('My desk');
+    await c.watchlists();
+    await c.createWatchlist('Asia', ['USDJPY']);
+    await c.updateWatchlist('w1', { symbols: [] });
+    await c.deleteWatchlist('w1');
+    await c.priceAlerts({ status: 'active' });
+    await c.createPriceAlert({ symbol: 'EURUSD', condition: 'price_above', threshold: '1.1' });
+    await c.cancelPriceAlert('a1');
+    await c.riskSummary();
+    await c.cancelAllOrders('EURUSD');
+    await c.cancelAllOrders();
+    expect(calls).toEqual([
+      'GET /api/me/layouts',
+      'PUT /api/me/layouts/My%20desk',
+      'DELETE /api/me/layouts/My%20desk',
+      'GET /api/me/watchlists',
+      'POST /api/me/watchlists',
+      'PUT /api/me/watchlists/w1',
+      'DELETE /api/me/watchlists/w1',
+      'GET /api/price-alerts?status=active',
+      'POST /api/price-alerts',
+      'DELETE /api/price-alerts/a1',
+      'GET /api/risk/summary',
+      'DELETE /api/orders?symbol=EURUSD',
+      'DELETE /api/orders',
+    ]);
+  });
 });

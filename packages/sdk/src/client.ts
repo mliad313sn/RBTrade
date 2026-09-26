@@ -1,6 +1,6 @@
 import type { KillSwitchScope } from '@kora/domain';
 
-import type { DepthSnapshot, Timeframe } from '@kora/domain';
+import type { CreateAlert, DepthSnapshot, PriceAlertDto, Timeframe, WatchlistDto } from '@kora/domain';
 
 import type {
   CalendarResponse,
@@ -29,6 +29,8 @@ import type {
   FillDto,
   QuestionnaireResponse,
   AttemptResponse,
+  SavedLayout,
+  RiskSummary,
   LoginResponse,
   MeResponse,
   MfaEnrollResponse,
@@ -192,6 +194,57 @@ export class KoraClient {
 
   fills(q: { limit?: number; before?: string; symbol?: string } = {}) {
     return this.request<{ accountId: string; currency: string; fills: FillDto[] }>('GET', `/fills${query(q)}`);
+  }
+
+  /** Cancels every open order (optionally one symbol) through the engine; each cancel is audited. */
+  cancelAllOrders(symbol?: string) {
+    return this.request<{ accountId: string; cancelled: number; orders: OrderDto[] }>('DELETE', `/orders${query({ symbol })}`);
+  }
+
+  // ---- Pro terminal (goal 04) ----
+
+  layouts() {
+    return this.request<{ layouts: SavedLayout[] }>('GET', '/me/layouts');
+  }
+
+  saveLayout(name: string, layout: Record<string, unknown>) {
+    return this.request<SavedLayout>('PUT', `/me/layouts/${encodeURIComponent(name)}`, { layout });
+  }
+
+  deleteLayout(name: string) {
+    return this.request<void>('DELETE', `/me/layouts/${encodeURIComponent(name)}`);
+  }
+
+  watchlists() {
+    return this.request<{ watchlists: WatchlistDto[] }>('GET', '/me/watchlists');
+  }
+
+  createWatchlist(name: string, symbols: string[] = []) {
+    return this.request<WatchlistDto>('POST', '/me/watchlists', { name, symbols });
+  }
+
+  updateWatchlist(id: string, patch: { name?: string; symbols?: string[]; position?: number }) {
+    return this.request<WatchlistDto>('PUT', `/me/watchlists/${encodeURIComponent(id)}`, patch);
+  }
+
+  deleteWatchlist(id: string) {
+    return this.request<void>('DELETE', `/me/watchlists/${encodeURIComponent(id)}`);
+  }
+
+  priceAlerts(q: { status?: 'active' | 'all'; limit?: number } = {}) {
+    return this.request<{ alerts: PriceAlertDto[] }>('GET', `/price-alerts${query(q)}`);
+  }
+
+  createPriceAlert(body: CreateAlert) {
+    return this.request<PriceAlertDto>('POST', '/price-alerts', body);
+  }
+
+  cancelPriceAlert(id: string) {
+    return this.request<PriceAlertDto>('DELETE', `/price-alerts/${encodeURIComponent(id)}`);
+  }
+
+  riskSummary() {
+    return this.request<RiskSummary>('GET', '/risk/summary');
   }
 
   // ---- appropriateness (B-018) ----

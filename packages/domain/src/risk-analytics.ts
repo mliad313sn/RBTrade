@@ -53,9 +53,17 @@ export function netExposureByCurrency(
     .filter(([, v]) => !v.isZero())
     .map(([currency, v]) => {
       const rate = toBase(currency);
-      return { currency, amount: quantize(v, 8).toFixed(), amountBase: rate ? quantize(v.mul(rate), 2).toFixed(2) : null };
+      return {
+        currency,
+        amount: quantize(v, 8).toFixed(),
+        amountBase: rate ? quantize(v.mul(rate), 2).toFixed(2) : null,
+      };
     })
-    .sort((a, b) => Math.abs(Number(b.amountBase ?? 0)) - Math.abs(Number(a.amountBase ?? 0)) || a.currency.localeCompare(b.currency));
+    .sort(
+      (a, b) =>
+        Math.abs(Number(b.amountBase ?? 0)) - Math.abs(Number(a.amountBase ?? 0)) ||
+        a.currency.localeCompare(b.currency),
+    );
 }
 
 /** Simple returns from a close series (float64 estimates). */
@@ -111,7 +119,12 @@ export function historicalVar(i: HistoricalVarInput): HistoricalVarResult {
   const confidence = i.confidence ?? 0.95;
   const maxObs = i.maxObservations ?? 250;
   const held = i.positions.filter((p) => p.valueBase !== 0);
-  const base = { method: 'historical' as const, confidence, horizonDays: 1 as const, required: VAR_MIN_OBSERVATIONS };
+  const base = {
+    method: 'historical' as const,
+    confidence,
+    horizonDays: 1 as const,
+    required: VAR_MIN_OBSERVATIONS,
+  };
   if (held.length === 0) return { ...base, value: '0.00', observations: 0 };
   const n = Math.min(maxObs, ...held.map((p) => i.returns[p.symbol]?.length ?? 0));
   if (n < VAR_MIN_OBSERVATIONS) return { ...base, value: null, observations: n };
@@ -159,7 +172,10 @@ export interface CorrelationResult {
   threshold: number;
 }
 
-export function correlationClusters(returns: Record<string, number[]>, threshold = 0.7): CorrelationResult {
+export function correlationClusters(
+  returns: Record<string, number[]>,
+  threshold = 0.7,
+): CorrelationResult {
   const symbols = Object.keys(returns).sort();
   const matrix = symbols.map((a) =>
     symbols.map((b) => {

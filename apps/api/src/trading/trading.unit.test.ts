@@ -64,6 +64,14 @@ describe('trading config', () => {
     expect(() => loadTradingConfig({ KORA_PAPER_STARTING_CASH: '1e6' })).toThrow();
     expect(() => loadTradingConfig({ KORA_PAPER_BASE_CURRENCY: 'usd' })).toThrow();
   });
+
+  it('session override (goal 04 weekend-deterministic e2e) is refused outside dev/test', () => {
+    expect([...loadTradingConfig({}).sessionOverride]).toEqual([]);
+    expect([...loadTradingConfig({ KORA_ENV: 'test', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD, GBPUSD' }).sessionOverride]).toEqual(['EURUSD', 'GBPUSD']);
+    expect(() => loadTradingConfig({ KORA_ENV: 'production', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow(/refused/);
+    expect(() => loadTradingConfig({ KORA_ENV: 'staging', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow(/refused/);
+    expect(() => loadTradingConfig({ KORA_ENV: 'test', KORA_TRADING_SESSION_OVERRIDE: 'eurusd' })).toThrow();
+  });
 });
 
 describe('DAY expiry follows the venue calendar', () => {

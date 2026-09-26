@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { dec } from './decimal.js';
-import { correlationClusters, historicalVar, netExposureByCurrency, pearson, quantile, simpleReturns, VAR_MIN_OBSERVATIONS } from './risk-analytics.js';
+import {
+  correlationClusters,
+  historicalVar,
+  netExposureByCurrency,
+  pearson,
+  quantile,
+  simpleReturns,
+  VAR_MIN_OBSERVATIONS,
+} from './risk-analytics.js';
 
 describe('net exposure by currency', () => {
   const rates: Record<string, string> = { USD: '1', EUR: '1.1', JPY: '0.0068' };
@@ -10,9 +18,30 @@ describe('net exposure by currency', () => {
   it('FX pairs expose both legs; equities expose their quote currency', () => {
     const r = netExposureByCurrency(
       [
-        { symbol: 'EURUSD', qty: '100000', price: '1.1', multiplier: '1', baseCcy: 'EUR', quoteCcy: 'USD' },
-        { symbol: 'AAPL', qty: '100', price: '200', multiplier: '1', baseCcy: null, quoteCcy: 'USD' },
-        { symbol: 'USDJPY', qty: '-50000', price: '150', multiplier: '1', baseCcy: 'USD', quoteCcy: 'JPY' },
+        {
+          symbol: 'EURUSD',
+          qty: '100000',
+          price: '1.1',
+          multiplier: '1',
+          baseCcy: 'EUR',
+          quoteCcy: 'USD',
+        },
+        {
+          symbol: 'AAPL',
+          qty: '100',
+          price: '200',
+          multiplier: '1',
+          baseCcy: null,
+          quoteCcy: 'USD',
+        },
+        {
+          symbol: 'USDJPY',
+          qty: '-50000',
+          price: '150',
+          multiplier: '1',
+          baseCcy: 'USD',
+          quoteCcy: 'JPY',
+        },
       ],
       toBase,
     );
@@ -51,20 +80,41 @@ describe('historical VaR', () => {
   it('revalues today’s positions on aligned returns', () => {
     // 20 returns: −10 %, −9 %, …, +9 %; one long position worth 1,000.
     const rets = Array.from({ length: 20 }, (_, i) => (i - 10) / 100);
-    const r = historicalVar({ positions: [{ symbol: 'A', valueBase: 1000 }], returns: { A: rets } });
+    const r = historicalVar({
+      positions: [{ symbol: 'A', valueBase: 1000 }],
+      returns: { A: rets },
+    });
     // P&L sorted −100…+90 step 10; 5 % quantile at h = 19·0.05 = 0.95 → −100 + .95·10 = −90.5 → VaR 90.50
-    expect(r).toMatchObject({ method: 'historical', confidence: 0.95, horizonDays: 1, value: '90.50', observations: 20, required: VAR_MIN_OBSERVATIONS });
+    expect(r).toMatchObject({
+      method: 'historical',
+      confidence: 0.95,
+      horizonDays: 1,
+      value: '90.50',
+      observations: 20,
+      required: VAR_MIN_OBSERVATIONS,
+    });
     // A short of the same size loses on the up moves: 5 % quantile of −P&L series → 80.50
-    expect(historicalVar({ positions: [{ symbol: 'A', valueBase: -1000 }], returns: { A: rets } }).value).toBe('80.50');
+    expect(
+      historicalVar({ positions: [{ symbol: 'A', valueBase: -1000 }], returns: { A: rets } }).value,
+    ).toBe('80.50');
   });
 
   it('short history or no positions', () => {
-    expect(historicalVar({ positions: [{ symbol: 'A', valueBase: 1 }], returns: { A: [0.01, 0.02] } })).toMatchObject({ value: null, observations: 2 });
-    expect(historicalVar({ positions: [{ symbol: 'A', valueBase: 1 }], returns: {} }).value).toBeNull();
-    expect(historicalVar({ positions: [], returns: {} })).toMatchObject({ value: '0.00', observations: 0 });
+    expect(
+      historicalVar({ positions: [{ symbol: 'A', valueBase: 1 }], returns: { A: [0.01, 0.02] } }),
+    ).toMatchObject({ value: null, observations: 2 });
+    expect(
+      historicalVar({ positions: [{ symbol: 'A', valueBase: 1 }], returns: {} }).value,
+    ).toBeNull();
+    expect(historicalVar({ positions: [], returns: {} })).toMatchObject({
+      value: '0.00',
+      observations: 0,
+    });
     // A hedge that never loses has zero VaR (floored).
     const up = Array.from({ length: 25 }, () => 0.01);
-    expect(historicalVar({ positions: [{ symbol: 'A', valueBase: 100 }], returns: { A: up } }).value).toBe('0.00');
+    expect(
+      historicalVar({ positions: [{ symbol: 'A', valueBase: 100 }], returns: { A: up } }).value,
+    ).toBe('0.00');
   });
 });
 

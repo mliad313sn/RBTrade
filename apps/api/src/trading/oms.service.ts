@@ -660,6 +660,32 @@ export class OmsService {
     });
   }
 
+  /**
+   * Cancels every open order of the user's account, optionally for one symbol (Pro terminal
+   * "Cancel all", goal 04). Each order goes through the engine's normal cancel path, so OCO groups,
+   * bracket children and the audit trail behave exactly as for a single cancel.
+   */
+  async cancelAll(userId: string, symbol?: string) {
+    const account = await this.accounts.ensure(userId);
+    return this.withAccount(account.id, async (tx) => {
+      const params: unknown[] = [tx.account.id, OPEN_ORDER_STATUSES];
+      if (symbol) params.push(symbol);
+      const r = await tx.c.query<OrderRow>(
+        `SELECT * FROM orders WHERE account_id = $1 AND status = ANY($2) ${symbol ? 'AND symbol = $3' : ''}
+         ORDER BY (exec_type = 'none') DESC, created_at FOR UPDATE`,
+        params,
+      );
+      const cancelled: ReturnType<typeof toOrderDto>[] = [];
+      for (const o of r.rows) {
+        const cur = await tx.c.query<OrderRow>('SELECT * FROM orders WHERE id = $1', [o.id]);
+        const row = cur.rows[0];
+        if (!row || !OPEN_ORDER_STATUSES.includes(row.status)) continue;
+        cancelled.push(toOrderDto(await this.engine.cancel(tx, row, 'user_cancel_all', { type: 'user', id: userId })));
+      }
+      return { accountId: tx.account.id, cancelled: cancelled.length, orders: cancelled };
+    });
+  }
+
   private async lockOrder(tx: TradingTx, orderId: string): Promise<OrderRow> {
     const r = await tx.c.query<OrderRow>(
       'SELECT * FROM orders WHERE id = $1 AND account_id = $2 FOR UPDATE',

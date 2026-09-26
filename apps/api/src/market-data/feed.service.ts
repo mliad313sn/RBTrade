@@ -3,6 +3,8 @@ import {
   candleChannel,
   depthChannel,
   quoteChannel,
+  tradesChannel,
+  type TradesBatch,
   STATUS_CHANNEL,
   TIMEFRAMES,
   type Candle,
@@ -45,6 +47,8 @@ interface FeedStats {
 
 const HISTORY_TFS = TIMEFRAMES.filter((t) => t !== '1s');
 const DAY_MS = 86_400_000;
+const TAPE_FLUSH_MS = 250;
+const TAPE_MAX_BATCH = 50;
 
 /**
  * Market data feed (goal 02): runs the adapters, checks sequence numbers, resyncs on gaps, keeps
@@ -69,6 +73,8 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly bars = new BarBuilder((s) => this.spec(s)?.qtyPrecision ?? 0);
   private readonly candles = new CandleTracker('simulated');
   private tradeBuf: Trade[] = [];
+  /** Prints waiting for the next `trades:{symbol}` batch (B-210). */
+  private tapeBuf = new Map<string, Trade[]>();
   private barBuf: Array<{ symbol: string; bar: OhlcvBar }> = [];
   private refreshFrom: number | null = null;
   private readonly startPrices = new Map<string, string>();
@@ -157,6 +163,7 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     this.every(this.cfg.staleCheckMs, () => this.checkStaleness());
     this.every(this.cfg.heartbeatMs, () => this.publishStatus());
     this.every(1000, () => void this.pump());
+    this.every(TAPE_FLUSH_MS, () => this.flushTape());
     this.every(3_600_000, () => void this.db.query('SELECT md_apply_retention()').catch((e: Error) => this.log.warn(`retention: ${e.message}`)));
     this.publishStatus();
     this.log.log(`feed started: ${specs.length} SIMULATED instruments, seed=${this.cfg.seed}`);
@@ -273,6 +280,9 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       if (r.status === 'gap') this.recordGap(adapter.source, t.symbol, 'trades', r.expected, r.got);
     }
     this.tradeBuf.push(t);
+    const tape = this.tapeBuf.get(t.symbol);
+    if (tape) tape.push(t);
+    else this.tapeBuf.set(t.symbol, [t]);
     for (const bar of this.bars.onTrade(t)) this.onBar(t.symbol, bar, t.seq);
   }
 
@@ -483,6 +493,21 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   // ---- helpers --------------------------------------------------------------------------------
+
+  /** Publishes buffered prints per symbol as one `trades:{symbol}` batch (time and sales, B-210). */
+  flushTape(): void {
+    if (this.tapeBuf.size === 0) return;
+    const buf = this.tapeBuf;
+    this.tapeBuf = new Map();
+    for (const [symbol, prints] of buf) {
+      const batch: TradesBatch = {
+        type: 'trades',
+        symbol,
+        trades: prints.slice(-TAPE_MAX_BATCH).map((p) => ({ tradeId: p.tradeId, price: p.price, qty: p.qty, side: p.side, exchangeTs: p.exchangeTs, seq: p.seq })),
+      };
+      this.publish(tradesChannel(symbol), batch);
+    }
+  }
 
   private publish(channel: string, msg: unknown): void {
     if (!this.pub) return;

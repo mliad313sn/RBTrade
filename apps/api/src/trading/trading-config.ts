@@ -33,12 +33,25 @@ const Schema = z.object({
   /** Daily roll (swaps) at this UTC hour: 21 ≈ 17:00 New York in summer time. */
   KORA_TRADING_ROLL_UTC_HOUR: z.coerce.number().int().min(0).max(23).default(21),
   KORA_RECONCILIATION_INTERVAL_MS: z.coerce.number().int().min(0).max(86_400_000).default(60_000),
+  /**
+   * Test-only: symbols the engine treats as in session regardless of the calendar, so weekday-bound
+   * e2e flows (EUR/USD) are deterministic at weekends (goal 04, ADR 0004). Refused outside dev/test.
+   */
+  KORA_TRADING_SESSION_OVERRIDE: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean))
+    .pipe(z.array(z.string().regex(/^[A-Z0-9][A-Z0-9._-]{0,31}$/))),
+  KORA_ENV: z.enum(['dev', 'test', 'staging', 'production']).default('dev'),
 });
 
 export type TradingConfig = ReturnType<typeof loadTradingConfig>;
 
 export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Schema.parse(env);
+  if (e.KORA_TRADING_SESSION_OVERRIDE.length > 0 && !(e.KORA_ENV === 'dev' || e.KORA_ENV === 'test')) {
+    throw new Error('KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused outside KORA_ENV=dev|test');
+  }
   return {
     startingCash: e.KORA_PAPER_STARTING_CASH,
     baseCurrency: e.KORA_PAPER_BASE_CURRENCY,
@@ -56,6 +69,7 @@ export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
     engineEnabled: e.KORA_ENGINE_ENABLED,
     rollUtcHour: e.KORA_TRADING_ROLL_UTC_HOUR,
     reconciliationIntervalMs: e.KORA_RECONCILIATION_INTERVAL_MS,
+    sessionOverride: new Set(e.KORA_TRADING_SESSION_OVERRIDE),
   };
 }
 

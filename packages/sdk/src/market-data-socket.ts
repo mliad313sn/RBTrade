@@ -1,8 +1,15 @@
 import {
+  accountChannel,
   candleChannel,
   depthChannel,
+  ordersChannel,
+  positionsChannel,
   quoteChannel,
   STATUS_CHANNEL,
+  tradesChannel,
+  type OrderDto,
+  type PositionDto,
+  type TradesBatch,
   type Candle,
   type DepthSnapshot,
   type FeedStatus,
@@ -149,6 +156,25 @@ export class MarketDataSocket {
 
   candles(symbol: string, tf: Timeframe, handler: ChannelHandler<Candle>): () => void {
     return this.subscribe(candleChannel(symbol, tf), handler);
+  }
+
+  /** Time and sales (B-210): batches of prints. */
+  trades(symbol: string, handler: ChannelHandler<TradesBatch>): () => void {
+    return this.subscribe(tradesChannel(symbol), handler);
+  }
+
+  /** Private (owner-only) order events: every committed transaction, never conflated. */
+  orders(accountId: string, handler: ChannelHandler<{ type: 'orders'; accountId: string; orders: OrderDto[] }>): () => void {
+    return this.subscribe(ordersChannel(accountId), handler);
+  }
+
+  positions(accountId: string, handler: ChannelHandler<{ type: 'positions'; positions: PositionDto[] }>): () => void {
+    return this.subscribe(positionsChannel(accountId), handler);
+  }
+
+  /** Account snapshots (coalesced 50 ms); the payload is the same view as GET /accounts/me. */
+  account<T = unknown>(accountId: string, handler: ChannelHandler<{ type: 'account'; account: T }>): () => void {
+    return this.subscribe(accountChannel(accountId), handler);
   }
 
   status(handler: ChannelHandler<FeedStatus>): () => void {

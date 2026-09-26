@@ -488,6 +488,33 @@
                       "minLength": 1,
                       "maxLength": 32
                     }
+                  },
+                  "terminal": {
+                    "type": "object",
+                    "properties": {
+                      "density": {
+                        "type": "string",
+                        "enum": [
+                          "compact",
+                          "comfortable"
+                        ]
+                      },
+                      "timeDisplay": {
+                        "type": "string",
+                        "enum": [
+                          "utc",
+                          "local"
+                        ]
+                      },
+                      "soundOnFills": {
+                        "type": "boolean"
+                      },
+                      "perTradeRiskPct": {
+                        "type": "string",
+                        "pattern": "^\\d{1,3}(\\.\\d{1,2})?$"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -1609,6 +1636,26 @@
         "tags": [
           "orders"
         ]
+      },
+      "delete": {
+        "operationId": "OrdersController_cancelAll",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cancel every open order, optionally for one symbol (Pro terminal \"Cancel all\"; each cancel is audited).",
+        "tags": [
+          "orders"
+        ]
       }
     },
     "/orders/{id}": {
@@ -2107,6 +2154,353 @@
         "summary": "Submit answers. Server-graded against the pass mark; a fail starts a cool-down; a pass grants the trader role and signs you out so the next login sets up two-factor authentication. Audited with version and score.",
         "tags": [
           "appropriateness"
+        ]
+      }
+    },
+    "/me/layouts": {
+      "get": {
+        "operationId": "LayoutsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Saved terminal layouts (names and JSON), most recently saved first.",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/me/layouts/{name}": {
+      "put": {
+        "operationId": "LayoutsController_save",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "layout": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "layout"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Save (create or replace) a named layout.",
+        "tags": [
+          "terminal"
+        ]
+      },
+      "delete": {
+        "operationId": "LayoutsController_remove",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a named layout.",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/me/watchlists": {
+      "get": {
+        "operationId": "WatchlistsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The user’s watchlists (created with the Majors and Global defaults on first read).",
+        "tags": [
+          "terminal"
+        ]
+      },
+      "post": {
+        "operationId": "WatchlistsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[\\p{L}\\p{N} ._-]{1,40}$"
+                  },
+                  "symbols": {
+                    "default": [],
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a watchlist (≤ 20 per user, ≤ 500 symbols each).",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/me/watchlists/{id}": {
+      "put": {
+        "operationId": "WatchlistsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[\\p{L}\\p{N} ._-]{1,40}$"
+                  },
+                  "symbols": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                    }
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rename, reorder symbols (drag or add/remove) or move a watchlist.",
+        "tags": [
+          "terminal"
+        ]
+      },
+      "delete": {
+        "operationId": "WatchlistsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a watchlist.",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/price-alerts": {
+      "get": {
+        "operationId": "AlertsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "active",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The user’s price and indicator alerts, newest first.",
+        "tags": [
+          "terminal"
+        ]
+      },
+      "post": {
+        "operationId": "AlertsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                  },
+                  "condition": {
+                    "type": "string",
+                    "enum": [
+                      "price_above",
+                      "price_below",
+                      "rsi_above",
+                      "rsi_below"
+                    ]
+                  },
+                  "threshold": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "timeframe": {
+                    "type": "string",
+                    "enum": [
+                      "1m",
+                      "5m",
+                      "15m",
+                      "1h",
+                      "4h",
+                      "1D"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "condition",
+                  "threshold"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a price (above/below) or RSI(14) alert on a timeframe. Audited as alert.created.",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/price-alerts/{id}": {
+      "delete": {
+        "operationId": "AlertsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cancel an active alert. Audited as alert.cancelled.",
+        "tags": [
+          "terminal"
+        ]
+      }
+    },
+    "/risk/summary": {
+      "get": {
+        "operationId": "RiskController_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Net exposure by currency, historical VaR(95 %, 1 day), correlation clusters and daily loss vs limit (PAPER, SIMULATED history).",
+        "tags": [
+          "terminal"
         ]
       }
     }

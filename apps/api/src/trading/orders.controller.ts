@@ -44,6 +44,8 @@ const ListQuery = z
   })
   .strict();
 
+const CancelAllQuery = z.object({ symbol: z.string().regex(SYMBOL_RE).optional() }).strict();
+
 @ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
@@ -95,6 +97,19 @@ export class OrdersController {
     @Query(new ZodValidationPipe(ListQuery)) q: z.infer<typeof ListQuery>,
   ) {
     return this.oms.list(p.sub, q);
+  }
+
+  @Delete()
+  @Throttle(orderThrottle())
+  @ApiOperation({
+    summary: 'Cancel every open order, optionally for one symbol (Pro terminal "Cancel all"; each cancel is audited).',
+  })
+  @ApiQuery({ name: 'symbol', required: false })
+  cancelAll(
+    @CurrentPrincipal() p: Principal,
+    @Query(new ZodValidationPipe(CancelAllQuery)) q: z.infer<typeof CancelAllQuery>,
+  ) {
+    return this.oms.cancelAll(p.sub, q.symbol);
   }
 
   @Get(':id')

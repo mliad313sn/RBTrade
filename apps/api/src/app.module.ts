@@ -16,6 +16,7 @@ import { MarketDataModule } from './market-data/market-data.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { RobotsController } from './robots/robots.controller';
 import { SimModule } from './sim/sim.module';
+import { TerminalModule } from './terminal/terminal.module';
 import { TradingModule } from './trading/trading.module';
 
 @Module({
@@ -50,6 +51,7 @@ import { TradingModule } from './trading/trading.module';
     SimModule,
     TradingModule,
     AppropriatenessModule,
+    TerminalModule,
   ],
   controllers: [HealthController, RobotsController, AdminController],
   providers: [
