@@ -14,6 +14,7 @@ import { HealthController } from './health/health.controller';
 import { KillSwitchController } from './kill-switch/kill-switch.controller';
 import { PreferencesModule } from './preferences/preferences.module';
 import { RobotsController } from './robots/robots.controller';
+import { SimModule } from './sim/sim.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { RobotsController } from './robots/robots.controller';
     AuditModule,
     AuthModule,
     PreferencesModule,
+    SimModule,
   ],
   controllers: [HealthController, KillSwitchController, RobotsController, AdminController],
   providers: [
