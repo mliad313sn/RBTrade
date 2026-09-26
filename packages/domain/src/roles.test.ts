@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasAnyRole, isNoviceOnly, isRole, requiresMfa, ROBOT_BUILDER_ROLES } from './roles.js';
+import {
+  AUDIT_READ_ALL_ROLES,
+  AUDIT_READ_ROLES,
+  hasAnyRole,
+  isNoviceOnly,
+  isRole,
+  requiresMfa,
+  ROBOT_BUILDER_ROLES,
+  rolesConflict,
+} from './roles.js';
 
 describe('roles', () => {
   it('requires MFA for every non-novice role', () => {
     expect(requiresMfa(['novice'])).toBe(false);
     expect(requiresMfa([])).toBe(false);
-    for (const r of ['trader', 'quant', 'risk_officer', 'admin'] as const) {
+    for (const r of ['trader', 'quant', 'risk_officer', 'admin', 'auditor'] as const) {
       expect(requiresMfa([r])).toBe(true);
       expect(requiresMfa(['novice', r])).toBe(true);
     }
@@ -25,6 +34,15 @@ describe('roles', () => {
     for (const r of ['trader', 'quant', 'risk_officer', 'admin'] as const) {
       expect(isNoviceOnly([r])).toBe(false);
       expect(isNoviceOnly(['novice', r])).toBe(false);
+    }
+  });
+  it('goal 09: the auditor (3rd line) reads the audit log but cannot act on accounts, and holds no operating role', () => {
+    expect(hasAnyRole(['auditor'], AUDIT_READ_ROLES)).toBe(true);
+    expect(hasAnyRole(['auditor'], AUDIT_READ_ALL_ROLES)).toBe(false);
+    expect(rolesConflict(['novice', 'auditor'])).toBeNull();
+    expect(rolesConflict(['trader', 'risk_officer'])).toBeNull();
+    for (const r of ['trader', 'quant', 'risk_officer', 'admin'] as const) {
+      expect(rolesConflict(['auditor', r])).toEqual(['auditor', r]);
     }
   });
 });

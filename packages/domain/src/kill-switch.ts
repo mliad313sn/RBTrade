@@ -25,7 +25,7 @@ export const KILL_SWITCH_SCOPE_LABELS: Record<KillSwitchScope, { title: string; 
 export const KillSwitchRequestSchema = z
   .object({
     scope: z.enum(KILL_SWITCH_SCOPES),
-    source: z.enum(['ui_button', 'hotkey', 'rest_fallback']).default('ui_button'),
+    source: z.enum(['ui_button', 'hotkey', 'rest_fallback', 'risk_console']).default('ui_button'),
   })
   .strict();
 export type KillSwitchRequest = z.infer<typeof KillSwitchRequestSchema>;

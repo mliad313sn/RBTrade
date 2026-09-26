@@ -255,7 +255,7 @@ export interface Venue {
 
 // ---- Channels -------------------------------------------------------------------------------
 
-export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'trades' | 'status' | 'orders' | 'positions' | 'account';
+export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'trades' | 'status' | 'orders' | 'positions' | 'account' | 'risk';
 /** Private trading channels (goal 03), keyed by account id; the gateway checks ownership. */
 export const PRIVATE_CHANNEL_KINDS = ['orders', 'positions', 'account'] as const;
 export type PrivateChannelKind = (typeof PRIVATE_CHANNEL_KINDS)[number];
@@ -274,6 +274,8 @@ export const ordersChannel = (accountId: string): string => `orders:${accountId}
 export const positionsChannel = (accountId: string): string => `positions:${accountId}`;
 export const accountChannel = (accountId: string): string => `account:${accountId}`;
 export const STATUS_CHANNEL = 'status';
+/** Goal 09: risk officer console alerts (breaches, kill switch, robots, reconciliation). 2nd line only. */
+export const RISK_ALERTS_CHANNEL = 'risk:alerts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -283,6 +285,7 @@ export function isPrivateChannelKind(kind: ChannelKind): kind is PrivateChannelK
 
 export function parseChannel(ch: string): ParsedChannel | null {
   if (ch === STATUS_CHANNEL) return { kind: 'status', symbol: null, tf: null, accountId: null };
+  if (ch === RISK_ALERTS_CHANNEL) return { kind: 'risk', symbol: null, tf: null, accountId: null };
   const parts = ch.split(':');
   const [kind, sym, tf] = parts;
   if ((kind === 'orders' || kind === 'positions' || kind === 'account') && parts.length === 2 && sym && UUID_RE.test(sym)) {

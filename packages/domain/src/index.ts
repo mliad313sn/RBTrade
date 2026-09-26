@@ -13,3 +13,4 @@ export * from './terminal.js';
 export * from './risk-analytics.js';
 export * from './strategy/index.js';
 export * from './novice/index.js';
+export * from './governance/index.js';

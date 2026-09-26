@@ -35,7 +35,27 @@ export const RISK_CODES = [
   // Goal 08 (novice guardrails and the monthly loss limit).
   'MONTHLY_LOSS_LIMIT',
   'NOVICE_COOLING_OFF',
+  // Goal 09 (B-801): the risk warning in force must be acknowledged before new exposure.
+  'DISCLOSURE_NOT_ACKNOWLEDGED',
 ] as const;
+
+/**
+ * Codes that mean a pre-trade *limit* was hit (goal 09): each rejection with one of them also
+ * raises a `risk.limit_breach` alert for the risk officer console.
+ */
+export const LIMIT_BREACH_CODES: readonly RiskCode[] = [
+  'MAX_ORDER_NOTIONAL',
+  'FAT_FINGER',
+  'MAX_POSITION',
+  'MAX_LEVERAGE',
+  'INSUFFICIENT_MARGIN',
+  'DAILY_LOSS_LIMIT',
+  'WEEKLY_LOSS_LIMIT',
+  'MONTHLY_LOSS_LIMIT',
+  'ORDER_RATE_LIMIT',
+  'NOVICE_LEVERAGE',
+  'NOVICE_COOLING_OFF',
+];
 export type RiskCode = (typeof RISK_CODES)[number];
 
 export interface RiskViolation {
@@ -100,6 +120,11 @@ export interface RiskContext {
   coolingOff?: CoolingOffReason | null;
   /** Month-to-date P&L in base currency (goal 08 monthly loss limit). */
   monthPnl?: Decimal;
+  /**
+   * Goal 09 (B-801): true when a novice-only user has not acknowledged the risk warning version and
+   * values in force; only reducing orders pass.
+   */
+  disclosureRequired?: boolean;
   halted: boolean;
   previewIssues: RiskViolation[];
   /** FOK: size available now within the limit. */
@@ -169,6 +194,12 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
       `No fresh exchange rate to ${ccy} is available, so costs and margin cannot be priced.`,
     );
   for (const i of ctx.previewIssues) add(i.code, i.message);
+
+  if (!reducing && ctx.disclosureRequired)
+    add(
+      'DISCLOSURE_NOT_ACKNOWLEDGED',
+      'Read and confirm the risk warning first. New trades open once you have acknowledged the current version; you can still close trades.',
+    );
 
   // Novice guardrails (server-enforced; goal 08 uses the same rules).
   if (ctx.novice) {

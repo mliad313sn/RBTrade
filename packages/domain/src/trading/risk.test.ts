@@ -106,6 +106,7 @@ const NEGATIVE: Record<RiskCode, () => RiskContext> = {
     ctx({ limits: { ...limits, monthlyLossLimit: '600' }, monthPnl: dec('-600') }),
   NOVICE_COOLING_OFF: () =>
     ctx({ novice: true, grossExposureAfter: dec('1000'), coolingOff: 'losing_trades' }),
+  DISCLOSURE_NOT_ACKNOWLEDGED: () => ctx({ novice: true, disclosureRequired: true }),
 };
 
 describe('pre-trade risk rules', () => {
@@ -160,6 +161,19 @@ describe('pre-trade risk rules', () => {
 
   it('covers every code with a negative case', () => {
     expect(Object.keys(NEGATIVE).sort()).toEqual([...RISK_CODES].sort());
+  });
+
+  it('goal 09 (B-801): an unacknowledged risk warning blocks new exposure but never a closing order', () => {
+    const closing = ctx(
+      {
+        disclosureRequired: true,
+        positionQtyBefore: dec('100000'),
+        positionQtyAfter: dec('0'),
+      },
+      { reduceOnly: true },
+    );
+    expect(codes(closing)).not.toContain('DISCLOSURE_NOT_ACKNOWLEDGED');
+    expect(codes(ctx({ disclosureRequired: false }))).toEqual([]);
   });
 
   it('positive edges: at-limit values pass', () => {
