@@ -1,12 +1,14 @@
-import { Placeholder } from '@/components/Placeholder';
+import { Learn } from '@/components/novice/Learn';
+import { serverClient } from '@/lib/api-server';
+import { getLocale } from '@/lib/i18n/server';
 
 export const metadata = { title: 'Learn' };
 
-export default function Page() {
-  return (
-    <>
-      <h1 className="k-sr-only">Learn</h1>
-      <Placeholder title="Learn" goal="goal 08 (plain-language guides and risk disclosures)" />
-    </>
-  );
+export default async function Page() {
+  const [client, locale] = await Promise.all([serverClient(), getLocale()]);
+  const disclosure = await client
+    .disclosure('risk-warning', locale)
+    .then((r) => r.document)
+    .catch(() => null);
+  return <Learn disclosure={disclosure} />;
 }

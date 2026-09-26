@@ -7,7 +7,7 @@
   "locales": {
     "en": {
       "title": "Trading can lose you money",
-      "banner": "{retailLossPct}% of retail accounts lose money trading with this provider. You're using practice money, so nothing real is at risk yet.",
+      "banner": "{retailLossPct}% of retail accounts lose money trading with this provider. You’re using practice money, so nothing real is at risk yet.",
       "body": [
         "{retailLossPct}% of retail accounts lose money trading with this provider.",
         "Prices can move fast. You can lose all the money you put into a trade.",
@@ -19,17 +19,17 @@
       "acknowledge": "I have read this and I understand I could lose money."
     },
     "fr": {
-      "title": "Le trading peut vous faire perdre de l'argent",
-      "banner": "{retailLossPct} % des comptes de particuliers perdent de l'argent en tradant avec ce fournisseur. Vous utilisez de l'argent d'entraînement : rien de réel n'est en jeu pour l'instant.",
+      "title": "Le trading peut vous faire perdre de l’argent",
+      "banner": "{retailLossPct} % des comptes de particuliers perdent de l’argent en tradant avec ce fournisseur. Vous utilisez de l’argent d’entraînement : rien de réel n’est en jeu pour l’instant.",
       "body": [
-        "{retailLossPct} % des comptes de particuliers perdent de l'argent en tradant avec ce fournisseur.",
-        "Les prix peuvent bouger vite. Vous pouvez perdre tout l'argent mis dans un trade.",
+        "{retailLossPct} % des comptes de particuliers perdent de l’argent en tradant avec ce fournisseur.",
+        "Les prix peuvent bouger vite. Vous pouvez perdre tout l’argent mis dans un trade.",
         "Un filet de sécurité (stop) limite une perte, mais sur un marché très rapide le prix peut sauter au-delà, et la perte peut être un peu plus grande.",
-        "L'emprunt (effet de levier) rend les gains et les pertes plus grands. Il est désactivé pour vous.",
+        "L’emprunt (effet de levier) rend les gains et les pertes plus grands. Il est désactivé pour vous.",
         "Les résultats passés ne sont pas une promesse de résultats futurs.",
-        "Pour l'instant, vous utilisez de l'argent d'entraînement. Rien de réel n'est en jeu."
+        "Pour l’instant, vous utilisez de l’argent d’entraînement. Rien de réel n’est en jeu."
       ],
-      "acknowledge": "J'ai lu ce texte et je comprends que je pourrais perdre de l'argent."
+      "acknowledge": "J’ai lu ce texte et je comprends que je pourrais perdre de l’argent."
     }
   }
 }
