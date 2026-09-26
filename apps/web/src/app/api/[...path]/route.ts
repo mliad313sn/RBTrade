@@ -20,7 +20,10 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     const v = req.headers.get(h);
     if (v) headers.set(h, v);
   }
-  headers.set('x-forwarded-for', req.headers.get('x-forwarded-for') ?? '127.0.0.1');
+  // Forward only the nearest hop's address: a client-supplied X-Forwarded-For chain must not reach
+  // the API (rate limits and audit IPs key on it). Production puts a trusted edge proxy in front.
+  const hop = (req.headers.get('x-forwarded-for') ?? '').split(',').pop()?.trim();
+  headers.set('x-forwarded-for', hop || '127.0.0.1');
   const hasBody = !['GET', 'HEAD'].includes(req.method);
   let upstream: Response;
   try {

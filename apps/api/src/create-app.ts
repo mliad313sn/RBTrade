@@ -35,7 +35,9 @@ export async function createApp(opts: { logger?: boolean } = {}): Promise<NestEx
   );
   app.use(cookieParser());
   app.enableShutdownHooks();
-  const doc = buildOpenApi(app);
-  SwaggerModule.setup('docs', app, doc, { jsonDocumentUrl: 'openapi.json' });
+  const production = process.env.NODE_ENV === 'production' || process.env.KORA_ENV === 'production';
+  if (!production) {
+    SwaggerModule.setup('docs', app, buildOpenApi(app), { jsonDocumentUrl: 'openapi.json' });
+  }
   return app;
 }
