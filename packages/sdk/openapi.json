@@ -9115,6 +9115,396 @@
           "ai"
         ]
       }
+    },
+    "/intel/radar": {
+      "get": {
+        "operationId": "IntelController_radar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Market Radar: heat map, ranked emerging trends and movers from the latest scan (SIMULATED).",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/trends/{symbol}": {
+      "get": {
+        "operationId": "IntelController_card",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Trend card: direction, calibrated probability or \"No reliable signal\", drivers, regime, risk, invalidation, cited news.",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/trends/{symbol}/explain": {
+      "post": {
+        "operationId": "IntelController_explain",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": {
+                  "horizon": "1d"
+                },
+                "type": "object",
+                "properties": {
+                  "horizon": {
+                    "default": "1d",
+                    "type": "string",
+                    "pattern": "^[0-9a-z]{1,8}$"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "pro",
+                      "novice"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Plain-language summary of a trend card written by the copilot from the card only (numbers checked). SSE with Accept: text/event-stream.",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/trends/{symbol}/draft": {
+      "post": {
+        "operationId": "IntelController_draft",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": {
+                  "horizon": "1d"
+                },
+                "type": "object",
+                "properties": {
+                  "horizon": {
+                    "default": "1d",
+                    "type": "string",
+                    "pattern": "^[0-9a-z]{1,8}$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Draft to ticket from a trend card: an audited order DRAFT the user previews and confirms in the ticket. Never submits.",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/news": {
+      "get": {
+        "operationId": "IntelController_newsList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Recent SIMULATED news with source, time, link, translation and schema-validated scores.",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/news/ingest": {
+      "post": {
+        "operationId": "IntelController_ingest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": {
+                  "adapter": "simulated"
+                },
+                "type": "object",
+                "properties": {
+                  "adapter": {
+                    "default": "simulated",
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]{1,40}$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Run the news pipeline for one adapter (SIMULATED fixtures; licensed providers are flagged stubs).",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/scan": {
+      "post": {
+        "operationId": "IntelController_scan",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Run a scan of the SIMULATED universe now (normally on bar close).",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/alerts": {
+      "get": {
+        "operationId": "IntelController_alertList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "My Market Radar alerts and their server-evaluated matches.",
+        "tags": [
+          "intel"
+        ]
+      },
+      "post": {
+        "operationId": "IntelController_alertCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "rule": {
+                    "type": "object",
+                    "properties": {
+                      "trendKinds": {
+                        "minItems": 1,
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "up",
+                            "down",
+                            "range",
+                            "breakout_up",
+                            "breakout_down",
+                            "reversal",
+                            "vol_regime"
+                          ]
+                        }
+                      },
+                      "region": {
+                        "type": "string",
+                        "enum": [
+                          "americas",
+                          "europe",
+                          "africa",
+                          "asia",
+                          "oceania",
+                          "global"
+                        ]
+                      },
+                      "assetClass": {
+                        "type": "string",
+                        "enum": [
+                          "equity",
+                          "etf",
+                          "bond",
+                          "future",
+                          "option",
+                          "fx",
+                          "metal",
+                          "energy",
+                          "agri",
+                          "crypto",
+                          "index",
+                          "cfd",
+                          "fund"
+                        ]
+                      },
+                      "sector": {
+                        "type": "string",
+                        "pattern": "^[a-z_]{2,32}$"
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                      },
+                      "minScore": {
+                        "default": 0.5,
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "trendKinds"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "name",
+                  "rule"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a Market Radar alert (evaluated by the server after every scan; notifies only).",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/alerts/{id}": {
+      "delete": {
+        "operationId": "IntelController_alertDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete one of my Market Radar alerts.",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/whats-moving": {
+      "get": {
+        "operationId": "IntelController_whatsMoving",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Novice \"What's moving and why\": plain words, no advice, a probability only if calibrated.",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/providers": {
+      "get": {
+        "operationId": "IntelController_providers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Provider adapter matrix per continent (every source is a flagged stub until licensed).",
+        "tags": [
+          "intel"
+        ]
+      }
+    },
+    "/intel/reliability": {
+      "get": {
+        "operationId": "IntelController_reliability",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Public track record per model and region, from stored predictions and outcomes.",
+        "tags": [
+          "intel"
+        ]
+      }
     }
   },
   "info": {
