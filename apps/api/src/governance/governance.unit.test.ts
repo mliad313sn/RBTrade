@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -17,6 +17,17 @@ import { loadGovernanceConfig } from './governance-config';
 import { RETENTION_CLASSES, retentionDays } from './retention';
 
 const DOCS = resolve(__dirname, '../../../../docs/governance');
+const ROOT = resolve(__dirname, '../../../..');
+
+function sources(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name === 'dist' || name === '.next' || name === 'coverage' || name.startsWith('.')) continue;
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) sources(p, out);
+    else if (/\.(ts|tsx|json|sql|py)$/.test(name)) out.push(p);
+  }
+  return out;
+}
 
 describe('control catalogue', () => {
   it('every control is complete, unique and has an implemented evidence query (and no query is orphaned)', () => {
@@ -151,5 +162,24 @@ describe('governance settings and helpers', () => {
     expect(set.placeholder).toBe(false);
     expect(set.contentHash).not.toBe(a.contentHash);
     expect(placeholderFor('other')).toBe('[other]');
+  });
+});
+
+describe('regulatory placeholder register', () => {
+  it('every OQ-* id referenced in the code is in docs/open-questions.md with an owner', () => {
+    const table = readFileSync(resolve(ROOT, 'docs/open-questions.md'), 'utf8');
+    const rows = new Map<string, string>();
+    for (const line of table.split('\n')) {
+      const m = /^\| (OQ-[A-Z]{1,2}\d+) \|/.exec(line);
+      if (m) rows.set(m[1]!, line.split('|')[4]!.trim()); // columns: ID | Question | Placeholder | Owner | …
+    }
+    const used = new Set<string>();
+    for (const dir of ['apps/api/src', 'apps/api/migrations', 'apps/web/src', 'packages/domain/src', 'packages/market-data/src', 'services/quant/src'])
+      for (const f of sources(resolve(ROOT, dir))) for (const m of readFileSync(f, 'utf8').matchAll(/OQ-[A-Z]{1,2}\d+/g)) used.add(m[0]);
+    expect(used.size).toBeGreaterThan(10);
+    for (const id of used) {
+      expect(rows.has(id), `${id} is referenced in the code but missing from docs/open-questions.md`).toBe(true);
+      expect(rows.get(id)!.length, `${id} has no owner`).toBeGreaterThan(2);
+    }
   });
 });
