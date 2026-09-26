@@ -8,3 +8,4 @@ export * from './sessions.js';
 export * from './market-data.js';
 export * from './trading/index.js';
 export * from './questionnaire.js';
+export * from './strategy/index.js';
