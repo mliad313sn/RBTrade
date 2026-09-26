@@ -1,0 +1,79 @@
+# Plan 07B — Market Intelligence: global scanner, news analysis and trend detection
+
+Lead seats: S7 (AI engineer), S5 (quant developer), S2 (senior trader), S8 (risk & compliance).
+Inputs: master goal (incl. the 2026-09-26 scope amendment), goal 07B, STATUS (goal 02 registry and
+sessions, goal 06 `ai_regime` hook and calibration hooks, goal 07 "What 07B needs"), ADRs 0002, 0006,
+0007, BACKLOG (B-601, B-701, B-702, B-703, B-708), open questions (OQ-M3, OQ-M4, OQ-A2).
+
+Parallel work: goal 08 (Novice view) is built in another worktree. This goal owns
+`services/quant/src/kora_quant/scanner`, `apps/api/src/intel`, `apps/web/src/app/(app)/radar`,
+`apps/web/src/app/reliability`, `apps/web/src/components/intel`, `apps/web/src/lib/intel`, migrations
+`0075–0079`. Shared files get additive edits only (app module, left rail + PRO nav, STATUS row +
+section, BACKLOG `B-751+`, open questions, `.env.example`, lockfile, CI). No novice route is edited:
+the "What's moving and why" card is exported for goal 08 to place.
+
+## 1. Decisions up front
+
+| Topic | Decision | Why |
+|---|---|---|
+| Scanner location | Python package `kora_quant.scanner` (`services/quant/src/kora_quant/scanner`), the quant service's src layout; routes `/scanner/*`. | Goal says `services/quant/scanner`; the service already uses a `src/` package layout (ruff/mypy/pytest config). |
+| Scanner engine | numpy panel maths over an instruments × bars matrix (float64, NaN = missing/warm-up), numba kernels for the recursive filters (Wilder/EMA/ADX, regime filter) looping over time and vectorised across instruments. Incremental mode: a per-timeframe `ScanState` keeps the trailing window (default 300 bars) and recomputes only the last bar's features on each bar close. | 10,000 instruments × 1 h bars in < 60 s on this host; bar-close incremental scans. |
+| Detectors (features only) | trend: `adx14`, `slope_t20` (OLS slope t-stat of log close); regime: `regime_trending/ranging/volatile` (point-in-time filter, below); breakout: `breakout20` (+1/−1/0 vs the previous 20-bar Donchian channel), `breakout_dist_atr`; compression: `bb_width_pct100` (Bollinger width percentile vs the trailing 100 bars), `atr_ratio_14_100`; momentum/mean reversion: `mom_z20`, `mr_z20`; relative strength: `rs_sector20`, `rs_index20` (20-bar log-return minus the equal-weight sector / index group return); correlation break: `corr_break` (|ρ20 − ρ100| to the group index); anomalies: `volume_z20`, `vol_z20` (log realised-vol ratio z-score); seasonality: `season_t` (t-stat of past same-hour-of-week returns, current bar excluded); event proximity: `event_minutes` (minutes to the next high-impact SIMULATED calendar event for the instrument's currency/region; scheduled events are known in advance). Output: numbers only, never prose. | Goal §2. |
+| Regime model | "Volatility-clustering" model: a 2-state Markov-switching filter on returns (low/high σ with σ estimated causally from an expanding window) gives P(volatile); trend efficiency (|slope t|) through a fixed logistic gives P(trending ∣ calm); `ranging` is the rest. Filtered (forward-only) probabilities → point-in-time by construction, checked by the prefix guard. Calibrated for display through `trend:regime:<tf>` rows (realised label: next-24-bar |z| > 1.5 → trending, vol ratio > 1.5 → volatile). | B-601/B-701; cheap, transparent, causal. |
+| Look-ahead guard | `verify_scan_point_in_time`: recomputes the panel on prefixes at checkpoints and compares with the full run (same idea as goal 06 `verify_point_in_time`); raises `LookAheadError`. Test injects future data / a centred-window detector and expects the error. | Acceptance 2. |
+| `ai_regime` hook (goal 06) | Filled: `regime_trending|ranging|volatile` are registered as causal indicator features in `bt.indicators.REGISTRY`, so the existing backtest/signal look-ahead guard covers them. Enabled per request (`aiRegime: "model"`); the api sends it from `KORA_AI_REGIME` (default `model`), `off` keeps the goal 06 `not_available` behaviour. NaN during warm-up → `not_available` (skip/block by the strategy's choice, unchanged). | Point-in-time output is available, so the hook is filled. |
+| Forecasts | Per instrument × horizon (`1d`, `1w`, `1m` in bars of the timeframe), L2 logistic regression (numpy IRLS) on standardised scanner features, trained point-in-time with an anchored walk-forward (retrain every fold, embargo = horizon). Calibration: isotonic (PAV) on the previous folds' OOS scores when ≥ 200 OOS points, else Platt. Every OOS forecast is logged with its timestamp; outcome = moved in the forecast direction by more than the round-trip cost; net return = signed move − cost. Drivers: exact linear SHAP (β·(x − x̄)) in log-odds, top 5. | Goal §3. Gradient boosting deferred (no sklearn; logistic is enough to show the pipeline honestly). |
+| "No reliable signal" | Shown unless the model's calibration row has an edge after costs (mean net > 0, t ≥ 2 — goal 07 `calibrationView`) **and** the current score's bin has n ≥ `KORA_AI_CALIBRATION_MIN_N`. The probability shown is the bin's hit rate from `ai_calibration_bins`, with the reliability line "When we said 0.6, it happened 57% of the time (n=…)". On SIMULATED GBM data this is expected to be "No reliable signal" almost everywhere; that is the honest result. | Goal §3; master goal (confidence only when calibrated). |
+| Track record | Live forecasts are written to `ai_predictions` (`source: live`, `model_key = trend:<model>:<region>:<horizon>`) at the bar close, before the horizon ends; a resolver fills `outcome`/`net_return` once the horizon has passed and rebuilds the bins. Walk-forward OOS forecasts are stored as `history_replay`. The public reliability page (`/reliability`, `GET /intel/reliability`, no login) shows per model/region: live n and hit rate, replay n, reliability bins, edge statement. | Goal §7. |
+| News | `NewsAdapter` interface (`id, regions, languages, flagged, licensed, fetchSince()`); `SimulatedNewsAdapter` (SIMULATED multilingual fixtures: en, fr, de, es, pt, ja, zh, ar incl. injection attempts, near-duplicates, clearly labelled) and three flagged stub providers (`newswire-americas`, `newswire-emea`, `newswire-apac`) whose live transport refuses to connect. Pipeline: normalise → dedup (content hash + 5-shingle Jaccard ≥ 0.8) → entity linking (registry symbols, venue MICs and an alias dictionary incl. local-language names) → local language guess (script + stop-words) → translation through the gateway (structured output `{language, title, summary}`) → per-article scoring through the gateway (structured output `{sentiment −1…1, relevance 0…1, novelty 0…1, eventType, entities ⊆ candidates}`), zod-validated; invalid output is rejected and stored as `invalid` (never used). Each article keeps source, published time and link; explanations cite `[news:<id>]`. | Goal §4; goal 07 hand-over. |
+| Gateway use | Structured calls go through the goal 07 provider abstraction: `ProviderRequest.outputFormat` (new, optional) → the anthropic provider sends `output_config.format = {type: 'json_schema', schema}` without tools; scripted/replay providers answer deterministically. Articles are wrapped with `wrapUntrusted({source: 'news', id})`; every call is audited as `ai.request` (surface `news`, model id, prompt hash, tokens) and counted through `BudgetService` (org budget) and `MetricsService.recordUsage`. Live when `ANTHROPIC_API_KEY` + `KORA_AI_MODEL` are set; unset → pipeline stores articles with `score_status = 'unavailable'` (no scores invented). | Reuse, fail closed. |
+| Explanations (trend card) | Card data (direction, horizon, calibrated probability or "No reliable signal", drivers from SHAP, linked news with sources, invalidation level, risk/vol context, disclaimer) is computed in code. The plain-language summary is `runCopilot` with the card as `<grounding>` (surface `radar`), so the numeric-fidelity guard, novice readability ≤ 8 and suggestion guards apply; the summary cites article ids. "What would invalidate this view": close beyond `last ∓ 2 × ATR14` or a regime flip, from data. | Goal §5. |
+| Copilot tools | `get_market_radar {region?, assetClass?, sector?, window}`, `get_trend_card {symbol, horizon}`, `get_news {symbol?, region?, hours, limit}` (read-only, all roles, novice-allowed; `untrustedKeys: title, summary, translatedTitle, translatedSummary, source`). | "What's trending in Asian equities this week and why?" |
+| Surfaces | Pro `/radar` "Market Radar": filters (region, asset class, sector), heat map (region × asset class, ▲▼ and +/− text, never colour alone), ranked emerging trends, trend drawer (card + streamed summary), server-evaluated alerts, "Draft to ticket" (audited `ai_order_drafts` row, surface `radar`; opens `/terminal?aiDraft=…`, the ticket still previews and confirms), "Send to Robot builder" (`/robots/builder?template=…&symbol=…`). Novice: `WhatsMovingCard` exported from `@/components/intel` (plain words, no probabilities unless calibrated, no trade suggestion). Public `/reliability`. | Goal §6. |
+| Universe | The seeded registry (19 venues, 51 instruments, 13 asset classes) stays as is. The scanner benchmark generates a deterministic, labelled SIMULATED synthetic universe (10,000 instruments across 5 regions × 13 asset classes × sectors) in Python only; nothing synthetic enters the registry. SIMULATED sector labels for seeded instruments live in `apps/api/src/intel/core/sectors.ts`. | Keep the registry reasonable. |
+| Provider matrix | `packages/market-data/src/providers/matrix.ts`: per region, market-data and news sources, each `{flagged: true, licensed: false, adapter}`; `GET /intel/providers`; the licensing need is logged in OQ-M3/OQ-M4. | Goal §1, acceptance 7. |
+
+## 2. Files
+
+- Quant: `scanner/{__init__,panel,kernels,detectors,regime,guard,forecast,calibrate,synthetic,models,routes}.py`; `bt/indicators.py` (+ regime features), `bt/evaluate.py` (hook), `bt/models.py` (`aiRegime`), `bench/bench_scanner.py`, `bench/SCANNER_RESULTS.md`, tests `test_scanner_*.py`, `test_bt_regime.py`.
+- Domain / market data: `packages/market-data/src/providers/matrix.ts` (+ test), `packages/market-data/src/seed/global-sessions.test.ts` (holidays + DST on seeded calendars for the 7 venues).
+- API: `migrations/0075_intel.sql` (scans, features, trends, forecasts), `0076_news.sql` (articles, entities, scores), `0077_intel_alerts.sql` (alerts, alert events, `radar` draft surface); `src/intel/core/*` (framework-free: sectors, news pipeline pieces, schemas, trend card, radar aggregation), `src/intel/*.service.ts`, `intel.controller.ts`, `intel.module.ts`; AI core additions (`ProviderRequest.outputFormat`, three tools, scripted policies); `test/intel.int.test.ts`.
+- Evals: `services/ai-evals/src/cases/{news,trends,radar}.json`, fixtures + harness task `news_score`.
+- Web: `app/(app)/radar/page.tsx`, `app/reliability/page.tsx`, `components/intel/*`, `lib/intel/client.ts`, terminal `AiDraftLoader`, nav entries, `e2e/radar.spec.ts`.
+- Docs: this plan (§6 results), `docs/adr/0007b-market-intelligence.md`, STATUS, BACKLOG `B-751+`, open questions, `.env.example`, `packages/sdk/openapi.json`.
+
+## 3. Schema (0075–0077)
+
+`intel_scans(id, timeframe, bar_ts, instruments, elapsed_ms, created_at)`;
+`intel_features(symbol, timeframe, bar_ts, features jsonb, regime jsonb, scan_id, PK(symbol, timeframe))` (latest per symbol);
+`intel_trends(id, scan_id, symbol, timeframe, kind up|down|range|breakout_up|breakout_down|reversal|vol_regime, score, rank, region, asset_class, sector, detected_at, features jsonb)`;
+`intel_forecasts(id, symbol, horizon, model_key, predicted_at, bar_ts, raw_prob_up, direction, raw_score, skill jsonb, drivers jsonb, prediction_id → ai_predictions, created_at)`;
+`news_articles(id uuid, provider, external_id, source_name, url, language, title, body, published_at, ingested_at, content_hash, dedup_of, simulated, UNIQUE(provider, external_id))`;
+`news_entities(article_id, kind symbol|venue, ref, match, PK(article_id, kind, ref))`;
+`news_scores(article_id PK, status ok|invalid|unavailable, detected_language, translated_title, translated_summary, sentiment, relevance, novelty, event_type, model_id, prompt_hash, audit_event_id, errors jsonb, scored_at)`;
+`intel_alerts(id, user_id, name, rule jsonb, active, created_at)`, `intel_alert_events(id, alert_id, user_id, symbol, detail jsonb, scan_id, created_at)`;
+`ai_order_drafts.surface` check gains `radar`.
+
+## 4. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Overclaiming skill on SIMULATED GBM data | Calibration-table gate + edge after costs; "No reliable signal" is the default; seeded-table test proves the positive path only from stored bins. |
+| Look-ahead in detectors/forecasts | Prefix guard on every scan in tests and on the api path (checkpoints), walk-forward with embargo, forecasts logged before outcomes, DB check `resolved_at ≥ predicted_at`. |
+| Prompt injection in news | Wrapping + neutralised delimiters, structured output with zod validation (extra keys refused), entity ids constrained to the candidate list, no tools on scoring calls, injection eval suite at 100 %. |
+| Hallucinated numbers in explanations | Card numbers from code; summary through the numeric-fidelity guard; eval requires 100 % exact fidelity. |
+| Advice framing | "Not investment advice." everywhere; novice card and novice summaries: no suggestion, grade ≤ 8. |
+| Scanner too slow for 10k | numba kernels over time with instrument-vectorised state; benchmark committed; incremental bar-close mode. |
+| Parallel goal 08 conflicts | Additive shared edits, migrations 0075–0077, novice card exported only. |
+
+## 5. Test plan
+
+- Quant unit: hand-computed fixtures per detector (short fixed series with values worked by hand in the test docstrings), regime filter properties (probabilities sum to 1, causal), guard fails on injected future data and on a centred-window detector, incremental scan equals full scan, forecast walk-forward uses no future rows, isotonic/Platt maths, "no skill" on random walks and positive skill on a planted-signal series, `ai_regime` hook (backtest trades change with the model on; `off` keeps not_available), perf test 10,000 × 1h bars < 60 s.
+- Domain/market data: session status incl. holidays and DST for XNYS, XLON, XTKS, XHKG, XJSE, BVMF, XASX on the seeded calendars; one venue per continent; every asset class; provider matrix all flagged.
+- API integration (real Postgres + Redis + quant): scan over the seeded universe stores features and trends; radar filters; forecasts write `ai_predictions` before outcomes (predicted_at < resolved_at, outcome null until resolution); seeded calibration table → card shows 0.57 + reliability line; no bins → "No reliable signal"; news ingest dedups, links entities, stores schema-valid scores only (adversarial provider → `invalid`), citations; injection articles do not alter scores or reach tools; trend explanation cites stored article ids with numbers matching; copilot "What's trending in Asian equities this week and why?" uses the radar/news tools; alerts evaluated server-side; draft to ticket creates a draft only; reliability page public.
+- Evals: news injection (100 %), schema validity, trend explanation numeric fidelity (100 %), novice readability, radar Q&A.
+- E2E: Market Radar: filter by region → open a trend → drivers and news visible → draft to ticket → ticket prefilled, no order until preview/confirm; reliability page renders without login.
+
+## 6. Results
+
+(Filled in at the end of the goal.)
