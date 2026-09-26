@@ -205,3 +205,35 @@ test('watchlists: global list covers every venue with session badges; add via âŒ
     return r.symbols.slice(-2);
   }).toEqual([sym, 'WTI']);
 });
+
+test('settings: per-trade risk rule drives the ticket warning; hotkeys are configurable; UTC/local and density persist', async ({ page }) => {
+  await apiSignIn(page, 'trader');
+  await page.goto('/settings');
+  await page.getByTestId('settings-risk-pct').fill('0.5');
+  await page.getByTestId('settings-risk-pct').press('Enter');
+  await expect(page.getByText('Saved').first()).toBeVisible();
+  await page.getByTestId('settings-time').selectOption('local');
+  await expect(page.getByTestId('status-clock')).toContainText('Local');
+  await page.getByTestId('settings-density').selectOption('comfortable');
+  await page.getByTestId('hotkey-ticketSell').fill('Alt+S');
+  await page.getByTestId('hotkey-ticketSell').press('Enter');
+  await expect.poll(async () => (await (await page.request.get('/api/me')).json()).preferences).toMatchObject({ hotkeys: { ticketSell: 'Alt+S' }, terminal: { perTradeRiskPct: '0.5', timeDisplay: 'local', density: 'comfortable' } });
+
+  await page.goto('/terminal?symbol=BTCUSD');
+  await expect(page.getByTestId('terminal-dock')).toHaveAttribute('data-density', 'comfortable');
+  const ticket = page.getByTestId('order-ticket');
+  await expect(ticket.getByTestId('ticket-side-buy')).toContainText(/\d/);
+  await ticket.getByRole('radio', { name: 'Market', exact: true }).click();
+  await ticket.getByTestId('ticket-qty').fill('0.1000');
+  await ticket.getByTestId('ticket-sl-mode').selectOption('percent');
+  await ticket.getByTestId('ticket-sl').fill('10');
+  await ticket.getByTestId('ticket-sl').blur();
+  // Loss at a 10 % stop on 0.1 BTC â‰ˆ 0.65 % of 100,000: above the 0.5 % rule (below the 1 % default).
+  await expect(page.locator('[data-code="RISK_ABOVE_RULE"]')).toContainText('above your per-trade rule of 0.5%');
+  // Rebound hotkey: Alt+S picks the sell side; plain S no longer does.
+  await page.locator('main').click({ position: { x: 3, y: 3 } });
+  await page.keyboard.press('s');
+  await expect(ticket.getByTestId('ticket-side-buy')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Alt+s');
+  await expect(ticket.getByTestId('ticket-side-sell')).toHaveAttribute('aria-checked', 'true');
+});
