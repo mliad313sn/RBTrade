@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   FOUR_EYES_KINDS,
@@ -52,9 +52,11 @@ export class ApprovalsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'One request.' })
-  get(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.fourEyes.get(id);
+  @ApiOperation({ summary: 'One request (approvers: any; others: their own).' })
+  async get(@CurrentPrincipal() p: Principal, @Param('id', new ParseUUIDPipe()) id: string) {
+    const r = await this.fourEyes.get(id);
+    if (!hasAnyRole(p.roles, APPROVER_ROLES) && r.requestedBy !== p.sub) throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
+    return r;
   }
 
   @Post(':id/approve')

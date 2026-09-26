@@ -52,7 +52,7 @@
                 "properties": {
                   "roles": {
                     "minItems": 1,
-                    "maxItems": 5,
+                    "maxItems": 6,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -61,7 +61,8 @@
                         "trader",
                         "quant",
                         "risk_officer",
-                        "admin"
+                        "admin",
+                        "auditor"
                       ]
                     }
                   }
@@ -160,7 +161,7 @@
             "description": ""
           }
         },
-        "summary": "List audit events (newest first). Non-privileged users see their own events.",
+        "summary": "List audit events (newest first). Non-privileged users see their own events and system/robot events about their own account (B-303); risk officers, admins and auditors see all.",
         "tags": [
           "audit"
         ]
@@ -2101,7 +2102,8 @@
                     "enum": [
                       "ui_button",
                       "hotkey",
-                      "rest_fallback"
+                      "rest_fallback",
+                      "risk_console"
                     ]
                   },
                   "reason": {
@@ -2179,9 +2181,113 @@
             "description": ""
           }
         },
-        "summary": "Resume trading after a halt (trader, quant, risk officer or admin; MFA). Risk officers/admins may pass accountId.",
+        "summary": "Resume trading after a halt (trader, quant, risk officer or admin; MFA). Risk officers/admins may pass accountId. A firm halt (goal 09) answers 202 with a four-eyes request that a second person approves.",
         "tags": [
           "kill-switch"
+        ]
+      }
+    },
+    "/disclosures/{id}": {
+      "get": {
+        "operationId": "DisclosuresController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "en",
+                "fr"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The disclosure in force (rendered with the Compliance-set values, e.g. the retail-loss %) and whether you acknowledged this version.",
+        "tags": [
+          "disclosures"
+        ]
+      }
+    },
+    "/disclosures/{id}/acknowledgements": {
+      "post": {
+        "operationId": "DisclosuresController_acknowledge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "contentHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "fr"
+                    ]
+                  },
+                  "context": {
+                    "default": "onboarding",
+                    "type": "string",
+                    "enum": [
+                      "onboarding",
+                      "banner",
+                      "settings",
+                      "reconfirm"
+                    ]
+                  }
+                },
+                "required": [
+                  "version",
+                  "contentHash",
+                  "locale"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Acknowledge the version you read (version + content hash). 409 when the text changed since. Stored append-only and audited.",
+        "tags": [
+          "disclosures"
         ]
       }
     },
@@ -9617,110 +9723,6 @@
         ]
       }
     },
-    "/disclosures/{id}": {
-      "get": {
-        "operationId": "DisclosuresController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "en",
-                "fr"
-              ],
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "The disclosure in force (rendered with the Compliance-set values, e.g. the retail-loss %) and whether you acknowledged this version.",
-        "tags": [
-          "disclosures"
-        ]
-      }
-    },
-    "/disclosures/{id}/acknowledgements": {
-      "post": {
-        "operationId": "DisclosuresController_acknowledge",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "version": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
-                  },
-                  "contentHash": {
-                    "type": "string",
-                    "pattern": "^[0-9a-f]{64}$"
-                  },
-                  "locale": {
-                    "type": "string",
-                    "enum": [
-                      "en",
-                      "fr"
-                    ]
-                  },
-                  "context": {
-                    "default": "onboarding",
-                    "type": "string",
-                    "enum": [
-                      "onboarding",
-                      "banner",
-                      "settings",
-                      "reconfirm"
-                    ]
-                  }
-                },
-                "required": [
-                  "version",
-                  "contentHash",
-                  "locale"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Acknowledge the version you read (version + content hash). 409 when the text changed since. Stored append-only and audited.",
-        "tags": [
-          "disclosures"
-        ]
-      }
-    },
     "/novice/profile": {
       "get": {
         "operationId": "NoviceController_profile",
@@ -10109,6 +10111,1550 @@
         "summary": "Start optional TOTP enrolment for the signed-in user (novices). Returns the secret, otpauth URI and an enrolment token for POST /auth/mfa/verify.",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/governance/approvals": {
+      "get": {
+        "operationId": "ApprovalsController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "limit_override",
+                "kill_switch_resume",
+                "mfa_reset",
+                "disclosure_publish"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "cancelled",
+                "expired"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Four-eyes requests (risk officers/admins: all; others: their own).",
+        "tags": [
+          "governance"
+        ]
+      },
+      "post": {
+        "operationId": "ApprovalsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "limit_override"
+                      },
+                      "accountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "limits": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "enum": [
+                            "maxOrderNotional",
+                            "maxPositionNotional",
+                            "maxLeverage",
+                            "dailyLossLimit",
+                            "weeklyLossLimit",
+                            "maxOrdersPerMinute"
+                          ]
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "pattern": "^\\d{1,15}(\\.\\d{1,8})?$"
+                        }
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "accountId",
+                      "limits",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "mfa_reset"
+                      },
+                      "userId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "userId",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "disclosure_publish"
+                      },
+                      "jurisdiction": {
+                        "type": "string",
+                        "pattern": "^([A-Z]{2}|GLOBAL)$"
+                      },
+                      "effectiveFrom": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "document": {
+                        "type": "object",
+                        "properties": {
+                          "disclosureId": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                          },
+                          "version": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "disclosureId",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "value": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z]{1,64}$"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "jurisdiction",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Open a four-eyes request: limit_override (loosen above the platform limit), mfa_reset (admin), disclosure_publish (document version or Compliance value).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/approvals/{id}": {
+      "get": {
+        "operationId": "ApprovalsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One request (approvers: any; others: their own).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/approvals/{id}/approve": {
+      "post": {
+        "operationId": "ApprovalsController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "note"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Approve and execute (risk officer/admin, not the requester, not the person it is about).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/approvals/{id}/reject": {
+      "post": {
+        "operationId": "ApprovalsController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "note"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Reject (risk officer/admin, not the requester).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/approvals/{id}/cancel": {
+      "post": {
+        "operationId": "ApprovalsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "note"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Withdraw your own pending request.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/controls": {
+      "get": {
+        "operationId": "GovernanceController_controls",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The control matrix (COBIT 2019 refs, owner line, frequency, evidence source, test procedure).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/controls/{id}": {
+      "get": {
+        "operationId": "GovernanceController_control",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One control.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/controls/{id}/evidence": {
+      "get": {
+        "operationId": "GovernanceController_evidenceExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "json",
+                "csv",
+                "pdf"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601, exclusive (default: now)",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 (default: 30 days before to)",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Run the control’s automated evidence query for a period [from, to) and export it as JSON, CSV or PDF. Audited (governance.evidence_exported) with the SHA-256 of the file.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/retention": {
+      "get": {
+        "operationId": "GovernanceController_retention",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Record retention policy and a dry-run report (periods are placeholders until Compliance sets them, OQ-R4).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/placeholders": {
+      "get": {
+        "operationId": "GovernanceController_placeholders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Regulatory placeholders still open in the disclosures registry, with their owner and open question.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/incidents": {
+      "get": {
+        "operationId": "GovernanceController_listIncidents",
+        "parameters": [
+          {
+            "name": "open",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Incident register.",
+        "tags": [
+          "governance"
+        ]
+      },
+      "post": {
+        "operationId": "GovernanceController_createIncident",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 160
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 4000
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "feed_outage",
+                      "engine_stall",
+                      "reconciliation_break",
+                      "ai_provider_outage",
+                      "kill_switch_fired",
+                      "database_restore",
+                      "security",
+                      "other"
+                    ]
+                  },
+                  "detectedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "alertId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "exercise": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "title",
+                  "description",
+                  "category"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Log an incident (detect → log).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/incidents/{id}": {
+      "get": {
+        "operationId": "GovernanceController_incident",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One incident.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/incidents/{id}/classify": {
+      "post": {
+        "operationId": "GovernanceController_classify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "impact": {
+                    "type": "string",
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "urgency": {
+                    "type": "string",
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "feed_outage",
+                      "engine_stall",
+                      "reconciliation_break",
+                      "ai_provider_outage",
+                      "kill_switch_fired",
+                      "database_restore",
+                      "security",
+                      "other"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "impact",
+                  "urgency"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Classify: impact × urgency → priority P1–P4.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/incidents/{id}/resolve": {
+      "post": {
+        "operationId": "GovernanceController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resolution": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "resolution"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Resolve with a resolution note.",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/governance/incidents/{id}/close": {
+      "post": {
+        "operationId": "GovernanceController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reviewRef": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Close (P1/P2 need a post-incident review reference).",
+        "tags": [
+          "governance"
+        ]
+      }
+    },
+    "/internal-audit/events": {
+      "get": {
+        "operationId": "InternalAuditController_events",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Every audit event (newest first), filterable; read-only.",
+        "tags": [
+          "internal-audit"
+        ]
+      }
+    },
+    "/internal-audit/events/export": {
+      "get": {
+        "operationId": "InternalAuditController_exportEvents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "CSV export of up to 500 filtered events (audited).",
+        "tags": [
+          "internal-audit"
+        ]
+      }
+    },
+    "/internal-audit/verify": {
+      "get": {
+        "operationId": "InternalAuditController_verify",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Recompute the hash chain and check every signed anchor (the run is recorded).",
+        "tags": [
+          "internal-audit"
+        ]
+      }
+    },
+    "/internal-audit/anchors": {
+      "get": {
+        "operationId": "InternalAuditController_listAnchors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Signed anchors of the audit head (B-007) with signature and chain checks.",
+        "tags": [
+          "internal-audit"
+        ]
+      },
+      "post": {
+        "operationId": "InternalAuditController_anchor",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Anchor the current audit head now (also runs daily in production).",
+        "tags": [
+          "internal-audit"
+        ]
+      }
+    },
+    "/internal-audit/sample": {
+      "get": {
+        "operationId": "InternalAuditController_sample",
+        "parameters": [
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "seed",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "n",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "controlId",
+            "required": true,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Random sample of N items for a control (its audit events in the period, or its evidence rows). Reproducible with the returned seed; recorded as internal_audit.sample_drawn.",
+        "tags": [
+          "internal-audit"
+        ]
+      }
+    },
+    "/risk-console/overview": {
+      "get": {
+        "operationId": "RiskConsoleController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Everything the console shows, in one call (real goal 03/06 data).",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/risk-console/exposure": {
+      "get": {
+        "operationId": "RiskConsoleController_exposure",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Firm exposure and loss vs limits per account.",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/risk-console/robots": {
+      "get": {
+        "operationId": "RiskConsoleController_robots",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Running robots and their usage of each auto-pause limit.",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/risk-console/approvals": {
+      "get": {
+        "operationId": "RiskConsoleController_approvals",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Pending four-eyes requests and robots waiting for a risk sign-off.",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/risk-console/alerts": {
+      "get": {
+        "operationId": "RiskConsoleController_alerts",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "prefix, e.g. risk. or kill_switch.",
+            "schema": {}
+          },
+          {
+            "name": "open",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Alerts (REST fallback for the live channel).",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/risk-console/alerts/{id}/ack": {
+      "post": {
+        "operationId": "RiskConsoleController_ack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Acknowledge an alert (audited).",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/risk-console/kill-switch": {
+      "post": {
+        "operationId": "RiskConsoleController_killAll",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "robots",
+                      "robots_cancel",
+                      "robots_cancel_flatten"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "scope",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "B-314: firm-wide kill switch on every active account (risk officer/admin, MFA). Each account then needs four eyes to resume.",
+        "tags": [
+          "risk-console"
+        ]
+      }
+    },
+    "/compliance/acknowledgements": {
+      "get": {
+        "operationId": "ComplianceController_acknowledgements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "A user’s acknowledgements, each with the disclosure version in force when it was given, re-rendered from the registry and verified by content hash.",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/disclosures/{id}/versions": {
+      "get": {
+        "operationId": "ComplianceController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Every published version of a disclosure (per jurisdiction, with effective dates) and pending drafts.",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/disclosures/{id}/at": {
+      "get": {
+        "operationId": "ComplianceController_at",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The disclosure text and values in force at a point in time (default now).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/disclosures/drafts": {
+      "post": {
+        "operationId": "ComplianceController_draft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jurisdiction": {
+                    "type": "string",
+                    "pattern": "^([A-Z]{2}|GLOBAL)$"
+                  },
+                  "definition": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "simulated": {
+                        "type": "boolean"
+                      },
+                      "reviewStatus": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z]{1,64}$"
+                        }
+                      },
+                      "locales": {
+                        "type": "object",
+                        "properties": {
+                          "en": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "banner": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "body": {
+                                "minItems": 1,
+                                "maxItems": 40,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "acknowledge": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "banner",
+                              "body",
+                              "acknowledge"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "fr": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "banner": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "body": {
+                                "minItems": 1,
+                                "maxItems": 40,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "acknowledge": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "banner",
+                              "body",
+                              "acknowledge"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "en",
+                          "fr"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "simulated",
+                      "reviewStatus",
+                      "values",
+                      "locales"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "jurisdiction",
+                  "definition"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Draft a new disclosure version (text in EN and FR, value keys). Publishing needs a four-eyes request (kind disclosure_publish) approved by someone else.",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/suitability/{userId}": {
+      "get": {
+        "operationId": "ComplianceController_suitabilityProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "A user’s appropriateness / knowledge / suitability profile (scores only; not advice).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/kyc/providers": {
+      "get": {
+        "operationId": "ComplianceController_kycProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "KYC provider interface: stub only (OQ-K1).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/best-execution": {
+      "get": {
+        "operationId": "ComplianceController_bestExecution",
+        "parameters": [
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "instrument",
+                "hour"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Best-execution report data: slippage vs the reference price by instrument or UTC hour.",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/compliance/subject-access/{userId}": {
+      "get": {
+        "operationId": "ComplianceController_subjectAccessExport",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Subject-access export on behalf of a user (audited).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/me/acknowledgements": {
+      "get": {
+        "operationId": "MeComplianceController_acknowledgements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Your acknowledgements, each with the exact text you acknowledged (verified).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/me/suitability": {
+      "get": {
+        "operationId": "MeComplianceController_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Your profile from the appropriateness, knowledge and suitability questionnaires (not advice).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/me/kyc": {
+      "get": {
+        "operationId": "MeComplianceController_kycStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Your KYC status (stub: not configured).",
+        "tags": [
+          "compliance"
+        ]
+      },
+      "post": {
+        "operationId": "MeComplianceController_kycStart",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Start a KYC check (stub: always refused, nothing is sent).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/me/data-export": {
+      "get": {
+        "operationId": "MeComplianceController_dataExport",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download everything KORA holds about you (subject access, JSON; audited).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/suitability/questionnaire": {
+      "get": {
+        "operationId": "SuitabilityController_questionnaire",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The suitability questionnaire (SIMULATED placeholder content, OQ-C2; no answer weights).",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/suitability/attempts": {
+      "post": {
+        "operationId": "SuitabilityController_submit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "questionnaireId": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "answers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    }
+                  }
+                },
+                "required": [
+                  "questionnaireId",
+                  "version",
+                  "answers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Submit answers; only the score and band are kept. The result is a profile, not a recommendation.",
+        "tags": [
+          "compliance"
         ]
       }
     }

@@ -22,9 +22,17 @@ describe('loadConfig', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
   });
   it('derives the keycloak issuer', () => {
-    const c = loadConfig({ ...base, AUTH_PROVIDER: 'keycloak', KEYCLOAK_URL: 'http://kc:8080/', KORA_ENV: 'staging' });
+    const c = loadConfig({ ...base, AUTH_PROVIDER: 'keycloak', KEYCLOAK_URL: 'http://kc:8080/', KORA_ENV: 'staging', KORA_ALLOW_INSECURE_TRANSPORT: 'true' });
     expect(c.auth.issuer).toBe('http://kc:8080/realms/kora');
     expect(c.auth.secureCookies).toBe(true);
+  });
+  it('goal 09: staging and production require TLS to Postgres and Redis (unless explicitly allowed for local compose)', () => {
+    const kc = { AUTH_PROVIDER: 'keycloak', KORA_ENV: 'staging' };
+    expect(() => loadConfig({ ...base, ...kc })).toThrow(/DATABASE_URL must use TLS/);
+    expect(() => loadConfig({ ...kc, DATABASE_URL: 'postgres://x?sslmode=require', REDIS_URL: 'redis://x' })).toThrow(/rediss/);
+    expect(loadConfig({ ...kc, DATABASE_URL: 'postgres://x?sslmode=verify-full', REDIS_URL: 'rediss://x' }).env).toBe('staging');
+    expect(loadConfig({ ...base, ...kc, KORA_ALLOW_INSECURE_TRANSPORT: 'true' }).env).toBe('staging');
+    expect(loadConfig(base).env).toBe('dev');
   });
   it('validates scrypt cost', () => {
     expect(() => loadConfig({ ...base, KORA_SCRYPT_N: '1000' })).toThrow(/power of two/);
