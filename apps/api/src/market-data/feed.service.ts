@@ -15,7 +15,9 @@ import {
   type Trade,
 } from '@kora/domain';
 import {
+  aggregateBars,
   BarBuilder,
+  generateHistory1m,
   CandleTracker,
   createStubAdapter,
   isStubEnabled,
@@ -69,6 +71,7 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
   private tradeBuf: Trade[] = [];
   private barBuf: Array<{ symbol: string; bar: OhlcvBar }> = [];
   private refreshFrom: number | null = null;
+  private readonly startPrices = new Map<string, string>();
   private lastRollup = 0;
   private pumping = false;
   private statusDirty = false;
@@ -119,6 +122,7 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       (s) => s.status === 'active' && (this.cfg.symbols.length === 0 || this.cfg.symbols.includes(s.symbol)),
     );
     const closes = await this.repo.lastCloses();
+    for (const spec of specs) this.startPrices.set(spec.symbol, closes.get(spec.symbol) ?? simProfileFor(spec).refPrice);
     const sim = new SimulatedAdapter({
       seed: this.cfg.seed,
       stepMs: this.cfg.stepMs,
@@ -132,7 +136,7 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
         return {
           spec,
           profile: simProfileFor(spec),
-          startPrice: closes.get(spec.symbol),
+          startPrice: this.startPrices.get(spec.symbol),
           countries: venue && venue.region !== 'global' ? [venue.country] : [],
         };
       }),
@@ -430,26 +434,44 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     );
   }
 
-  /** SIMULATED history before the first live bar, for symbols that have no stored data yet. */
+  /**
+   * SIMULATED history before the first live bar for symbols without history. Anchored to the
+   * earliest stored 1 s bar when live data already exists (e.g. an interrupted backfill), else to
+   * the simulator start, so history always ends exactly where live data begins.
+   */
   private async runBackfill(sim: SimulatedAdapter, specs: InstrumentSpec[]): Promise<number> {
     const t0 = Date.now();
-    const have = new Set(
-      (await this.db.query<{ symbol: string }>('SELECT DISTINCT symbol FROM md_candles_history UNION SELECT DISTINCT symbol FROM md_bars_1s')).map((r) => r.symbol),
+    const have = new Set((await this.db.query<{ symbol: string }>('SELECT DISTINCT symbol FROM md_candles_history')).map((r) => r.symbol));
+    const firstLive = new Map(
+      (await this.db.query<{ symbol: string; ts: Date; open: string }>('SELECT DISTINCT ON (symbol) symbol, ts, open FROM md_bars_1s ORDER BY symbol, ts')).map((r) => [
+        r.symbol,
+        { ts: r.ts.getTime(), open: r.open },
+      ]),
     );
-    const end = sim.market.startTs;
     let rows = 0;
     for (const spec of specs) {
-      if (have.has(spec.symbol)) continue;
+      if (have.has(spec.symbol) || !this.started) continue;
+      const live = firstLive.get(spec.symbol);
+      const end = live?.ts ?? sim.market.startTs;
+      const base = generateHistory1m({
+        spec,
+        profile: simProfileFor(spec),
+        seed: this.cfg.seed,
+        endTs: end,
+        endPrice: live?.open ?? this.startPrices.get(spec.symbol)!,
+        minutes: this.cfg.historyDays * 1440,
+      });
       for (const tf of HISTORY_TFS) {
         const days = tf === '1m' ? Math.min(2, this.cfg.historyDays) : this.cfg.historyDays;
-        const candles = await sim.getCandles(spec.symbol, tf, end - days * DAY_MS, end);
-        for (let i = 0; i < candles.length; i += 5000) {
-          const c = candles.slice(i, i + 5000);
+        const from = Math.floor(end / 60_000) * 60_000 - days * DAY_MS;
+        const bars = (tf === '1m' ? base : aggregateBars(base, tf, spec.qtyPrecision)).filter((b) => b.bucket >= from);
+        for (let i = 0; i < bars.length; i += 5000) {
+          const c = bars.slice(i, i + 5000);
           await this.db.query(
             `INSERT INTO md_candles_history (symbol, tf, bucket, open, high, low, close, volume, trades, source)
-             SELECT $1, $2, * FROM unnest($3::timestamptz[], $4::numeric[], $5::numeric[], $6::numeric[], $7::numeric[], $8::numeric[], $9::int[], $10::text[])
+             SELECT $1, $2, *, 'simulated-history' FROM unnest($3::timestamptz[], $4::numeric[], $5::numeric[], $6::numeric[], $7::numeric[], $8::numeric[], $9::int[])
              ON CONFLICT DO NOTHING`,
-            [spec.symbol, tf, c.map((x) => new Date(x.bucket).toISOString()), c.map((x) => x.open), c.map((x) => x.high), c.map((x) => x.low), c.map((x) => x.close), c.map((x) => x.volume), c.map((x) => x.trades), c.map((x) => x.source)],
+            [spec.symbol, tf, c.map((x) => new Date(x.bucket).toISOString()), c.map((x) => x.open), c.map((x) => x.high), c.map((x) => x.low), c.map((x) => x.close), c.map((x) => x.volume), c.map((x) => x.trades)],
           );
           rows += c.length;
         }

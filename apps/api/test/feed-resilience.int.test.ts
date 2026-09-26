@@ -21,7 +21,11 @@ describe('feed resilience (in-process feed, real gateway)', () => {
     process.env.KORA_MD_FEED = 'inprocess';
     process.env.KORA_MD_SYMBOLS = 'EURUSD,BTCUSD,AAPL';
     process.env.KORA_MD_ROLLUP_MS = '1000';
-    await ownerQuery("DELETE FROM md_bars_1s WHERE symbol IN ('EURUSD','BTCUSD','AAPL'); DELETE FROM md_candles WHERE symbol IN ('EURUSD','BTCUSD','AAPL')");
+    process.env.KORA_MD_BACKFILL = 'true';
+    process.env.KORA_MD_HISTORY_DAYS = '1';
+    await ownerQuery(
+      "DELETE FROM md_bars_1s WHERE symbol IN ('EURUSD','BTCUSD','AAPL'); DELETE FROM md_candles WHERE symbol IN ('EURUSD','BTCUSD','AAPL'); DELETE FROM md_candles_history WHERE symbol IN ('EURUSD','BTCUSD','AAPL')",
+    );
     app = await startApp();
     url = (await listen(app)).ws;
     admin = (await createUser(app, 'trader', ['admin'], { realClock: true })).token;
@@ -98,6 +102,18 @@ describe('feed resilience (in-process feed, real gateway)', () => {
     await c.waitFor((m) => m.ch === 'status' && m.data.state === 'ok', 4000, c.messages.length);
     c.close();
   }, 20_000);
+
+  it('backfills SIMULATED history that ends at the live start price', async () => {
+    const rows = await app.get(FeedService).backfill;
+    expect(rows).toBeGreaterThan(0);
+    const counts = await ownerQuery<{ tf: string; n: string }>("SELECT tf, count(*) AS n FROM md_candles_history WHERE symbol = 'EURUSD' GROUP BY tf ORDER BY tf");
+    expect(Object.fromEntries(counts.map((c) => [c.tf, Number(c.n)]))).toMatchObject({ '1m': 1440, '1h': expect.any(Number), '1D': expect.any(Number) });
+    const [last] = await ownerQuery<{ close: string }>("SELECT close FROM md_candles_history WHERE symbol = 'EURUSD' AND tf = '1m' ORDER BY bucket DESC LIMIT 1");
+    expect(last!.close).toBe('1.08420'); // no stored live data before this run → simulator reference start
+    const res = await request(app.getHttpServer()).get('/candles?symbol=EURUSD&tf=15m&limit=500').set(bearer(trader)).expect(200);
+    expect(res.body.candles.length).toBeGreaterThanOrEqual(96);
+    expect(await app.get(FeedService).backfill).toBe(rows); // idempotent: symbols with history are skipped on restart
+  });
 
   it('persists trades and 1 s bars and rolls them up into candles', async () => {
     const deadline = Date.now() + 8000;
