@@ -42,7 +42,7 @@ describe('KoraClient', () => {
     const f = mockFetch(200, {});
     const c = new KoraClient({ baseUrl: '/api', fetch: f as unknown as typeof fetch }).withToken('x');
     await c.health();
-    await c.signup({ email: 'a@b.c', password: 'p', displayName: 'd', accountType: 'novice' });
+    await c.signup({ email: 'a@b.c', password: 'p', displayName: 'd' });
     await c.login('a@b.c', 'p');
     await c.mfaEnroll('m');
     await c.mfaVerify('m', '123456');
@@ -54,5 +54,46 @@ describe('KoraClient', () => {
       '/api/health', '/api/auth/signup', '/api/auth/login', '/api/auth/mfa/enroll', '/api/auth/mfa/verify',
       '/api/me', '/api/me/preferences', '/api/me/preferences', '/api/audit/verify',
     ]);
+  });
+
+  it('covers the trading, kill switch and appropriateness endpoints (goal 03)', async () => {
+    const f = mockFetch(200, {});
+    const c = new KoraClient({ baseUrl: '/api', fetch: f as unknown as typeof fetch });
+    await c.account();
+    await c.updateAccountSettings({ confirmMode: 'always' });
+    await c.previewOrder({ symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000' });
+    await c.placeOrder({ clientOrderId: 'c1', symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000' });
+    await c.orders({ status: 'all' });
+    await c.order('o 1');
+    await c.amendOrder('o1', { qty: '2000' });
+    await c.cancelOrder('o1');
+    await c.positions();
+    await c.closePosition('EURUSD');
+    await c.fills({ limit: 5 });
+    await c.killSwitch('robots', 'hotkey', 'why');
+    await c.killSwitchState();
+    await c.resumeTrading('checked', 'a1');
+    await c.appropriateness();
+    await c.submitAppropriateness('appropriateness', 1, { q: 'a' });
+    const calls = f.mock.calls.map((x) => [x[1]?.method, x[0]]);
+    expect(calls).toEqual([
+      ['GET', '/api/accounts/me'],
+      ['PUT', '/api/accounts/me/settings'],
+      ['POST', '/api/orders/preview'],
+      ['POST', '/api/orders'],
+      ['GET', '/api/orders?status=all'],
+      ['GET', '/api/orders/o%201'],
+      ['PATCH', '/api/orders/o1'],
+      ['DELETE', '/api/orders/o1'],
+      ['GET', '/api/positions'],
+      ['POST', '/api/positions/EURUSD/close'],
+      ['GET', '/api/fills?limit=5'],
+      ['POST', '/api/kill-switch'],
+      ['GET', '/api/kill-switch'],
+      ['POST', '/api/kill-switch/resume?accountId=a1'],
+      ['GET', '/api/appropriateness/questionnaire'],
+      ['POST', '/api/appropriateness/attempts'],
+    ]);
+    expect(JSON.parse(String(f.mock.calls[11]![1]!.body))).toEqual({ scope: 'robots', source: 'hotkey', reason: 'why' });
   });
 });

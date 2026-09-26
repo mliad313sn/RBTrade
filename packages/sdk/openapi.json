@@ -16,54 +16,6 @@
         ]
       }
     },
-    "/kill-switch": {
-      "post": {
-        "operationId": "KillSwitchController_trigger",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "scope": {
-                    "type": "string",
-                    "enum": [
-                      "robots",
-                      "robots_cancel",
-                      "robots_cancel_flatten"
-                    ]
-                  },
-                  "source": {
-                    "default": "ui_button",
-                    "type": "string",
-                    "enum": [
-                      "ui_button",
-                      "hotkey",
-                      "rest_fallback"
-                    ]
-                  }
-                },
-                "required": [
-                  "scope"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": ""
-          }
-        },
-        "summary": "Request a kill switch with one of three scopes. Always audited.",
-        "tags": [
-          "kill-switch"
-        ]
-      }
-    },
     "/robots/builder": {
       "get": {
         "operationId": "RobotsController_builder",
@@ -304,10 +256,7 @@
                   "accountType": {
                     "default": "novice",
                     "type": "string",
-                    "enum": [
-                      "novice",
-                      "trader"
-                    ]
+                    "const": "novice"
                   }
                 },
                 "required": [
@@ -325,7 +274,7 @@
             "description": ""
           }
         },
-        "summary": "Create an account (novice or trader; PAPER only). Trader requires MFA enrolment at first login.",
+        "summary": "Create an account. Everyone starts as novice (PAPER); Pro trading needs the appropriateness assessment, then TOTP enrolment at the next login.",
         "tags": [
           "auth"
         ]
@@ -1302,6 +1251,862 @@
         "summary": "\"Project from my paper results\": analytics, then a block bootstrap of the paper trades. Audited.",
         "tags": [
           "simulator"
+        ]
+      }
+    },
+    "/orders/preview": {
+      "post": {
+        "operationId": "OrdersController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientOrderId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "buy",
+                      "sell"
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "market",
+                      "limit",
+                      "stop",
+                      "stop_limit",
+                      "trailing",
+                      "bracket",
+                      "oco"
+                    ]
+                  },
+                  "qty": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "limitPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "stopPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "trailAmount": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "entryType": {
+                    "type": "string",
+                    "enum": [
+                      "market",
+                      "limit"
+                    ]
+                  },
+                  "stopLossPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "takeProfitPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "legs": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "limit",
+                            "stop",
+                            "stop_limit"
+                          ]
+                        },
+                        "limitPrice": {
+                          "type": "string",
+                          "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                        },
+                        "stopPrice": {
+                          "type": "string",
+                          "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "tif": {
+                    "default": "gtc",
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "gtc",
+                      "ioc",
+                      "fok",
+                      "gtd"
+                    ]
+                  },
+                  "expireAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "reduceOnly": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "postOnly": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "default": "manual",
+                    "type": "string",
+                    "enum": [
+                      "manual",
+                      "ai-draft-accepted"
+                    ]
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "side",
+                  "type",
+                  "qty"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Order preview: notional, fees + spread, FX conversion, margin impact, loss if the stop is hit (currency and % of equity), reward:risk, confirmation flag and the pre-trade risk verdict. PAPER, SIMULATED.",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/orders": {
+      "post": {
+        "operationId": "OrdersController_place",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientOrderId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9][A-Z0-9._-]{0,31}$"
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "buy",
+                      "sell"
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "market",
+                      "limit",
+                      "stop",
+                      "stop_limit",
+                      "trailing",
+                      "bracket",
+                      "oco"
+                    ]
+                  },
+                  "qty": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "limitPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "stopPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "trailAmount": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "entryType": {
+                    "type": "string",
+                    "enum": [
+                      "market",
+                      "limit"
+                    ]
+                  },
+                  "stopLossPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "takeProfitPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "legs": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "limit",
+                            "stop",
+                            "stop_limit"
+                          ]
+                        },
+                        "limitPrice": {
+                          "type": "string",
+                          "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                        },
+                        "stopPrice": {
+                          "type": "string",
+                          "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "tif": {
+                    "default": "gtc",
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "gtc",
+                      "ioc",
+                      "fok",
+                      "gtd"
+                    ]
+                  },
+                  "expireAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "reduceOnly": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "postOnly": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "default": "manual",
+                    "type": "string",
+                    "enum": [
+                      "manual",
+                      "ai-draft-accepted"
+                    ]
+                  }
+                },
+                "required": [
+                  "clientOrderId",
+                  "symbol",
+                  "side",
+                  "type",
+                  "qty"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Place a paper order. Idempotent on clientOrderId (201 new, 200 replay, 409 reused with a different body). Risk rejections return 422 with a machine code and a plain-language message.",
+        "tags": [
+          "orders"
+        ]
+      },
+      "get": {
+        "operationId": "OrdersController_list",
+        "parameters": [
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "symbol",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "open",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List orders (open by default), newest first.",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "OrdersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One order with its children (bracket stop/target, OCO legs).",
+        "tags": [
+          "orders"
+        ]
+      },
+      "patch": {
+        "operationId": "OrdersController_amend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "qty": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "limitPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "stopPrice": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  },
+                  "trailAmount": {
+                    "type": "string",
+                    "pattern": "^[+-]?(?:\\d+)(?:\\.\\d+)?$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Amend quantity, limit, stop or trailing distance of a working order (audited).",
+        "tags": [
+          "orders"
+        ]
+      },
+      "delete": {
+        "operationId": "OrdersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cancel an open order (audited). Cancelling an OCO group cancels its legs.",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/accounts/me": {
+      "get": {
+        "operationId": "AccountsController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Paper account: cash, equity, day P&L, margin used/free, leverage, loss-limit usage, halt state (base currency, SIMULATED).",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/accounts/me/settings": {
+      "put": {
+        "operationId": "AccountsController_settings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmMode": {
+                    "type": "string",
+                    "enum": [
+                      "always",
+                      "above_thresholds",
+                      "never"
+                    ]
+                  },
+                  "confirmNotionalAbove": {
+                    "type": "string",
+                    "pattern": "^\\d+(\\.\\d+)?$"
+                  },
+                  "confirmLossPctAbove": {
+                    "type": "string",
+                    "pattern": "^\\d+(\\.\\d+)?$"
+                  },
+                  "baseCurrency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "riskLimits": {
+                    "type": "object",
+                    "properties": {
+                      "maxOrderNotional": {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d+)?$"
+                      },
+                      "maxPositionNotional": {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d+)?$"
+                      },
+                      "maxLeverage": {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d+)?$"
+                      },
+                      "dailyLossLimit": {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d+)?$"
+                      },
+                      "weeklyLossLimit": {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d+)?$"
+                      },
+                      "maxOrdersPerMinute": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirmation thresholds, tighter risk limits, and the base currency (only before any activity). Audited.",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/accounts/me/ledger": {
+      "get": {
+        "operationId": "AccountsController_ledgerLines",
+        "parameters": [
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Double-entry ledger lines (newest first) and balances per ledger account.",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/positions": {
+      "get": {
+        "operationId": "AccountsController_positions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Open positions with mark (exit side), unrealised P&L, notional and margin in base currency.",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/positions/{symbol}/close": {
+      "post": {
+        "operationId": "AccountsController_close",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Close a position at market (reduce-only market order through the normal OMS path).",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/fills": {
+      "get": {
+        "operationId": "AccountsController_fills",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Fills with quote at decision, fill price, slippage, fees and FX conversion (newest first).",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/alerts": {
+      "get": {
+        "operationId": "AccountsController_alerts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Alerts (reconciliation mismatches). Risk officers and admins see all; others their own account.",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/reconciliation/run": {
+      "post": {
+        "operationId": "AccountsController_reconcile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Run reconciliation now (engine positions vs ledger replay, cash vs ledger). Risk officers/admins: all accounts; others: own account.",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/kill-switch": {
+      "post": {
+        "operationId": "KillSwitchController_trigger",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "robots",
+                      "robots_cancel",
+                      "robots_cancel_flatten"
+                    ]
+                  },
+                  "source": {
+                    "default": "ui_button",
+                    "type": "string",
+                    "enum": [
+                      "ui_button",
+                      "hotkey",
+                      "rest_fallback"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "scope"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Trigger the kill switch: robots | robots_cancel | robots_cancel_flatten. Idempotent, audited, REST fallback.",
+        "tags": [
+          "kill-switch"
+        ]
+      },
+      "get": {
+        "operationId": "KillSwitchController_state",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Current halt state of your paper account.",
+        "tags": [
+          "kill-switch"
+        ]
+      }
+    },
+    "/kill-switch/resume": {
+      "post": {
+        "operationId": "KillSwitchController_resume",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Resume trading after a halt (trader, quant, risk officer or admin; MFA). Risk officers/admins may pass accountId.",
+        "tags": [
+          "kill-switch"
+        ]
+      }
+    },
+    "/appropriateness/questionnaire": {
+      "get": {
+        "operationId": "AppropriatenessController_questionnaire",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The active appropriateness questionnaire (no answer key) and your status: eligible, passed, cool-down.",
+        "tags": [
+          "appropriateness"
+        ]
+      }
+    },
+    "/appropriateness/attempts": {
+      "post": {
+        "operationId": "AppropriatenessController_attempt",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "questionnaireId": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "answers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    }
+                  }
+                },
+                "required": [
+                  "questionnaireId",
+                  "version",
+                  "answers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Submit answers. Server-graded against the pass mark; a fail starts a cool-down; a pass grants the trader role and signs you out so the next login sets up two-factor authentication. Audited with version and score.",
+        "tags": [
+          "appropriateness"
         ]
       }
     }

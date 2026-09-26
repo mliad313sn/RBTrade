@@ -12,6 +12,17 @@ import type {
   ChainVerification,
   KillSwitchScope,
   OrderType,
+  OrderDto,
+  FillDto,
+  PositionDto,
+  PreviewResult,
+  RiskViolation,
+  RiskLimits,
+  ConfirmMode,
+  PublicQuestionnaire,
+  MarketDataState,
+  PlaceOrderRequest,
+  PreviewOrderRequest,
   Role,
   UpdatePreferences,
   UserPreferences,
@@ -78,7 +89,25 @@ export interface KillSwitchResponse {
   scope: KillSwitchScope;
   label: string;
   auditEventId: string;
-  engine: string;
+  engine: 'paper';
+  killSwitchId: string;
+  accountId: string;
+  halted: true;
+  alreadyHalted: boolean;
+  robotsHalted: boolean;
+  ordersCancelled: number;
+  positionsFlattened: number;
+  flattenPending: Array<{ symbol: string; orderId: string; reason: string }>;
+  durationMs: number;
+}
+
+export interface KillSwitchState {
+  accountId: string;
+  halted: boolean;
+  scope: KillSwitchScope | null;
+  haltedAt: string | null;
+  haltedBy: string | null;
+  reason: string | null;
 }
 
 export interface AuditListQuery {
@@ -172,3 +201,106 @@ export interface CalendarResponse {
   simulated: boolean;
   events: CalendarEvent[];
 }
+
+// ---- Trading (goal 03) -------------------------------------------------------------------------
+
+export type { OrderDto, FillDto, PositionDto, RiskViolation, PlaceOrderRequest, PreviewOrderRequest };
+
+/** Place/preview body as sent by clients (defaults are applied server-side). */
+export type OrderInput = Omit<PlaceOrderRequest, 'tif' | 'reduceOnly' | 'postOnly' | 'source'> &
+  Partial<Pick<PlaceOrderRequest, 'tif' | 'reduceOnly' | 'postOnly' | 'source'>>;
+export type PreviewInput = Omit<OrderInput, 'clientOrderId'> & { clientOrderId?: string };
+
+export interface PreviewResponse {
+  symbol: string;
+  simulated: true;
+  environment: 'PAPER';
+  instrument: {
+    assetClass: AssetClass;
+    quoteCcy: string;
+    pricePrecision: number;
+    tickSize: string;
+    qtyStep: string;
+    minQty: string;
+    multiplier: string;
+    feeScheduleId: string;
+    feesSimulated: boolean;
+  };
+  market: { bid: string | null; ask: string | null; session: SessionState; dataState: MarketDataState; dataReason: string | null };
+  novice: boolean;
+  preview: Omit<PreviewResult, 'exact' | 'estimatedPriceExact'> | null;
+  risk: { ok: boolean; violations: RiskViolation[] };
+  timings: { riskMs: number; totalMs: number };
+}
+
+export interface PlaceOrderResponse {
+  order: OrderDto;
+  idempotentReplay: boolean;
+  legs?: OrderDto[];
+}
+
+/** 422 body of a risk rejection. */
+export interface RiskRejectionBody {
+  statusCode: 422;
+  error: 'risk_rejected';
+  code: string;
+  message: string;
+  violations: RiskViolation[];
+  order?: OrderDto;
+}
+
+export interface AccountView {
+  id: string;
+  environment: 'PAPER' | 'LIVE';
+  simulated: true;
+  baseCurrency: string;
+  marginTier: string;
+  status: 'active' | 'disabled';
+  startingCash: string;
+  cash: string;
+  equity: string;
+  unrealizedPnl: string;
+  dayPnl: string;
+  weekPnl: string;
+  marginUsed: string;
+  marginFree: string;
+  marginUsedPct: string;
+  grossExposure: string;
+  leverage: string;
+  dailyLossLimit: string;
+  dailyLossUsedPct: string;
+  openPositions: number;
+  unpriced: string[];
+  halt: { halted: boolean; scope: KillSwitchScope | null; haltedAt: string | null; haltedBy: string | null; reason: string | null };
+  limits: RiskLimits;
+  settings: { confirmMode: ConfirmMode; confirmNotionalAbove: string; confirmLossPctAbove: string };
+  asOf: string;
+}
+
+export interface AccountSettingsPatch {
+  confirmMode?: ConfirmMode;
+  confirmNotionalAbove?: string;
+  confirmLossPctAbove?: string;
+  baseCurrency?: string;
+  riskLimits?: Partial<RiskLimits>;
+}
+
+export interface OrderDetail extends OrderDto {
+  children: OrderDto[];
+}
+
+// ---- Appropriateness (B-018) ------------------------------------------------------------------
+
+export interface QuestionnaireResponse {
+  questionnaire: PublicQuestionnaire;
+  status: {
+    hasTraderRole: boolean;
+    eligible: boolean;
+    cooldownUntil: string | null;
+    lastAttempt: { version: number; scorePct: number; passed: boolean; at: string } | null;
+  };
+}
+
+export type AttemptResponse =
+  | { passed: true; scorePct: number; passMarkPct: number; questionnaire: { id: string; version: number }; roleGranted: 'trader'; next: 'sign_in_again'; message: string }
+  | { passed: false; scorePct: number; passMarkPct: number; questionnaire: { id: string; version: number }; cooldownUntil: string | null; topicsToReview: string[]; message: string };

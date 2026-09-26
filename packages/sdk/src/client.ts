@@ -16,6 +16,19 @@ import type {
   Capabilities,
   HealthResponse,
   KillSwitchResponse,
+  KillSwitchState,
+  AccountView,
+  AccountSettingsPatch,
+  PreviewInput,
+  PreviewResponse,
+  OrderInput,
+  PlaceOrderResponse,
+  OrderDto,
+  OrderDetail,
+  PositionDto,
+  FillDto,
+  QuestionnaireResponse,
+  AttemptResponse,
   LoginResponse,
   MeResponse,
   MfaEnrollResponse,
@@ -46,7 +59,7 @@ export interface KoraClientOptions {
   headers?: Record<string, string>;
 }
 
-/** Typed KORA API client (hand-written stub; generated from OpenAPI in goal 03, BACKLOG B-004). */
+/** Typed KORA API client (hand-written, mirrored by packages/sdk/openapi.json; generation is B-004). */
 export class KoraClient {
   private readonly base: string;
   private readonly f: typeof fetch;
@@ -85,7 +98,8 @@ export class KoraClient {
     return this.request<HealthResponse>('GET', '/health');
   }
 
-  signup(input: { email: string; password: string; displayName: string; accountType: 'novice' | 'trader' }) {
+  /** Everyone signs up as novice (B-018); Pro trading needs the appropriateness assessment. */
+  signup(input: { email: string; password: string; displayName: string }) {
     return this.request<{ user: PublicUser; mfaRequired: boolean }>('POST', '/auth/signup', input);
   }
 
@@ -117,8 +131,77 @@ export class KoraClient {
     return this.request<{ preferences: UserPreferences; capabilities: Capabilities }>('PUT', '/me/preferences', patch);
   }
 
-  killSwitch(scope: KillSwitchScope, source: 'ui_button' | 'hotkey' | 'rest_fallback' = 'ui_button') {
-    return this.request<KillSwitchResponse>('POST', '/kill-switch', { scope, source });
+  killSwitch(scope: KillSwitchScope, source: 'ui_button' | 'hotkey' | 'rest_fallback' = 'ui_button', reason?: string) {
+    return this.request<KillSwitchResponse>('POST', '/kill-switch', { scope, source, ...(reason ? { reason } : {}) });
+  }
+
+  killSwitchState() {
+    return this.request<KillSwitchState>('GET', '/kill-switch');
+  }
+
+  resumeTrading(reason: string, accountId?: string) {
+    return this.request<{ resumed: true; accountId: string; previous: { scope: KillSwitchScope | null; haltedAt: string | null; haltedBy: string | null } }>(
+      'POST',
+      `/kill-switch/resume${query({ accountId })}`,
+      { reason },
+    );
+  }
+
+  // ---- trading (goal 03) ----
+
+  account() {
+    return this.request<AccountView>('GET', '/accounts/me');
+  }
+
+  updateAccountSettings(patch: AccountSettingsPatch) {
+    return this.request<AccountView>('PUT', '/accounts/me/settings', patch);
+  }
+
+  previewOrder(body: PreviewInput) {
+    return this.request<PreviewResponse>('POST', '/orders/preview', body);
+  }
+
+  /** Throws KoraApiError(422, code) with a RiskRejectionBody on a risk rejection. */
+  placeOrder(body: OrderInput) {
+    return this.request<PlaceOrderResponse>('POST', '/orders', body);
+  }
+
+  orders(q: { status?: 'open' | 'all'; symbol?: string; limit?: number; before?: string } = {}) {
+    return this.request<{ accountId: string; orders: OrderDto[] }>('GET', `/orders${query(q)}`);
+  }
+
+  order(id: string) {
+    return this.request<OrderDetail>('GET', `/orders/${encodeURIComponent(id)}`);
+  }
+
+  amendOrder(id: string, patch: { qty?: string; limitPrice?: string; stopPrice?: string; trailAmount?: string }) {
+    return this.request<OrderDto>('PATCH', `/orders/${encodeURIComponent(id)}`, patch);
+  }
+
+  cancelOrder(id: string) {
+    return this.request<OrderDto>('DELETE', `/orders/${encodeURIComponent(id)}`);
+  }
+
+  positions() {
+    return this.request<{ accountId: string; currency: string; positions: PositionDto[] }>('GET', '/positions');
+  }
+
+  closePosition(symbol: string) {
+    return this.request<PlaceOrderResponse>('POST', `/positions/${encodeURIComponent(symbol)}/close`);
+  }
+
+  fills(q: { limit?: number; before?: string; symbol?: string } = {}) {
+    return this.request<{ accountId: string; currency: string; fills: FillDto[] }>('GET', `/fills${query(q)}`);
+  }
+
+  // ---- appropriateness (B-018) ----
+
+  appropriateness() {
+    return this.request<QuestionnaireResponse>('GET', '/appropriateness/questionnaire');
+  }
+
+  submitAppropriateness(questionnaireId: string, version: number, answers: Record<string, string>) {
+    return this.request<AttemptResponse>('POST', '/appropriateness/attempts', { questionnaireId, version, answers });
   }
 
   audit(q: AuditListQuery = {}) {
