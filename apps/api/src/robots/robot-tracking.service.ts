@@ -19,6 +19,7 @@ import { robotSource, type RobotRow } from './robots.types';
 const DAY = 86_400_000;
 
 interface BtTrade {
+  reason: string;
   entryTs: number;
   exitTs: number;
   netPnl: number;
@@ -155,8 +156,9 @@ export class RobotTrackingService {
         guard: false,
         maxPoints: 50,
       });
+      // A position still open at the end of the data is not realised yet (live holds it too).
       for (const t of res.trades)
-        if (t.entryTs >= start && t.exitTs >= from && t.exitTs < to) {
+        if (t.reason !== 'end_of_data' && t.entryTs >= start && t.exitTs >= from && t.exitTs < to) {
           btPnl += t.netPnl;
           btTrades += 1;
         }

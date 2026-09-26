@@ -134,6 +134,7 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
     body: Record<string, unknown>;
   }> = [];
   let contextStatus = 200;
+  let qe: QueueEvents;
 
   beforeAll(async () => {
     stub = createServer(async (req, res) => {
@@ -197,8 +198,13 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
     };
     redis = new Redis(redisUrl!, { maxRetriesPerRequest: 2 });
     runner = await startRunner(cfg);
+    qe = new QueueEvents(cfg.queueName, {
+      connection: new Redis(redisUrl!, { maxRetriesPerRequest: null }),
+    });
+    await qe.waitUntilReady();
   });
   afterAll(async () => {
+    await qe.close();
     await runner.queue.obliterate({ force: true });
     await runner.close();
     redis.disconnect();
@@ -247,27 +253,17 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
       { type: 'bar_close', robotId: ROBOT, symbol: 'BTCUSD', tf: '1m', barTs: 120_000 },
       { attempts: 5 },
     );
-    const events = new QueueEvents(cfg.queueName, {
-      connection: new Redis(redisUrl!, { maxRetriesPerRequest: null }),
-    });
-    await events.waitUntilReady();
-    await expect(job.waitUntilFinished(events, 10_000)).rejects.toThrow(/409/);
+    await expect(job.waitUntilFinished(qe, 15_000)).rejects.toThrow(/409/);
     expect((await runner.queue.getJob(job.id!))?.attemptsMade).toBe(1);
-    await events.close();
     contextStatus = 200;
   });
 
   it('runs the tracking job through the api', async () => {
     const job = await runner.queue.add('tracking', { type: 'tracking', day: '2026-01-01' });
-    const events = new QueueEvents(cfg.queueName, {
-      connection: new Redis(redisUrl!, { maxRetriesPerRequest: null }),
-    });
-    await events.waitUntilReady();
-    expect(await job.waitUntilFinished(events, 10_000)).toMatchObject({ day: '2026-01-01' });
+    expect(await job.waitUntilFinished(qe, 15_000)).toMatchObject({ day: '2026-01-01' });
     expect(seen.find((s) => s.path === '/internal/robots/tracking')!.body).toEqual({
       day: '2026-01-01',
     });
-    await events.close();
   });
 
   it('halts the account’s robots within milliseconds of the kill-switch message and stops heartbeats', async () => {

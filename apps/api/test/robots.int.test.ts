@@ -21,7 +21,8 @@ import {
 } from './robot-helpers';
 
 const M = 60_000;
-const T0 = Date.UTC(2025, 2, 3, 9, 0); // SIMULATED 1-minute bars (fixed, deterministic)
+/** SIMULATED 1-minute bars (fixed shape) ending a few minutes ago, so fills and bars share the day. */
+const T0 = Math.floor(Date.now() / 60_000) * 60_000 - 80 * 60_000;
 const TICK = 0.1;
 const HALF_SPREAD = 0.5; // BTCUSD SIMULATED spread: 10 ticks
 const HB = 300;
@@ -210,17 +211,14 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
       .get('/internal/robots/running')
       .set('x-kora-service-token', TOKEN)
       .expect(200);
-    const rest = await request(http)
-      .post('/orders')
-      .set(bearer(owner.token))
-      .send({
-        clientOrderId: 'x-robot-spoof',
-        symbol: 'BTCUSD',
-        side: 'buy',
-        type: 'market',
-        qty: '0.1',
-        source: 'robot:00000000-0000-0000-0000-000000000000',
-      });
+    const rest = await request(http).post('/orders').set(bearer(owner.token)).send({
+      clientOrderId: 'x-robot-spoof',
+      symbol: 'BTCUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '0.1',
+      source: 'robot:00000000-0000-0000-0000-000000000000',
+    });
     expect(rest.status).toBe(400);
   });
 
@@ -319,6 +317,39 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
       .send({ reason: 'parity done' })
       .expect(200);
   }, 120_000);
+
+  it('tracking error: live vs backtest for the same bars, computed per day and stored', async () => {
+    await ownerQuery(
+      'UPDATE robots SET paper_started_at = to_timestamp($2 / 1000.0) WHERE id = $1',
+      [parityRobot, T0],
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await request(http)
+      .post(`/robots/${parityRobot}/tracking`)
+      .set(bearer(owner.token))
+      .send({ day: today })
+      .expect(200);
+    expect(res.body.liveTrades).toBeGreaterThanOrEqual(1);
+    const row = await ownerQuery<{
+      tracking_error: number;
+      live_trades: number;
+      backtest_trades: number;
+    }>(
+      'SELECT tracking_error, live_trades, backtest_trades FROM robot_tracking WHERE robot_id = $1 AND day = $2::date',
+      [parityRobot, today],
+    );
+    expect(row).toHaveLength(1);
+    const allToday = bars.every((b) => new Date(b.t).toISOString().slice(0, 10) === today);
+    if (allToday) {
+      expect(row[0]!.backtest_trades).toBe(row[0]!.live_trades);
+      expect(row[0]!.tracking_error).toBeLessThan(0.001); // < 0.1 % of the allocation: fills differ only by slippage
+    }
+    const d = await request(http)
+      .get(`/robots/${parityRobot}`)
+      .set(bearer(owner.token))
+      .expect(200);
+    expect(d.body.kpis.live.days).toBe(1);
+  });
 
   it('auto-pauses on a max-drawdown breach in a simulated crash (and raises an alert)', async () => {
     const v = await createStrategy(owner, ALWAYS_LONG);
