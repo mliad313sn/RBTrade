@@ -14,12 +14,13 @@ import {
 import { DbService, type Queryable } from '../db/db.service';
 import appropriatenessV1 from './questionnaires/appropriateness.v1.json';
 import knowledgeCheckV1 from './questionnaires/knowledge-check.v1.json';
+import suitabilityV1 from './questionnaires/suitability.v1.json';
 
 /**
  * Every published questionnaire version, as reviewed data. Adding a version = adding a file here;
  * editing a published file fails the boot (versions are immutable, see `sync`).
  */
-export const QUESTIONNAIRE_FILES: unknown[] = [appropriatenessV1, knowledgeCheckV1];
+export const QUESTIONNAIRE_FILES: unknown[] = [appropriatenessV1, knowledgeCheckV1, suitabilityV1];
 
 export interface AttemptRow {
   id: string;

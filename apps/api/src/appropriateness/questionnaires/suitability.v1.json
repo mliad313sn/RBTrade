@@ -1,0 +1,74 @@
+{
+  "id": "suitability",
+  "version": 1,
+  "kind": "suitability",
+  "title": "About you and your goals",
+  "intro": "SIMULATED placeholder questions pending Compliance review (OQ-C2). Six questions about your goals, time frame, how you feel about losses and what you could afford to lose. There are no right answers. We keep only the total score and the profile band, not your answers. This is a record of what you told us, not a recommendation.",
+  "locale": "en",
+  "simulated": true,
+  "reviewStatus": "placeholder_pending_compliance_review",
+  "passMarkPct": 0,
+  "cooldownMinutes": 0,
+  "questions": [
+    {
+      "id": "objective",
+      "topic": "Goal",
+      "prompt": "What is the main reason you want to trade?",
+      "options": [
+        { "id": "learn", "label": "To learn how markets work, with practice money.", "points": 1 },
+        { "id": "grow", "label": "To grow savings slowly over several years.", "points": 2 },
+        { "id": "active", "label": "To trade actively and take larger risks for larger possible gains.", "points": 4 }
+      ]
+    },
+    {
+      "id": "horizon",
+      "topic": "Time frame",
+      "prompt": "How long could you leave money invested without needing it?",
+      "options": [
+        { "id": "short", "label": "Less than a year.", "points": 1 },
+        { "id": "medium", "label": "One to five years.", "points": 2 },
+        { "id": "long", "label": "More than five years.", "points": 3 }
+      ]
+    },
+    {
+      "id": "reaction",
+      "topic": "Losses",
+      "prompt": "Your trades fall 20% in a month. What would you most likely do?",
+      "options": [
+        { "id": "sell", "label": "Close everything to stop the loss.", "points": 1 },
+        { "id": "wait", "label": "Wait and review my plan.", "points": 2 },
+        { "id": "add", "label": "Add more, because prices are lower.", "points": 4 }
+      ]
+    },
+    {
+      "id": "capacity",
+      "topic": "What you could afford to lose",
+      "prompt": "If you lost all the money you put into trading, how would it affect you?",
+      "options": [
+        { "id": "severe", "label": "It would seriously hurt my finances.", "points": 0 },
+        { "id": "noticeable", "label": "It would be painful but I would cope.", "points": 2 },
+        { "id": "minor", "label": "It would not change my day-to-day life.", "points": 4 }
+      ]
+    },
+    {
+      "id": "experience",
+      "topic": "Experience",
+      "prompt": "How often have you traded shares, currencies or other investments in the last three years?",
+      "options": [
+        { "id": "never", "label": "Never.", "points": 0 },
+        { "id": "few", "label": "A few times.", "points": 2 },
+        { "id": "regular", "label": "Regularly.", "points": 4 }
+      ]
+    },
+    {
+      "id": "leverage_view",
+      "topic": "Borrowing",
+      "prompt": "Which statement about borrowing to trade (leverage) is closest to your view?",
+      "options": [
+        { "id": "avoid", "label": "I do not want to borrow to trade.", "points": 0 },
+        { "id": "small", "label": "I might borrow a little once I understand it.", "points": 2 },
+        { "id": "comfortable", "label": "I am comfortable with borrowing and know I can lose more quickly.", "points": 4 }
+      ]
+    }
+  ]
+}

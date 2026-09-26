@@ -19,7 +19,8 @@
     "db:seed": "tsx src/db/seed-cli.ts",
     "openapi": "node dist/openapi-cli.js",
     "md:feed": "tsx src/market-data/feed-cli.ts",
-    "load:ws": "node load/ws-fanout.mjs"
+    "load:ws": "node load/ws-fanout.mjs",
+    "control-matrix": "tsx src/governance/control-matrix-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
