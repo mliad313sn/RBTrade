@@ -15,3 +15,4 @@ Anything legal, regulatory, contractual or involving real money escalates to the
 | OQ-D1 | The `.dc.html` prototype sources are referenced but only PNG exports are in the repo | PNGs used as reference | Product Owner | goal 00 | Open |
 | OQ-D2 | Buy button text colour: the prototype shows white on `#4DA3FF` (2.6:1, fails AA). We use ink `#0B0E13` on up/down fills (> 7:1). Confirm. | ink text on fills | Product Owner (S1) | goal 01 | Proposed |
 | OQ-A1 | AI provider data-processing agreement and allowed data categories | copilot not built | Sponsor | goal 00 | Open |
+| OQ-Q1 | Novice Practice uses a skill-free edge (50% wins, 1:1, costs 0.05 R, 2% of losses gap to 2 R), so the typical practice year is slightly negative. Confirm this is the product stance, and whether the regulatory retail-loss figure should be shown next to it. | skill-free assumptions shown under "How we worked this out" | Product Owner (S1) / S8 | goal 05 | Proposed |

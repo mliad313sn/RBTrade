@@ -76,3 +76,60 @@ Last updated: 2026-09-26 (end of goal 01).
   - e2e: api 4010, web 3010, db `kora_e2e`;
   - integration tests: db `kora_test`.
 - **Env:** everything lives in the repo-root `.env`. The api and web load it themselves and never override variables that are already set.
+
+## Goal 05: gain simulator (G5: done, with deferrals)
+
+Plan and evidence: `docs/plans/05-gain-simulator.md`. ADR 0005. Built in parallel with goal 02, on its own branch. Gate table row to add when merging: `| G5 | 05 gain simulator | **Done, with deferrals**: see plan 05 §5–§6 |`.
+
+### What shipped
+
+- **Quant (`services/quant/src/kora_quant/sim/`):**
+  - `POST /mc/project` (parametric edge) and `POST /mc/from-trades` (circular moving-block bootstrap, block auto `⌈n^{1/3}⌉` or user-set);
+  - `POST /analytics/paper` (Decimal FIFO analytics over `Fill[]`) and `POST /reality-checks`;
+  - numpy PCG64 plus a numba kernel, seeded and deterministic, LRU-cached by input hash;
+  - defaults: 10k paths, max 50k;
+  - 10k × 1,000 trades in **163 ms p95** (`bench/RESULTS.md`);
+  - 85 pytest tests, 98.9% coverage, passing on Python 3.11 and 3.12.
+- **Model:** R-multiple outcomes with costs on by default, fat tails, a stress edge cut, three sizing models (fixed-fractional, fixed amount, Kelly fraction), withdrawals and a ruin floor.
+- **Outputs:**
+  - P5–P95 bands, final distribution, P(below start), risk of ruin plus a closed-form estimate;
+  - drawdown median/P95/histogram, time under water, longest losing streak;
+  - expectancy after costs, full Kelly after costs and tails, and the user/Kelly ratio;
+  - 3 sample paths and reality checks.
+- **Reality checks:** 6 pure rules with rationales in `docs/quant/reality-checks.md`. The model is described in `docs/quant/monte-carlo.md`.
+- **API (`apps/api/src/sim/`):**
+  - `POST /sim/project`, `POST /sim/from-trades`, `GET /sim/paper/analytics`, `POST /sim/paper/project`;
+  - zod validation with plain-language rejections;
+  - `KORA_SIM_RATE_LIMIT` per client per minute (default 60);
+  - audit events `sim.projection_run`, `sim.bootstrap_run` and `sim.paper_projection_run`;
+  - quant failures map to 502/503 with "Nothing was simulated".
+- **Web Pro (`/simulator`):**
+  - assumptions panel;
+  - SVG fan chart (bands, median, start, ruin floor, 3 sample paths) with the SIMULATED watermark;
+  - 5 KPI tiles, drawdown histogram, risk table, reality checks;
+  - stress and fat-tail toggles;
+  - "Project from my paper results";
+  - "Import from backtest" placeholder (goal 06);
+  - A/B compare (overlay and table);
+  - CSV and PNG export.
+- **Web Novice (`/practice`):**
+  - three plain questions: how much, how often, how careful;
+  - good / typical / bad year, a band chart, "This is a simulation, not a promise";
+  - glossary links, with an automated jargon scan in e2e.
+- **Tests:**
+  - api integration: 18 new (43 total);
+  - web unit: 8 new;
+  - e2e: 5 new (21 total, all green).
+
+### Stubbed or placeholder
+
+- Paper fills come from a deterministic **SIMULATED fixture** (`apps/api/src/sim/paper-fixture.ts`, 80 round trips). It is labelled in the API response and the UI until the goal 03 engine exists (B-018).
+- "Import from backtest" is an `aria-disabled` button that names goal 06 (B-019).
+
+### What goals 03, 06 and 08 need to know
+
+- **Goal 03:** replace `paperFixtureFills()` in `SimController.paperAnalytics()` with the account's fills (same `Fill` shape, decimal strings, tz-aware `ts`). Pass `contractMultipliers` from the instrument registry for non-quote-currency P&L. Drop `?simulated_source=true` once the fills are real.
+- **Goal 06:** "Send to Monte Carlo" posts `{trades: number[] (R multiples), source: 'backtest_in_sample' | 'backtest_out_of_sample', riskPct, blockSize?}` to `/sim/from-trades`. The `small_sample` and `in_sample_source` checks fire on their own.
+- **Goal 08:** the Practice mapping lives in `apps/web/src/lib/sim/practice.ts`, and the glossary and jargon list in `apps/web/src/lib/sim/glossary.ts`. Human copy review is B-021, and the product stance on the skill-free edge is OQ-Q1.
+- **Env:** `QUANT_URL` (default `http://127.0.0.1:$QUANT_PORT`), `QUANT_TIMEOUT_MS`, `KORA_SIM_RATE_LIMIT`. Playwright starts uvicorn on `E2E_QUANT_PORT` (default 8010), and the api gets `QUANT_URL` automatically.
+- **Numbers:** simulation outputs are float estimates, always labelled SIMULATED and never booked. Paper P&L is Decimal (ADR 0005 §4).
