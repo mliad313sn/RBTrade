@@ -75,7 +75,7 @@ describe('novice auto-invest: template robots, PAPER, guarded', () => {
   it('the runner acts for a novice template robot (orders pass the novice guardrails); pause, resume, live refused', async () => {
     const list = (await request(http).get('/novice/auto-invest').set(bearer(nov.token)).expect(200)).body;
     const robot = list.templates.find((x: { id: string }) => x.id === 'breakout-crypto').robot;
-    const [{ version_id: versionId }] = await ownerQuery<{ version_id: string }>('SELECT version_id FROM robots WHERE id = $1', [robot.id]);
+    const versionId = (await ownerQuery<{ version_id: string }>('SELECT version_id FROM robots WHERE id = $1', [robot.id]))[0]!.version_id;
     await md.touch();
     const barTs = Math.floor(Date.now() / 3_600_000) * 3_600_000;
     const signal = (qty: string, ts: number) => ({

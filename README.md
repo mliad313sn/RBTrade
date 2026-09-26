@@ -69,6 +69,14 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - The bot runner (`services/bot-runner`) evaluates each closed bar through `/internal/robots/*` (service token `KORA_SERVICE_TOKEN`, generated for dev by `scripts/dev-db.sh`) and quant `/bt/signal`; orders go through the OMS with source `robot:{id}`.
 - Design: ADR 0006, `docs/quant/backtester.md`. Results: `docs/plans/06-robot-trader.md`.
 
+## Novice view (goal 08, PAPER only)
+
+- Routes: `/onboarding` (5 short screens, the risk warning acknowledged against its version, daily and monthly loss limits), `/home` (balance, holdings in words, the 3-step trade with "most you could lose", limits), `/practice`, `/auto-invest` (ready-made robots only), `/learn` (lessons, word list, `/learn/check` 5-question check). EN and FR (switch in the top bar); installable PWA with an offline "prices paused" shell.
+- Guardrails are server-side for novice-only users and anyone in the Novice view: market orders with a stop only, no borrowing (1×) unless the knowledge check is passed and a 24 h wait is over, loosened limits wait 24 h (tightening is immediate), cooling-off until the next day after 3 losing trades, a 5 % day loss or the daily limit, and an optional monthly loss limit.
+- API: `/novice/profile`, `/novice/onboarding/complete`, `/novice/limits`, `/novice/leverage`, `/novice/summary`, `/novice/assets` (curated list from the registry), `/novice/ticket` (builds the order and returns the unchanged `/orders/preview`), `/novice/knowledge-check(/attempts)`, `/novice/auto-invest(/:id/pause|resume|go-live)`, `/disclosures/:id(/acknowledgements)`, `/sim/scenarios`, `/auth/mfa/opt-in`.
+- Checks: `pnpm --filter @kora/web i18n:check` (EN/FR keys), `pnpm --filter @kora/web readability` (writes `docs/novice/readability-report.md`), ESLint forbids confetti/streak/leaderboard components in novice files.
+- Design: ADR 0008. Results: `docs/plans/08-novice-view.md`.
+
 ## Layout
 
 ```

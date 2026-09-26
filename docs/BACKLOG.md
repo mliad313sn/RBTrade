@@ -16,11 +16,11 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-010 | Toolchain major upgrades (TS 7, Next 16, Nest 12, vitest 5, ESLint 10, Storybook 10) | ADR 0001 | 10 | Open |
 | B-011 | Visual regression vs prototype at 1440×900 | goal 04 | 04 | Done (own baseline + structural/perceptual comparison with `Main.png`, plan 04 §6.3) |
 | B-012 | Grafana dashboards beyond provisioning stub; alert → runbook links | goal 01 infra | 10 | Open |
-| B-013 | FR translations (EN only in goal 01) | goal 08 | 08 | Open |
+| B-013 | FR translations (EN only in goal 01) | goal 08 | 08 | Done in goal 08 (Novice view EN + FR, `i18n:check` in CI; Pro screens stay English) |
 | B-014 | Sign-up returns 409 for an existing email (account enumeration). Move to a verify-email flow with a generic response. | G1 S9 review | 09 | Open |
 | B-015 | Deployment edge proxy must set a trusted `X-Forwarded-For`. The web `/api` proxy forwards only the nearest hop. | G1 S9 review | 10 | Open |
 | B-016 | Instrument registry (goal 02) must feed `Price`/`NumberInput` precision. The goal 01 UI uses explicit precisions only in stories and the ticket skeleton. | G1 | 02 | Open |
-| B-017 | The optional TOTP opt-in for novice accounts (API supports MFA for any user once enrolled) needs a settings UI | G1 | 08 | Open |
+| B-017 | The optional TOTP opt-in for novice accounts (API supports MFA for any user once enrolled) needs a settings UI | G1 | 08 | Done in goal 08 (`POST /auth/mfa/opt-in` + Settings "Two-step sign-in (optional)") |
 | B-018 | Remove self-service `trader` at sign-up (OQ-S2 decision). Sign-up creates `novice` only; `POST /appropriateness` assessment (versioned questions, pass mark, cool-down on fail, audit event) upgrades the role to `trader` and requires TOTP enrolment on the next login. API tests and e2e required. | Sponsor decision | 03 (gate), 08/09 (questionnaire engine) | Done in goal 03 (ADR 0003 §9); content review is OQ-C1 / B-313 |
 | B-201 | TimescaleDB: hypertables for `md_trades`/`md_bars_1s`, continuous aggregates replacing `md_refresh_candles`, compression and retention policies; exercise the guarded DDL in a Timescale CI job | ADR 0002 | 10 | Open |
 | B-202 | Minor-unit quotes (GBX, ZAc) and price multipliers in the registry; LSE/JSE instruments currently quoted in major units | G2 | 09 | Open (not cheap in goal 04: registry columns + engine multiplier, owned by goal 03 code) |
@@ -35,23 +35,23 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-501 | Replace the SIMULATED paper fixture in `apps/api/src/sim/paper-fixture.ts` with the account's real paper fills from the goal 03 engine (same `Fill[]` contract into `/analytics/paper`); add contract multipliers from the instrument registry | goal 05 | 03 | Done (fixture kept, labelled, only for accounts with no fills) |
 | B-502 | "Import from backtest" / Robots "Send to Monte Carlo": post the goal 06 trade list (R multiples, `source` IS/OOS) to `/sim/from-trades`; enable the button | goal 05 | 06 | Done in goal 06 (monitor button + simulator import of the latest or `?backtest=` run) |
 | B-503 | Shared simulation result cache (Redis, keyed by the same input hash) if the quant service scales beyond one process | ADR 0005 | 10 | Open |
-| B-504 | Human plain-language review of the Novice Practice copy (S1 + S8), including FR once B-013 lands; the automated jargon scan is in place | goal 05 | 08 | Open |
-| B-505 | Save and name scenarios per user (A/B compare is in-session only today) | goal 05 | 08 | Open |
-| B-506 | Regenerate `packages/sdk/openapi.json` after merging goals 02 and 05, and add typed `/sim/*` methods to the SDK (the web uses `apps/web/src/lib/sim/client.ts` meanwhile) | goal 05 | 08 | Partly done: `openapi.json` regenerated in goal 03; typed `/sim/*` SDK methods still open |
+| B-504 | Human plain-language review of the Novice Practice copy (S1 + S8), including FR once B-013 lands; the automated jargon scan is in place | goal 05 | 08 | Prep done in goal 08 (`docs/novice/copy-review.md`, readability report, FR); human S1 + S8 sign-off still owed (B-808) |
+| B-505 | Save and name scenarios per user (A/B compare is in-session only today) | goal 05 | 08 | Done in goal 08 for the API (`/sim/scenarios`) and Novice Practice; Pro simulator UI is B-802 |
+| B-506 | Regenerate `packages/sdk/openapi.json` after merging goals 02 and 05, and add typed `/sim/*` methods to the SDK (the web uses `apps/web/src/lib/sim/client.ts` meanwhile) | goal 05 | 08 | Done in goal 08 (typed `/sim/*` and scenario methods in `KoraClient`; web simulator uses them) |
 | B-507 | OpenTelemetry spans in the quant service (FastAPI instrumentation, trace context from the api); today it has structured logs with the input hash only | goal 05 | 10 | Open |
 | B-301 | Bot runner: subscribe to `kora:ctl:robots` (halt/resume), submit robot orders through `OmsService.submit` (`actor.type='robot'`, `source='robot:{id}'`) with service authentication and robot ownership checks; REST `source=robot:*` stays refused until then | goal 03 | 06 | Done in goal 06 (ADR 0006 §6: `/internal/robots/*` with `KORA_SERVICE_TOKEN`, robot → owner → account resolved server-side) |
 | B-302 | Matching loop scale-out: advisory-lock leader or per-account sharding across api replicas; move the loop to its own process | goal 03 | 10 | Open |
 | B-303 | Audit visibility: let owners read system-actor events about their own orders/accounts (engine fills, triggers, swaps) through `/audit` (today only risk officers/admins see them) | goal 03 | 09 | Open |
 | B-304 | Paper realism: queue position for resting limits, matching on trade prints (`md_trades`), latency model, triple-swap and holiday roll days, maker/taker fee tiers | goal 03 | 06/10 | Open |
 | B-305 | Pro ticket (pips from the registry `pipSize`, hotkeys, OCO two-leg editor, trailing in pips, depth-aware sizing) and streaming blotter on the private WS channels | goal 03 | 04 | Done (goal 04; depth-aware sizing = order book click-to-price and the preview's depth walk, see B-406 for aggregated depth) |
-| B-306 | Novice "Make a trade" flow wired to `POST /orders/preview` and `POST /orders` (market + protective stop, plain-language preview) | goal 03 | 08 | Open |
+| B-306 | Novice "Make a trade" flow wired to `POST /orders/preview` and `POST /orders` (market + protective stop, plain-language preview) | goal 03 | 08 | Done in goal 08 (`/novice/ticket` builds the order and returns the unchanged preview; review sheet with "I understand") |
 | B-307 | Margin close-out / stop-out automation at a margin level set by Compliance (OQ-B3); margin-call notices | goal 03 | 09 | Open |
 | B-308 | Day/week start equity from a scheduled snapshot at the roll time (today: first valuation of the UTC day/ISO week, in-process cache) and loss-limit periods in the customer's time zone | goal 03 | 09 | Open |
 | B-309 | Multi-currency cash sub-ledgers (hold balances in several currencies) and base-currency change after activity | goal 03 | post-RC | Open |
 | B-310 | FX conversion on the bid/ask side (today mid × conversion bps) and show both legs of a triangulated rate | goal 03 | 09 | Open |
 | B-311 | Reconciliation against a LIVE broker's positions and cash; route critical alerts to on-call (links B-012) | goal 03 | 10 | Open |
 | B-312 | OpenAPI response schemas for the trading, kill switch and appropriateness endpoints, then SDK generation (with B-004/B-209) | goal 03 | 10 | Open (retargeted from 04 with B-004) |
-| B-313 | Appropriateness content: Compliance-authored questions per jurisdiction and language, periodic re-assessment; add knowledge-check (goal 08) and suitability (goal 09) definitions to the questionnaire engine | goal 03 | 08/09 | Open |
+| B-313 | Appropriateness content: Compliance-authored questions per jurisdiction and language, periodic re-assessment; add knowledge-check (goal 08) and suitability (goal 09) definitions to the questionnaire engine | goal 03 | 08/09 | Partly done: knowledge-check definition added in goal 08 (SIMULATED, OQ-N4); Compliance content and suitability (goal 09) open |
 | B-314 | Kill switch global scope for risk officers/admins (halt every account's robots, platform-wide cancel) | goal 03 | 09 | Open |
 | B-315 | Distributed order-rate limits (per account and per robot) in Redis for multi-replica deployments | goal 03 | 10 | Open |
 | B-401 | Move the Risk tab analytics (historical VaR, correlation clusters) to a quant-service endpoint; the api computes them with `@kora/domain/risk-analytics.ts` and labels `source: 'api'` meanwhile | goal 04 | 06/10 | Open |
@@ -77,4 +77,14 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-611 | SDK: typed strategies / backtests / robots / signals methods (the web uses `apps/web/src/lib/robots/client.ts` meanwhile), with B-004 | goal 06 | 04/10 | Open |
 | B-612 | Builder UX: keyboard reordering of chips, undo/redo, inline editing of literal values, multi-window sessions, per-template onboarding; visual regression against the prototype (B-011) | goal 06 | 08/10 | Open |
 | B-613 | Long optimisations and walk-forwards as async BullMQ jobs with progress and cancellation; result cache keyed by input hash (with B-503) | goal 06 | 10 | Open |
-| B-614 | Templates for goal 08: plain-language copy review (S1 + S8, like B-504), FR translations (B-013), risk-level rationale per template | goal 06 | 08 | Open |
+| B-614 | Templates for goal 08: plain-language copy review (S1 + S8, like B-504), FR translations (B-013), risk-level rationale per template | goal 06 | 08 | Done in goal 08: guarded `/novice/auto-invest` path (templates as-is, PAPER, capped, OOS/paper results only, live refused); copy review in the B-504 pack |
+| B-801 | Server-side gate: a novice must have acknowledged the current risk-warning version before the first order (goal 08 enforces it in onboarding and auto-invest; the OMS is not gated so goal 03/04/06 paths stay unchanged) | goal 08 | 09 | Open |
+| B-802 | Pro simulator: save / load named scenarios in the UI (API `/sim/scenarios` kind `pro` ready) | goal 08 | 10 | Open |
+| B-803 | Cooling-off and loss-limit day/month boundaries in the customer's time zone (today UTC; with B-308) | goal 08 | 09 | Open |
+| B-804 | Security and limit alerts to the phone/email through a reviewed path (no trading nudges; the service worker has no push handler today) | goal 08 | 09/10 | Open |
+| B-805 | Lighthouse mobile for the Novice routes in CI with budgets (perf ≥ 85, a11y ≥ 95; with B-405) | goal 08 | 10 | Open |
+| B-806 | Localise the remaining shared screens reachable from the Novice view (appropriateness page, audit log, forbidden page) and server risk messages | goal 08 | 09 | Open |
+| B-807 | Ready-made robot OOS results from a scheduled platform backtest on licensed history (today a best-effort SIMULATED run on first adoption) | goal 08 | 10 | Open |
+| B-808 | Human plain-language review and sign-off of the Novice copy, EN and FR (pack: `docs/novice/copy-review.md`) | goal 08 | before RC | Open |
+| B-809 | e2e for the offline navigation fallback (Playwright cannot fail a service worker's own fetches; covered by `sw.test.ts` in a VM and a cache check in `pwa.spec.ts`) | goal 08 | 10 | Open |
+| B-810 | Risk-officer view of novice guardrail events (borrowing requests, cooling-off triggers, loosening requests) and alerts on patterns | goal 08 | 09 | Open |
