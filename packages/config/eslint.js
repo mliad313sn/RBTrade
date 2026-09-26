@@ -44,6 +44,7 @@ export function koraConfig({ react = false, nest = false, ignores = [] } = {}) {
           },
         ]
       : []),
+    { files: ['scripts/**', '**/*-cli.ts', '**/*.stories.tsx'], rules: { 'no-console': 'off' } },
     prettier,
   );
 }
