@@ -1,12 +1,13 @@
-import { Placeholder } from '@/components/Placeholder';
+import { Suspense } from 'react';
+
+import { RobotsMonitor } from '@/components/robots/RobotsMonitor';
 
 export const metadata = { title: 'Robots' };
 
 export default function Page() {
   return (
-    <>
-      <h1 className="k-sr-only">Robots</h1>
-      <Placeholder title="Robots" goal="goal 06 (strategy builder, backtests, walk-forward)" />
-    </>
+    <Suspense fallback={<p className="text-sm text-muted">Loading robots…</p>}>
+      <RobotsMonitor />
+    </Suspense>
   );
 }

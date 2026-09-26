@@ -262,10 +262,10 @@ export function CompareTable({ a, b }: { a: Scenario; b: Scenario }) {
             Metric
           </th>
           <th scope="col" className="text-right font-semibold">
-            A · {a.origin === 'paper' ? 'paper' : 'assumptions'}
+            A · {a.origin}
           </th>
           <th scope="col" className="text-right font-semibold">
-            B · {b.origin === 'paper' ? 'paper' : 'assumptions'}
+            B · {b.origin}
           </th>
           <th scope="col" className="text-right font-semibold">
             B vs A

@@ -52,7 +52,7 @@ export function CalendarPanel({ onTitle }: { onTitle?: (t: string) => void }) {
               <span className="k-num">{formatClock(e.time, timeDisplay).slice(0, 5)}</span>
               <span className={`cal-impact cal-impact--${e.impact}`} aria-label={IMPACT[e.impact]} role="img">
                 {'●'.repeat(e.impact)}
-                <span className="cal-impact-rest">{'●'.repeat(3 - e.impact)}</span>
+                <span className="cal-impact-rest" aria-hidden="true">{'●'.repeat(3 - e.impact)}</span>
               </span>
               <span className="truncate" title={`${e.currency} · ${e.title}`}>
                 <span className="text-muted">{e.currency}</span> {e.title}

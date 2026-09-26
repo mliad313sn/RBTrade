@@ -148,8 +148,15 @@ describe('ledger and position properties (fast-check)', () => {
           const cashChange = cashBalance(b.lines).sub(dec('100000'));
           const unrealized = unrealizedPnl(b.position, mark, m).mul(rate);
           const equityChange = cashChange.add(unrealized);
-          // Engine identity (exact): realised + unrealised − fees, each booked at ledger scale.
-          expect(equityChange.eq(b.realized.add(unrealized).sub(b.fees))).toBe(true);
+          // Engine identity: realised + unrealised − fees, each booked at ledger scale. Cash and the
+          // booked terms are exact; only the unquantised unrealised term is added in a different order
+          // on each side, so the sums can differ in the last of Decimal's significant digits (seen: 4e-35).
+          expect(
+            equityChange
+              .sub(b.realized.add(unrealized).sub(b.fees))
+              .abs()
+              .lte('1e-20'),
+          ).toBe(true);
           // Independent: Σ direction × qty × (mark − fill price) × multiplier × rate − fees.
           let mtm = ZERO;
           for (const f of fills)

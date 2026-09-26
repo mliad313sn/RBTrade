@@ -51,4 +51,6 @@ export const simApi = {
     seed: number;
     paths: number;
   }) => call<PaperProjection>('POST', '/paper/project', req),
+  /** Block bootstrap of a trade list (goal 06 backtests send their OOS R multiples here, B-502). */
+  fromTrades: (req: Record<string, unknown>) => call<SimResult>('POST', '/from-trades', req),
 };

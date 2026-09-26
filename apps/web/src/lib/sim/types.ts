@@ -131,7 +131,7 @@ export interface PaperProjection {
 /** A run kept for display: what was asked and what came back. */
 export interface Scenario {
   label: string;
-  origin: 'assumptions' | 'paper';
+  origin: 'assumptions' | 'paper' | 'backtest';
   request: ProjectRequest;
   result: SimResult;
 }

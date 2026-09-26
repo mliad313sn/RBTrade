@@ -10,6 +10,6 @@ import { UsersRepository } from './users.repository';
 @Module({
   providers: [TokenService, UsersRepository, DevIdpService, UserProvisioner],
   controllers: [AuthController, OidcBffController],
-  exports: [TokenService, UsersRepository, UserProvisioner],
+  exports: [TokenService, UsersRepository, UserProvisioner, DevIdpService],
 })
 export class AuthModule {}

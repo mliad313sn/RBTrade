@@ -12,12 +12,15 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 const API_PORT = process.env.E2E_API_PORT ?? '4010';
 const WEB_PORT = process.env.E2E_WEB_PORT ?? '3010';
 const QUANT_PORT = process.env.E2E_QUANT_PORT ?? '8010';
+const BOT_RUNNER_PORT = process.env.E2E_BOT_RUNNER_PORT ?? '4110';
+const MD_PREFIX = process.env.E2E_MD_REDIS_PREFIX ?? 'kora:e2e:md:';
+// Test-only shared secret between the api and the bot runner (goal 06, B-301).
+const SERVICE_TOKEN = process.env.E2E_SERVICE_TOKEN ?? 'e2e-only-service-token-0123456789abcdef';
 const e2eDb = process.env.DATABASE_URL_E2E;
 if (!e2eDb) throw new Error('DATABASE_URL_E2E is not set (see .env.example)');
 
 export default defineConfig({
   testDir: './e2e',
-  globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
@@ -39,7 +42,9 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: 'node dist/main.js',
+      // Resets kora_e2e first: web servers start before any globalSetup, and the bot runner polls
+      // the api as soon as it is up, so the schema must be fresh before the api starts.
+      command: 'node ../web/e2e/reset-db.mjs && node dist/main.js',
       cwd: resolve(__dirname, '../api'),
       url: `http://127.0.0.1:${API_PORT}/health`,
       reuseExistingServer: false,
@@ -57,12 +62,31 @@ export default defineConfig({
         KORA_MD_FEED: 'inprocess',
         KORA_MD_BACKFILL: 'false',
         KORA_MD_SYMBOLS: 'EURUSD,GBPUSD,USDJPY,XAUUSD,BTCUSD,ETHUSD,US500,NAS100,AAPL,NVDA,WTI',
-        KORA_MD_REDIS_PREFIX: process.env.E2E_MD_REDIS_PREFIX ?? 'kora:e2e:md:',
         // Goal 04: FX is closed at weekends and the engine refuses fills then. The acceptance flow trades
         // EUR/USD, so the e2e api treats EURUSD as in session (test-only; refused outside dev/test, ADR 0004).
         KORA_TRADING_SESSION_OVERRIDE: 'EURUSD',
         KORA_ALERTS_EVAL_MS: '500',
+        KORA_MD_REDIS_PREFIX: MD_PREFIX,
+        KORA_SERVICE_TOKEN: SERVICE_TOKEN,
         KORA_MD_WS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
+      },
+    },
+    {
+      // Goal 06 bot runner (BullMQ): bar-close evaluation, heartbeats, kill-switch reaction.
+      command: 'pnpm exec tsx src/main.ts',
+      cwd: resolve(__dirname, '../../services/bot-runner'),
+      url: `http://127.0.0.1:${BOT_RUNNER_PORT}/health`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: {
+        ...(process.env as Record<string, string>),
+        BOT_RUNNER_HEALTH_PORT: BOT_RUNNER_PORT,
+        BOT_RUNNER_QUEUE: `kora-bots-e2e-${API_PORT}`,
+        BOT_RUNNER_API_URL: `http://127.0.0.1:${API_PORT}`,
+        QUANT_URL: `http://127.0.0.1:${QUANT_PORT}`,
+        KORA_SERVICE_TOKEN: SERVICE_TOKEN,
+        KORA_MD_REDIS_PREFIX: MD_PREFIX,
+        KORA_BOT_RUNNER_TRACKING_CRON: '',
       },
     },
     {

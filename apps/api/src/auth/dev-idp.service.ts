@@ -137,6 +137,20 @@ export class DevIdpService {
     return { secret, otpauthUrl: otpauthUrl(secret, user.email) };
   }
 
+  /**
+   * Step-up check for a signed-in user (goal 06 promote-to-LIVE confirmation): verifies a fresh TOTP
+   * code against the enrolled secret and consumes its step (replay-protected). Failures are audited.
+   */
+  async verifyStepUp(userId: string, code: string): Promise<boolean> {
+    const mfa = await this.users.mfa(userId);
+    if (!mfa?.enabled_at) return false;
+    const step = verifyTotp(base32Decode(this.box.open(mfa.totp_secret_enc, userId)), code);
+    const ok = step !== null && (await this.db.tx((c) => this.users.consumeMfaStep(c, userId, step)));
+    if (!ok)
+      await this.audit.record({ actorId: userId, actorType: 'user', action: 'auth.step_up_failed', entity: 'user', entityId: userId, payload: {} });
+    return ok;
+  }
+
   async verify(mfaToken: string, code: string, ip: string): Promise<{ accessToken: string; user: PublicUser; enrolled: boolean }> {
     const { sub } = await this.mfaSubject(mfaToken);
     const user = await this.users.findById(sub);

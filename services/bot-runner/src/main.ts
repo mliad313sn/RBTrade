@@ -4,7 +4,19 @@ import { startRunner } from './runner.js';
 loadEnv();
 const cfg = loadConfig();
 const runner = await startRunner(cfg);
-console.warn(JSON.stringify({ level: 'info', service: 'kora-bot-runner', msg: 'started', queue: cfg.queueName, healthPort: cfg.healthPort, environment: 'PAPER' }));
+console.warn(
+  JSON.stringify({
+    level: 'info',
+    service: 'kora-bot-runner',
+    msg: 'started',
+    queue: cfg.queueName,
+    healthPort: cfg.healthPort,
+    environment: 'PAPER',
+    robots: cfg.serviceToken ? 'enabled' : 'disabled (KORA_SERVICE_TOKEN not set)',
+    api: cfg.apiUrl,
+    quant: cfg.quantUrl,
+  }),
+);
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.once(sig, () => {

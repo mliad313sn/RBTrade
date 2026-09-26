@@ -61,6 +61,13 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - ⌘K / Ctrl+K opens the palette: every registry instrument, grouped by region and asset class, plus actions. Press `?` for the hotkey cheat sheet; change the bindings in Settings.
 - API: `/me/layouts`, `/me/watchlists`, `/price-alerts` (evaluated by the server), `GET /risk/summary`, `DELETE /orders?symbol=` (cancel all). WebSocket: `trades:{symbol}` (time and sales).
 - Design: ADR 0004. Results and evidence: `docs/plans/04-pro-terminal.md`.
+## Robot trader (goal 06, PAPER only)
+
+- Builder: `/robots/builder` (trader, quant or admin; novices get the friendly 403 and use `GET /strategy-templates`). Strategies are `kora.strategy` v1 JSON (`GET /strategies/schema`), saved as immutable, content-hashed versions: `POST /strategies`, `POST /strategies/:id/versions {definition, reason, baseVersionId}`, `POST /strategies/validate`.
+- Research (SIMULATED data, registry cost model, trials counted server-side): `POST /backtests`, `/backtests/walk-forward`, `/backtests/optimise`, `/backtests/sensitivity`; `GET /backtests/:id/trades?segment=oos` feeds "Send to Monte Carlo" (`POST /sim/from-trades`).
+- Robots: `POST /robots`, `POST /robots/:id/start|pause`, `PUT /robots/:id/version|limits`, `GET /robots/:id` (book, limit usage, KPIs), `/signals`, `/audit`, `/promotion`, `POST /robots/:id/promote {totpCode}` (always refused while `LIVE_TRADING_ENABLED=false`, but recorded); risk officers sign limits at `POST /robot-reviews/:id/signoff`.
+- The bot runner (`services/bot-runner`) evaluates each closed bar through `/internal/robots/*` (service token `KORA_SERVICE_TOKEN`, generated for dev by `scripts/dev-db.sh`) and quant `/bt/signal`; orders go through the OMS with source `robot:{id}`.
+- Design: ADR 0006, `docs/quant/backtester.md`. Results: `docs/plans/06-robot-trader.md`.
 
 ## Layout
 

@@ -14,9 +14,10 @@ import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
 import { MarketDataModule } from './market-data/market-data.module';
 import { PreferencesModule } from './preferences/preferences.module';
-import { RobotsController } from './robots/robots.controller';
+import { RobotsModule } from './robots/robots.module';
 import { SimModule } from './sim/sim.module';
 import { TerminalModule } from './terminal/terminal.module';
+import { StrategiesModule } from './strategies/strategies.module';
 import { TradingModule } from './trading/trading.module';
 
 @Module({
@@ -52,8 +53,10 @@ import { TradingModule } from './trading/trading.module';
     TradingModule,
     AppropriatenessModule,
     TerminalModule,
+    StrategiesModule,
+    RobotsModule,
   ],
-  controllers: [HealthController, RobotsController, AdminController],
+  controllers: [HealthController, AdminController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
