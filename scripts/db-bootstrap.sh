@@ -4,7 +4,7 @@
 set -euo pipefail
 : "${KORA_DB_OWNER_PASSWORD:?}" "${KORA_DB_APP_PASSWORD:?}" "${KORA_DB_AUDIT_READER_PASSWORD:?}"
 PSQL="${PSQL:-psql}"
-DBS="${KORA_DATABASES:-kora kora_test}"
+DBS="${KORA_DATABASES:-kora kora_test kora_e2e}"
 
 "$PSQL" -v ON_ERROR_STOP=1 -q \
   -v owner_pw="$KORA_DB_OWNER_PASSWORD" -v app_pw="$KORA_DB_APP_PASSWORD" -v reader_pw="$KORA_DB_AUDIT_READER_PASSWORD" <<'SQL'

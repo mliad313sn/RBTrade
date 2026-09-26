@@ -1,0 +1,43 @@
+'use client';
+
+import { Bot, CandlestickChart, PieChart, Settings, Sigma } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+import { useShell } from './ShellContext';
+
+const ITEMS = [
+  { href: '/terminal', label: 'Terminal', Icon: CandlestickChart },
+  { href: '/simulator', label: 'Simulator', Icon: Sigma },
+  { href: '/robots', label: 'Robots', Icon: Bot, needs: 'robotBuilder' as const },
+  { href: '/portfolio', label: 'Portfolio', Icon: PieChart },
+];
+
+export function LeftRail() {
+  const pathname = usePathname();
+  const { me } = useShell();
+  const link = (href: string, label: string, Icon: typeof Bot, locked = false) => {
+    const active = pathname === href || pathname.startsWith(`${href}/`);
+    return (
+      <li key={href}>
+        <Link
+          href={href}
+          aria-label={locked ? `${label} (not on your account)` : label}
+          title={label}
+          aria-current={active ? 'page' : undefined}
+          className={`flex items-center justify-center w-10 h-10 rounded ${active ? 'bg-raised text-accent' : 'text-muted hover:text-text'} ${locked ? 'opacity-60' : ''}`}
+        >
+          <Icon size={18} aria-hidden="true" />
+        </Link>
+      </li>
+    );
+  };
+  return (
+    <nav aria-label="Modules" className="flex flex-col items-center justify-between w-14 py-2 border-r border-border bg-bg">
+      <ul className="flex flex-col gap-1 list-none m-0 p-0">
+        {ITEMS.map((i) => link(i.href, i.label, i.Icon, i.needs ? !me.capabilities[i.needs] : false))}
+      </ul>
+      <ul className="list-none m-0 p-0">{link('/settings', 'Settings', Settings)}</ul>
+    </nav>
+  );
+}

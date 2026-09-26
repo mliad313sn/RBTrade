@@ -1,0 +1,50 @@
+{
+  "name": "@kora/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p ${WEB_PORT:-3000}",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "^5.2.8",
+    "@fontsource/figtree": "^5.2.10",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans-condensed": "^5.2.8",
+    "@kora/domain": "workspace:*",
+    "@kora/sdk": "workspace:*",
+    "@kora/ui": "workspace:*",
+    "@tanstack/react-query": "^5.90.5",
+    "jose": "^6.1.0",
+    "lucide-react": "^0.548.0",
+    "next": "15.5.26",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@kora/config": "workspace:*",
+    "@next/eslint-plugin-next": "15.5.26",
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/postcss": "^4.1.16",
+    "@types/node": "^22.19.0",
+    "@types/pg": "^8.15.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "9.39.1",
+    "pg": "^8.16.3",
+    "tailwindcss": "^4.1.16",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

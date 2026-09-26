@@ -1,0 +1,74 @@
+@import 'tailwindcss';
+@import '@kora/ui/styles.css';
+
+/* Tailwind utilities mapped onto KORA CSS-variable tokens (packages/ui/src/tokens.ts). */
+@theme inline {
+  --color-bg: var(--k-bg);
+  --color-panel: var(--k-panel);
+  --color-raised: var(--k-raised);
+  --color-border: var(--k-border);
+  --color-text: var(--k-text);
+  --color-muted: var(--k-text-muted);
+  --color-up: var(--k-up);
+  --color-down: var(--k-down);
+  --color-accent: var(--k-accent);
+  --color-ai: var(--k-ai);
+  --color-warn: var(--k-warn);
+  --color-warn-surface: var(--k-warn-surface);
+  --color-kill: var(--k-kill);
+  --color-primary: var(--k-primary);
+  --color-on-primary: var(--k-on-primary);
+  --color-up-surface: var(--k-up-surface);
+  --color-down-surface: var(--k-down-surface);
+  --font-ui: var(--k-font-ui);
+  --font-num: var(--k-font-num);
+  --font-display: var(--k-font-display);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--k-bg);
+  color: var(--k-text);
+  font-family: var(--k-font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--k-focus);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: var(--k-panel);
+  color: var(--k-text);
+  border: 1px solid var(--k-border);
+}
+.skip-link:focus {
+  left: 8px;
+}
+
+/* Pro top-bar hazard stripe (prototype). Decorative only. */
+.k-hazard {
+  height: 3px;
+  background: repeating-linear-gradient(135deg, var(--k-warn) 0 10px, var(--k-bg) 10px 20px);
+}

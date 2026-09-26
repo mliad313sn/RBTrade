@@ -131,7 +131,11 @@ export const HoldToConfirmButton = forwardRef<HoldHandle, HoldToConfirmButtonPro
         disabled={disabled}
         onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
           if (e.button !== 0) return;
-          e.currentTarget.setPointerCapture?.(e.pointerId);
+          try {
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+          } catch {
+            /* synthetic or already-released pointer: holding still works without capture */
+          }
           start();
         }}
         onPointerUp={cancel}
