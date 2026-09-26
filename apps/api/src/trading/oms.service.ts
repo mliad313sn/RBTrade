@@ -564,7 +564,13 @@ export class OmsService {
     return result;
   }
 
-  async amend(userId: string, roles: Role[], orderId: string, patch: AmendOrderRequest) {
+  async amend(
+    userId: string,
+    roles: Role[],
+    orderId: string,
+    patch: AmendOrderRequest,
+    actor: Actor = { type: 'user', id: userId },
+  ) {
     const account = await this.accounts.ensure(userId);
     return this.withAccount(account.id, async (tx) => {
       const order = await this.lockOrder(tx, orderId);
@@ -629,7 +635,7 @@ export class OmsService {
         }
       }
       const updated = await this.engine.patch(tx, order, fields);
-      tx.audit({ type: 'user', id: userId }, 'order.amended', 'order', order.id, {
+      tx.audit(actor, 'order.amended', 'order', order.id, {
         accountId: account.id,
         changed: JSON.parse(JSON.stringify(patch)) as Record<string, string>,
         previous: {
@@ -645,7 +651,12 @@ export class OmsService {
     });
   }
 
-  async cancel(userId: string, orderId: string, reason = 'user_requested') {
+  async cancel(
+    userId: string,
+    orderId: string,
+    reason = 'user_requested',
+    actor: Actor = { type: 'user', id: userId },
+  ) {
     const account = await this.accounts.ensure(userId);
     return this.withAccount(account.id, async (tx) => {
       const order = await this.lockOrder(tx, orderId);
@@ -655,7 +666,7 @@ export class OmsService {
           message: `The order is already ${order.status.replace('_', ' ')}.`,
         });
       }
-      const row = await this.engine.cancel(tx, order, reason, { type: 'user', id: userId });
+      const row = await this.engine.cancel(tx, order, reason, actor);
       return toOrderDto(row);
     });
   }
