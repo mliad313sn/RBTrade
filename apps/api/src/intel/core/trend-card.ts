@@ -182,7 +182,7 @@ export function buildTrendCard(
   modelKey: string,
 ): TrendCard {
   const f = row.features;
-  const atr = r(f.atr, 6);
+  const atr = r(f.atr, Math.min(8, row.pricePrecision + 2));
   const direction = directionOf(row.trend?.kind, forecast);
   return {
     symbol: row.symbol,

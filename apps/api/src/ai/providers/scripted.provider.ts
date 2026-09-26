@@ -445,7 +445,7 @@ function cardAnswer(c: CardLike): string {
   const prob =
     c.probability?.status === 'calibrated'
       ? `Calibrated probability ${str(c.probability.value)}: ${c.probability.reliabilityLine}.`
-      : `No reliable signal: ${c.probability?.reason ?? 'no demonstrated skill after costs'}`;
+      : `No reliable signal: ${stripTags(c.probability?.reason) || 'no demonstrated skill after costs'}`;
   const drivers = (c.drivers ?? [])
     .slice(0, 3)
     .map((d) => `${d.label} ${signed(d.contribution)}`)
@@ -464,7 +464,7 @@ function cardAnswer(c: CardLike): string {
     c.risk?.atr !== null && c.risk?.atr !== undefined
       ? `Volatility: ATR ${str(c.risk.atr)} (${str(c.risk.atrPct)}% of the last close ${str(c.risk.lastClose)}).`
       : 'Volatility context is not available yet.',
-    c.invalidation?.rule ?? 'No directional view, so there is no invalidation level.',
+    stripTags(c.invalidation?.rule) || 'No directional view, so there is no invalidation level.',
     news ? `News: ${news}.` : 'No linked news.',
   ];
   return lines.join('\n');
