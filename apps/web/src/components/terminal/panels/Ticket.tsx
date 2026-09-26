@@ -39,6 +39,8 @@ const LABEL: Record<OrderType, string> = {
 const QTY_LABEL: Record<QtyMode, string> = { units: 'units', notional: 'notional', pct_equity: '% equity' };
 const DIST_LABEL: Record<DistanceMode, string> = { price: 'price', pips: 'pips', percent: '%' };
 export const PREVIEW_DEBOUNCE_MS = 150;
+/** Upper bound between previews while the body keeps changing (market-relative stops move every tick). */
+export const PREVIEW_MAX_WAIT_MS = 500;
 export const MARKET_HOLD_MS = 600;
 
 interface OcoLegInput {
@@ -128,6 +130,7 @@ export function TicketPanel() {
   const sellRef = useRef<HTMLButtonElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
   const previewSeq = useRef(0);
+  const lastPreviewAt = useRef(0);
 
   // Instrument (registry grid) and a fresh quantity default per symbol.
   useEffect(() => {
@@ -282,7 +285,10 @@ export function TicketPanel() {
       return;
     }
     const seq = ++previewSeq.current;
+    // Debounce, but never starve: with a stop in % or pips the body changes on every tick.
+    const delay = Date.now() - lastPreviewAt.current >= PREVIEW_MAX_WAIT_MS ? 0 : PREVIEW_DEBOUNCE_MS;
     const t = setTimeout(() => {
+      lastPreviewAt.current = Date.now();
       api
         .previewOrder(JSON.parse(bodyKey) as PreviewInput)
         .then((p) => {
@@ -295,7 +301,7 @@ export function TicketPanel() {
           setPreview(null);
           setPreviewError(e instanceof KoraApiError ? e.message : 'Preview unavailable');
         });
-    }, PREVIEW_DEBOUNCE_MS);
+    }, delay);
     return () => clearTimeout(t);
   }, [bodyKey]);
 
