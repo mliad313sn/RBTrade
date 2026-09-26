@@ -156,11 +156,19 @@ describe('pre-trade risk rules', () => {
     ).toEqual([]);
     expect(codes(ctx({ ...reducing, novice: true }, { hasStopLoss: false }))).toEqual([]);
     expect(codes(ctx({ ...reducing }, { reduceOnly: true }))).toEqual([]);
-    // A flip is not reducing.
+    // A reduce-only order larger than the position is clipped by the engine, so it is allowed.
     expect(
       codes(
-        ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('-100') }, { reduceOnly: true }),
+        ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('-100'), grossExposureAfter: dec('9999999') }, { reduceOnly: true }),
       ),
+    ).toEqual([]);
+    // A plain flip is not reducing: exposure rules apply.
+    expect(
+      codes(ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('-100'), grossExposureAfter: dec('9999999') })),
+    ).toContain('MAX_LEVERAGE');
+    // Reduce-only in the same direction as the position increases it.
+    expect(
+      codes(ctx({ positionQtyBefore: dec('100'), positionQtyAfter: dec('200') }, { reduceOnly: true })),
     ).toContain('REDUCE_ONLY_WOULD_INCREASE');
   });
 

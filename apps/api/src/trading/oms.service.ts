@@ -32,7 +32,7 @@ import {
 } from '@kora/domain';
 
 import { AuditService } from '../audit/audit.service';
-import { DbService } from '../db/db.service';
+import { DbService, type Queryable } from '../db/db.service';
 import { AccountsService, type Valuation } from './accounts.service';
 import { FxService } from './fx.service';
 import { MarketViewService, type MarketSnapshot } from './market-view.service';
@@ -88,13 +88,15 @@ export class OmsService {
   ) {}
 
   /** Guardrails apply to novice-only accounts and to anyone using the Novice view (goal 08). */
-  async isNovice(userId: string, roles: Role[]): Promise<boolean> {
+  async isNovice(userId: string, roles: Role[], c?: Queryable): Promise<boolean> {
     if (!hasAnyRole(roles, PRO_ROLES)) return true;
-    const r = await this.db.query<{ view_mode: string }>(
+    // Inside a trading transaction, reuse its connection: never take a second pool connection
+    // while holding the account lock (pool exhaustion under parallel submits).
+    const r = await (c ?? this.db.pool).query<{ view_mode: string }>(
       'SELECT view_mode FROM user_preferences WHERE user_id = $1',
       [userId],
     );
-    return (r[0]?.view_mode ?? defaultPreferences(roles).viewMode) === 'novice';
+    return (r.rows[0]?.view_mode ?? defaultPreferences(roles).viewMode) === 'novice';
   }
 
   /** Registry grid checks: qty on the step and at least min qty, prices on the tick. */
@@ -147,7 +149,7 @@ export class OmsService {
     const now = tx?.now ?? Date.now();
     const snap = await this.market.snapshot(inst, now);
     const valuation = await this.accounts.value(account, tx?.c, now);
-    const novice = await this.isNovice(sub.userId, sub.roles);
+    const novice = await this.isNovice(sub.userId, sub.roles, tx?.c);
     const rate = await this.fx.rate(inst.spec.quoteCcy, account.base_currency, now);
     const pos = valuation.positions.find((p) => p.symbol === req.symbol);
     const posQty = pos?.qty ?? new Decimal(0);
@@ -347,6 +349,14 @@ export class OmsService {
     const hash = this.requestHash(req, sub.source);
     const inst = await this.registry.get(req.symbol);
     this.validateAgainstRegistry(req, inst);
+    // Fast path for replays: no lock needed to read a committed order.
+    const known = await this.db.query<OrderRow>(
+      'SELECT * FROM orders WHERE account_id = $1 AND client_order_id = $2',
+      [account.id, req.clientOrderId],
+    );
+    if (known[0] && known[0].request_hash === hash && known[0].status !== 'rejected') {
+      return { order: toOrderDto(known[0]), idempotentReplay: true };
+    }
     const out = await this.withAccount(account.id, async (tx) => {
       const existing = await tx.c.query<OrderRow>(
         'SELECT * FROM orders WHERE account_id = $1 AND client_order_id = $2',

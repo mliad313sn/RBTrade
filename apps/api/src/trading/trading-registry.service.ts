@@ -60,11 +60,40 @@ export class TradingRegistryService {
     private readonly instruments: InstrumentsRepository,
   ) {}
 
+  /**
+   * Stale-while-revalidate: once loaded, lookups never wait on the database (they run inside
+   * account-locked transactions); a refresh happens in the background after 60 s.
+   */
   private async tables(): Promise<{
     fees: Map<string, FeeSchedule>;
     classes: Map<string, AssetClassTrading>;
   }> {
-    if (this.cache && Date.now() - this.cache.at < 60_000) return this.cache;
+    if (this.cache) {
+      if (Date.now() - this.cache.at > 60_000 && !this.refreshing) {
+        this.refreshing = this.loadTables()
+          .catch(() => undefined)
+          .finally(() => (this.refreshing = null));
+      }
+      return this.cache;
+    }
+    return this.loadTables();
+  }
+
+  private refreshing: Promise<unknown> | null = null;
+  private instrumentsAt = 0;
+
+  private async registryView() {
+    if (Date.now() - this.instrumentsAt > 60_000) {
+      this.instrumentsAt = Date.now();
+      void this.instruments.load().catch(() => undefined);
+    }
+    return this.instruments.load(Number.MAX_SAFE_INTEGER);
+  }
+
+  private async loadTables(): Promise<{
+    fees: Map<string, FeeSchedule>;
+    classes: Map<string, AssetClassTrading>;
+  }> {
     const [fees, classes] = await Promise.all([
       this.db.query<FeeRow>('SELECT * FROM fee_schedules'),
       this.db.query<ClassRow>('SELECT * FROM asset_class_trading'),
@@ -115,7 +144,7 @@ export class TradingRegistryService {
   }
 
   async find(symbol: string): Promise<TradableInstrument | null> {
-    const reg = await this.instruments.load();
+    const reg = await this.registryView();
     const spec = reg.instruments.get(symbol);
     if (!spec) return null;
     const venue = reg.venues.get(spec.venue);
@@ -143,7 +172,7 @@ export class TradingRegistryService {
 
   /** FX instruments by (base, quote) for the FX service. */
   async fxPairs(): Promise<Map<string, InstrumentSpec>> {
-    const reg = await this.instruments.load();
+    const reg = await this.registryView();
     const out = new Map<string, InstrumentSpec>();
     for (const s of reg.instruments.values()) {
       if (s.assetClass === 'fx' && s.baseCcy && s.status === 'active')

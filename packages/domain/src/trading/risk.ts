@@ -109,10 +109,14 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
   const add = (code: RiskCode, message: string) => v.push({ code, message });
   const ccy = ctx.baseCcy;
   const money = (d: Decimal) => `${formatAmount(d, ccy)} ${ccy}`;
+  // Opposite to an open position. A reduce-only order larger than the position is clipped by the
+  // engine at fill time, so it can never increase or flip exposure.
+  const opposite = ctx.positionQtyAfter.sub(ctx.positionQtyBefore).mul(ctx.positionQtyBefore).lt(0); // lt: decimal.js keeps -0
   const reducing =
-    ctx.positionQtyAfter.abs().lte(ctx.positionQtyBefore.abs()) &&
-    !ctx.positionQtyBefore.isZero() &&
-    ctx.positionQtyAfter.mul(ctx.positionQtyBefore).gte(0);
+    (ctx.order.reduceOnly && opposite) ||
+    (ctx.positionQtyAfter.abs().lte(ctx.positionQtyBefore.abs()) &&
+      !ctx.positionQtyBefore.isZero() &&
+      ctx.positionQtyAfter.mul(ctx.positionQtyBefore).gte(0));
   const immediate = fillsImmediately(ctx);
 
   if (ctx.halted && isRobotSource(ctx.order.source))
