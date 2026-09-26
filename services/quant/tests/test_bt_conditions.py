@@ -88,7 +88,7 @@ def test_no_event_window_and_missing_calendar() -> None:
     assert _entries(_with_filter({"type": "no_event", "withinMinutes": 30, "impact": "high"})) == []
 
 
-def test_ai_regime_is_not_available_until_goal_07() -> None:
+def test_ai_regime_model_off_is_not_available() -> None:
     ignore = _with_filter(
         {
             "type": "ai_regime",

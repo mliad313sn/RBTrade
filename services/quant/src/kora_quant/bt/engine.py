@@ -302,11 +302,12 @@ def run(
     *,
     guard: bool = True,
     roll_hour: int = 21,
+    ai_regime: bool = False,
 ) -> EngineResult:
     tf_s = TIMEFRAME_SECONDS[d.universe.timeframe]
     tf_ms = tf_s * 1000
     bpy = bars_per_year(tf_s)
-    keys = feature_keys(d, p)
+    keys = feature_keys(d, p, ai_regime)
     ctxs: dict[str, EvalContext] = {}
     checkpoints = 0
     for s in symbols:

@@ -101,6 +101,7 @@ def _run(
             req.capital,
             guard=guard,
             roll_hour=req.roll_hour_utc,
+            ai_regime=req.ai_regime == "model",
         )
     except ValueError as exc:
         if exc.__class__ is not ValueError:
@@ -498,7 +499,7 @@ def signal(req: SignalRequest) -> dict[str, Any]:
             raise ResearchError("No bars to evaluate.")
         tf_s = TIMEFRAME_SECONDS[d.universe.timeframe]
         bpy = bars_per_year(tf_s)
-        keys = feature_keys(d, p)
+        keys = feature_keys(d, p, req.ai_regime == "model")
         feats = compute_features(sym.bars, keys, bpy)
         verify_point_in_time(sym.bars, keys, bpy, feats, checkpoints=3)
         ctx = EvalContext(d, p, sym, feats, tf_s)

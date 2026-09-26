@@ -13,6 +13,7 @@ Conventions (documented in docs/quant/backtester.md):
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -171,6 +172,36 @@ class Bars:
 
 IndicatorFn = Callable[[Bars, int, float], F]
 
+
+def regime_probability(bars: Bars, regime: str) -> F:
+    """Point-in-time regime probability from the goal 07B scanner's regime filter (causal: a
+    forward filter on returns up to t). Used by the `ai_regime` condition; NaN while warming up."""
+    from ..scanner import detectors  # local import: the scanner imports this module's package
+    from ..scanner.panel import Panel, ScanConfig
+
+    n = len(bars)
+
+    def one(a: NDArray[np.float64] | NDArray[np.int64]) -> NDArray[Any]:
+        return a.reshape(1, n)
+
+    panel = Panel(
+        ["_"],
+        one(bars.t.astype(np.int64)),
+        one(bars.o),
+        one(bars.h),
+        one(bars.lo),
+        one(bars.c),
+        one(bars.v),
+        3_600_000,
+        np.zeros(1, dtype=np.int64),
+        np.zeros(1, dtype=np.int64),
+        [np.zeros(0, dtype=np.int64)],
+    )
+    return np.asarray(
+        detectors.regime(panel, ScanConfig())[f"regime_{regime}"][0], dtype=np.float64
+    )
+
+
 # Registry used by the evaluator. Tests may patch an entry to prove the look-ahead guard works.
 REGISTRY: dict[str, IndicatorFn] = {
     "close": lambda b, _n, _y: b.c.copy(),
@@ -187,6 +218,9 @@ REGISTRY: dict[str, IndicatorFn] = {
     "highest": lambda b, n, _y: highest(b.h, n),
     "lowest": lambda b, n, _y: lowest(b.lo, n),
     "realised_vol": lambda b, n, y: realised_vol(b.c, n, y),
+    "regime_trending": lambda b, _n, _y: regime_probability(b, "trending"),
+    "regime_ranging": lambda b, _n, _y: regime_probability(b, "ranging"),
+    "regime_volatile": lambda b, _n, _y: regime_probability(b, "volatile"),
 }
 
 PRICE_LIKE = {"close", "open", "high", "low", "ema", "sma", "highest", "lowest"}

@@ -1,11 +1,11 @@
 """Condition evaluation, per-signal features and contributions, and the look-ahead guard.
 
 Conditions are tri-state: True, False or "not_available" (warm-up NaN, no session/calendar data, or
-the AI regime filter before goal 07). Contributions are a transparent heuristic, not a model
-attribution: the signed distance of each condition from its threshold, scaled (ATR for price-like
-operands, 10 points for RSI/ADX, 1 unit otherwise) and squashed with tanh into [-1, 1], positive
-when
-it supports the action. They are stored with every signal for explainability (goal 07).
+the AI regime filter when the goal 07B regime model is off or still warming up). Contributions are
+a transparent heuristic, not a model attribution: the signed distance of each condition from its
+threshold, scaled (ATR for price-like operands, 10 points for RSI/ADX, 1 unit otherwise) and
+squashed with tanh into [-1, 1], positive when it supports the action. They are stored with every
+signal for explainability (goal 07).
 """
 
 from __future__ import annotations
@@ -109,7 +109,10 @@ def _conditions(d: StrategyDefinition) -> list[Condition]:
     return [*d.entry.conditions, *d.filters, *d.exit.conditions]
 
 
-def feature_keys(d: StrategyDefinition, p: Params) -> list[str]:
+def feature_keys(d: StrategyDefinition, p: Params, ai_regime: bool = False) -> list[str]:
+    """Feature columns a definition needs. With `ai_regime` (goal 07B model on), the regime
+    probabilities of every `ai_regime` condition are features too, so the look-ahead guard covers
+    them like any indicator."""
     keys: set[str] = {SCALE_KEY, "close"}
     for c in _conditions(d):
         if isinstance(c, CompareCondition | CrossCondition):
@@ -122,6 +125,10 @@ def feature_keys(d: StrategyDefinition, p: Params) -> list[str]:
             keys.add(f"atr:{p.period(blk.period)}")  # type: ignore[union-attr]
     if isinstance(d.size, VolTargetSize):
         keys.add(f"realised_vol:{p.period(d.size.lookback)}")
+    if ai_regime:
+        for c in _conditions(d):
+            if isinstance(c, AiRegimeCondition):
+                keys.add(f"regime_{c.regime}")
     return sorted(keys)
 
 
@@ -306,9 +313,19 @@ def eval_condition(
         return ev
     if not (isinstance(c, AiRegimeCondition)):  # pragma: no cover - type narrowing
         raise TypeError("unexpected DSL shape")
-    # Goal 07 supplies the regime model. Until then: "not available", skipped or blocking by choice.
-    ev.values = {"probability": None}
-    ev.skipped = c.when_unavailable == "ignore"
+    # Goal 07B regime model: the point-in-time probability of this bar (a feature column, so the
+    # look-ahead guard has verified it). Model off or still warming up: "not available", skipped
+    # or blocking by the strategy's choice.
+    key = f"regime_{c.regime}"
+    prob = float(ctx.features[key][t]) if key in ctx.features else math.nan
+    if math.isnan(prob):
+        ev.values = {"probability": None}
+        ev.skipped = c.when_unavailable == "ignore"
+        return ev
+    threshold = ctx.p.num(c.min_probability)
+    ev.values = {"probability": round(prob, 6)}
+    ev.result = prob > threshold
+    ev.contribution = _squash(prob - threshold, 0.25)
     return ev
 
 

@@ -1,4 +1,5 @@
-"""FastAPI application: health plus the gain simulator (goal 05)."""
+"""FastAPI application: health, the gain simulator (goal 05), robot research (goal 06) and the
+market intelligence scanner (goal 07B)."""
 
 from __future__ import annotations
 
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 from . import __version__
 from .bt.routes import router as bt_router
 from .config import Settings, load_settings
+from .scanner.kernels import warm_up as warm_up_scanner
+from .scanner.routes import router as scanner_router
 from .sim.engine import warm_up
 from .sim.routes import router as sim_router
 
@@ -29,6 +32,7 @@ class Health(BaseModel):
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     warm_up()  # compile (or load cached) numba kernels before the first request
+    warm_up_scanner()
     yield
 
 
@@ -49,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(sim_router)
     app.include_router(bt_router)
+    app.include_router(scanner_router)
     return app
 
 

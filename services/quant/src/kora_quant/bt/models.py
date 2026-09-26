@@ -82,6 +82,8 @@ class ResearchBase(Wire):
     split: Split = Split()
     trials: TrialContext = TrialContext()
     roll_hour_utc: Annotated[int, Field(ge=0, le=23)] = 21
+    # Goal 07B: "model" fills the ai_regime condition from the scanner's regime filter.
+    ai_regime: Literal["model", "off"] = "off"
     max_points: Annotated[int, Field(ge=50, le=5_000)] = 1_000
 
 
@@ -132,3 +134,4 @@ class SignalRequest(Wire):
     position: PositionWire | None = None
     equity: Annotated[float, Field(ge=0)]
     open_positions: Annotated[int, Field(ge=0, le=100)] = 0
+    ai_regime: Literal["model", "off"] = "off"
