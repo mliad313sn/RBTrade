@@ -25,16 +25,16 @@ const int = (v: string | undefined, d: number, min: number, max: number) => {
 
 export function loadIntelConfig(e: NodeJS.ProcessEnv = process.env): IntelConfig {
   const env = e.KORA_ENV ?? 'dev';
-  const tf = (e.KORA_INTEL_TIMEFRAME ?? '1h') as Timeframe;
+  const tf = (e.KORA_INTEL_TIMEFRAME?.trim() || '1h') as Timeframe;
   return {
-    scan: (e.KORA_INTEL_SCAN ?? (env === 'test' ? 'off' : 'on')) === 'on',
+    scan: (e.KORA_INTEL_SCAN?.trim() || (env === 'test' ? 'off' : 'on')) === 'on',
     scanCheckMs: int(e.KORA_INTEL_SCAN_CHECK_MS, 60_000, 1_000, 3_600_000),
     timeframe: (TIMEFRAMES as readonly string[]).includes(tf) && tf !== '1s' ? tf : '1h',
     bars: int(e.KORA_INTEL_BARS, 1000, 50, 5000),
     horizons: parseHorizons(e.KORA_INTEL_HORIZONS),
     minTrain: int(e.KORA_INTEL_MIN_TRAIN, 200, 50, 10_000),
     guardCheckpoints: int(e.KORA_INTEL_GUARD_CHECKPOINTS, 2, 1, 20),
-    news: (e.KORA_INTEL_NEWS ?? (env === 'test' ? 'off' : 'on')) === 'on',
+    news: (e.KORA_INTEL_NEWS?.trim() || (env === 'test' ? 'off' : 'on')) === 'on',
     newsIntervalMs: int(e.KORA_INTEL_NEWS_INTERVAL_MS, 900_000, 10_000, 86_400_000),
     aiRegime: e.KORA_AI_REGIME === 'off' ? 'off' : 'model',
   };
