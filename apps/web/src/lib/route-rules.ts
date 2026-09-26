@@ -1,4 +1,4 @@
-import { hasAnyRole, ROBOT_BUILDER_ROLES, type Role } from '@kora/domain';
+import { AUDIT_READ_ROLES, hasAnyRole, ROBOT_BUILDER_ROLES, type Role } from '@kora/domain';
 
 /** Routes reachable without a session (goal 07B: public reliability page; goal 08: PWA offline shell and assets). */
 export const PUBLIC_PATHS = ['/login', '/signup', '/forbidden', '/reliability', '/offline'];
@@ -27,6 +27,9 @@ interface Rule {
  */
 export const ROUTE_RULES: Rule[] = [
   { pattern: /^\/robots(\/.*)?$/, roles: ROBOT_BUILDER_ROLES, feature: 'Robot builder' },
+  // Goal 09: 2nd line console and 3rd line internal audit view.
+  { pattern: /^\/risk(\/.*)?$/, roles: ['risk_officer', 'admin'], feature: 'Risk console' },
+  { pattern: /^\/internal-audit(\/.*)?$/, roles: AUDIT_READ_ROLES, feature: 'Internal audit' },
   { pattern: /^\/admin(\/.*)?$/, roles: ['admin'], feature: 'Administration' },
 ];
 

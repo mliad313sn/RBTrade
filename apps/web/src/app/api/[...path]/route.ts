@@ -8,7 +8,21 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const FORWARD_REQUEST = ['content-type', 'cookie', 'authorization', 'x-kora-csrf', 'accept', 'user-agent'];
-const FORWARD_RESPONSE = ['content-type', 'set-cookie', 'cache-control', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'retry-after', 'location'];
+const FORWARD_RESPONSE = [
+  'content-type',
+  'set-cookie',
+  'cache-control',
+  'x-ratelimit-limit',
+  'x-ratelimit-remaining',
+  'retry-after',
+  'location',
+  // Goal 09: evidence and audit exports (file name, SHA-256, row count, sampling seed, paging).
+  'content-disposition',
+  'x-kora-evidence-sha256',
+  'x-kora-evidence-rows',
+  'x-kora-sample-seed',
+  'x-kora-next-before-id',
+];
 
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {
   const { path } = await ctx.params;

@@ -158,7 +158,11 @@ export class KoraClient {
   }
 
   resumeTrading(reason: string, accountId?: string) {
-    return this.request<{ resumed: true; accountId: string; previous: { scope: KillSwitchScope | null; haltedAt: string | null; haltedBy: string | null } }>(
+    return this.request<
+      | { resumed: true; accountId: string; previous: { scope: KillSwitchScope | null; haltedAt: string | null; haltedBy: string | null } }
+      // Goal 09: a firm halt answers 202 with a four-eyes request a second person approves.
+      | { resumed: false; accountId: string; pendingApproval: { id: string; status: string; requestedBy: string; expiresAt: string }; message: string }
+    >(
       'POST',
       `/kill-switch/resume${query({ accountId })}`,
       { reason },

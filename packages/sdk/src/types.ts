@@ -111,6 +111,9 @@ export interface KillSwitchState {
   haltedAt: string | null;
   haltedBy: string | null;
   reason: string | null;
+  /** Goal 09: a firm halt needs a second authorised person to resume. */
+  resumeNeedsApproval?: boolean;
+  pendingResume?: { id: string; requestedBy: string; requestedAt: string; expiresAt: string; reason: string } | null;
 }
 
 export interface AuditListQuery {

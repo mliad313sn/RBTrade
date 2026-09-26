@@ -40,6 +40,12 @@ const TO_PRO: Record<string, string> = {
 
 export const HOME: Record<ViewMode, string> = { pro: '/terminal', novice: '/home' };
 
+/** Goal 09: an internal auditor (3rd line, no operating role) lands on the internal audit view. */
+export function landingPath(roles: readonly string[], mode: ViewMode): string {
+  if (roles.includes('auditor') && !roles.some((r) => ['trader', 'quant', 'risk_officer', 'admin'].includes(r))) return '/internal-audit';
+  return HOME[mode];
+}
+
 /** The equivalent screen in the other mode. Keeps the instrument (?symbol=) and flags the switch. */
 export function counterpartPath(pathname: string, target: ViewMode, search = ''): string {
   const top = `/${pathname.split('/')[1] ?? ''}`;

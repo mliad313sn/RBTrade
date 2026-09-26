@@ -3,7 +3,7 @@
 import { hasAnyRole, KILL_SWITCH_SCOPE_LABELS, type Role } from '@kora/domain';
 import { KoraApiError } from '@kora/sdk';
 import { Banner, Button, Dialog, useToast } from '@kora/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { refreshAccount, useAccount } from '@/lib/account';
 import { api } from '@/lib/api-browser';
@@ -26,6 +26,23 @@ export function TradingHaltBanner({ className }: { className?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t, novice } = useI18n();
+  // Goal 09: a firm halt (set by a risk officer or the global kill switch) needs a second approver.
+  const [approval, setApproval] = useState<{ needed: boolean; pendingId: string | null }>({ needed: false, pendingId: null });
+  const halted = !!account?.halt.halted;
+  const haltedAtKey = account?.halt.haltedAt ?? null;
+  useEffect(() => {
+    if (!halted) return;
+    let cancelled = false;
+    api
+      .killSwitchState()
+      .then((s) => {
+        if (!cancelled) setApproval({ needed: !!s.resumeNeedsApproval, pendingId: s.pendingResume?.id ?? null });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [halted, haltedAtKey]);
   if (!account?.halt.halted || !account.halt.scope) return null;
   const canResume = hasAnyRole(me.roles, RESUME_ROLES);
   const since = account.halt.haltedAt ? new Date(account.halt.haltedAt).toISOString().slice(11, 16) : null;
@@ -37,11 +54,16 @@ export function TradingHaltBanner({ className }: { className?: string }) {
     setBusy(true);
     setError(null);
     try {
-      await api.resumeTrading(reason.trim());
+      const r = await api.resumeTrading(reason.trim());
       setOpen(false);
       setReason('');
-      toast.push('Trading resumed. The resume and your reason are in the audit log.', 'success', 6000);
-      refreshAccount();
+      if (r.resumed) {
+        toast.push('Trading resumed. The resume and your reason are in the audit log.', 'success', 6000);
+        refreshAccount();
+      } else {
+        setApproval({ needed: true, pendingId: r.pendingApproval.id });
+        toast.push('Resume requested. A second authorised person must approve it (four-eyes).', 'info', 8000);
+      }
     } catch (e) {
       setError(e instanceof KoraApiError ? e.message : 'Could not resume. Try again.');
     } finally {
@@ -59,9 +81,9 @@ export function TradingHaltBanner({ className }: { className?: string }) {
             : `Trading halted: ${KILL_SWITCH_SCOPE_LABELS[scope].title}${since ? ` since ${since} UTC` : ''}.`
         }
         action={
-          canResume ? (
+          canResume && !approval.pendingId ? (
             <Button size="sm" onClick={() => setOpen(true)} data-testid="resume-trading">
-              Resume trading
+              {approval.needed ? 'Request resume' : 'Resume trading'}
             </Button>
           ) : null
         }
@@ -76,6 +98,14 @@ export function TradingHaltBanner({ className }: { className?: string }) {
           <>
             Robots are stopped and cannot place orders.{account.halt.reason ? ` Reason: ${account.halt.reason}.` : ''}{' '}
             {canResume ? 'Resuming needs a written reason and is audited.' : 'A trader, risk officer or admin must resume trading.'}
+            {approval.needed ? (
+              <span data-testid="halt-four-eyes">
+                {' '}
+                {approval.pendingId
+                  ? 'A resume request is waiting for a second authorised person to approve it.'
+                  : 'This halt was set by the firm: resuming needs a second authorised person (four-eyes).'}
+              </span>
+            ) : null}
           </>
         )}
       </Banner>

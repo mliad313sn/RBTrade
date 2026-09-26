@@ -234,6 +234,8 @@ export const fr: Record<MessageKey, string> = {
     'Ce trade demanderait de l’argent emprunté. L’emprunt est désactivé. Choisissez un montant plus petit.',
   'risk.NOVICE_COOLING_OFF':
     'C’est le moment de faire une pause. Les nouveaux trades rouvrent demain. Vous pouvez toujours fermer vos trades.',
+  'risk.DISCLOSURE_NOT_ACKNOWLEDGED':
+    'Lisez et confirmez d’abord l’avertissement sur les risques. Ensuite, vous pourrez trader. Vous pouvez toujours fermer vos trades.',
   'risk.REDUCE_ONLY_WOULD_INCREASE': 'Cet ordre peut seulement réduire un trade.',
   'risk.POST_ONLY_WOULD_TAKE': 'Cet ordre s’exécuterait tout de suite, ce qui n’est pas permis.',
   'risk.STOP_LOSS_WRONG_SIDE': 'Le filet de sécurité est du mauvais côté du prix.',

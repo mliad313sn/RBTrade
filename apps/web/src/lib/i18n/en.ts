@@ -223,6 +223,8 @@ export const en = {
     'This trade would need borrowed money. Borrowing is off. Use a smaller amount.',
   'risk.NOVICE_COOLING_OFF':
     'Time for a break. New trades open again tomorrow. You can still close trades.',
+  'risk.DISCLOSURE_NOT_ACKNOWLEDGED':
+    'Please read and confirm the risk warning first. Then you can trade. You can still close trades.',
   'risk.REDUCE_ONLY_WOULD_INCREASE': 'This order can only make a trade smaller.',
   'risk.POST_ONLY_WOULD_TAKE': 'This order would happen right away, which it must not.',
   'risk.STOP_LOSS_WRONG_SIDE': 'The safety net is on the wrong side of the price.',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { counterpartPath, isNoviceRoute, isProRoute } from './modes';
+import { counterpartPath, isNoviceRoute, isProRoute, landingPath } from './modes';
 import { checkRoute, isPublicPath } from './route-rules';
 
 describe('route rules', () => {
@@ -16,6 +16,16 @@ describe('route rules', () => {
     expect(checkRoute('/admin/users', ['trader'])).toMatchObject({ allow: false, requiredRoles: ['admin'] });
     expect(checkRoute('/admin/users', ['admin'])).toEqual({ allow: true });
     expect(checkRoute('/terminal', ['novice'])).toEqual({ allow: true });
+  });
+  it('goal 09: the risk console is 2nd line only; internal audit is for auditors, risk officers and admins', () => {
+    expect(checkRoute('/risk', ['trader'])).toMatchObject({ allow: false, feature: 'Risk console' });
+    expect(checkRoute('/risk', ['novice', 'auditor'])).toMatchObject({ allow: false });
+    expect(checkRoute('/risk', ['risk_officer'])).toEqual({ allow: true });
+    expect(checkRoute('/internal-audit', ['novice', 'auditor'])).toEqual({ allow: true });
+    expect(checkRoute('/internal-audit', ['trader'])).toMatchObject({ allow: false, feature: 'Internal audit' });
+    expect(landingPath(['novice', 'auditor'], 'pro')).toBe('/internal-audit');
+    expect(landingPath(['novice', 'trader'], 'pro')).toBe('/terminal');
+    expect(landingPath(['novice'], 'novice')).toBe('/home');
   });
   it('knows public paths', () => {
     expect(isPublicPath('/login')).toBe(true);
