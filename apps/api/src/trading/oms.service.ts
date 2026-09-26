@@ -150,6 +150,8 @@ export class OmsService {
     const snap = await this.market.snapshot(inst, now);
     const valuation = await this.accounts.value(account, tx?.c, now);
     const novice = await this.isNovice(sub.userId, sub.roles, tx?.c);
+    // Goal 08: cooling-off and the borrowing cap only matter for guarded accounts.
+    const guard = novice ? await this.accounts.guardState(account, valuation, now, tx?.c) : null;
     const rate = await this.fx.rate(inst.spec.quoteCcy, account.base_currency, now);
     const pos = valuation.positions.find((p) => p.symbol === req.symbol);
     const posQty = pos?.qty ?? new Decimal(0);
@@ -274,8 +276,11 @@ export class OmsService {
       dayPnl: valuation.dayPnl,
       weekPnl: valuation.weekPnl,
       ordersLastMinute,
-      limits: this.accounts.limits(account),
+      limits: this.accounts.limits(account, now),
       novice,
+      noviceMaxLeverage: guard ? dec(guard.noviceMaxLeverage) : undefined,
+      coolingOff: guard?.coolingOff.reason ?? null,
+      monthPnl: valuation.monthPnl,
       halted: account.trading_halted,
       previewIssues: preview?.issues ?? [],
       availableNow:
@@ -691,7 +696,11 @@ export class OmsService {
         const cur = await tx.c.query<OrderRow>('SELECT * FROM orders WHERE id = $1', [o.id]);
         const row = cur.rows[0];
         if (!row || !OPEN_ORDER_STATUSES.includes(row.status)) continue;
-        cancelled.push(toOrderDto(await this.engine.cancel(tx, row, 'user_cancel_all', { type: 'user', id: userId })));
+        cancelled.push(
+          toOrderDto(
+            await this.engine.cancel(tx, row, 'user_cancel_all', { type: 'user', id: userId }),
+          ),
+        );
       }
       return { accountId: tx.account.id, cancelled: cancelled.length, orders: cancelled };
     });

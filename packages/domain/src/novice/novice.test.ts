@@ -132,9 +132,9 @@ describe('guarded limit changes', () => {
     expect(pendingChanges(s2.stored, t0 + 1000).map((p) => p.field)).toEqual(['monthlyLossLimit']);
   });
 
-  it('setting a limit that did not exist yet counts as loosening only when above the current value', () => {
+  it('setting a first limit where none was in force is a tightening (applies now)', () => {
     const first = applyLimitChanges({}, { monthlyLossLimit: '600' }, () => undefined, t0, day);
-    expect(first.pending.monthlyLossLimit).toBeDefined();
+    expect(first.applied).toEqual({ monthlyLossLimit: '600' });
     const within = applyLimitChanges({}, { dailyLossLimit: '150' }, () => '5000', t0, day);
     expect(within.applied).toEqual({ dailyLossLimit: '150' });
   });

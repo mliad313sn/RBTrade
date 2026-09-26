@@ -23,6 +23,21 @@ const Schema = z.object({
   KORA_RISK_DAILY_LOSS_LIMIT: decimal.default('5000'),
   KORA_RISK_WEEKLY_LOSS_LIMIT: decimal.default('10000'),
   KORA_RISK_MAX_ORDERS_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(60),
+  /** Goal 08: optional platform monthly loss limit (empty = none; accounts may set their own). */
+  KORA_RISK_MONTHLY_LOSS_LIMIT: z.union([decimal, z.literal('')]).default(''),
+  /**
+   * Goal 08 novice guardrails (SIMULATED placeholders pending Compliance, OQ-R3/OQ-R5): the wait
+   * before a loosened limit applies, the cooling-off triggers, and the most a novice may borrow once
+   * the knowledge check is passed and the 24 h wait is over.
+   */
+  KORA_NOVICE_LOOSEN_DELAY_HOURS: z.coerce
+    .number()
+    .min(0)
+    .max(24 * 30)
+    .default(24),
+  KORA_NOVICE_COOLOFF_LOSING_TRADES: z.coerce.number().int().min(1).max(100).default(3),
+  KORA_NOVICE_COOLOFF_DAILY_LOSS_PCT: decimal.default('5'),
+  KORA_NOVICE_MAX_LEVERAGE: decimal.default('2'),
   /** Order endpoints per client per minute (throttler). */
   KORA_ORDER_RATE_LIMIT: z.coerce.number().int().min(1).max(1_000_000).default(600),
   /** Feed status older than this is treated as not ok (fill safety). */
@@ -40,7 +55,12 @@ const Schema = z.object({
   KORA_TRADING_SESSION_OVERRIDE: z
     .string()
     .default('')
-    .transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean))
+    .transform((v) =>
+      v
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
     .pipe(z.array(z.string().regex(/^[A-Z0-9][A-Z0-9._-]{0,31}$/))),
   KORA_ENV: z.enum(['dev', 'test', 'staging', 'production']).default('dev'),
 });
@@ -49,8 +69,13 @@ export type TradingConfig = ReturnType<typeof loadTradingConfig>;
 
 export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Schema.parse(env);
-  if (e.KORA_TRADING_SESSION_OVERRIDE.length > 0 && !(e.KORA_ENV === 'dev' || e.KORA_ENV === 'test')) {
-    throw new Error('KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused outside KORA_ENV=dev|test');
+  if (
+    e.KORA_TRADING_SESSION_OVERRIDE.length > 0 &&
+    !(e.KORA_ENV === 'dev' || e.KORA_ENV === 'test')
+  ) {
+    throw new Error(
+      'KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused outside KORA_ENV=dev|test',
+    );
   }
   return {
     startingCash: e.KORA_PAPER_STARTING_CASH,
@@ -62,6 +87,15 @@ export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
       dailyLossLimit: e.KORA_RISK_DAILY_LOSS_LIMIT,
       weeklyLossLimit: e.KORA_RISK_WEEKLY_LOSS_LIMIT,
       maxOrdersPerMinute: e.KORA_RISK_MAX_ORDERS_PER_MINUTE,
+      monthlyLossLimit: e.KORA_RISK_MONTHLY_LOSS_LIMIT || undefined,
+    },
+    novice: {
+      loosenDelayMs: Math.round(e.KORA_NOVICE_LOOSEN_DELAY_HOURS * 3_600_000),
+      coolingOff: {
+        losingTrades: e.KORA_NOVICE_COOLOFF_LOSING_TRADES,
+        dailyLossPct: e.KORA_NOVICE_COOLOFF_DAILY_LOSS_PCT,
+      },
+      maxLeverage: e.KORA_NOVICE_MAX_LEVERAGE,
     },
     orderRateLimit: e.KORA_ORDER_RATE_LIMIT,
     statusMaxAgeMs: e.KORA_TRADING_STATUS_MAX_AGE_MS,

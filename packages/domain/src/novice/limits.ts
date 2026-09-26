@@ -99,7 +99,8 @@ export function applyLimitChanges(
     if (raw === undefined) continue;
     const value = String(raw);
     const cur = current(field);
-    const looser = cur === undefined || dec(value).gt(dec(cur));
+    // No limit in force (undefined) means unlimited: setting one is a tightening.
+    const looser = cur !== undefined && dec(value).gt(dec(cur));
     if (looser && delayMs > 0) {
       const p: PendingChange = {
         value,

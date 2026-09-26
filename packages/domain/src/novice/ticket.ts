@@ -110,3 +110,23 @@ export function scenarioGain(loss: { price: string; costs: string }, accountCcy:
     .toDecimalPlaces(dp, Decimal.ROUND_HALF_EVEN)
     .toFixed(dp);
 }
+
+/** The preview's `lossIfStopHit` block (strings in the account currency). */
+export interface LossAtStop {
+  price: string;
+  costs: string;
+  total: string;
+}
+
+/**
+ * The three numbers the Novice ticket shows, taken from the preview without recalculation:
+ * "most you could lose" (`total`: price loss + all fees), "includes … in fees" (`costs`), and the
+ * review sheet's gain scenario.
+ */
+export function noviceLossFigures(
+  loss: LossAtStop | null | undefined,
+  accountCcy: string,
+): { mostYouCouldLose: string; fees: string; gain: string } | null {
+  if (!loss) return null;
+  return { mostYouCouldLose: loss.total, fees: loss.costs, gain: scenarioGain(loss, accountCcy) };
+}
