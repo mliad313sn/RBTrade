@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { base32Decode, totp } from '../src/auth/totp';
-import { bearer, CSRF, createUser, PASSWORD, startApp } from './helpers';
+import { acknowledgeRiskWarning, bearer, CSRF, createUser, PASSWORD, startApp } from './helpers';
 import { MarketFixture } from './market-fixture';
 
 /**
@@ -85,6 +85,7 @@ describe('novice onboarding, disclosure, summary, MFA opt-in and saved scenarios
 
   it('home summary: balance, change since start, series, worst dip, holdings in words', async () => {
     const u = await createUser(app, 'novice', [], { realClock: true });
+    await acknowledgeRiskWarning(app, u.token); // B-801 gate (goal 09)
     let s = (await request(http).get('/novice/summary').set(bearer(u.token)).expect(200)).body;
     expect(s).toMatchObject({ currency: 'USD', startingBalance: '100000.00', balance: '100000.00', changeSinceStart: { amount: '0.00', pct: '0.00' }, worstDip: { amount: '0.00' }, holdings: [] });
     expect(s.series.length).toBeGreaterThanOrEqual(2);

@@ -29,10 +29,10 @@ describe('appropriateness assessment and the questionnaire engine', () => {
 
   async function novice() {
     const email = uniqueEmail('appr');
-    const s = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'A' }).expect(201);
+    await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'A' }).expect(201);
     const l = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
     expect(l.body.status).toBe('ok');
-    return { id: s.body.user.id as string, email, token: l.body.accessToken as string };
+    return { id: l.body.user.id as string, email, token: l.body.accessToken as string };
   }
 
   it('serves the versioned SIMULATED questionnaire without the answer key', async () => {

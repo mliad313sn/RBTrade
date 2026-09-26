@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EngineLoopService } from '../src/trading/engine-loop.service';
-import { bearer, createUser, startApp, type TestUser } from './helpers';
+import { acknowledgeRiskWarning, bearer, createUser, startApp, type TestUser } from './helpers';
 import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
 
 let n = 0;
@@ -109,6 +109,7 @@ describe('pre-trade risk and fill safety through the API', () => {
 
   it('novice guardrails: market only, stop required, no leverage; closing needs no stop', async () => {
     const nov = await createUser(app, 'novice');
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     await md.touch();
     const noStop = await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000' }, 'NOVICE_STOP_REQUIRED');
     expect(noStop.message).toContain('stop loss');

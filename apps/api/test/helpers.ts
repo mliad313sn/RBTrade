@@ -98,10 +98,11 @@ export async function createUser(
     .set(CSRF)
     .send({ email, password: PASSWORD, displayName: `Test ${accountType}` })
     .expect(201);
-  const id = signup.body.user.id as string;
+  void signup; // B-014: the answer is generic (no user id); the id comes from the first sign-in.
   let roles: Role[] = ['novice'];
+  const first = await login(app, email, undefined, opts);
+  const id = (await request(http).get('/me').set(bearer(first.token)).expect(200)).body.user.id as string;
   if (accountType === 'trader') {
-    const first = await login(app, email, undefined, opts);
     await passAppropriateness(app, first.token);
     roles = ['novice', 'trader'];
   }
@@ -111,6 +112,8 @@ export async function createUser(
     await ownerQuery('INSERT INTO user_roles (user_id, role) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING', [id, admin]);
   }
   if (extraRoles.includes('trader') && accountType !== 'trader') throw new Error('Use accountType "trader" (passes the assessment)');
+  // A novice with no extra role keeps the first session (same roles); others sign in again.
+  if (accountType === 'novice' && admin.length === 0) return { id, email, roles, token: first.token };
   return { id, email, roles, ...(await login(app, email, undefined, opts)) };
 }
 
@@ -136,3 +139,20 @@ export async function login(
 }
 
 export const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
+
+/**
+ * Goal 09 (B-801): acknowledges the risk warning in force through the API, so a novice-only user may
+ * place orders that add exposure.
+ */
+export async function acknowledgeRiskWarning(app: INestApplication, token: string): Promise<void> {
+  const http = app.getHttpServer();
+  const doc = (await request(http).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200)).body.document as {
+    version: string;
+    contentHash: string;
+  };
+  await request(http)
+    .post('/disclosures/risk-warning/acknowledgements')
+    .set(bearer(token))
+    .send({ version: doc.version, contentHash: doc.contentHash, locale: 'en' })
+    .expect(201);
+}

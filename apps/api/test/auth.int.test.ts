@@ -35,7 +35,7 @@ describe('identity: sign-up, MFA, login, RBAC', () => {
     const refused = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'T', accountType: 'trader' }).expect(400);
     expect(JSON.stringify(refused.body)).toContain('appropriateness');
     const s = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'T' }).expect(201);
-    expect(s.body).toMatchObject({ user: { roles: ['novice'] }, mfaRequired: false });
+    expect(s.body).toEqual({ accepted: true, mfaRequired: false, next: 'sign_in' });
     const l0 = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
     expect(l0.body.status).toBe('ok');
     await passAppropriateness(app, l0.body.accessToken);
@@ -84,8 +84,16 @@ describe('identity: sign-up, MFA, login, RBAC', () => {
     await request(http).post('/auth/signup').set(CSRF).send({ email: uniqueEmail('x'), password: 'short', displayName: 'X' }).expect(400);
     await request(http).post('/auth/signup').set(CSRF).send({ email: uniqueEmail('x'), password: PASSWORD, displayName: 'X', accountType: 'admin' }).expect(400);
     const email = uniqueEmail('dup');
-    await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'X' }).expect(201);
-    await request(http).post('/auth/signup').set(CSRF).send({ email: email.toUpperCase(), password: PASSWORD, displayName: 'X' }).expect(409);
+    const first = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'X' }).expect(201);
+    // B-014: an existing e-mail gets the same answer (no account enumeration); the duplicate is audited.
+    const dup = await request(http).post('/auth/signup').set(CSRF).send({ email: email.toUpperCase(), password: 'another-password-123', displayName: 'Y' }).expect(201);
+    expect(dup.body).toEqual(first.body);
+    expect(dup.body).toEqual({ accepted: true, mfaRequired: false, next: 'sign_in' });
+    const audited = await ownerQuery<{ n: string }>(`SELECT count(*)::text AS n FROM audit_events WHERE action = 'auth.signup_duplicate' AND ts > now() - interval '1 minute'`);
+    expect(Number(audited[0]!.n)).toBeGreaterThanOrEqual(1);
+    // The original password still works and the second password does not.
+    await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
+    await request(http).post('/auth/login').set(CSRF).send({ email, password: 'another-password-123' }).expect(401);
   });
 
   it('wrong password → 401 with a generic message; unknown user is indistinguishable', async () => {

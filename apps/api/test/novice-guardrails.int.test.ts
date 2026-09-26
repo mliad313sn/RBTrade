@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { bearer, createUser, login, startApp, type TestUser } from './helpers';
+import { acknowledgeRiskWarning, bearer, createUser, login, startApp, type TestUser } from './helpers';
 import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
 import { knowledgeFail, onboard, passKnowledgeCheck } from './novice-helpers';
 import knowledgeCheckV1 from '../src/appropriateness/questionnaires/knowledge-check.v1.json';
@@ -67,6 +67,7 @@ describe('novice guardrails through the API', () => {
 
   it('cannot place an order without a stop (market, limit, or through the Pro endpoints)', async () => {
     const nov = await createUser(app, 'novice');
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     const r = await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000' }, 'NOVICE_STOP_REQUIRED');
     expect(r.violations.find((v) => v.code === 'NOVICE_STOP_REQUIRED')!.message).toContain('stop loss');
     await rejected(nov, { symbol: 'EURUSD', side: 'sell', type: 'market', qty: '10000' }, 'NOVICE_STOP_REQUIRED');
@@ -83,6 +84,7 @@ describe('novice guardrails through the API', () => {
 
   it('cannot use leverage: off by default; asking needs the knowledge check; on only after 24 h, capped at 2×', async () => {
     const nov = await createUser(app, 'novice');
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     // 1.5 × the 100,000 practice balance in EUR/USD (margin allows it; the novice rule does not).
     const big = { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '138000', stopLossPrice: '1.07500' };
     await rejected(nov, big, 'NOVICE_LEVERAGE');
@@ -119,6 +121,7 @@ describe('novice guardrails through the API', () => {
 
   it('cannot open the strategy builder or the robot / backtest API (403); templates are readable', async () => {
     const nov = await createUser(app, 'novice');
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     await request(http).get('/robots/builder').set(bearer(nov.token)).expect(403);
     await request(http).get('/strategies/catalog').set(bearer(nov.token)).expect(403);
     await request(http).post('/strategies/validate').set(bearer(nov.token)).send({ definition: {} }).expect(403);
@@ -132,6 +135,7 @@ describe('novice guardrails through the API', () => {
 
   it('cannot loosen a limit without the 24 h wait; tightening is immediate (any endpoint)', async () => {
     const nov = await createUser(app, 'novice');
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     await onboard(app, nov.token, { dailyLossLimit: '150', monthlyLossLimit: '600' });
     let p = await profile(nov);
     expect(p.limits.daily.limit).toBe('150');
@@ -187,6 +191,7 @@ describe('novice guardrails through the API', () => {
     vi.setSystemTime(vi.getRealSystemTime());
     await md.standard();
     const nov = await createUser(app, 'novice', [], { realClock: true });
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     const open = { symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.05', stopLossPrice: '62000.0' };
     for (let i = 0; i < 3; i++) {
       expect((await send(nov, open)).status).toBe(201);
@@ -216,6 +221,7 @@ describe('novice guardrails through the API', () => {
 
   it('cooling-off after a 5 % daily loss (closing allowed), and the monthly loss limit', async () => {
     const nov = await createUser(app, 'novice');
+    await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     expect((await send(nov, { symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '1', stopLossPrice: '62000.0' })).status).toBe(201);
     await md.quote('BTCUSD', '59600.0', '59602.0'); // about −5,200 on a 100,000 balance
     const r = await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' }, 'NOVICE_COOLING_OFF');
@@ -225,6 +231,8 @@ describe('novice guardrails through the API', () => {
     expect((await request(http).post('/positions/BTCUSD/close').set(bearer(nov.token))).status).toBe(201);
 
     const m = await createUser(app, 'novice');
+
+    await acknowledgeRiskWarning(app, m.token); // B-801 gate (goal 09)
     await request(http).put('/novice/limits').set(bearer(m.token)).send({ monthlyLossLimit: '100' }).expect(200);
     expect((await send(m, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '90000', stopLossPrice: '1.07500' })).status).toBe(201);
     await md.quote('EURUSD', '1.08290', '1.08292'); // about −120 (with fees)
