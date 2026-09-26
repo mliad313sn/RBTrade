@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { KILL_SWITCH_HOLD_MS, KILL_SWITCH_SCOPE_LABELS, KILL_SWITCH_SCOPES, KillSwitchRequestSchema } from './kill-switch.js';
+import {
+  KILL_SWITCH_HOLD_MS,
+  KILL_SWITCH_SCOPE_LABELS,
+  KILL_SWITCH_SCOPES,
+  KillSwitchRequestSchema,
+} from './kill-switch.js';
 
 describe('kill switch contract', () => {
   it('has exactly three scopes with labels and a 1.5 s hold', () => {
@@ -12,5 +17,20 @@ describe('kill switch contract', () => {
     expect(KillSwitchRequestSchema.parse({ scope: 'robots' }).source).toBe('ui_button');
     expect(KillSwitchRequestSchema.safeParse({ scope: 'everything' }).success).toBe(false);
     expect(KillSwitchRequestSchema.safeParse({ scope: 'robots', extra: 1 }).success).toBe(false);
+  });
+});
+
+describe('kill switch goal 03 additions', () => {
+  it('accepts an optional reason and validates resume', async () => {
+    const m = await import('./kill-switch.js');
+    expect(
+      m.KillSwitchRequestWithReasonSchema.parse({ scope: 'robots', reason: 'runaway bot' }).reason,
+    ).toBe('runaway bot');
+    expect(m.KillSwitchRequestWithReasonSchema.parse({ scope: 'robots' }).source).toBe('ui_button');
+    expect(m.KillSwitchResumeSchema.safeParse({ reason: 'ok' }).success).toBe(false);
+    expect(m.KillSwitchResumeSchema.safeParse({ reason: 'checked, all clear' }).success).toBe(true);
+    expect(m.KILL_SWITCH_SCOPE_RANK.robots_cancel_flatten).toBeGreaterThan(
+      m.KILL_SWITCH_SCOPE_RANK.robots,
+    );
   });
 });

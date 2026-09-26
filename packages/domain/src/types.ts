@@ -1,5 +1,6 @@
 import type { Decimal } from './decimal.js';
 import type { InstrumentSpec } from './market-data.js';
+import type { OrderType, Side } from './trading/orders.js';
 
 /** Shared domain types. Money fields are decimal strings on the wire and Decimal in memory. */
 export type DecimalString = string;
@@ -10,34 +11,28 @@ export type TradingEnvironment = (typeof ENVIRONMENTS)[number];
 /** Registry instrument (goal 02). See `InstrumentSpec` in market-data.ts. */
 export type Instrument = InstrumentSpec;
 
-export type Side = 'buy' | 'sell';
-export type OrderType = 'market' | 'limit' | 'stop' | 'stop_limit' | 'trailing' | 'bracket' | 'oco';
-export const ADVANCED_ORDER_TYPES: readonly OrderType[] = ['stop_limit', 'trailing', 'bracket', 'oco'];
+export const ADVANCED_ORDER_TYPES: readonly OrderType[] = [
+  'stop_limit',
+  'trailing',
+  'bracket',
+  'oco',
+];
 export const NOVICE_ORDER_TYPES: readonly OrderType[] = ['market'];
-export const PRO_ORDER_TYPES: readonly OrderType[] = ['market', 'limit', 'stop', 'stop_limit', 'trailing', 'bracket', 'oco'];
+export const PRO_ORDER_TYPES: readonly OrderType[] = [
+  'market',
+  'limit',
+  'stop',
+  'stop_limit',
+  'trailing',
+  'bracket',
+  'oco',
+];
 
 export function orderTypesFor(viewMode: 'pro' | 'novice'): readonly OrderType[] {
   return viewMode === 'pro' ? PRO_ORDER_TYPES : NOVICE_ORDER_TYPES;
 }
-export type TimeInForce = 'gtc' | 'day' | 'ioc' | 'fok';
-export type OrderStatus = 'new' | 'working' | 'partially_filled' | 'filled' | 'cancelled' | 'rejected';
 
-export interface Order {
-  id: string;
-  clientOrderId: string;
-  accountId: string;
-  symbol: string;
-  side: Side;
-  type: OrderType;
-  qty: DecimalString;
-  limitPrice: DecimalString | null;
-  stopPrice: DecimalString | null;
-  tif: TimeInForce;
-  status: OrderStatus;
-  source: 'manual' | 'robot' | 'ai_draft';
-  createdAt: string;
-}
-
+/** Fill as consumed by paper analytics (quant `/analytics/paper`, goal 05). */
 export interface Fill {
   id: string;
   orderId: string;
@@ -48,15 +43,6 @@ export interface Fill {
   fee: DecimalString;
   slippage: DecimalString;
   ts: string;
-}
-
-export interface Position {
-  accountId: string;
-  symbol: string;
-  qty: DecimalString; // signed
-  avgPrice: DecimalString;
-  unrealizedPnl: DecimalString;
-  realizedPnl: DecimalString;
 }
 
 export interface Strategy {
