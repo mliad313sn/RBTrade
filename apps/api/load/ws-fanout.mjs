@@ -247,6 +247,14 @@ if (isMainThread) {
   const publisher = new Worker(fileURLToPath(import.meta.url), {
     workerData: { role: 'publisher', redisUrl: process.env.REDIS_URL, prefix, symbols, rate: cfg.rate, tickMs: 5 },
   });
+  if (cfg.clients === 0) {
+    // Publisher-only mode for external generators (k6): api + publisher, token printed for the client tool.
+    console.warn(`[load] publisher-only mode for ${cfg.warmup + cfg.duration} s; TOKEN=${token}`);
+    await new Promise((r) => setTimeout(r, (cfg.warmup + cfg.duration) * 1000));
+    publisher.postMessage('stop');
+    api.kill('SIGTERM');
+    process.exit(0);
+  }
   const per = Math.ceil(cfg.clients / cfg.workers);
   const workers = Array.from({ length: cfg.workers }, (_, w) => {
     const n = Math.max(0, Math.min(per, cfg.clients - w * per));
@@ -306,7 +314,7 @@ if (isMainThread) {
   mkdirSync(outDir, { recursive: true });
   const out = resolve(outDir, `ws-fanout-${cfg.clients}c-${cfg.symbols}s-${cfg.perClient}k-flush${Number(process.env.KORA_MD_WS_FLUSH_MS ?? 0)}.json`);
   writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
-  console.log(JSON.stringify(result, null, 2));
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   console.warn(`[load] p99 fan-out latency ${result.latencyMs.p99} ms → ${result.pass ? 'PASS' : 'FAIL'} (< 50 ms). Wrote ${out}`);
   process.exit(result.pass ? 0 : 1);
 }

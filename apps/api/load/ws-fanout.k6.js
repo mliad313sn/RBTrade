@@ -1,3 +1,4 @@
+/* global __ENV, __VU */
 // k6 reference scenario for the goal 02 fan-out criterion (for CI/Docker hosts where k6 is
 // installed; NOT executed in the build environment, whose proxy blocks the k6 binary download).
 // The executed tool is ws-fanout.mjs, which also provides the api + Redis publisher:
