@@ -44,6 +44,12 @@ export default defineConfig({
         KORA_SCRYPT_N: '16384',
         KORA_AUTH_RATE_LIMIT: '10000',
         LOG_LEVEL: 'warn',
+        // Market data (goal 02): in-process SIMULATED feed for the prototype majors, own Redis namespace.
+        KORA_MD_FEED: 'inprocess',
+        KORA_MD_BACKFILL: 'false',
+        KORA_MD_SYMBOLS: 'EURUSD,GBPUSD,USDJPY,XAUUSD,BTCUSD,ETHUSD,US500,NAS100,AAPL,NVDA,WTI',
+        KORA_MD_REDIS_PREFIX: 'kora:e2e:md:',
+        KORA_MD_WS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
       },
     },
     {

@@ -1,16 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { apiWsPort } from './lib/market-ws';
 import { checkRoute, isPublicPath } from './lib/route-rules';
 import { verifySession } from './lib/session';
 
-function csp(nonce: string, dev: boolean): string {
+function csp(nonce: string, dev: boolean, wsHost: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    `connect-src 'self'${dev ? ' ws: wss:' : ''}`,
+    // The market data WebSocket lives on the api port of the same host (goal 02).
+    `connect-src 'self' ws://${wsHost} wss://${wsHost}${dev ? ' ws: wss:' : ''}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -25,7 +27,10 @@ function csp(nonce: string, dev: boolean): string {
  */
 export async function middleware(req: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
-  const policy = csp(nonce, process.env.NODE_ENV !== 'production');
+  // The browser connects to the api on the page's own hostname (so the session cookie is sent).
+  const rawHost = (req.headers.get('host') ?? req.nextUrl.host).replace(/:\d+$/, '');
+  const pageHost = /^[a-z0-9.-]{1,253}$/i.test(rawHost) ? rawHost : 'localhost';
+  const policy = csp(nonce, process.env.NODE_ENV !== 'production', `${pageHost}:${apiWsPort()}`);
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', policy);

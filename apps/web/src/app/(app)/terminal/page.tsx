@@ -1,6 +1,8 @@
 import { Banner, Panel, Tabs } from '@kora/ui';
 
 import { OrderTicketPreview } from '@/components/OrderTicketPreview';
+import { LiveWatchlist } from '@/components/terminal/LiveWatchlist';
+import { apiWsPort } from '@/lib/market-ws';
 import { DEFAULT_SYMBOL } from '@/lib/modes';
 
 export const metadata = { title: 'Terminal' };
@@ -11,11 +13,11 @@ export default async function TerminalPage({ searchParams }: { searchParams: Pro
     <div className="grid gap-2 h-full grid-cols-1 lg:grid-cols-[240px_1fr_320px] lg:grid-rows-[1fr_220px]">
       <h1 className="k-sr-only">Pro terminal — {symbol}</h1>
       <Panel title="Watchlist · Majors" className="lg:row-span-1">
-        <p className="m-0 text-muted text-sm">Simulated market data arrives in goal 02.</p>
+        <LiveWatchlist wsPort={apiWsPort()} />
       </Panel>
       <Panel title={`${symbol} · chart`}>
         <Banner tone="info" title="Simulated feed · not market data.">
-          Charts and live quotes arrive in goals 02 and 04.
+          The chart, order book and calendar panels arrive with the Pro terminal (goal 04).
         </Banner>
       </Panel>
       <Panel title="Order ticket" className="lg:row-span-2">

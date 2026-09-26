@@ -83,7 +83,25 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    if (this.cfg.feed === 'inprocess') await this.start();
+    if (this.cfg.feed === 'inprocess') await this.startWithRetry();
+  }
+
+  /** A feed that cannot reach its registry (e.g. migrations pending) retries instead of crashing the api. */
+  private async startWithRetry(attempt = 0): Promise<void> {
+    try {
+      await this.start();
+    } catch (e) {
+      this.started = false;
+      for (const t of this.timers.splice(0)) clearInterval(t);
+      this.pub?.disconnect();
+      this.pub = null;
+      this.adapters.clear();
+      const delay = Math.min(10_000, 500 * 2 ** attempt);
+      this.log.warn(`feed start failed (${(e as Error).message}); retrying in ${delay} ms`);
+      const t = setTimeout(() => void this.startWithRetry(attempt + 1), delay);
+      t.unref();
+      this.timers.push(t as unknown as NodeJS.Timeout);
+    }
   }
 
   get isRunning(): boolean {

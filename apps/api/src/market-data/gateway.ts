@@ -136,7 +136,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
 
   async onApplicationBootstrap(): Promise<void> {
     await this.hub.init();
-    await this.repo.load();
+    await this.repo.load().catch((e: Error) => this.log.warn(`registry not loaded yet (${e.message}); will load on first subscribe`));
     this.server = this.adapterHost.httpAdapter.getHttpServer() as Server;
     this.wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
     this.server.on('upgrade', this.onUpgrade);
