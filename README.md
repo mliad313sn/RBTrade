@@ -75,8 +75,15 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - Model id **only** from `KORA_AI_MODEL`, key from `ANTHROPIC_API_KEY` (env / vault). Without them every copilot answer is a friendly "Copilot unavailable"; the terminal strip's data (bias, calibrated confidence, drivers) still works. `KORA_AI_PROVIDER=scripted` is a deterministic test double (dev/test only).
 - API: `POST /ai/chat` (SSE with `Accept: text/event-stream`, focused-panel context), `POST /ai/explain` (novice, plain words), `GET /ai/strip`, `POST /ai/strip/draft`, `POST /ai/signals/:id/why`, `GET /ai/robots/:id/insights`, `GET /ai/scan/no-edge`, `GET /ai/calibration`, `POST /ai/drafts/:id/decision`, `GET /metrics` (Prometheus; Grafana dashboard in `infra/grafana/provisioning/dashboards`).
 - The copilot's tools are read-only plus two draft tools; nothing can place, amend or cancel an order or control a robot (enforced on the server). Drafts open in the ticket / as an unapproved strategy change; you confirm or save.
-- Evals: `pnpm evals` (80 graded cases, scripted provider, thresholds enforced in CI); `ANTHROPIC_API_KEY=… KORA_AI_MODEL=… pnpm evals:live` for the real model.
+- Evals: `pnpm evals` (117 graded cases incl. goal 07B news and trend cases, scripted provider, thresholds enforced in CI); `ANTHROPIC_API_KEY=… KORA_AI_MODEL=… pnpm evals:live` for the real model.
 - Design: ADR 0007 (with the threat model). Results: `docs/plans/07-ai-copilot.md`.
+
+## Market intelligence (goal 07B: scanner, trend forecasts, news, all SIMULATED)
+
+- Scanner: `services/quant/src/kora_quant/scanner` (`POST /scanner/run`), 20 detectors as numbers only, look-ahead guard, benchmark `services/quant/bench/bench_scanner.py` (10,000 instruments × 500 one-hour bars < 60 s).
+- API: `GET /intel/radar`, `GET /intel/trends/:symbol` (card: calibrated probability or **"No reliable signal"**, drivers, cited news, invalidation), `POST /intel/trends/:symbol/explain`, `POST /intel/trends/:symbol/draft` (a draft only), `GET /intel/news`, `/intel/alerts`, `GET /intel/whats-moving`, `GET /intel/providers`, public `GET /intel/reliability`; `POST /intel/scan` and `POST /intel/news/ingest` (admin/quant; otherwise timers, `KORA_INTEL_SCAN` / `KORA_INTEL_NEWS`).
+- Web: Pro `/radar` (Market Radar), public `/reliability`; `WhatsMovingCard` for the novice Home.
+- Every data and news provider is a flagged stub until licensed (OQ-M3, OQ-M4). Design: ADR 0007B. Results: `docs/plans/07b-market-intelligence.md`.
 
 ## Layout
 

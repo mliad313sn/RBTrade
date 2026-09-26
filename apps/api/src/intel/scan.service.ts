@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -206,7 +207,11 @@ export class ScanService implements OnModuleInit, OnModuleDestroy {
         },
       });
     }
-    if (!instruments.length) throw new Error('No instrument has enough SIMULATED history to scan.');
+    if (!instruments.length)
+      throw new ConflictException({
+        error: 'no_history',
+        message: 'No instrument has enough SIMULATED history to scan yet.',
+      });
 
     const out = await this.quant.post<QuantScan>(
       '/scanner/run',
