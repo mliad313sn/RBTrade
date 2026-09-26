@@ -1,12 +1,14 @@
 [project]
 name = "kora-quant"
 version = "0.1.0"
-description = "KORA quant service: Monte Carlo, backtests, metrics (skeleton in goal 01)."
+description = "KORA quant service: Monte Carlo projection, bootstrap, reality checks and paper analytics."
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
   "uvicorn[standard]>=0.32,<1",
   "pydantic>=2.9,<3",
+  "numpy>=1.26,<3",
+  "numba>=0.60,<1",
 ]
 
 [project.optional-dependencies]
@@ -15,6 +17,7 @@ dev = [
   "mypy>=1.13",
   "pytest>=8.3",
   "pytest-cov>=6.0",
+  "pytest-benchmark>=4.0",
   "ruff>=0.8",
 ]
 

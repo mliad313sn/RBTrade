@@ -29,3 +29,5 @@ __pycache__/
 .vscode/*
 !.vscode/extensions.json
 *.log
+services/quant/.coverage
+.coverage
