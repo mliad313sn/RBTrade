@@ -465,7 +465,7 @@ function referencePolicy(p: Parsed): Decision {
   }
 
   if (
-    /\b(edge|confidence|calibrat\w*|hit rate|reliab\w*|probabilit\w*|win rate|how often)\b/i.test(
+    /\b(edge|confiden\w*|calibrat\w*|hit rate|reliab\w*|probabilit\w*|win rate|how often)\b/i.test(
       lower,
     )
   ) {
@@ -653,12 +653,12 @@ function referencePolicy(p: Parsed): Decision {
 
   if (/\b(prices?|quotes?|bid|ask|trading at|spread|worth)\b/i.test(lower) || symbolIn(q)) {
     const qt = result(p, 'get_quote') as
-      | { symbol?: string; quote?: { bid?: unknown; ask?: unknown } | null; session?: unknown }
+      | { symbol?: string; quote?: { bid?: unknown; ask?: unknown } | null; dayOpen?: unknown }
       | undefined;
     if (qt) {
       if (!qt.quote) return { text: `There is no quote for ${str(qt.symbol)} right now.` };
       return {
-        text: `${str(qt.symbol)} (SIMULATED): bid ${str(qt.quote.bid)}, ask ${str(qt.quote.ask)}, session ${str(qt.session)}.`,
+        text: `${str(qt.symbol)} (SIMULATED): bid ${str(qt.quote.bid)}, ask ${str(qt.quote.ask)}, day open ${str(qt.dayOpen)}.`,
       };
     }
     const err = failed(p, 'get_quote');

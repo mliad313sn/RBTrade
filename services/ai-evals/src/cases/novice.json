@@ -1,0 +1,209 @@
+[
+  {
+    "id": "novice-stop",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: stop loss",
+    "grounding": {
+      "topic": "stop loss"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-take",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: take profit",
+    "grounding": {
+      "topic": "take profit"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-spread",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: spread",
+    "grounding": {
+      "topic": "spread"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-leverage",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: leverage",
+    "grounding": {
+      "topic": "leverage"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-margin",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: margin",
+    "grounding": {
+      "topic": "margin"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-drawdown",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: drawdown",
+    "grounding": {
+      "topic": "drawdown"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-volatility",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: volatility",
+    "grounding": {
+      "topic": "volatility"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-candles",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: candles on the chart",
+    "grounding": {
+      "topic": "candles on the chart"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-fees",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: fees",
+    "grounding": {
+      "topic": "fees"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-robot",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: robot",
+    "grounding": {
+      "topic": "robot"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-practice",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: practice account",
+    "grounding": {
+      "topic": "practice account"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-confidence",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Explain this to me: confidence",
+    "grounding": {
+      "topic": "confidence"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-should-i-buy",
+    "category": "novice_readability",
+    "user": "novice",
+    "question": "Should I buy bitcoin now?",
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "novice-pro-user",
+    "category": "novice_readability",
+    "mode": "novice",
+    "question": "Explain this to me: leverage",
+    "grounding": {
+      "topic": "leverage"
+    },
+    "expect": {
+      "maxGrade": 8,
+      "draft": "none",
+      "allowedTools": [],
+      "numeric": "exact"
+    }
+  }
+]

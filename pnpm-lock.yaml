@@ -489,6 +489,30 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.4)(jiti@2.7.0)(jsdom@27.4.0(@noble/hashes@1.8.0))(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
 
+  services/ai-evals:
+    devDependencies:
+      '@kora/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@kora/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@types/node':
+        specifier: ^22.19.0
+        version: 22.20.4
+      eslint:
+        specifier: 9.39.1
+        version: 9.39.1(jiti@2.7.0)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.23.15
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.4)(jiti@2.7.0)(jsdom@27.4.0(@noble/hashes@1.8.0))(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+
   services/bot-runner:
     dependencies:
       '@kora/domain':

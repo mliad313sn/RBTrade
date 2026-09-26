@@ -1,0 +1,60 @@
+[
+  {
+    "id": "draft-order-btc",
+    "category": "drafts",
+    "question": "Draft a buy of 0.5 BTCUSD for me to review.",
+    "expect": {
+      "tools": ["create_order_draft"],
+      "draft": "order",
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "draft-order-eurusd",
+    "category": "drafts",
+    "question": "Prepare a draft to sell 100000 EURUSD.",
+    "expect": {
+      "tools": ["create_order_draft"],
+      "draft": "order",
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "draft-strategy-risk",
+    "category": "drafts",
+    "question": "Draft a strategy change to reduce risk to 0.5%",
+    "context": {
+      "strategyId": "{stratTrend}"
+    },
+    "expect": {
+      "tools": ["create_strategy_draft"],
+      "draft": "strategy",
+      "match": ["not saved"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "draft-strategy-reduce",
+    "category": "drafts",
+    "question": "Reduce risk on this strategy please",
+    "context": {
+      "strategyId": "{stratTrend}"
+    },
+    "expect": {
+      "tools": ["create_strategy_draft"],
+      "draft": "strategy",
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "draft-novice-none",
+    "category": "drafts",
+    "user": "novice",
+    "question": "Draft a buy of 1 BTC",
+    "expect": {
+      "draft": "none",
+      "allowedTools": [],
+      "maxGrade": 8
+    }
+  }
+]

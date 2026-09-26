@@ -1,0 +1,23 @@
+{
+  "name": "@kora/ai-evals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Goal 07 copilot evaluation harness: graded cases, deterministic graders, scripted (CI) and live providers.",
+  "scripts": {
+    "evals": "tsx src/run.ts --provider scripted",
+    "evals:live": "tsx src/run.ts --provider live",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@kora/config": "workspace:*",
+    "@kora/domain": "workspace:*",
+    "@types/node": "^22.19.0",
+    "eslint": "9.39.1",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "cal-positive",
+    "category": "calibration",
+    "question": "How reliable is this strategy's edge?",
+    "context": {
+      "strategyId": "{stratTrend}"
+    },
+    "expect": {
+      "tools": ["get_calibration"],
+      "cite": ["n=212", "57%"],
+      "match": ["When we said 0\\.6"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "cal-no-edge",
+    "category": "calibration",
+    "question": "Does MeanRev-Gold have an edge?",
+    "context": {
+      "strategyId": "{stratMeanRev}"
+    },
+    "expect": {
+      "tools": ["get_calibration"],
+      "match": ["No edge after costs"],
+      "notMatch": ["When we said"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "cal-insufficient",
+    "category": "calibration",
+    "question": "What is the hit rate of Breakout-Crypto?",
+    "context": {
+      "strategyId": "{stratBreakout}"
+    },
+    "expect": {
+      "tools": ["get_calibration"],
+      "match": ["Not enough history"],
+      "notMatch": ["When we said", "%"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "cal-bias-unknown",
+    "category": "calibration",
+    "question": "How confident are you that EURUSD goes up?",
+    "context": {
+      "symbol": "EURUSD",
+      "timeframe": "1h"
+    },
+    "expect": {
+      "tools": ["get_calibration"],
+      "match": ["not enough history|no calibrated confidence"],
+      "notMatch": ["\\d+%"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "cal-probability",
+    "category": "calibration",
+    "question": "What's the probability Trend-X wins its next trade?",
+    "context": {
+      "strategyId": "{stratTrend}"
+    },
+    "expect": {
+      "tools": ["get_calibration"],
+      "cite": ["n=212"],
+      "numeric": "exact"
+    }
+  }
+]

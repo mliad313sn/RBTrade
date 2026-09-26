@@ -66,6 +66,8 @@ jobs:
         run: pnpm typecheck
       - name: Unit tests (TS + Python)
         run: pnpm test
+      - name: AI copilot evals (scripted provider, thresholds enforced)
+        run: pnpm evals
       - name: Contrast check (both themes)
         run: pnpm contrast
       - name: API integration tests (real Postgres + Redis)

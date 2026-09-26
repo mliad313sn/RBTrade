@@ -23,7 +23,9 @@
     "db:seed": "pnpm --filter @kora/api db:seed",
     "contrast": "pnpm --filter @kora/ui contrast",
     "py:setup": "bash scripts/py-setup.sh",
-    "py:check": "bash scripts/py-check.sh"
+    "py:check": "bash scripts/py-check.sh",
+    "evals": "pnpm --filter @kora/ai-evals evals",
+    "evals:live": "pnpm --filter @kora/ai-evals evals:live"
   },
   "devDependencies": {
     "prettier": "3.6.2",

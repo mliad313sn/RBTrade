@@ -1,0 +1,176 @@
+[
+  {
+    "id": "why-signal-1",
+    "category": "grounded_explanation",
+    "question": "Why did this trade happen?",
+    "surface": "why",
+    "context": {
+      "signalId": "c3c3c3c3-0000-4000-8000-000000000001",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["1.08412", "1.08377", "26.4", "+0.34", "+0.12"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-robot-1",
+    "category": "grounded_explanation",
+    "question": "Why did Trend-X go long EUR/USD at 09:00?",
+    "context": {
+      "robotId": "{trendX}",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["1.08412", "1.08377", "26.4", "+0.34", "+0.12"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-signal-2",
+    "category": "grounded_explanation",
+    "question": "Why did this trade happen?",
+    "surface": "why",
+    "context": {
+      "signalId": "c3c3c3c3-0000-4000-8000-000000000002",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["1.26455", "1.26398", "31.7", "+0.41", "+0.27"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-robot-2",
+    "category": "grounded_explanation",
+    "question": "Why did Trend-X buy GBP/USD at 13:00?",
+    "context": {
+      "robotId": "{trendX}",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["1.26455", "1.26398", "31.7", "+0.41", "+0.27"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-signal-3",
+    "category": "grounded_explanation",
+    "question": "Why did this trade happen?",
+    "surface": "why",
+    "context": {
+      "signalId": "c3c3c3c3-0000-4000-8000-000000000003",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["74.8", "2398.6", "2396.15", "+0.29", "+0.18"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-robot-3",
+    "category": "grounded_explanation",
+    "question": "Why did MeanRev-Gold go short gold at 10:15?",
+    "context": {
+      "robotId": "{meanRev}",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["74.8", "2398.6", "2396.15", "+0.29", "+0.18"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-signal-4",
+    "category": "grounded_explanation",
+    "question": "Why did this trade happen?",
+    "surface": "why",
+    "context": {
+      "signalId": "c3c3c3c3-0000-4000-8000-000000000004",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["48.2", "+0.07"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-robot-4",
+    "category": "grounded_explanation",
+    "question": "Why did MeanRev-Gold exit XAU/USD at 15:45?",
+    "context": {
+      "robotId": "{meanRev}",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["48.2", "+0.07"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-signal-5",
+    "category": "grounded_explanation",
+    "question": "Why did this trade happen?",
+    "surface": "why",
+    "context": {
+      "signalId": "c3c3c3c3-0000-4000-8000-000000000005",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["64812.5", "64590", "1840.2", "1210.7", "+0.52", "+0.31"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-robot-5",
+    "category": "grounded_explanation",
+    "question": "Why did Breakout-Crypto buy BTC/USD at 16:00?",
+    "context": {
+      "robotId": "{breakout}",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["64812.5", "64590", "1840.2", "1210.7", "+0.52", "+0.31"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-signal-6",
+    "category": "grounded_explanation",
+    "question": "Why did this trade happen?",
+    "surface": "why",
+    "context": {
+      "signalId": "c3c3c3c3-0000-4000-8000-000000000006",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["3104.2", "3098.55", "+0.11"],
+      "numeric": "exact"
+    }
+  },
+  {
+    "id": "why-robot-6",
+    "category": "grounded_explanation",
+    "question": "Why was Breakout-Crypto blocked on ETH/USD at 20:00?",
+    "context": {
+      "robotId": "{breakout}",
+      "panel": "robots"
+    },
+    "expect": {
+      "tools": ["get_signal_features"],
+      "cite": ["3104.2", "3098.55", "+0.11"],
+      "numeric": "exact"
+    }
+  }
+]

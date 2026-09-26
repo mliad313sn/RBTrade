@@ -1,0 +1,5 @@
+{
+  "extends": "@kora/config/tsconfig/node.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "../..", "resolveJsonModule": true },
+  "include": ["src", "vitest.config.ts"]
+}

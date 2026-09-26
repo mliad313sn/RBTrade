@@ -1,0 +1,174 @@
+[
+  {
+    "id": "nf-quote-eurusd",
+    "category": "numeric_fidelity",
+    "question": "What is the EURUSD price?",
+    "context": {},
+    "expect": {
+      "tools": ["get_quote"],
+      "cite": ["1.08419", "1.08421"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-quote-btc",
+    "category": "numeric_fidelity",
+    "question": "Where is BTC/USD trading?",
+    "context": {},
+    "expect": {
+      "tools": ["get_quote"],
+      "cite": ["64812.0"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-quote-gold",
+    "category": "numeric_fidelity",
+    "question": "Quote for gold please",
+    "context": {},
+    "expect": {
+      "tools": ["get_quote"],
+      "cite": ["2395.20"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-quote-eth-ask",
+    "category": "numeric_fidelity",
+    "question": "What is the ask on ETH/USD right now?",
+    "context": {},
+    "expect": {
+      "tools": ["get_quote"],
+      "cite": ["3104.40"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-positions",
+    "category": "numeric_fidelity",
+    "question": "Show my open positions",
+    "context": {},
+    "expect": {
+      "tools": ["get_positions"],
+      "cite": ["200000", "1.08120", "599.37"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-pnl",
+    "category": "numeric_fidelity",
+    "question": "What is my unrealised P&L?",
+    "context": {},
+    "expect": {
+      "tools": ["get_positions"],
+      "cite": ["1114.00"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-margin",
+    "category": "numeric_fidelity",
+    "question": "How much margin am I using?",
+    "context": {},
+    "expect": {
+      "tools": ["get_account_risk"],
+      "cite": ["18420.00"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-equity",
+    "category": "numeric_fidelity",
+    "question": "What's my equity and daily loss?",
+    "context": {},
+    "expect": {
+      "tools": ["get_account_risk"],
+      "cite": ["250000.00", "5000.00"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-rsi",
+    "category": "numeric_fidelity",
+    "question": "What is the RSI on EURUSD?",
+    "context": {},
+    "expect": {
+      "tools": ["get_indicators"],
+      "cite": ["61.23"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-candle",
+    "category": "numeric_fidelity",
+    "question": "Show the last candle for EURUSD",
+    "context": {},
+    "expect": {
+      "tools": ["get_candles"],
+      "cite": ["1.08483", "1.08420"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-calendar",
+    "category": "numeric_fidelity",
+    "question": "What events are coming up today?",
+    "context": {},
+    "expect": {
+      "tools": ["get_calendar"],
+      "cite": ["US CPI"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-backtest",
+    "category": "numeric_fidelity",
+    "question": "What was the out-of-sample Sharpe of the latest backtest?",
+    "context": {
+      "strategyId": "{stratTrend}"
+    },
+    "expect": {
+      "tools": ["get_backtest_results"],
+      "cite": ["1.01", "1.62", "164"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-mc",
+    "category": "numeric_fidelity",
+    "question": "Walk me through the Monte Carlo projection",
+    "context": {
+      "strategyId": "{stratTrend}"
+    },
+    "expect": {
+      "tools": ["get_mc_projection"],
+      "cite": ["91240", "121980", "0.31"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  },
+  {
+    "id": "nf-preview",
+    "category": "numeric_fidelity",
+    "question": "What would it cost to buy 0.1 BTCUSD? Just a preview.",
+    "context": {},
+    "expect": {
+      "tools": ["get_order_preview"],
+      "cite": ["6.48", "3240.65"],
+      "numeric": "exact",
+      "draft": "none"
+    }
+  }
+]
