@@ -15,6 +15,7 @@ import { ResearchDataService } from '../strategies/research-data.service';
 import { AccountsService } from '../trading/accounts.service';
 import { TradingRegistryService } from '../trading/trading-registry.service';
 import { robotSource, type RobotRow } from './robots.types';
+import { loadIntelConfig } from '../intel/intel-config';
 
 const DAY = 86_400_000;
 
@@ -155,6 +156,7 @@ export class RobotTrackingService {
         split: { oosFraction: 0.5 },
         guard: false,
         maxPoints: 50,
+        aiRegime: loadIntelConfig().aiRegime,
       });
       // A position still open at the end of the data is not realised yet (live holds it too).
       for (const t of res.trades)

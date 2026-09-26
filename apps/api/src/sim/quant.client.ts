@@ -28,7 +28,7 @@ interface PydanticIssue {
 export class QuantClient {
   private readonly log = new Logger('QuantClient');
 
-  async post<T>(path: string, body: unknown): Promise<T> {
+  async post<T>(path: string, body: unknown, opts: { timeoutMs?: number } = {}): Promise<T> {
     const url = `${quantBaseUrl()}${path}`;
     let res: Response;
     try {
@@ -36,7 +36,7 @@ export class QuantClient {
         method: 'POST',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs()),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? timeoutMs()),
       });
     } catch (err) {
       this.log.warn(`quant unreachable at ${path}: ${(err as Error).name}`);

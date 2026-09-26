@@ -18,6 +18,7 @@ import { AccountsService } from '../trading/accounts.service';
 import { ResearchClient } from './research-client';
 import { ResearchDataService, type SymbolDataWire } from './research-data.service';
 import { StrategiesService, type VersionRow } from './strategies.service';
+import { loadIntelConfig } from '../intel/intel-config';
 
 type Kind = 'backtest' | 'walk_forward' | 'optimise' | 'sensitivity';
 
@@ -136,6 +137,8 @@ export class BacktestsService {
         count: others.length,
         periodSharpes: others.map((t) => t.is_period_sharpe).filter((x): x is number => x !== null),
       },
+      // Goal 07B: the ai_regime condition reads the scanner's point-in-time regime model.
+      aiRegime: loadIntelConfig().aiRegime,
       ...extra,
     };
   }

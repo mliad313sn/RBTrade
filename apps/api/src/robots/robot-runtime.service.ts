@@ -27,6 +27,7 @@ import type { Actor } from '../trading/tx';
 import { RobotBookService } from './robot-book.service';
 import { RobotsService, signalDto } from './robots.service';
 import { robotSource, type RobotJoinRow } from './robots.types';
+import { loadIntelConfig } from '../intel/intel-config';
 
 /** What quant `/bt/signal` returns (the runner forwards it unchanged). */
 export interface SignalResult {
@@ -181,6 +182,7 @@ export class RobotRuntimeService {
         position,
         equity: Number(b.equity.toFixed(2)),
         openPositions: b.positions.length,
+        aiRegime: loadIntelConfig().aiRegime,
       },
     };
   }
