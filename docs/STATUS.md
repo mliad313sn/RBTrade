@@ -1,6 +1,6 @@
 # KORA — delivery status
 
-Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B market intelligence; goal 08 Novice view merged with 07 and 07B).
+Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B market intelligence; goal 08 Novice view merged with 07 and 07B; goal 09 risk, compliance and governance).
 
 | Gate | Goal | State |
 |---|---|---|
@@ -14,6 +14,7 @@ Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B m
 | G7 | 07 AI copilot (+ B-602) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07-ai-copilot.md` §6 (live-provider eval pending a key, OQ-A2; deferred items in §6.3) |
 | G7B | 07B market intelligence (+ B-601, B-701) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07b-market-intelligence.md` §6 (all data SIMULATED, providers flagged stubs, OQ-M3/OQ-M4; live-provider evals pending a key, OQ-A2; deferred items in §6.3) |
 | G8 | 08 Novice view (+ B-013, B-017, B-306, B-505, B-506, B-614; B-504 prep) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/08-novice-view.md` §6 (deferred items in §6.4) |
+| G9 | 09 Risk, compliance and governance (+ B-003 part, B-007, B-014, B-202, B-203, B-303, B-314, B-801, B-810) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/09-governance.md` §6 (deferred items in §6.3; regulatory values stay placeholders with owners) |
 
 ## What shipped in goal 01
 
@@ -446,3 +447,79 @@ Goal 08 was built in a worktree next to goals 07 and 07B; the merge wired them t
 - **Goal 09 (questionnaires / suitability):** the engine now holds `appropriateness` v1 and `knowledge-check` v1; add `suitability` the same way (`QUESTIONNAIRE_FILES`). `QuestionnaireService.record(c, user, def, grade, at?)` takes an optional app-clock time. Knowledge-check status: `NoviceService.knowledgeStatus(userId)`; audit `knowledge_check.passed|failed`.
 - **Goal 09 (limits):** guarded loosening lives in `@kora/domain` `applyLimitChanges/effectiveOwnLimits/pendingChanges`; Pro loosening policy (OQ-R5) can reuse it by passing a delay. Audit `account.settings_updated` carries `{guarded, limitsApplied, limitsPending}`.
 - **Env:** `KORA_DISCLOSURE_RETAIL_LOSS_PCT`, `KORA_NOVICE_*`, `KORA_RISK_MONTHLY_LOSS_LIMIT`, `KORA_EXPLAIN_THIS` (see `.env.example`). e2e helpers: `apiSignIn(page, 'novice')` now completes onboarding through the API (`{onboarded: false}` to skip); `apiOnboard(request)`.
+
+## Goal 09: Risk, compliance and governance (G9: done, with deferrals)
+
+Plan and evidence: `docs/plans/09-governance.md` §6. ADR 0009. Lead seats S8, S9, S3. Migrations
+`0090`–`0092`. Nothing here is legal advice; every regulatory value stays a placeholder with an owner.
+
+### What shipped
+
+- **Control framework:** 31 controls in code (`apps/api/src/governance/controls/catalogue.ts`) covering
+  access/MFA, segregation of duties, change management, audit-log integrity, pre-trade risk,
+  reconciliation, AI oversight, retention/data protection, incidents, backup/restore, compliance hooks
+  and independent assurance; COBIT 2019 references, owner line 1/2/3, frequency, nature, test
+  procedure; `docs/governance/control-matrix.md` + `.xlsx` generated (drift test). Each control has an
+  implemented evidence query; `GET /governance/controls/{id}/evidence?from&to&format=json|csv|pdf`,
+  audited with the file's SHA-256.
+- **Three lines of defence:** new role `auditor` (read-only, MFA, SoD: no operating role; API + trigger).
+  `docs/governance/three-lines.md`.
+- **Four-eyes engine** (`four_eyes_requests`, API + trigger): limit overrides above the platform
+  default (`accounts.limit_overrides`), resume after a firm halt, MFA reset (B-003), disclosure
+  publication; robot promotion keeps the goal 06 sign-off. Approver ≠ requester ≠ person concerned.
+- **Kill switch:** firm-wide kill switch on the console (B-314); firm halts need two people to resume
+  (`KORA_FOUR_EYES_RESUME=firm|all`); every activation raises a `kill_switch.fired` alert.
+- **Risk officer console** `/risk`: exposure and loss vs limits (goal 03 valuations), limit breaches,
+  robots near auto-pause (goal 06 supervisor inputs), pending approvals, kill-switch history,
+  reconciliation breaks, AI draft rates, novice guardrail events (B-810), open incidents, evidence
+  export; live alerts on WS `risk:alerts` via `pg_notify` → Redis (breach → screen ≈ 60 ms; budget 5 s).
+- **Internal audit view** `/internal-audit`: read-only events, chain verification, ES256-signed audit
+  anchors (B-007), seeded reproducible sampling per control, CSV exports.
+- **Compliance hooks:** DB disclosures registry (versioned, per jurisdiction, effective dates,
+  placeholder values, four-eyes publication) behind the goal 08 interface; acknowledgement history with
+  the re-rendered, hash-verified text; first-order gate `DISCLOSURE_NOT_ACKNOWLEDGED` (B-801);
+  suitability questionnaire on the goal 03 engine; KYC stub; best-execution data; retention policy and
+  dry-run report; subject-access export.
+- **Operations:** runbooks for feed outage, engine stall, reconciliation break, AI provider outage,
+  kill switch fired, database restore; SLOs (proposed); ITIL 4 incident workflow + register (P1/P2
+  close only with a review); post-incident review template; tabletop "kill switch fired +
+  reconciliation break" exercised on the local stack with evidence; `scripts/backup.sh` (backup +
+  restore test → `backup_runs`); release record (`system.release_started`).
+- **Also:** B-014 generic sign-up, B-202 minor-unit quotes (HSBA.XLON in GBX), B-203 WS quotas and token
+  refresh, B-303 owners see system events about their account, TLS to Postgres/Redis enforced outside
+  dev/test, `docs/governance/data-protection.md`.
+
+### Stubbed or placeholder
+
+- Regulatory values: retail-loss figure `[XX]` (OQ-R1), retention periods (OQ-R4), suitability content
+  and bands (OQ-C2), KYC provider (OQ-K1), personal-data retention and subject-access rules (OQ-P1,
+  OQ-P2), SLO targets (OQ-O1), notification duties (OQ-O2), best-execution policy (OQ-X1), COBIT
+  references to confirm (OQ-G1), four-eyes parameters (OQ-G2), console thresholds (OQ-G3).
+- KYC is a flagged stub; anchors go to a JSON-lines file (object-lock storage is B-903).
+
+### Deferred
+
+B-002 (→ 10 with Keycloak), B-003 recovery codes (B-902), B-204 (Sponsor data), B-307 (OQ-B3), B-308 /
+B-803 (time zones), B-310, B-403, B-605, B-606, B-702, B-756, B-757, B-804, B-806, and the new B-901 …
+B-916 (see BACKLOG).
+
+### What goal 10 needs to know
+
+- **Gate additions:** the integration suite now includes `governance-four-eyes`, `governance-evidence`,
+  `risk-console`, `internal-audit`, `compliance`, `ws-quotas`, `minor-units`; e2e adds
+  `governance.spec.ts`. Novice test users must acknowledge the risk warning before trading
+  (`acknowledgeRiskWarning()` in `apps/api/test/helpers.ts`; e2e `apiSignIn` already onboards).
+- **Security review targets (S9):** four-eyes engine and triggers, the `auditor` SoD, evidence export
+  (CSV injection neutralised, PDF writer), subject-access export (no secrets), `risk:alerts` channel
+  authorisation, WS quotas, TLS enforcement, anchor key handling (`KORA_AUDIT_ANCHOR_JWK` required
+  outside dev/test), B-014.
+- **Observability (S10):** relay counters on `GET /risk-console/alerts` (`relay`), release record events,
+  `backup_runs`, SLO list in `docs/runbooks/slos.md` → dashboards and alerts (B-916, B-012); page on-call
+  for critical alerts (B-908).
+- **Release:** set `KORA_BUILD_SHA` and `KORA_RELEASE_APPROVAL_REF` in the pipeline (control KC-11);
+  schedule `scripts/backup.sh` (or managed PITR + monthly restore test) and the daily anchor job
+  (`KORA_AUDIT_ANCHOR_INTERVAL_MS=86400000`, object-lock storage B-903).
+- **Env:** `KORA_FOUR_EYES_*`, `KORA_RISK_NEAR_*`, `KORA_AUDIT_ANCHOR_*`, `KORA_JURISDICTION`,
+  `KORA_BUILD_SHA`, `KORA_RELEASE_*`, `KORA_ALERT_RELAY`, `KORA_RETENTION_<CLASS>_DAYS`,
+  `KORA_SUITABILITY_BANDS`, `KORA_MD_WS_MAX_CONN_PER_*`, `KORA_ALLOW_INSECURE_TRANSPORT` (see
+  `.env.example`).

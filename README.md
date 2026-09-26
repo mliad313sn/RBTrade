@@ -94,6 +94,16 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - With goals 07/07B: "Explain this to me" (novice copilot, `KORA_EXPLAIN_THIS=on`) on Home, the trade review, Learn, Practice and Auto-invest; "What's moving and why" on Home, in EN and FR.
 - Design: ADR 0008. Results: `docs/plans/08-novice-view.md`.
 
+## Risk, compliance and governance (goal 09)
+
+- **Control matrix:** `docs/governance/control-matrix.md` and `.xlsx`, generated from `apps/api/src/governance/controls/catalogue.ts` (`pnpm --filter @kora/api control-matrix`). 31 controls with COBIT 2019 references, owner line, frequency, test procedure and an implemented evidence query each.
+- **Evidence export:** `GET /governance/controls/{id}/evidence?from&to&format=json|csv|pdf` (risk officer, auditor, admin; audited with the file's SHA-256), also on the risk console and the internal audit view.
+- **Three lines:** new role `auditor` (read-only 3rd line; cannot hold an operating role). **Risk console** at `/risk` (risk officer/admin): exposure vs limits, breaches, robots near auto-pause, four-eyes approvals, kill-switch history, reconciliation, AI rates, novice guardrail events, live alerts on the `risk:alerts` WebSocket channel (≤ 5 s), firm-wide kill switch. **Internal audit** at `/internal-audit`: chain + signed-anchor verification, seeded sampling, exports.
+- **Four-eyes:** `/governance/approvals` for limit overrides above the platform default, resuming a firm halt, MFA resets and disclosure publications; the approver is never the requester (API + database trigger).
+- **Compliance hooks:** database disclosures registry (versioned, per jurisdiction, effective dates, `[XX]` placeholders until published), acknowledgement history with the exact text (`/compliance/acknowledgements`), B-801 first-order gate, suitability questionnaire (`/suitability`), KYC stub, best-execution data, retention report, subject-access export (`/me/data-export`).
+- **Operations:** runbooks, SLOs and the ITIL 4 incident workflow in `docs/runbooks/`; incident register `/governance/incidents`; `scripts/backup.sh` (backup + restore test); tabletop script `apps/api/scripts/tabletop-kill-switch-recon.mjs`.
+- Nothing here is legal advice; every regulatory value is a placeholder with an owner in `docs/open-questions.md`. ADR 0009.
+
 ## Layout
 
 ```

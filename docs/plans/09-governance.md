@@ -50,7 +50,7 @@ explicit placeholder with an owner in `docs/open-questions.md`. Nothing here ena
 - `apps/api/src/compliance/`: disclosure registry (DB), publication, acknowledgement history, suitability, KYC stub, best execution, subject access.
 - Edits: `KillSwitchService` (target account + actor, resume policy), `AccountsService.limits` (overrides), `OmsService` (breach alert, disclosure gate), `AuditController` (B-303, auditor), `DisclosuresModule` (provider swap), `DevIdpService.signup` (B-014), gateway (B-203, `risk:alerts`), admin roles (SoD), config (transport checks).
 - `apps/web`: `/risk` console, `/internal-audit`, left-rail entries by role, route rules, halted banner pending-approval state, i18n keys for the new risk code.
-- `scripts/backup.sh`, `scripts/tabletop/g09-tabletop.mjs`.
+- `scripts/backup.sh`, `apps/api/scripts/tabletop-kill-switch-recon.mjs` (tabletop runner; lives with the api so it can use `pg`/`ws`).
 - Docs: `docs/governance/control-matrix.md/.xlsx`, `docs/governance/data-protection.md`, `docs/governance/three-lines.md`, `docs/runbooks/` (SLOs, 6 scenarios, ITIL 4 incident workflow, PIR template, tabletop record), ADR 0009, STATUS, BACKLOG B-901+, open questions (owners for every placeholder), README section, `.env.example`.
 
 ## 3. Test plan
@@ -74,4 +74,59 @@ B-002 refresh tokens and session revocation (with Keycloak, B-001, goal 10), B-2
 
 ## 6. Results
 
-_Filled in at the end of the goal._
+Commits on `claude/magical-newton-yyxga6` from `d5c7a7f` (plan) to the STATUS commit. Migrations
+0090–0092. Everything PAPER and SIMULATED.
+
+### 6.1 Acceptance criteria
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | Every control names a working automated evidence source; the export produces it for a chosen date range (5 sample controls) | **Pass** | 31 controls, each with an implemented query (`governance.unit.test.ts`: no control without a query, no orphan query, matrix `.md`/`.xlsx` match the catalogue). `governance-evidence.int.test.ts`: every control's evidence runs for a period; CSV + PDF for **KC-06, KC-12, KC-15, KC-20, KC-27** contain the period's rows and nothing from an earlier period; each export audited with the file's SHA-256 (header = audit payload); roles and bad periods refused |
+| 2 | Four-eyes enforced: the same user cannot request and approve (promotion, limit loosening, kill-switch resume) | **Pass** | `governance-four-eyes.int.test.ts` (7 tests): resume after a firm halt → 202, requester self-approval 403 `four_eyes`, DB trigger refuses `decided_by = requested_by`, second risk officer approves (audit names both); a risk officer cannot approve their own account's resume; limit override: requester and account holder refused, second risk officer applies it; robot owner/risk officer cannot sign own robot, another can; MFA reset (B-003) same rule. Goal 06 `promotion.int.test.ts` still green |
+| 3 | Risk console shows real data from goals 03 and 06; breach alerts reach it within 5 s | **Pass** | `risk-console.int.test.ts`: overview exposure row equals the engine's `/accounts/me` numbers, breaches, reconciliation, approvals, robots, AI, novice panels; breach → WS `risk:alerts` frame **60 ms** after the order request (twice); non-2nd-line subscription `forbidden`. e2e `governance.spec.ts`: alert visible on `/risk` **61 ms** after the breach; firm kill switch by hold, four-eyes approval in the UI, KC-07 CSV download |
+| 4 | The disclosure version in force at each acknowledgement can be retrieved for any user | **Pass** | `compliance.int.test.ts`: a user acknowledges v1 with `[XX]`, Compliance publishes 74 through four-eyes, the user must re-acknowledge (B-801 gate blocks the order until then), `/compliance/acknowledgements?userId=` returns both, each re-rendered from the registry with `verified: true` (content hash), the first shows `[XX]`, the second 74; future-dated v2 served only at its effective date; the value was restored to the placeholder |
+| 5 | Runbooks for all 6 scenarios; tabletop "kill switch fired + reconciliation break" documented | **Pass** | `docs/runbooks/` (feed outage, engine stall, reconciliation break, AI provider outage, kill switch fired, database restore, SLOs, ITIL 4 workflow, PIR template). Tabletop run on the local stack (dev DB :55432, built api :4020): `docs/runbooks/tabletop-kill-switch-reconciliation.md` with the pasted log (mismatch alert on the console 26 ms, P1 incident, firm scope-3 halt 3 accounts in 60 ms, ledger fix, clean re-run, 202 → 403 self-approval → approval by a second risk officer, P1 close refused without review, anchors, evidence hashes, sample) |
+| 6 | `docs/open-questions.md` lists every regulatory placeholder with an owner; STATUS updated | **Pass** | 42 rows (10 new: OQ-C2, G1–G3, K1, P1, P2, O1, O2, X1; OQ-R4 and OQ-A4 updated); unit test fails if the code references an `OQ-*` missing from the table or a row has no owner. STATUS G9 row + section |
+
+### 6.2 Gate (all green)
+
+| Check | Result |
+|---|---|
+| `pnpm build` | pass (7 tasks) |
+| `pnpm lint` | pass (13 tasks) |
+| `pnpm typecheck` | pass |
+| `pnpm test` | pass — domain 183, api unit 149, web 62, ui 113, market-data 71, sdk 15, bot-runner 11, ai-evals 4 |
+| `pnpm test:integration` (run 1) | **217 / 217** (34 files; +49 tests since goal 08: governance-four-eyes 7, governance-evidence 4, risk-console 3, internal-audit 5, compliance 7, ws-quotas 2, minor-units 2, plus existing suites adjusted for B-801/B-014) |
+| `pnpm test:integration` (run 2) | **217 / 217**; kill switch 1,000 orders 165 ms; breach alert 60 ms |
+| `pnpm test:e2e` | **54 / 54** (3.3 min; +2 `governance.spec.ts`) |
+| `pnpm py:check` | pass — ruff, mypy --strict, 160 pytest, 97.4 % coverage |
+| `pnpm evals` | 117 / 117 (100 %), PASS |
+| `pnpm --filter @kora/web i18n:check` | pass (7 tests; `risk.DISCLOSURE_NOT_ACKNOWLEDGED` EN/FR, readability report regenerated) |
+| Backup + restore test | `scripts/backup.sh` on the dev DB after the tabletop: dump 269,456 bytes (sha256 `7df0bfbd…`), restore test **true**, 11 tables / 234 rows compared, audit head in chain |
+
+### 6.3 Deferred (with reason)
+
+- **B-002** refresh tokens / session revocation → goal 10 with Keycloak (B-001).
+- **B-003** MFA recovery codes → B-902 (the four-eyes reset shipped).
+- **B-204** licensed reference data → post-RC, needs a Sponsor contract (OQ-M2).
+- **B-307** margin close-out → blocked on the policy (OQ-B3).
+- **B-308 / B-803** customer time zones, **B-310** bid/ask FX, **B-403 / B-757** push of price/radar alerts,
+  **B-605 / B-606 / B-702** robot segregation and live KPIs, **B-756 / B-806** translations, **B-804**
+  phone/e-mail alerts → goal 10 (engine or UX work outside the governance scope).
+- **B-202 remainder** (NPN.XJSE in ZAc, Novice display) → B-901: NPN is a curated Novice asset and
+  minor units need Novice copy first.
+- UIs for disclosure drafting (B-905), suitability questionnaire (B-906), sign-off approval and incident
+  classification in the console (B-904); APIs are complete.
+- Tabletop actions B-907 … B-910; retention execution (B-911, needs OQ-R4/OQ-P1); KYC provider (B-914,
+  Sponsor); WORM object-lock storage (B-903).
+
+### 6.4 Committee review notes
+
+- **S8:** no regulatory value was invented; every figure is a placeholder with an owner; the product
+  never gives recommendations (suitability records answers only). OQ-A4 reviewed (acceptable for PAPER).
+- **S9:** four-eyes enforced twice (service + trigger); auditor SoD twice (API + trigger); CSV injection
+  neutralised; subject access excludes secrets; `risk:alerts` 2nd line only; WS quotas; TLS enforced
+  outside dev/test; no new third-party dependency (PDF/XLSX writers are in-repo).
+- **S3:** governance core module is global to avoid a trading ↔ governance cycle; the disclosures
+  registry keeps the goal 08 interface; alert relay via NOTIFY survives multiple api replicas (Redis
+  `SET NX` de-duplication).
