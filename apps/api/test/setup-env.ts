@@ -9,3 +9,6 @@ process.env.KORA_AUTH_RATE_LIMIT = '10000';
 process.env.LOG_LEVEL = 'silent';
 process.env.AUTH_PROVIDER = 'dev';
 process.env.LIVE_TRADING_ENABLED = 'false';
+process.env.KORA_MD_FEED ??= 'off';
+process.env.KORA_MD_BACKFILL ??= 'false';
+process.env.KORA_MD_REDIS_PREFIX ??= `kora:test:${process.pid}:md:`;

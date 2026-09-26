@@ -17,10 +17,13 @@
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:seed": "tsx src/db/seed-cli.ts",
-    "openapi": "node dist/openapi-cli.js"
+    "openapi": "node dist/openapi-cli.js",
+    "md:feed": "tsx src/market-data/feed-cli.ts",
+    "load:ws": "node load/ws-fanout.mjs"
   },
   "dependencies": {
     "@kora/domain": "workspace:*",
+    "@kora/market-data": "workspace:*",
     "@nestjs/common": "^11.1.8",
     "@nestjs/core": "^11.1.8",
     "@nestjs/platform-express": "^11.1.8",
@@ -42,6 +45,7 @@
     "pino-http": "^10.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "ws": "^8.21.3",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -54,6 +58,7 @@
     "@types/node": "^22.19.0",
     "@types/pg": "^8.15.6",
     "@types/supertest": "^6.0.3",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "9.39.1",
     "pino-pretty": "^13.1.2",

@@ -12,6 +12,7 @@ import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
 import { KillSwitchController } from './kill-switch/kill-switch.controller';
+import { MarketDataModule } from './market-data/market-data.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { RobotsController } from './robots/robots.controller';
 
@@ -43,6 +44,7 @@ import { RobotsController } from './robots/robots.controller';
     AuditModule,
     AuthModule,
     PreferencesModule,
+    MarketDataModule,
   ],
   controllers: [HealthController, KillSwitchController, RobotsController, AdminController],
   providers: [
