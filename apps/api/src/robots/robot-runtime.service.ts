@@ -240,7 +240,9 @@ export class RobotRuntimeService {
     let orderId: string | null = null;
     const s = body.signal;
     const act = async (): Promise<Outcome> => {
-      if (!hasAnyRole(roles, ROBOT_BUILDER_ROLES)) {
+      // Novice template robots (goal 08, B-614) are the one exception: their owner may be a novice;
+      // their orders still pass the novice guardrails in the OMS (market + stop, no leverage).
+      if (!hasAnyRole(roles, ROBOT_BUILDER_ROLES) && r.origin !== 'novice_template') {
         await this.robots.pauseRobot(
           robotId,
           'owner_role_revoked',
