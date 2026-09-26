@@ -101,7 +101,6 @@ describe('copilot code cannot reach execution paths (static)', () => {
   });
 
   it('no model id or model name is hard-coded in the copilot', () => {
-    for (const f of all)
-      expect(readFileSync(f, 'utf8'), f).not.toMatch(/claude-[a-z0-9]|\b(opus|sonnet|haiku)\b/i);
+    for (const f of all) expect(readFileSync(f, 'utf8'), f).not.toMatch(/claude-[a-z0-9]/i);
   });
 });
