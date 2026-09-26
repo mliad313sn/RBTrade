@@ -25,6 +25,8 @@ export interface TicketDraft {
   origin?: 'manual' | 'order_book' | 'chart' | 'blotter' | 'ai';
   /** Shown above the ticket, e.g. the copilot's one-line rationale. */
   note?: string;
+  /** Goal 07: the audited AI draft behind an `ai` prefill; the ticket records the user's decision. */
+  aiDraftId?: string;
 }
 
 export type PanelTarget = 'watchlist' | 'chart' | 'orderbook' | 'ticket' | 'blotter';

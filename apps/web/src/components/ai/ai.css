@@ -1,0 +1,213 @@
+/* Goal 07 copilot surfaces. Tokens only (--k-*), colour never the only cue (▲▼, words). */
+.ai-strip {
+  position: relative;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+.ai-strip__main {
+  white-space: nowrap;
+  color: var(--k-text);
+}
+.ai-strip__noedge {
+  color: var(--k-warn);
+  font-weight: 600;
+}
+.ai-strip__drivers {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-strip__btn {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--k-ai);
+  border-radius: var(--k-radius-sm);
+  background: transparent;
+  color: var(--k-ai);
+  font: 600 11px/1.2 var(--k-font-ui);
+  cursor: pointer;
+}
+.ai-strip__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ai-strip__why {
+  flex: none;
+  background: none;
+  border: 0;
+  color: var(--k-ai);
+  font: 600 11px/1 var(--k-font-ui);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ai-strip__btn:focus-visible,
+.ai-strip__why:focus-visible {
+  outline: 2px solid var(--k-focus, var(--k-ai));
+  outline-offset: 2px;
+}
+.ai-strip__notice {
+  color: var(--k-text-muted);
+  white-space: nowrap;
+}
+.ai-strip__pop {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 4px);
+  z-index: 20;
+  width: min(460px, 90vw);
+  max-height: 60vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--k-ai);
+  border-radius: var(--k-radius-sm);
+  background: var(--k-panel);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  font-size: 12px;
+}
+.ai-strip__line {
+  margin: 0 0 6px;
+}
+.ai-strip__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+.ai-strip__table th,
+.ai-strip__table td {
+  text-align: left;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--k-border);
+  font-weight: 400;
+}
+.ai-strip__table th {
+  color: var(--k-text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ai-strip__method,
+.ai-strip__disclaimer {
+  margin: 6px 0 0;
+  font-size: 11px;
+}
+
+.ai-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ai-chat__form {
+  display: flex;
+  gap: 6px;
+}
+.ai-chat__input {
+  flex: 1;
+  min-width: 0;
+}
+.ai-chat__answer {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ai-chat__answer p {
+  margin: 0 0 4px;
+}
+.ai-chat__warn {
+  color: var(--k-warn);
+}
+.ai-chat__draft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px dashed var(--k-ai);
+  border-radius: var(--k-radius-sm);
+  color: var(--k-ai);
+}
+
+.ai-drawer__h {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--k-text-muted);
+}
+.ai-drawer__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ai-drawer__box {
+  padding: 8px;
+  border: 1px solid var(--k-border);
+  border-radius: var(--k-radius-sm);
+}
+.ai-drawer__big {
+  margin: 0;
+  font-size: 20px;
+  color: var(--k-ai);
+}
+.ai-drawer__warn {
+  color: var(--k-warn);
+}
+.ai-drawer__suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--k-ai);
+  border-radius: var(--k-radius-sm);
+  background: color-mix(in srgb, var(--k-ai) 6%, transparent);
+}
+.ai-drawer__text {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ai-drawer__text p {
+  margin: 0 0 4px;
+}
+.ai-fc__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 64px;
+  align-items: center;
+  gap: 8px;
+}
+.ai-fc__track {
+  display: block;
+  height: 8px;
+  background: color-mix(in srgb, var(--k-border) 50%, transparent);
+  border-radius: 2px;
+}
+.ai-fc__bar {
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--k-ai);
+}
+.ai-fc__bar.is-neg {
+  background: var(--k-down);
+}
+
+.ai-explain__text {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--k-ai);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ai-explain__text p {
+  margin: 0 0 6px;
+}
+.tk-note__dismiss {
+  margin-left: 6px;
+  background: none;
+  border: 0;
+  color: var(--k-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 11px;
+}

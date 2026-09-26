@@ -147,8 +147,8 @@ export class InsightsService {
         recommendation:
           v.edge === 'none'
             ? r.status === 'running'
-              ? 'No edge detected after costs. Consider pausing it and revisiting the rules.'
-              : 'No edge detected after costs. Keeping it paused is the cautious option.'
+              ? 'Consider pausing it and revisiting the rules.'
+              : 'Keeping it paused is the cautious option.'
             : v.edge === 'insufficient_data'
               ? 'Not enough out-of-sample trades to judge. Run a longer backtest.'
               : 'Positive after costs on past trades; keep monitoring tracking error.',

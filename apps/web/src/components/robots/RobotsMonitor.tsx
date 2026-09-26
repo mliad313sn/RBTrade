@@ -23,6 +23,8 @@ import type {
   WalkForwardResult,
 } from '@/lib/robots/types';
 
+import { RobotCopilot } from '../ai/RobotCopilot';
+
 import { BlockChips } from './BlockChips';
 import { EquityChart } from './EquityChart';
 import { Heatmap } from './Heatmap';
@@ -721,45 +723,12 @@ export function RobotsMonitor() {
             title={<span style={{ color: 'var(--k-ai)' }}>✦ AI copilot</span>}
             actions={<span className="text-xs text-muted">suggests · never executes</span>}
           >
-            <p className="mt-0 text-xs text-muted">
-              The copilot arrives with goal 07. It will explain signals from the features stored
-              with each decision, shown here.
-            </p>
-            {signal ? (
-              <div data-testid="signal-features">
-                <h3 className="mb-1 mt-2 text-xs font-semibold uppercase text-muted">
-                  Feature contribution · {signal.action.replace('_', ' ')} {signal.symbol}{' '}
-                  {signal.barTs.slice(11, 16)}
-                </h3>
-                <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs">
-                  {signal.conditions.map((c) => (
-                    <li
-                      key={c.label}
-                      className="grid grid-cols-[minmax(0,1fr)_60px_44px] items-center gap-2"
-                    >
-                      <span className="truncate">{c.label}</span>
-                      <span
-                        className="h-2 rounded"
-                        style={{
-                          width: `${Math.round(Math.abs(c.contribution ?? 0) * 100)}%`,
-                          background: (c.contribution ?? 0) >= 0 ? 'var(--k-ai)' : 'var(--k-down)',
-                        }}
-                        aria-hidden="true"
-                      />
-                      <span className="k-num text-right">
-                        {c.contribution === null
-                          ? c.result === 'not_available'
-                            ? 'n/a'
-                            : '—'
-                          : fmtSigned(c.contribution)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <p className="text-xs text-muted">No signal yet.</p>
-            )}
+            <RobotCopilot
+              robotId={robot?.id ?? null}
+              strategyId={strategy?.id ?? null}
+              signalId={signal?.id ?? null}
+              onVersionSaved={() => void loadStrategy()}
+            />
           </Panel>
           {mc ? (
             <Panel title="Monte Carlo (OOS trades)">

@@ -49,6 +49,12 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
   if (target.pathname.endsWith('/auth/oidc/callback')) {
     out.set('content-security-policy', "default-src 'none'");
   }
+  // Goal 07: Server-Sent Events (copilot streaming) pass through unbuffered.
+  if ((upstream.headers.get('content-type') ?? '').startsWith('text/event-stream') && upstream.body) {
+    out.set('cache-control', 'no-cache, no-transform');
+    out.set('x-accel-buffering', 'no');
+    return new Response(upstream.body, { status: upstream.status, headers: out });
+  }
   return new Response(upstream.status === 204 ? null : await upstream.arrayBuffer(), { status: upstream.status, headers: out });
 }
 

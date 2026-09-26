@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 
+import '@/components/ai/register-strip';
 import type { AiStripMode } from '@/lib/terminal/ai-strip';
 
 /** The dockable terminal is client-only (dockview and the canvas chart need the DOM). */

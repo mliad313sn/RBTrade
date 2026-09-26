@@ -132,6 +132,28 @@ const CAL = [
   { id: 'c3', time: '2026-09-28T18:00:00Z', country: 'US', currency: 'USD', impact: 1, title: 'FOMC minutes', source: 'simulated' },
 ];
 
+/** Goal 07 strip, SIMULATED values echoing the prototype (calibrated confidence, drivers, event risk). */
+const AI_STRIP = {
+  symbol: 'EURUSD',
+  timeframe: '15m',
+  simulated: true,
+  bias: { direction: 'long', label: 'Mild long bias', score: 0.58 },
+  confidence: { value: 0.58, n: 212, saidAs: 0.6, bin: 5 },
+  reliabilityLine: 'When we said 0.6, it worked 58% of the time (n=212)',
+  edge: 'positive',
+  edgeStatement: 'Positive after costs on past predictions, which does not guarantee future results.',
+  calibration: { modelKey: 'bias:EURUSD:15m', n: 1840, hitRate: 0.54, minN: 30, source: 'fixture' },
+  drivers: [
+    { key: 'momentum', label: '4-bar momentum (ATR multiples)', value: 0.9, contribution: 0.36 },
+    { key: 'emaSpread', label: 'EMA 20 vs EMA 50 (ATR multiples)', value: 0.3, contribution: 0.24 },
+    { key: 'rsi', label: 'RSI 14 vs 50', value: -0.1, contribution: -0.06 },
+  ],
+  eventRisk: [{ time: '2026-09-28T12:30:00Z', currency: 'USD', title: 'US CPI', minutesAway: 83 }],
+  canDraft: true,
+  disclaimer: 'Not investment advice.',
+  method: 'fixture',
+};
+
 const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
 /** Installs the REST + WebSocket fixtures on a signed-in page (registry specs come from the real api). */
@@ -168,6 +190,7 @@ export async function installTerminalFixtures(page: Page): Promise<void> {
     if (path === '/calendar') return route.fulfill(json({ source: 'simulated', simulated: true, events: CAL }));
     if (path === '/price-alerts') return route.fulfill(json({ alerts: [] }));
     if (path === '/health') return route.fulfill(json({ status: 'ok', service: 'kora-api', environment: 'PAPER', liveTradingEnabled: false, authProvider: 'dev', checks: {}, time: new Date(FIXED_NOW).toISOString() }));
+    if (path === '/ai/strip') return route.fulfill(json(AI_STRIP));
     if (path === '/orders/preview') return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'fixture', message: 'Preview is not part of the visual fixture' }) });
     return route.continue();
   });

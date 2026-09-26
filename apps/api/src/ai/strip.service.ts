@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   dec,
+  PreviewOrderSchema,
   quoteChannel,
   roundQtyDown,
   roundToTick,
@@ -20,6 +21,15 @@ import type { AiConfig } from './core/config';
 import type { ToolCallCtx } from './core/tools';
 import { DISCLAIMER } from './core/types';
 import { DraftsService } from './drafts.service';
+import { AiReadPorts } from './read-ports';
+
+const SIZE_CODES = new Set([
+  'INSUFFICIENT_MARGIN',
+  'MAX_LEVERAGE',
+  'MAX_ORDER_NOTIONAL',
+  'MAX_POSITION',
+  'FAT_FINGER',
+]);
 
 /**
  * Terminal AI strip (goal 07 §5): bias, calibrated confidence (or "No edge after costs"), top drivers
@@ -38,6 +48,7 @@ export class StripService {
     private readonly accounts: AccountsService,
     private readonly drafts: DraftsService,
     private readonly fx: FxService,
+    private readonly ports: AiReadPorts,
     @Inject(MD_CONFIG) md: MdConfig,
   ) {
     this.calendar = new SimulatedCalendarProvider(md.seed);
@@ -135,6 +146,31 @@ export class StripService {
       ? roundQtyDown(riskAmount.div(perUnit), spec.qtyStep)
       : dec(spec.minQty);
     if (qty.lt(dec(spec.minQty))) qty = dec(spec.minQty);
+    // Respect the account's pre-trade risk rules (margin, leverage, notional): halve the size until the
+    // read-only preview passes (or the minimum is reached). The ticket re-previews anyway.
+    for (let i = 0; i < 8 && qty.gt(dec(spec.minQty)); i++) {
+      const pv = await this.ports
+        .previewOrder(
+          ctx.user.id,
+          ctx.user.roles,
+          PreviewOrderSchema.parse({
+            symbol,
+            side,
+            type: 'market',
+            qty: qty.toFixed(),
+            stopLossPrice: sl.toFixed(),
+          }),
+        )
+        .catch(() => null);
+      if (
+        !pv ||
+        pv.risk.ok ||
+        !pv.risk.violations.some((v: { code: string }) => SIZE_CODES.has(v.code))
+      )
+        break;
+      const half = roundQtyDown(qty.div(2), spec.qtyStep);
+      qty = half.lt(dec(spec.minQty)) ? dec(spec.minQty) : half;
+    }
     const conf = s.confidence
       ? `calibrated ${s.confidence.value}, n=${s.confidence.n}`
       : s.edgeStatement;

@@ -69,6 +69,10 @@ export default defineConfig({
         KORA_MD_REDIS_PREFIX: MD_PREFIX,
         KORA_SERVICE_TOKEN: SERVICE_TOKEN,
         KORA_MD_WS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
+        // Goal 07: deterministic scripted copilot (no API key in CI); refused outside dev/test.
+        KORA_AI_PROVIDER: 'scripted',
+        KORA_AI_RATE_PER_MIN: '1000',
+        KORA_AI_REDIS_PREFIX: `kora:e2e:ai:${API_PORT}:`,
       },
     },
     {
@@ -95,7 +99,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${WEB_PORT}/login`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { ...(process.env as Record<string, string>), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.KORA_AI_STRIP ?? 'placeholder' },
+      env: { ...(process.env as Record<string, string>), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on' },
     },
   ],
 });

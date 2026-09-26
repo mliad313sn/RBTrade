@@ -19,6 +19,7 @@ import { Button, Dialog, HoldToConfirmButton, NumberInput, formatMoney, formatPr
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useShell } from '@/components/shell/ShellContext';
+import { recordAiDecision } from '@/lib/ai/decision';
 import { api } from '@/lib/api-browser';
 import { formatQty } from '@/lib/terminal/format';
 import { useTerminal } from '@/lib/terminal/store';
@@ -114,6 +115,7 @@ export function TicketPanel() {
   ]);
   const [origin, setOrigin] = useState<'manual' | 'ai' | string>('manual');
   const [note, setNote] = useState<string | null>(null);
+  const [aiDraftId, setAiDraftId] = useState<string | null>(null);
   const [quote, setQuote] = useState<{ bid: string; ask: string } | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -194,6 +196,7 @@ export function TicketPanel() {
     if (draft.reduceOnly !== undefined) setReduceOnly(draft.reduceOnly);
     setOrigin(draft.origin ?? 'manual');
     setNote(draft.note ?? null);
+    setAiDraftId(draft.origin === 'ai' ? (draft.aiDraftId ?? null) : null);
     setResult(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.nonce]);
@@ -323,8 +326,11 @@ export function TicketPanel() {
       setResult({ tone: 'ok', text });
       toast.push(text, 'success', 4000);
       setConfirm(false);
+      // Goal 07: the user placed the order from an AI draft; record the human decision (audited).
+      if (origin === 'ai' && aiDraftId) void recordAiDecision(aiDraftId, { decision: 'accepted', orderId: o.id });
       setOrigin('manual');
       setNote(null);
+      setAiDraftId(null);
       refreshTrading();
     } catch (e) {
       const b = e instanceof KoraApiError ? (e.body as Partial<RiskRejectionBody> | undefined) : undefined;
@@ -333,7 +339,7 @@ export function TicketPanel() {
     } finally {
       setBusy(false);
     }
-  }, [body, inst?.qtyPrecision, toast]);
+  }, [body, inst?.qtyPrecision, toast, origin, aiDraftId]);
 
   const review = useCallback(() => {
     if (!canSubmit || !p) return;
@@ -367,6 +373,21 @@ export function TicketPanel() {
       {note ? (
         <p className="tk-note" data-testid="ticket-note">
           <span className="text-ai">✦ Draft</span> {note} <span className="text-muted">Review before placing.</span>
+          {aiDraftId ? (
+            <button
+              type="button"
+              className="tk-note__dismiss"
+              onClick={() => {
+                void recordAiDecision(aiDraftId, { decision: 'rejected' });
+                setAiDraftId(null);
+                setNote(null);
+                setOrigin('manual');
+              }}
+              data-testid="ticket-draft-dismiss"
+            >
+              Dismiss draft
+            </button>
+          ) : null}
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Side">
