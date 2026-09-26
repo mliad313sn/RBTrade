@@ -4,3 +4,9 @@ scrape_configs:
   - job_name: otel-collector
     static_configs:
       - targets: ["otel-collector:8889"]
+  # Goal 07: the api's own /metrics (copilot tokens, cost, budgets). The api runs on the host in dev;
+  # set KORA_METRICS_TOKEN in real deployments and add it here as a bearer token.
+  - job_name: kora-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:4000"]
