@@ -31,6 +31,7 @@ import type {
   AttemptResponse,
   SavedLayout,
   RiskSummary,
+  VenueDto,
   LoginResponse,
   MeResponse,
   MfaEnrollResponse,
@@ -265,6 +266,11 @@ export class KoraClient {
 
   instruments(q: InstrumentsQuery = {}) {
     return this.request<{ instruments: InstrumentDto[] }>('GET', `/instruments${query(q)}`);
+  }
+
+  /** Venues (ISO 10383 MIC, region, timezone, calendar) with their current session. */
+  venues() {
+    return this.request<{ venues: VenueDto[] }>('GET', '/venues');
   }
 
   instrument(symbol: string) {

@@ -149,6 +149,10 @@ export interface InstrumentDto extends InstrumentSpec {
   session: SessionInfo | null;
 }
 
+export interface VenueDto extends Venue {
+  session: SessionInfo;
+}
+
 export interface InstrumentDetail extends InstrumentDto {
   staleAfterMs: number | null;
   venueInfo: (Venue & { session: SessionInfo }) | null;
