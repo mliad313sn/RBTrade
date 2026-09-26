@@ -70,10 +70,12 @@ jobs:
         run: pnpm contrast
       - name: API integration tests (real Postgres + Redis)
         run: pnpm --filter @kora/api test:integration
-      - name: Storybook build
-        run: pnpm --filter @kora/ui build-storybook
       - name: Playwright browsers
         run: pnpm --filter @kora/web exec playwright install --with-deps chromium
+      - name: Storybook build
+        run: pnpm --filter @kora/ui build-storybook
+      - name: Storybook axe in Chromium (every story, both themes, contrast included)
+        run: pnpm --filter @kora/ui test:storybook-axe
       - name: Playwright e2e
         run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
