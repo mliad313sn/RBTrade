@@ -1,6 +1,6 @@
 # KORA — delivery status
 
-Last updated: 2026-09-26 (goal 03 done; goals 02 and 05 merged earlier).
+Last updated: 2026-09-26 (goal 04 done; goal 03 done; goals 02 and 05 merged earlier).
 
 | Gate | Goal | State |
 |---|---|---|
@@ -8,6 +8,7 @@ Last updated: 2026-09-26 (goal 03 done; goals 02 and 05 merged earlier).
 | G1 | 01 foundation | **Done, with deferrals**: see `docs/plans/01-foundation.md` §4 and §6 |
 | G2 | 02 market data | **Done, with deferrals**: see `docs/plans/02-market-data.md` §7 and §8 |
 | G3 | 03 OMS, paper engine, risk, kill switch (+ B-018 appropriateness, B-501) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/03-oms.md` §6 (deferred items in §6.3) |
+| G4 | 04 Pro terminal UI (+ B-009, B-011, B-208, B-210, B-305) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/04-pro-terminal.md` §6 (deferred items in §6.5) |
 | G5 | 05 gain simulator | **Done, with deferrals**: see `docs/plans/05-gain-simulator.md` (paper import now uses real fills, B-501 done in goal 03; human copy review owed) |
 
 ## What shipped in goal 01
@@ -44,9 +45,8 @@ Last updated: 2026-09-26 (goal 03 done; goals 02 and 05 merged earlier).
 
 ## Stubbed or placeholder (explicit in the UI)
 
-- Chart is shown as "arrives in goal 04". (Account summary, order preview, blotter and the kill switch engine are live since goal 03.)
-- The robot builder, simulator, practice, auto-invest and learn pages are placeholders.
-- The command palette is an entry point only.
+- The Pro terminal (chart, order book, full ticket, streaming blotter, ⌘K palette) is live since goal 04.
+- The robot builder, auto-invest and learn pages are placeholders (robots: goal 06).
 
 ## Deferred (reasons in plan 01 §6)
 
@@ -221,4 +221,83 @@ B-301 robot runner wiring, B-302 matching-loop scale-out, B-303 owner access to 
 - **Novice (goal 08):** guardrails are server-side (`NOVICE_*` codes) for novice-only users and anyone in the Novice view; closing a position never needs a stop. Use `POST /orders/preview` for "most you could lose" (`lossIfStopHit.total`) and `GET /accounts/me` for the balance.
 - **Numbers:** quantities follow the registry grid (`qtyStep`, `minQty`); prices the `tickSize`; `multiplier` comes from `asset_class_trading.multiplier_mode` (FX/metals/crypto/equities in units). Marks are exit-side (bid for longs, ask for shorts). FX sessions close at weekends, so day-independent tests use BTC/USD.
 - **Env:** `KORA_PAPER_*`, `KORA_RISK_*`, `KORA_ORDER_RATE_LIMIT`, `KORA_ENGINE_*`, `KORA_TRADING_*`, `KORA_RECONCILIATION_INTERVAL_MS`, `KORA_APPROPRIATENESS_*` (see `.env.example`). Integration tests set `KORA_ENGINE_ENABLED=false` and drive matching with `EngineLoopService.matchSymbol`; `test/market-fixture.ts` writes quotes/depth/status into Redis.
+
+## Goal 04: Pro terminal UI (G4: done, with deferrals)
+
+Plan and evidence: `docs/plans/04-pro-terminal.md` §6. ADR 0004. Lead seats: S6, S1, S2. Built in parallel with goal 06.
+
+### What shipped
+
+- **Dockable terminal (`/terminal`, dockview).**
+  - Default layout per `Main.png`: watchlist (2/12) over the calendar, chart (7/12) with the AI strip, order book | time & sales over the ticket (3/12), and a 186 px blotter (240 px from 1,000 px high).
+  - Blotter tabs (Positions, Orders, Fills, Alerts, Risk) are dockable panels.
+  - Named layouts per user (`/me/layouts`), a working layout in `localStorage`, and reset to default.
+- **Watchlists (`/me/watchlists`).**
+  - Majors + Global (one instrument per registry venue) by default; create, rename, delete, ≤ 500 symbols.
+  - Add via ⌘K, drag or Alt+↑/↓ to reorder, Delete to remove.
+  - Rows show mid, change %, spread (pips) and venue MIC + session badge ("Closed" is not "Stale", B-208). They flash for 150 ms and are virtualised (tested with 500 rows).
+- **Chart (lightweight-charts v5).**
+  - 1m–1D candles and volume.
+  - EMA/SMA/VWAP/Bollinger/RSI/ATR from `@kora/domain/indicators.ts` (reference-tested).
+  - Horizontal-line and trendline drawing, own fills as markers, last price tag, OHLC readout.
+  - Working orders as draggable price lines (drag or arrow keys → confirm → PATCH).
+- **Order book** (10 levels per side, cumulative bars, spread and mid; a level click or Enter fills the ticket limit) and **time & sales** (B-210 `trades:{symbol}` channel).
+- **Pro ticket (B-305).**
+  - All goal 03 order types, including the OCO editor.
+  - Quantity in units, notional or % equity; SL/TP in price, pips or %; TIF (incl. GTD), reduce-only, post-only.
+  - Live preview, debounced 150 ms.
+  - Warnings: per-trade risk rule, event within 60 min, closed session, data state, no stop.
+  - Confirmation dialog, plus a 600 ms hold for market orders above the threshold.
+- **Blotter.**
+  - Streams on the private channels, with a REST fallback.
+  - Positions: close, reverse, SL/TP. Orders: amend inline, cancel, cancel-all (`DELETE /orders?symbol=`). Fills: with slippage.
+  - Alerts: price/RSI, evaluated by the server (`/price-alerts`, audited).
+  - Risk: `GET /risk/summary` (exposure by currency, VaR 95 % 1 day historical, correlation clusters, daily loss vs limit).
+- **Keyboard and settings.**
+  - Configurable hotkeys: B/S, Ctrl+Enter, Esc, Ctrl+Shift+K, Alt+1..5, ⌘K, and `?` for the cheat sheet.
+  - Settings: colour convention, density, UTC/local, sound on fills (off), per-trade risk %.
+- **⌘K palette (B-009).** In the Pro shell on every page: every registry instrument grouped by region/asset class, plus actions.
+- **Status bar.** Feed state, tick-to-paint p95 and UTC/local clock.
+- **API.** Migration `0040_terminal.sql`, `TerminalModule`, the feed's trade tape, `cancelAll`, and the test-only `KORA_TRADING_SESSION_OVERRIDE`, which is refused outside dev/test. SDK methods: `layouts/saveLayout/deleteLayout`, `watchlists/…`, `priceAlerts/…`, `riskSummary`, `cancelAllOrders`, `venues`, and socket helpers `trades/orders/positions/account`. `openapi.json` is regenerated.
+- **Numbers.**
+  - Tick-to-paint p95 42 ms; streaming CLS 0.0000.
+  - Lighthouse desktop: LCP 1.4 s, performance 0.95, accessibility 1.00. At 4× CPU: LCP 2.1 s.
+  - Prototype fit: mean IoU 0.973; perceptual Δ 0.040.
+  - Tests: integration 125, e2e 36, web unit 29, domain 132.
+
+### Stubbed or placeholder
+
+- The AI strip is a placeholder (`KORA_AI_STRIP=placeholder`) with no numbers; goal 07 fills it.
+- The Risk tab's VaR and correlations are computed in the api, not the quant service (B-401). All history is SIMULATED.
+- The visual-regression run uses REST/WS fixtures (SIMULATED values echoing the prototype).
+
+### Deferred
+
+B-202 (to 09), B-004/B-312 (to 10), B-506 (to 08), B-401 to B-410 (see BACKLOG).
+
+### What goals 07 and 08 need to know
+
+- **AI strip slot (goal 07).**
+  - Contract: `apps/web/src/lib/terminal/ai-strip.ts`. Call `registerAiStrip(Component)` once, client side, before `/terminal` mounts (for example from a module imported by the terminal page).
+  - The component receives `AiStripSlotProps {symbol: string, timeframe: Timeframe, prefillTicket(draft)}`.
+  - Set `KORA_AI_STRIP=on` (`off` hides the strip; `placeholder` is the default).
+  - The strip is 42 px tall under the chart. Keep it one line and add a "Why?" disclosure inside it.
+- **Ticket prefill for drafts (goals 07 and 08).**
+  - Call `useTerminal.getState().prefillTicket(draft)` or `terminalApi.prefillTicket(draft)` (`apps/web/src/lib/terminal/store.ts`).
+  - `TicketDraft = {symbol?, side?, type?, qty? (units), limitPrice?, stopPrice?, trailAmount?, stopLossPrice?, takeProfitPrice?, tif?, reduceOnly?, origin?: 'manual'|'order_book'|'chart'|'blotter'|'ai', note?}`.
+  - With `origin: 'ai'`, the ticket shows "✦ Draft {note} · Review before placing". The order goes out with `source: 'ai-draft-accepted'` only after the user reviews and confirms (confirmation dialog / hold rules unchanged). Nothing can submit without the user.
+  - Audit the suggestion itself (goal 07) and pass the audit id in `note` if useful.
+- **Layout and theme hooks.**
+  - Layouts: `apps/web/src/lib/terminal/layout.ts` has `PANEL_IDS`, `buildDefaultLayout(api)` and `isCompleteLayout(json)`. `/me/layouts` stores dockview JSON. Adding a panel means adding its id to `PANEL_IDS`; old saved layouts are then rejected and rebuilt from the default.
+  - Window events: `kora:layout` `{action: 'open'|'reset'}`, `kora:focus-panel` `{id}`, `kora:palette` `{mode: 'go'|'add'}` and `kora:watchlist-add` `{symbol}`.
+  - Theme: the dockview theme class `dockview-theme-kora` (`components/terminal/terminal.css`) reads only `--k-*` tokens. The colour convention and density are `data-colors` on `<html>` and `data-density` on the dock.
+- **Goal 08 (Novice).** Reusable pieces:
+  - `@kora/domain/terminal.ts`: `unitsFromQtyInput`, `protectivePrice`, `ticketWarnings`, `sessionBadge`, `quoteBadge`;
+  - the indicator library;
+  - `MarketStore` (one socket, frame-batched);
+  - `useRegistry` / `searchInstruments`.
+
+  The Novice view must not use the dock or advanced order types (server-enforced). Terminal settings live in `preferences.terminal` (`TerminalSettingsSchema`).
+- **Goal 06 (robots).** Positions show a "Source" column from the latest filled order's `source` (`robot:<id>` → "Robot · id…"). Position-level attribution is B-408.
+- **Env:** `KORA_AI_STRIP`, `KORA_ALERTS_ENABLED`, `KORA_ALERTS_EVAL_MS`, `KORA_TRADING_SESSION_OVERRIDE` (test only), and `E2E_MD_REDIS_PREFIX` (a second e2e stack on one host).
 

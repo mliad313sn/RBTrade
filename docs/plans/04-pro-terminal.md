@@ -112,6 +112,97 @@ Built in parallel with goal 06 (robots), which owns `services/quant`, `services/
 - Web unit: market store batching and tick-to-paint bookkeeping, watchlist virtualisation with 500 rows, ticket helpers, hotkey matcher, palette grouping.
 - Runs in this session use `kora_test_g4` / `kora_e2e_g4`, ports 4024/3024/8024 and Redis prefix `kora:e2e-g4:md:` through `DATABASE_URL_*`, `E2E_*_PORT` and `E2E_MD_REDIS_PREFIX`. The defaults stay the same for CI.
 
-## 6. Results
+## 6. Results (verified 2026-09-26 on the working branch)
 
-(filled in after verification)
+The runs used this session's isolated resources (§5.4): `kora_test_g4` / `kora_e2e_g4`, ports 4024/3024/8024 and Redis prefix `kora:e2e-g4:md:`. Today is a Saturday, so FX sessions were closed during every run.
+
+### 6.1 Acceptance criteria
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | e2e: search EUR/USD → limit buy with SL/TP → preview values match the API → confirm → Orders → drag the price line to amend → fills → Positions and Fills with slippage → close | **Pass** | `apps/web/e2e/terminal.spec.ts` › "search EUR/USD → …". See the detail below. |
+| 2 | Kill-switch e2e: hold 1.5 s → scope 3 → banner, orders cancelled, positions flat, audit entries visible | **Pass** | `apps/web/e2e/terminal-kill-switch.spec.ts`. See the detail below. |
+| 3 | Visual regression vs the prototype at 1440×900 within the agreed thresholds; ≥ 1280 px breakpoint | **Pass** | `apps/web/e2e/terminal-visual.spec.ts`: own baseline `terminal-1440-chromium-linux.png` (≤ 1 % pixels); mean IoU **0.973** (≥ 0.85), every edge ≤ 11 px (≤ 24); perceptual mean \|Δluma\| **0.0398** (≤ 0.12). The 1280×800 run has no horizontal scroll and every panel ≥ 160 px wide. |
+| 4 | Indicator library matches reference values | **Pass** | `packages/domain/src/indicators.test.ts`, 10 tests. See the detail below. |
+| 5 | axe 0 serious violations; text contrast ≥ 4.5:1 | **Pass** | `apps/web/e2e/terminal-a11y-perf.spec.ts`. See the detail below. |
+| 6 | STATUS update | **Done** | `docs/STATUS.md`: G4 row and the goal 04 section |
+
+**Criterion 1 in detail.** The acceptance flow runs these steps:
+- The palette (Ctrl+K) searches "EUR/USD", and Enter switches the chart and the URL.
+- Limit buy 100,000 at 10 pips under the bid, SL 20 pips, TP 40 pips. The request body carries SL = limit − 0.0020 and TP = limit + 0.0040 (registry pip size).
+- The notional, fees + spread, margin, loss at stop (and % of equity) and reward:risk on screen equal the captured `/orders/preview` response.
+- The confirmation dialog opens (notional > 50,000) → the order is working → the streamed Orders tab shows it.
+- The order-line handle is dragged above the ask → the amend dialog shows the new price → PATCH 200 → fill.
+- Positions shows a long 100,000 with its stop, and Fills has a row with a slippage cell.
+- Close → flat, the protective orders are cancelled, and 3 fill rows remain.
+
+EUR/USD is in session through `KORA_TRADING_SESSION_OVERRIDE=EURUSD`, which only the e2e api sets (ADR 0004 §11).
+
+**Criterion 2 in detail.**
+- Setup: a BTC/USD position and a resting limit.
+- A 1.5 s mouse hold → scope 3 → "1 order cancelled. 1 position closed. Audit event #…".
+- The halted banner appears. The tabs go to `Positions (0)` / `Orders (0)` and both tables empty.
+- The banner persists after a reload.
+- `/audit` shows `kill_switch.requested` and `kill_switch.completed`, and the API confirms `scope: robots_cancel_flatten`.
+
+**Criterion 4 in detail.** The tests cover:
+- the StockCharts 10-day SMA/EMA (30 closes, ±0.006 / ±0.011) and 14-period Wilder RSI (33 closes, ±0.02) worked examples;
+- a hand-computed Bollinger band plus a check against the naive definition;
+- a hand-computed Wilder ATR and true range;
+- a hand-computed VWAP with a UTC-day reset.
+
+The api's RSI alert uses the same library, covered by an integration test.
+
+**Criterion 5 in detail.**
+- axe (wcag2a/aa, 21a/aa, 22aa) reports 0 serious or critical violations on the live terminal, on each blotter tab, on time & sales, with the palette open and with the cheat sheet open.
+- The computed contrast scan of every visible text node finds 0 failures.
+- No button lacks an accessible name.
+- The keyboard-only ticket-to-fill passes: B → Tab to Market → Space → quantity → Ctrl+Enter → Tab to the hold button → hold Space 750 ms → filled → Alt+5 focuses the blotter.
+
+### 6.2 Performance
+
+| Bar | Result |
+|---|---|
+| Tick-to-paint < 100 ms | p50 **28.8 ms**, p95 **42.0 ms**, max 43.8 ms (817 updates, 6 s of BTC/USD + watchlist streaming; e2e asserts p95 < 100) |
+| No layout shift while streaming | CLS after first render **0.0000**; whole page load 0.0164 (e2e asserts < 0.01 streaming, < 0.1 total) |
+| Initial load < 2.5 s (Lighthouse, production build) | Lighthouse 13.5.0, Chromium 141, `--preset=desktop`, authenticated `/terminal`: performance **0.95**, accessibility **1.00**, best practices 0.96; FCP 0.4 s, **LCP 1.4 s**, TTI 1.4 s, TBT 80 ms, CLS 0.008. With `--throttling.cpuSlowdownMultiplier=4` (a slower "mid laptop"): LCP **2.1 s**, TTI 2.2 s, TBT 730 ms, performance 0.64. Lighthouse ran from a scratch `npm i lighthouse` outside the repo (not in the lockfile); CI wiring is B-405. |
+| Navigation timing in e2e | load event 223 ms, FCP 180 ms (asserted < 2,500 ms) |
+
+### 6.3 Prototype comparison method (agreed thresholds)
+
+- **Region measurement.** Panel borders were measured on `Main.png` with pngjs by scanning rows and columns for the border colour `#262E3B` against the `#0B0E13` background. The results are committed in `apps/web/e2e/fixtures/prototype-regions.json`:
+  - top bar 0–41;
+  - rail 0–48;
+  - panels at x 55/287/1092, y 49, with 8 px gaps;
+  - blotter 683–869;
+  - status bar 877–900.
+
+  The DOM rectangles of the dockview groups are compared edge by edge (≤ 24 px) and by IoU (mean ≥ 0.85).
+- **Perceptual comparison.** Both 1440×900 images → 8× block-mean luminance → 3×3 box blur → mean absolute difference ≤ 0.12.
+- **Artefacts.** The test writes `test-results/prototype-compare/prototype-vs-ours.png` (side by side), `prototype-vs-ours-luma.png` (prototype | ours | heat map) and `report.txt`.
+- **Deliberate differences.**
+  - Dark ink on the buy/sell fills (OQ-D2).
+  - The copilot strip shows no invented numbers (goal 07).
+  - Every panel has a dockview tab header; the prototype's chart has none.
+  - The calendar is its own panel under the watchlist.
+  - Our SIMULATED fixture values.
+
+### 6.4 Gate run
+
+| Command | Result |
+|---|---|
+| `pnpm build` | 7/7 tasks successful |
+| `pnpm lint` | 12/12 successful, 0 errors |
+| `pnpm typecheck` | 12/12 successful |
+| `pnpm test` | domain 132, ui 113, market-data 60, api unit 38, sdk 13, web 29, bot-runner 5, all passing; domain coverage 99.9 % lines (indicators, terminal and risk analytics 100 %) |
+| `pnpm test:integration` | 18 files, **125 tests** passed (7 new in `terminal.int.test.ts`: layouts, watchlists, alerts with audit and a once-only trigger, cancel-all, risk summary, terminal preferences, `trades:` channel) |
+| `pnpm test:e2e` | **36 passed** (2.2 min), including 10 new goal 04 tests in 4 specs; goal 02/03 specs updated for the Pro ticket (hold to confirm) and the status bar |
+
+### 6.5 Deferred (with reason)
+
+- **B-202 (GBX/ZAc minor units).** Needs registry columns and changes to the engine's quantity multiplier, which goal 03 owns. It is not cheap to do safely now; retargeted to 09.
+- **B-004 / B-312 (SDK generated from OpenAPI).** The OpenAPI document is regenerated (`packages/sdk/openapi.json`) and the hand-written SDK gained typed terminal methods. Generation needs response schemas on every endpoint; retargeted to 10.
+- **B-506 (typed `/sim/*` SDK methods).** Not needed by the terminal; retargeted to 08.
+- **VaR from the quant service** (spec: "when available"). The quant service has no risk endpoint, and goal 06 owns it during this goal. The api computes it with unit-tested domain code and labels the source (B-401).
+- **Order book depth.** The simulator publishes 10 levels. The panel shows 10 per side (the spec allows 10–20). Aggregation / 20 levels is B-406.
+- **Server-pushed alert notifications.** The web polls every 5 s (B-403).
