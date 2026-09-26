@@ -15,3 +15,4 @@ Numbering:
 | [0005](0005-gain-simulator.md) | Gain simulator: engine, determinism, numbers, service boundary | Accepted |
 | [0004](0004-pro-terminal.md) | Pro terminal: docking, hot path, indicators, ticket, alerts, risk tab, test aids | Accepted |
 | [0006](0006-robot-trader.md) | Robot trader: DSL, single evaluator, backtester, bot runner ↔ OMS, promotion | Accepted |
+| [0007](0007-ai-copilot.md) | AI copilot: gateway, read-only/draft tools, calibration table, safety, evals, threat model | Accepted |
