@@ -43,12 +43,15 @@ class Connection implements HubClient {
   ops: number[] = [];
   timers: NodeJS.Timeout[] = [];
   corked = false;
+  /** B-203: the timer that closes the socket when the current token expires (re-armed on refresh). */
+  expiry: NodeJS.Timeout | null = null;
   readonly socket: Socket;
 
   constructor(
     readonly id: number,
     readonly ws: WebSocket,
     private readonly flusher: Flusher,
+    readonly ip: string,
   ) {
     // ws keeps the upgraded TCP socket here; with per-message deflate off its own sends are
     // synchronous writes to the same socket, so frame order is preserved.
@@ -173,12 +176,21 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       socket.destroy();
       return;
     }
+    // B-203: per-IP quota (the socket address; X-Forwarded-For is not trusted here, B-015).
+    const ip = req.socket.remoteAddress ?? 'unknown';
+    let fromIp = 0;
+    for (const c of this.conns) if (c.ip === ip) fromIp += 1;
+    if (fromIp >= this.cfg.wsMaxConnPerIp) {
+      socket.write('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     const cookieToken = parseCookie(req.headers.cookie, ACCESS_COOKIE);
-    this.wss!.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, cookieToken));
+    this.wss!.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, cookieToken, ip));
   };
 
-  private onConnection(ws: WebSocket, cookieToken: string | null): void {
-    const conn = new Connection(this.nextId++, ws, this.flusher);
+  private onConnection(ws: WebSocket, cookieToken: string | null, ip: string): void {
+    const conn = new Connection(this.nextId++, ws, this.flusher, ip);
     this.conns.add(conn);
     ws.on('pong', () => (conn.alive = true));
     ws.on('close', () => this.cleanup(conn));
@@ -259,21 +271,41 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     return ok;
   }
 
+  /**
+   * First `auth` authenticates the socket; a later `auth` (B-203) refreshes the token on the open
+   * socket: same subject only, the expiry timer is re-armed, subscriptions stay.
+   */
   private async authenticate(conn: Connection, token: string): Promise<void> {
+    const refresh = conn.principal !== null;
     try {
       const p = await this.tokens.verifyAccessToken(token);
       if (requiresMfa(p.roles) && !p.mfa) {
         conn.close(4403, 'mfa required');
         return;
       }
+      if (refresh && p.sub !== conn.principal!.sub) {
+        conn.close(4403, 'subject mismatch');
+        return;
+      }
+      if (!refresh) {
+        // B-203: per-user quota.
+        let mine = 0;
+        for (const c of this.conns) if (c !== conn && c.principal?.sub === p.sub) mine += 1;
+        if (mine >= this.cfg.wsMaxConnPerUser) {
+          conn.close(4429, 'too many connections');
+          return;
+        }
+      }
       conn.principal = p;
+      if (refresh) conn.accounts.clear();
+      if (conn.expiry) clearTimeout(conn.expiry);
+      conn.expiry = null;
       const exp = decodeJwt(token).exp;
       if (exp) {
-        const t = setTimeout(() => conn.close(4401, 'token expired'), Math.max(0, exp * 1000 - Date.now()));
-        t.unref();
-        conn.timers.push(t);
+        conn.expiry = setTimeout(() => conn.close(4401, 'token expired'), Math.max(0, exp * 1000 - Date.now()));
+        conn.expiry.unref();
       }
-      conn.json({ type: 'authenticated', sub: p.sub });
+      conn.json({ type: 'authenticated', sub: p.sub, ...(refresh ? { refreshed: true } : {}), exp: exp ?? null });
     } catch {
       conn.close(4401, 'invalid token');
     }
@@ -283,6 +315,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     if (!this.conns.delete(conn)) return;
     conn.uncork();
     for (const t of conn.timers) clearTimeout(t);
+    if (conn.expiry) clearTimeout(conn.expiry);
     for (const ch of conn.channels) this.hub.unsubscribe(conn, ch);
     conn.channels.clear();
   }

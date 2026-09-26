@@ -5,6 +5,7 @@ import {
   ordersChannel,
   positionsChannel,
   quoteChannel,
+  RISK_ALERTS_CHANNEL,
   STATUS_CHANNEL,
   tradesChannel,
   type OrderDto,
@@ -49,6 +50,11 @@ export interface MarketDataSocketOptions {
   backoff?: { initialMs?: number; maxMs?: number; factor?: number; jitter?: number };
   /** Ping interval; the connection is recycled if nothing arrives for 2.5× this. */
   heartbeatMs?: number;
+  /**
+   * B-203: with a token provider, the socket re-authenticates this long before the token expires
+   * (`{op:"auth"}` on the open socket, subscriptions kept). Default 60 s.
+   */
+  refreshBeforeMs?: number;
   random?: () => number;
   timers?: SocketTimers;
   now?: () => number;
@@ -181,6 +187,18 @@ export class MarketDataSocket {
     return this.subscribe(STATUS_CHANNEL, handler);
   }
 
+  /** Goal 09: risk console alerts (risk officers and admins only; others get `forbidden`). */
+  riskAlerts<T = unknown>(handler: ChannelHandler<{ type: 'risk_alert'; alert: T; ts: number }>): () => void {
+    return this.subscribe(RISK_ALERTS_CHANNEL, handler);
+  }
+
+  /** B-203: sends a fresh token on the open socket (same user); the server re-arms its expiry. */
+  refreshToken(token: string): boolean {
+    if (!this.ws || this.ws.readyState !== 1) return false;
+    this.ws.send(JSON.stringify({ op: 'auth', token }));
+    return true;
+  }
+
   onState(listener: (s: SocketState) => void): () => void {
     this.stateListeners.add(listener);
     return () => this.stateListeners.delete(listener);
@@ -232,7 +250,7 @@ export class MarketDataSocket {
 
   private onMessage(raw: unknown): void {
     this.lastMessageAt = this.now();
-    let msg: { ch?: string; data?: unknown; snapshot?: boolean; type?: string; code?: string; message?: string };
+    let msg: { ch?: string; data?: unknown; snapshot?: boolean; type?: string; code?: string; message?: string; exp?: number | null };
     try {
       msg = JSON.parse(typeof raw === 'string' ? raw : String(raw)) as typeof msg;
     } catch {
@@ -243,6 +261,8 @@ export class MarketDataSocket {
       if (!set) return;
       const meta = { channel: msg.ch, snapshot: msg.snapshot === true };
       for (const h of set) h(msg.data, meta);
+    } else if (msg.type === 'authenticated') {
+      this.scheduleRefresh(msg.exp ?? null);
     } else if (msg.type === 'error') {
       for (const l of this.errorListeners) l({ type: 'error', code: msg.code ?? 'error', message: msg.message ?? '' });
     }
@@ -285,7 +305,24 @@ export class MarketDataSocket {
     if (this.ws && this.ws.readyState === OPEN && this.stateValue === 'open') this.ws.send(JSON.stringify(op));
   }
 
+  private refreshTimer: unknown = null;
+
+  /** B-203: re-authenticate before the token expires when the token comes from a provider. */
+  private scheduleRefresh(exp: number | null): void {
+    if (this.refreshTimer !== null) this.timers.clearTimeout(this.refreshTimer);
+    this.refreshTimer = null;
+    const t = this.opts.token;
+    if (!exp || typeof t !== 'function') return;
+    const delay = Math.max(1000, exp * 1000 - this.now() - (this.opts.refreshBeforeMs ?? 60_000));
+    this.refreshTimer = this.timers.setTimeout(() => {
+      this.refreshTimer = null;
+      void Promise.resolve(t()).then((token) => this.refreshToken(token));
+    }, delay);
+  }
+
   private clearTimers(): void {
+    if (this.refreshTimer !== null) this.timers.clearTimeout(this.refreshTimer);
+    this.refreshTimer = null;
     if (this.reconnectTimer !== null) this.timers.clearTimeout(this.reconnectTimer);
     if (this.heartbeatTimer !== null) this.timers.clearInterval(this.heartbeatTimer);
     this.reconnectTimer = null;

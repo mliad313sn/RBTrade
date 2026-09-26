@@ -218,6 +218,9 @@ if (isMainThread) {
       KORA_MD_FEED: 'off',
       KORA_MD_REDIS_PREFIX: prefix,
       KORA_MD_WS_MAX_CHANNELS: String(Math.max(300, cfg.perClient)),
+      // B-203 quotas: every load client shares one user and one IP.
+      KORA_MD_WS_MAX_CONN_PER_USER: String(Math.max(20, cfg.clients + 10)),
+      KORA_MD_WS_MAX_CONN_PER_IP: String(Math.max(200, cfg.clients + 10)),
     },
     stdio: ['ignore', 'inherit', 'inherit'],
   });

@@ -26,6 +26,9 @@ const Schema = z.object({
   KORA_MD_ROLLUP_MS: z.coerce.number().int().min(500).max(60_000).default(2000),
   KORA_MD_WS_MAX_CHANNELS: z.coerce.number().int().min(1).max(5000).default(300),
   KORA_MD_WS_ORIGINS: z.string().optional().default(''),
+  /** B-203: open sockets allowed per signed-in user and per remote IP address. */
+  KORA_MD_WS_MAX_CONN_PER_USER: z.coerce.number().int().min(1).max(100_000).default(20),
+  KORA_MD_WS_MAX_CONN_PER_IP: z.coerce.number().int().min(1).max(100_000).default(200),
   KORA_MD_CONFLATE_PER_SEC: z.coerce.number().int().min(1).max(100).default(10),
   KORA_MD_CONFLATE_BURST: z.coerce.number().int().min(1).max(20).default(2),
   /** Per-client write coalescing window (ms); 0 = flush at the end of the event-loop turn. */
@@ -60,6 +63,8 @@ export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = '
     conflateBurst: e.KORA_MD_CONFLATE_BURST,
     prefix: e.KORA_MD_REDIS_PREFIX,
     wsFlushMs: e.KORA_MD_WS_FLUSH_MS,
+    wsMaxConnPerUser: e.KORA_MD_WS_MAX_CONN_PER_USER,
+    wsMaxConnPerIp: e.KORA_MD_WS_MAX_CONN_PER_IP,
   };
 }
 

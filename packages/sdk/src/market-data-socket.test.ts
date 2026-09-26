@@ -88,6 +88,26 @@ function make(opts: Partial<ConstructorParameters<typeof MarketDataSocket>[0]> =
 }
 
 describe('MarketDataSocket', () => {
+  it('B-203: re-authenticates on the open socket before the token expires (provider tokens), keeps subscriptions', async () => {
+    let n = 0;
+    const { s, clock, ws } = make({ token: () => `token-number-${++n}`, refreshBeforeMs: 60_000, heartbeatMs: 1_000_000 });
+    s.riskAlerts(() => undefined);
+    s.connect();
+    ws().open();
+    await flush();
+    expect(ws().sent).toEqual([{ op: 'auth', token: 'token-number-1' }, { op: 'subscribe', channels: ['risk:alerts'] }]);
+    ws().push({ type: 'authenticated', sub: 'u1', exp: Math.floor((clock.t + 300_000) / 1000) });
+    clock.advance(239_000);
+    await flush();
+    expect(ws().sent).toHaveLength(2);
+    clock.advance(2_000);
+    await flush();
+    expect(ws().sent.at(-1)).toEqual({ op: 'auth', token: 'token-number-2' });
+    expect(FakeWs.all).toHaveLength(1);
+    expect(s.refreshToken('manual-token-xyz')).toBe(true);
+    expect(ws().sent.at(-1)).toEqual({ op: 'auth', token: 'manual-token-xyz' });
+  });
+
   it('authenticates, subscribes, dispatches typed channel data with snapshot meta', async () => {
     const { s, ws } = make({ token: 't0ken-abcdef' });
     const states: string[] = [];
