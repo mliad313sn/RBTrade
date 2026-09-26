@@ -70,12 +70,12 @@ describe('market data WebSocket gateway', () => {
 
   it('validates channels, unknown symbols and the per-connection channel cap', async () => {
     const c = await TestWs.authed(url, token);
-    c.send({ op: 'subscribe', channels: ['quotes:EURUSD', 'quotes:NOPE', 'trades:EURUSD', 'candles:EURUSD:2m', 'depth:7203.XTKS', 'candles:EURUSD:15m', 'status', 'quotes:GBPUSD', 'quotes:USDJPY'], id: 1 });
+    c.send({ op: 'subscribe', channels: ['quotes:EURUSD', 'quotes:NOPE', 'trades:EURUSD:1m', 'candles:EURUSD:2m', 'depth:7203.XTKS', 'candles:EURUSD:15m', 'status', 'quotes:GBPUSD', 'quotes:USDJPY'], id: 1 });
     const r = (await c.waitFor((m) => m.type === 'subscribed')).msg;
     expect(r.channels).toEqual(['quotes:EURUSD', 'depth:7203.XTKS', 'candles:EURUSD:15m', 'status', 'quotes:GBPUSD']);
     expect(r.rejected).toEqual([
       { channel: 'quotes:NOPE', code: 'unknown_symbol' },
-      { channel: 'trades:EURUSD', code: 'invalid_channel' },
+      { channel: 'trades:EURUSD:1m', code: 'invalid_channel' },
       { channel: 'candles:EURUSD:2m', code: 'invalid_channel' },
       { channel: 'quotes:USDJPY', code: 'too_many_channels' },
     ]);

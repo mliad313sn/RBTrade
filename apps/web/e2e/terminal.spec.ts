@@ -42,7 +42,14 @@ test('search EUR/USD → limit buy with SL/TP → preview matches the API → co
   await ticket.getByRole('radio', { name: 'Limit', exact: true }).click();
   const q = await quote(page, 'EURUSD');
   const limit = (Math.round((Number(q.bid) - 0.001) * 1e5) / 1e5).toFixed(5); // test-side arithmetic for a resting price
-  let lastPreview: { body: Record<string, unknown>; res: { preview: Record<string, any> } } | null = null;
+  interface PreviewJson {
+    notional: { base: string };
+    fees: { total: string };
+    margin: { required: string };
+    lossIfStopHit: { total: string; pctEquity: string };
+    rewardRisk: string;
+  }
+  let lastPreview: { body: Record<string, unknown>; res: { preview: PreviewJson } } | null = null;
   page.on('response', async (r) => {
     if (!r.url().endsWith('/api/orders/preview') || r.request().method() !== 'POST') return;
     const body = r.request().postDataJSON() as Record<string, unknown>;

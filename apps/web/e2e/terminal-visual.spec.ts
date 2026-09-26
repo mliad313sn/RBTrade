@@ -167,7 +167,7 @@ test('visual regression at 1440×900: own baseline, structure and perception vs 
   writeFileSync(`${OUT}prototype-vs-ours.png`, PNG.sync.write(side));
   const report = [...rows, `mean IoU ${meanIou.toFixed(3)} (≥ ${MIN_MEAN_IOU})`, `perceptual mean |Δluma| ${meanDiff.toFixed(4)} (≤ ${MAX_PERCEPTUAL_DIFF})`].join('\n');
   writeFileSync(`${OUT}report.txt`, `${report}\n`);
-  console.log(`[visual]\n${report}`);
+  process.stdout.write(`[visual]\n${report}\n`);
   expect(meanIou).toBeGreaterThanOrEqual(MIN_MEAN_IOU);
   expect(meanDiff).toBeLessThanOrEqual(MAX_PERCEPTUAL_DIFF);
 });

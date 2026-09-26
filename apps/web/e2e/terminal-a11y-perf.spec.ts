@@ -65,7 +65,7 @@ async function contrastFailures(page: Page): Promise<string[]> {
       const f = blend(fg, bg);
       const [a, b] = [lum(f), lum(bg)].sort((x, y) => y - x);
       const ratio = (a! + 0.05) / (b! + 0.05);
-      const size = parseFloat(cs.fontSize);
+      const size = Number(cs.fontSize.replace('px', ''));
       const bold = Number(cs.fontWeight) >= 700;
       const graphic = Boolean(el.closest('[role="img"]'));
       const need = graphic || size >= 24 || (bold && size >= 18.66) ? 3 : 4.5;
@@ -136,14 +136,14 @@ test('tick-to-paint p95 < 100 ms and no layout shift while data streams', async 
   const p95 = ticks[Math.ceil(ticks.length * 0.95) - 1]!;
   const p50 = ticks[Math.ceil(ticks.length * 0.5) - 1]!;
   test.info().annotations.push({ type: 'tick-to-paint', description: `n=${ticks.length} p50=${p50.toFixed(1)} ms p95=${p95.toFixed(1)} ms max=${ticks.at(-1)!.toFixed(1)} ms frames=${perf.frames}` });
-  console.log(`[perf] tick-to-paint n=${ticks.length} p50=${p50.toFixed(1)} ms p95=${p95.toFixed(1)} ms max=${ticks.at(-1)!.toFixed(1)} ms`);
+  process.stdout.write(`[perf] tick-to-paint n=${ticks.length} p50=${p50.toFixed(1)} ms p95=${p95.toFixed(1)} ms max=${ticks.at(-1)!.toFixed(1)} ms\n`);
   expect(ticks.length).toBeGreaterThan(50);
   expect(p95).toBeLessThan(100);
   const cls = await page.evaluate(() => (window as unknown as { __cls: Array<{ t: number; v: number; src: string }> }).__cls);
-  for (const e of cls) console.log(`[cls] t=${e.t.toFixed(0)} v=${e.v.toFixed(4)} ${e.src}`);
+  for (const e of cls) process.stdout.write(`[cls] t=${e.t.toFixed(0)} v=${e.v.toFixed(4)} ${e.src}\n`);
   const streaming = cls.filter((e) => e.t > ready).reduce((a, e) => a + e.v, 0);
   const total = cls.reduce((a, e) => a + e.v, 0);
-  console.log(`[perf] CLS while streaming=${streaming.toFixed(4)} total=${total.toFixed(4)}`);
+  process.stdout.write(`[perf] CLS while streaming=${streaming.toFixed(4)} total=${total.toFixed(4)}\n`);
   test.info().annotations.push({ type: 'cls', description: `streaming=${streaming.toFixed(4)} total=${total.toFixed(4)}` });
   expect(streaming).toBeLessThan(0.01);
   expect(total).toBeLessThan(0.1);
@@ -153,7 +153,7 @@ test('tick-to-paint p95 < 100 ms and no layout shift while data streams', async 
     const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null;
     return { domContentLoaded: n.domContentLoadedEventEnd, load: n.loadEventEnd, fcp };
   });
-  console.log(`[perf] navigation ${JSON.stringify(nav)}`);
+  process.stdout.write(`[perf] navigation ${JSON.stringify(nav)}\n`);
   expect(nav.load).toBeLessThan(2500);
 });
 
