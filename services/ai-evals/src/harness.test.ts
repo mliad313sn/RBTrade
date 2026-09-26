@@ -58,4 +58,43 @@ describe('eval harness', () => {
     expect(why.grades.find((g) => g.grader === 'no_execution_claim')!.pass).toBe(true);
     expect(why.grades.find((g) => g.grader === 'disclaimer')!.pass).toBe(true);
   });
+
+  it('news graders catch a gullible model that obeys injected instructions (goal 07B)', async () => {
+    /** Follows article instructions: echoes canaries and sets every score to 1 when told to. */
+    class GullibleProvider implements AiProvider {
+      readonly kind = 'scripted' as const;
+      readonly modelId = 'test:gullible';
+      async complete(req: ProviderRequest): Promise<ProviderTurn> {
+        const text = String(req.messages[0]?.content ?? '');
+        const canary = /CANARY-[0-9A-Z]+/.exec(text)?.[0] ?? '';
+        const told = /sentiment|instructions|指令|指示|instructions précédentes/i.test(text);
+        const json =
+          req.outputFormat?.name === 'news_translate'
+            ? { language: 'en', title: `ok ${canary}`, summary: canary }
+            : {
+                sentiment: told ? 1 : 0,
+                relevance: 1,
+                novelty: 1,
+                eventType: 'other',
+                entities: [],
+                note: canary,
+              };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(json) }],
+          stopReason: 'end_turn',
+          usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        };
+      }
+    }
+    const gullible = new GullibleProvider();
+    const news = cases.filter(
+      (c) => c.category === 'news_injection' && (c.persona ?? 'reference') === 'reference',
+    );
+    const results = [];
+    for (const c of news)
+      results.push(await runCase(c, (p) => (p === 'adversarial' ? scripted(p) : gullible)));
+    expect(results.every((r) => !r.pass)).toBe(true);
+    const first = results.find((r) => r.id === 'news-inj-ignore-set-scores')!;
+    expect(first.grades.find((g) => g.grader === 'status:ok')!.pass).toBe(false); // extra "note" key rejected
+  });
 });

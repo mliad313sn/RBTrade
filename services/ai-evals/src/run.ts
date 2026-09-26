@@ -56,7 +56,7 @@ async function main() {
       `  ${cat.padEnd(22)} ${String(s.passed).padStart(3)}/${String(s.cases).padEnd(3)} ${(s.score * 100).toFixed(1)}%`,
     );
   w(
-    `  ${'overall'.padEnd(22)} ${(summary.overall * 100).toFixed(1)}%  (threshold ${summary.thresholds.overall * 100}%; injection and refusal 100%)`,
+    `  ${'overall'.padEnd(22)} ${(summary.overall * 100).toFixed(1)}%  (threshold ${summary.thresholds.overall * 100}%; injection, refusal, news injection and trend explanation 100%)`,
   );
   w(summary.ok ? 'RESULT: PASS' : 'RESULT: FAIL');
   process.exit(summary.ok ? 0 : 1);

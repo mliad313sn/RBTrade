@@ -1,4 +1,5 @@
 import type { ToolBackend, ToolCallCtx } from '../../../apps/api/src/ai/core';
+import { card, news, radar } from './intel-fixtures';
 
 /**
  * SIMULATED fixture world for the eval harness. No real market or customer data: every value is
@@ -447,6 +448,18 @@ export function fixtureBackend(rec: Recorder): ToolBackend {
         confidence: null,
         reliabilityLine: null,
       };
+    },
+    get_market_radar: async (_c, i) => {
+      log('get_market_radar', i);
+      return radar(i);
+    },
+    get_trend_card: async (_c, i) => {
+      log('get_trend_card', i);
+      return card(i.symbol);
+    },
+    get_news: async (_c, i) => {
+      log('get_news', i);
+      return news(i);
     },
     create_order_draft: async (_c, i) => {
       log('create_order_draft', i);

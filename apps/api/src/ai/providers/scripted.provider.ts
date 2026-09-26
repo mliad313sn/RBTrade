@@ -324,7 +324,7 @@ const stripTags = (v: unknown): string =>
     .trim();
 
 const RADAR_Q =
-  /\b(trending|emerging trends?|trends in|what'?s moving|movers?|market radar|radar|what'?s hot|biggest moves?)\b/i;
+  /\b(trending|emerging trends?|trends in|what'?s moving|what is moving|moving in|movers?|market radar|radar|what'?s hot|biggest moves?)\b/i;
 const REGION_WORDS: Array<[RegExp, string]> = [
   [/\basia(n)?\b/i, 'asia'],
   [/\beurope(an)?\b/i, 'europe'],
@@ -395,9 +395,9 @@ function radarFilters(q: string, focus: Record<string, string>): Record<string, 
 }
 
 function newsLine(n: NonNullable<NewsLike['articles']>[number]): string {
-  const title = stripTags(n.translatedTitle) || stripTags(n.title);
+  // Cite by id, source and score; titles are untrusted text shown by the UI from data, not repeated.
   const sent = typeof n.sentiment === 'number' ? `, sentiment ${signed(n.sentiment)}` : '';
-  return `[news:${n.id}] "${title}" (${stripTags(n.source)}${sent})`;
+  return `[news:${n.id}] (${stripTags(n.source)}${sent})`;
 }
 
 function radarAnswer(p: Parsed, radar: RadarLike): string {
@@ -480,7 +480,7 @@ function noviceCardAnswer(c: CardLike): string {
         : `${name} has not moved in one clear way lately.`;
   const prob =
     c.probability?.status === 'calibrated'
-      ? `In the past, calls like this were right about ${Math.round((c.probability.value ?? 0) * 100)} times out of 100.`
+      ? `In the past, calls like this came true ${Math.round((c.probability.value ?? 0) * 100)}% of the time.`
       : 'We have no reliable forecast for it, so we do not guess.';
   const news = (c.news ?? []).length ? 'There is a news story about it in the list below.' : '';
   return [
