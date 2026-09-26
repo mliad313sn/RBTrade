@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { atr, ema, PreviewOrderSchema, quoteChannel, rsi, sma, type Quote } from '@kora/domain';
 import { SimulatedCalendarProvider } from '@kora/market-data';
 
@@ -12,6 +13,8 @@ import { CalibrationService } from './calibration.service';
 import { loadAiConfig } from './core/config';
 import type { ToolBackend, ToolCallCtx, ToolInput } from './core/tools';
 import { DraftsService } from './drafts.service';
+import type { IntelReadService } from '../intel/intel-read.service';
+import { INTEL_READ } from '../intel/intel.tokens';
 import { AiReadPorts } from './read-ports';
 
 const IMPACT = { 1: 'low', 2: 'medium', 3: 'high' } as const;
@@ -35,6 +38,7 @@ export class AiToolBackend implements ToolBackend {
     private readonly calibration: CalibrationService,
     private readonly drafts: DraftsService,
     private readonly quant: QuantClient,
+    private readonly moduleRef: ModuleRef,
     @Inject(MD_CONFIG) md: MdConfig,
   ) {
     this.calendar = new SimulatedCalendarProvider(md.seed);
@@ -294,6 +298,39 @@ export class AiToolBackend implements ToolBackend {
       await this.calibration.ensureStrategy(ctx.user.id, ctx.user.roles, i.modelKey.slice(9));
     const v = await this.calibration.view(i.modelKey, i.rawScore, loadAiConfig().calibrationMinN);
     return { ...v, bins: v.bins.filter((b) => b.n > 0) };
+  }
+
+  /** Goal 07B reads (resolved lazily: the intel module depends on this one, not the reverse). */
+  private async intel(): Promise<IntelReadService> {
+    return this.moduleRef.get<IntelReadService>(INTEL_READ, { strict: false });
+  }
+
+  async get_market_radar(_: ToolCallCtx, i: ToolInput<'get_market_radar'>) {
+    const r = await (
+      await this.intel()
+    ).radar({ region: i.region, assetClass: i.assetClass, sector: i.sector }, i.window, 'region');
+    return {
+      simulated: true,
+      window: r.window,
+      filters: r.filters,
+      scannedAt: r.scannedAt,
+      instruments: r.instruments,
+      trends: r.trends.slice(0, 10).map((t) => ({ ...t, label: t.kind.replace('_', ' ') })),
+      movers: r.movers,
+      heatMap: r.heatMap,
+      method: r.method,
+    };
+  }
+
+  async get_trend_card(_: ToolCallCtx, i: ToolInput<'get_trend_card'>) {
+    return (await this.intel()).trendCard(i.symbol, i.horizon);
+  }
+
+  async get_news(_: ToolCallCtx, i: ToolInput<'get_news'>) {
+    const n = await (
+      await this.intel()
+    ).news({ symbol: i.symbol, region: i.region, hours: i.hours, limit: i.limit });
+    return { simulated: true, articles: n.articles };
   }
 
   create_order_draft(ctx: ToolCallCtx, i: ToolInput<'create_order_draft'>) {

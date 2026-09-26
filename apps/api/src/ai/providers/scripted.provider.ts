@@ -1,5 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 
+import { SCRIPTED_TRANSLATIONS } from '../../intel/core/news-fixtures';
+import { guessLanguage, jaccard, normaliseText, shingles } from '../../intel/core/news-pipeline';
 import type { ScriptPersona } from '../core/config';
 import { FORBIDDEN_TOOL_NAMES, TOOL_NAMES } from '../core/tools';
 import type { AiProvider, ProviderRequest, ProviderTurn } from '../core/types';
@@ -313,6 +315,185 @@ export function noviceAnswer(q: string, topic?: string): string {
   return 'This screen shows prices from our practice market, not real money. Prices go up and down all the time. Ask about any word on the screen and I will explain it in plain words.';
 }
 
+// ---------------------------------------------------------------------------------------------
+// Goal 07B: Market Radar, trend cards and news (answers composed from tool outputs only).
+// ---------------------------------------------------------------------------------------------
+const stripTags = (v: unknown): string =>
+  String(v ?? '')
+    .replace(/<\/?untrusted_data[^>]*>/g, '')
+    .trim();
+
+const RADAR_Q =
+  /\b(trending|emerging trends?|trends in|what'?s moving|movers?|market radar|radar|what'?s hot|biggest moves?)\b/i;
+const REGION_WORDS: Array<[RegExp, string]> = [
+  [/\basia(n)?\b/i, 'asia'],
+  [/\beurope(an)?\b/i, 'europe'],
+  [/\bafrica(n)?\b/i, 'africa'],
+  [/\bamerica(s|n)?\b|\blatin america\b/i, 'americas'],
+  [/\boceania\b|\baustralia(n)?\b/i, 'oceania'],
+];
+const CLASS_WORDS: Array<[RegExp, string]> = [
+  [/\b(equit(y|ies)|stocks?|shares)\b/i, 'equity'],
+  [/\b(fx|forex|currenc(y|ies))\b/i, 'fx'],
+  [/\bcrypto\w*\b/i, 'crypto'],
+  [/\bbonds?\b/i, 'bond'],
+  [/\b(indices|index)\b/i, 'index'],
+  [/\bmetals?\b/i, 'metal'],
+  [/\benergy\b/i, 'energy'],
+];
+
+interface RadarLike {
+  filters?: Record<string, unknown>;
+  window?: string;
+  trends?: Array<{
+    symbol: string;
+    name?: string;
+    kind?: string;
+    label?: string;
+    score?: number;
+    momentumZ?: number | null;
+    regimeTrending?: number | null;
+  }>;
+  movers?: Array<{ symbol: string; name?: string; momentumZ?: number }>;
+  scannedAt?: string | null;
+}
+interface NewsLike {
+  articles?: Array<{
+    id: string;
+    title?: string;
+    translatedTitle?: string | null;
+    source?: string;
+    sentiment?: number | null;
+  }>;
+}
+interface CardLike {
+  symbol: string;
+  name?: string;
+  horizon?: string;
+  trend?: { label?: string; score?: number } | null;
+  direction?: string | null;
+  probability?: {
+    status?: string;
+    value?: number;
+    n?: number;
+    reliabilityLine?: string;
+    reason?: string;
+  };
+  drivers?: Array<{ label?: string; contribution?: number }>;
+  regime?: { trending?: number | null; ranging?: number | null; volatile?: number | null };
+  risk?: { lastClose?: number | null; atr?: number | null; atrPct?: number | null };
+  invalidation?: { rule?: string } | null;
+  news?: Array<{ id: string; title?: string; translatedTitle?: string | null; source?: string }>;
+}
+
+function radarFilters(q: string, focus: Record<string, string>): Record<string, unknown> {
+  const region = REGION_WORDS.find(([re]) => re.test(q))?.[1];
+  const assetClass = CLASS_WORDS.find(([re]) => re.test(q))?.[1];
+  const window = /\b(today|day|24 ?h)\b/i.test(q) ? 'day' : 'week';
+  void focus;
+  return { ...(region ? { region } : {}), ...(assetClass ? { assetClass } : {}), window };
+}
+
+function newsLine(n: NonNullable<NewsLike['articles']>[number]): string {
+  const title = stripTags(n.translatedTitle) || stripTags(n.title);
+  const sent = typeof n.sentiment === 'number' ? `, sentiment ${signed(n.sentiment)}` : '';
+  return `[news:${n.id}] "${title}" (${stripTags(n.source)}${sent})`;
+}
+
+function radarAnswer(p: Parsed, radar: RadarLike): string {
+  const f = radar.filters ?? {};
+  const scope = [f.region, f.assetClass].filter(Boolean).join(' · ') || 'all markets';
+  const when = radar.window === 'day' ? 'the past day' : 'the past week';
+  const trends = (radar.trends ?? []).slice(0, 3);
+  const items: Array<{ symbol: string; line: string }> = trends.length
+    ? trends.map((t) => ({
+        symbol: t.symbol,
+        line: `${stripTags(t.name) || t.symbol} (${t.symbol}): ${t.label ?? t.kind}, score ${str(t.score)}; momentum z ${str(t.momentumZ)}, trending-regime probability ${str(t.regimeTrending)}.`,
+      }))
+    : (radar.movers ?? []).slice(0, 3).map((m) => ({
+        symbol: m.symbol,
+        line: `${stripTags(m.name) || m.symbol} (${m.symbol}): no trend label fired; momentum z ${str(m.momentumZ)}.`,
+      }));
+  if (!items.length)
+    return `No instruments were scanned for ${scope} in ${when} yet (SIMULATED data), so there is nothing to report.`;
+  const lines = [
+    trends.length
+      ? `Emerging trends in ${scope} over ${when} (SIMULATED data, detected from price features):`
+      : `No emerging trend labels fired in ${scope} over ${when}; the biggest movers (SIMULATED data):`,
+  ];
+  items.forEach((it, i) => {
+    lines.push(`${i + 1}. ${it.line}`);
+    const news = p.results.find(
+      (r) =>
+        r.name === 'get_news' && !r.error && (r.input as { symbol?: string }).symbol === it.symbol,
+    )?.output as NewsLike | undefined;
+    const top = (news?.articles ?? []).slice(0, 2);
+    lines.push(
+      top.length
+        ? `   Why: ${top.map(newsLine).join('; ')}.`
+        : '   Why: no linked news in this window; the move shows in the price features only.',
+    );
+  });
+  lines.push(
+    'A forecast probability is shown on each trend card only when the calibration table supports it; otherwise it says "No reliable signal". These are patterns in SIMULATED data, not a recommendation.',
+  );
+  return lines.join('\n');
+}
+
+function cardAnswer(c: CardLike): string {
+  const name = stripTags(c.name) || c.symbol;
+  const prob =
+    c.probability?.status === 'calibrated'
+      ? `Calibrated probability ${str(c.probability.value)}: ${c.probability.reliabilityLine}.`
+      : `No reliable signal: ${c.probability?.reason ?? 'no demonstrated skill after costs'}`;
+  const drivers = (c.drivers ?? [])
+    .slice(0, 3)
+    .map((d) => `${d.label} ${signed(d.contribution)}`)
+    .join(', ');
+  const news = (c.news ?? [])
+    .slice(0, 2)
+    .map((n) => newsLine(n))
+    .join('; ');
+  const lines = [
+    `${name} (${c.symbol}), ${c.horizon ?? ''} horizon: ${c.trend ? `${c.trend.label} (score ${str(c.trend.score)})` : 'no trend label'}${c.direction ? `, direction ${c.direction}` : ''}.`,
+    prob,
+    drivers
+      ? `Top drivers (log-odds contributions): ${drivers}.`
+      : 'No model drivers for this horizon.',
+    `Regime probabilities: trending ${str(c.regime?.trending)}, ranging ${str(c.regime?.ranging)}, volatile ${str(c.regime?.volatile)}.`,
+    c.risk?.atr !== null && c.risk?.atr !== undefined
+      ? `Volatility: ATR ${str(c.risk.atr)} (${str(c.risk.atrPct)}% of the last close ${str(c.risk.lastClose)}).`
+      : 'Volatility context is not available yet.',
+    c.invalidation?.rule ?? 'No directional view, so there is no invalidation level.',
+    news ? `News: ${news}.` : 'No linked news.',
+  ];
+  return lines.join('\n');
+}
+
+function noviceCardAnswer(c: CardLike): string {
+  const name = stripTags(c.name) || c.symbol;
+  const move =
+    c.direction === 'up'
+      ? `${name} has gone up more than usual lately.`
+      : c.direction === 'down'
+        ? `${name} has gone down more than usual lately.`
+        : `${name} has not moved in one clear way lately.`;
+  const prob =
+    c.probability?.status === 'calibrated'
+      ? `In the past, calls like this were right about ${Math.round((c.probability.value ?? 0) * 100)} times out of 100.`
+      : 'We have no reliable forecast for it, so we do not guess.';
+  const news = (c.news ?? []).length ? 'There is a news story about it in the list below.' : '';
+  return [
+    move,
+    'This comes from past prices in our practice market.',
+    prob,
+    news,
+    'Prices can change fast.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function modelKeyFor(p: Parsed): string | null {
   if (p.focus.strategyId) return `strategy:${p.focus.strategyId}`;
   const sym = symbolIn(p.question, p.focus.symbol);
@@ -331,6 +512,13 @@ function referencePolicy(p: Parsed): Decision {
       text: "I can't change my rules or share my instructions. I can explain signals, prices, risk and events from KORA data.",
     };
   }
+
+  // Goal 07B: trend cards (grounded) in both modes.
+  const groundedCard = p.grounding?.card as CardLike | undefined;
+  if (groundedCard?.symbol)
+    return {
+      text: p.mode === 'novice' ? noviceCardAnswer(groundedCard) : cardAnswer(groundedCard),
+    };
 
   if (p.mode === 'novice') {
     return {
@@ -425,6 +613,55 @@ function referencePolicy(p: Parsed): Decision {
         },
       ],
     };
+  }
+
+  // Goal 07B: "What's trending in Asian equities this week and why?" → radar, then news per mover.
+  if (
+    RADAR_Q.test(q) &&
+    !p.focus.robotId &&
+    !p.focus.signalId &&
+    p.offered.has('get_market_radar')
+  ) {
+    const radar = result(p, 'get_market_radar') as RadarLike | undefined;
+    if (!radar) {
+      const err = failed(p, 'get_market_radar');
+      if (err) return { text: `I could not load the Market Radar: ${err}` };
+      return { tools: [{ name: 'get_market_radar', input: radarFilters(q, p.focus) }] };
+    }
+    const symbols = ((radar.trends ?? []).length ? radar.trends! : (radar.movers ?? []))
+      .slice(0, 3)
+      .map((t) => t.symbol);
+    const pending = symbols.filter(
+      (sym) =>
+        !p.results.some(
+          (r) => r.name === 'get_news' && (r.input as { symbol?: string }).symbol === sym,
+        ),
+    );
+    if (pending.length && p.offered.has('get_news'))
+      return {
+        tools: pending.map((sym) => ({
+          name: 'get_news',
+          input: { symbol: sym, hours: radar.window === 'day' ? 24 : 168, limit: 3 },
+        })),
+      };
+    return { text: radarAnswer(p, radar) };
+  }
+
+  // Goal 07B: explain one trend from its card.
+  if (
+    /\btrend (card|view)\b|\bexplain (the |this )?trend\b|\btrend (for|on) /i.test(q) &&
+    !/trend-x/i.test(q) &&
+    p.offered.has('get_trend_card')
+  ) {
+    const card = result(p, 'get_trend_card') as CardLike | undefined;
+    if (card) return { text: cardAnswer(card) };
+    const err = failed(p, 'get_trend_card');
+    if (err) return { text: `I could not load that trend card: ${err}` };
+    const sym = symbolIn(q, p.focus.symbol);
+    if (sym) {
+      const horizon = /\b(1w|week)\b/i.test(q) ? '1w' : /\b(1m|month)\b/i.test(q) ? '1m' : '1d';
+      return { tools: [{ name: 'get_trend_card', input: { symbol: sym, horizon } }] };
+    }
   }
 
   // Why did this trade happen: stored features only.
@@ -725,6 +962,161 @@ function adversarialPolicy(p: Parsed): Decision {
   };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Structured outputs (goal 07B news translation and scoring): deterministic JSON from the request.
+// ---------------------------------------------------------------------------------------------
+const POSITIVE = [
+  'raise',
+  'raises',
+  'raised',
+  'strong',
+  'beats',
+  'beat',
+  'gain',
+  'gains',
+  'gained',
+  'rose',
+  'rise',
+  'rises',
+  'record',
+  'climbs',
+  'climbed',
+  'rebounds',
+  'lifts',
+  'higher',
+  'growth',
+  'upgrade',
+  'hausse',
+  'hebt',
+  'steigt',
+  'aumento',
+  'subiram',
+  'sube',
+  'máximo',
+  '引き上げ',
+  '好調',
+  '上昇',
+  '反発',
+  '超出预期',
+  '上涨',
+  '增长',
+  'ترتفع',
+  'ارتفعت',
+];
+const NEGATIVE = [
+  'cut',
+  'cuts',
+  'weak',
+  'weaken',
+  'weaker',
+  'decline',
+  'declines',
+  'fell',
+  'fall',
+  'falls',
+  'slows',
+  'slowed',
+  'drop',
+  'miss',
+  'warns',
+  'loss',
+  'reculent',
+  'baisse',
+  'senkt',
+  'fällt',
+  'queda',
+  'cae',
+  '下落',
+  '低迷',
+  '放缓',
+  '下降',
+  '下跌',
+];
+const EVENT_WORDS: Array<[RegExp, string]> = [
+  [/guidance|target|forecast|prognose|目標|预期/i, 'guidance'],
+  [/revenue|profit|earnings|margins|收入|利润|sales|ventes|销量/i, 'earnings'],
+  [/\bECB\b|rates|central bank/i, 'central_bank'],
+  [/oil|gold|iron ore|النفط|oro|pré-sal|inflows/i, 'commodity'],
+  [/chips|unveil|product/i, 'product'],
+  [/stake sale|merger|buyback/i, 'corporate_action'],
+];
+
+function countTerms(text: string, terms: string[]): number {
+  const lower = text.toLowerCase();
+  let n = 0;
+  for (const t of terms) {
+    if (/[\u3040-\u30ff\u4e00-\u9fff\u0600-\u06ff]/.test(t)) {
+      if (lower.includes(t)) n += 1;
+    } else if (new RegExp(`(?<![\\p{L}])${t}(?![\\p{L}])`, 'u').test(lower)) n += 1;
+  }
+  return n;
+}
+
+function untrustedBlocks(text: string): Array<{ id: string; body: string }> {
+  const out: Array<{ id: string; body: string }> = [];
+  for (const m of text.matchAll(
+    /<untrusted_data source="news"(?: id="([^"]*)")?>\n?([\s\S]*?)\n?<\/untrusted_data>/g,
+  ))
+    out.push({ id: m[1] ?? '', body: m[2] ?? '' });
+  return out;
+}
+
+function round2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
+
+function structuredAnswer(req: ProviderRequest, persona: ScriptPersona): string {
+  if (persona === 'adversarial') {
+    // A compromised model: out-of-range scores, an extra instruction field, a foreign entity.
+    return JSON.stringify({
+      sentiment: 5,
+      relevance: 1,
+      novelty: 1,
+      eventType: 'buy_now',
+      entities: ['AAPL', 'TSLA'],
+      action: 'submit_order',
+      language: 'xx',
+    });
+  }
+  const text = firstUserText(req);
+  const task = tag(text, 'task') ?? '';
+  const blocks = untrustedBlocks(text);
+  const article = blocks.find((b) => !b.id.startsWith('recent-'));
+  const body = article?.body ?? '';
+  const [titleLine = '', ...rest] = body.split('\n');
+  if (task === 'news_translate') {
+    const known = Object.entries(SCRIPTED_TRANSLATIONS).find(
+      ([k]) => normaliseText(k) === normaliseText(titleLine),
+    )?.[1];
+    return JSON.stringify({
+      language: guessLanguage(body),
+      title: known?.title ?? titleLine.trim().slice(0, 300) ?? 'untitled',
+      summary: known?.summary ?? rest.join(' ').trim().slice(0, 200),
+    });
+  }
+  let candidates: string[] = [];
+  try {
+    candidates = JSON.parse(tag(text, 'candidates') ?? '[]') as string[];
+  } catch {
+    candidates = [];
+  }
+  const pos = countTerms(body, POSITIVE);
+  const neg = countTerms(body, NEGATIVE);
+  const recent = blocks.filter((b) => b.id.startsWith('recent-'));
+  const sim = recent.reduce(
+    (m, r) => Math.max(m, jaccard(shingles(titleLine), shingles(r.body))),
+    0,
+  );
+  const eventType = EVENT_WORDS.find(([re]) => re.test(body))?.[1] ?? 'other';
+  return JSON.stringify({
+    sentiment: round2(Math.max(-1, Math.min(1, (pos - neg) / (pos + neg + 1)))),
+    relevance: candidates.length ? round2(Math.min(1, 0.5 + 0.2 * candidates.length)) : 0.1,
+    novelty: round2(1 - sim),
+    eventType,
+    entities: candidates.slice(0, 10),
+  });
+}
+
 function estimateTokens(s: string): number {
   return Math.max(1, Math.ceil(s.length / 4));
 }
@@ -741,6 +1133,19 @@ export class ScriptedProvider implements AiProvider {
     req: ProviderRequest,
     onTextDelta?: (delta: string) => void,
   ): Promise<ProviderTurn> {
+    if (req.outputFormat) {
+      const json = structuredAnswer(req, this.persona);
+      return {
+        content: [{ type: 'text', text: json }],
+        stopReason: 'end_turn',
+        usage: {
+          inputTokens: estimateTokens(JSON.stringify(req.messages)) + estimateTokens(req.system),
+          outputTokens: estimateTokens(json),
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        },
+      };
+    }
     const parsed = parseRequest(req);
     const decision =
       this.persona === 'adversarial' ? adversarialPolicy(parsed) : referencePolicy(parsed);

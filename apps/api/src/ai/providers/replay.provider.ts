@@ -14,6 +14,8 @@ export function cassetteKey(req: ProviderRequest): string {
     system: req.system,
     tools: req.tools.map((t) => ({ name: t.name, schema: t.input_schema })),
     messages: req.messages,
+    // Structured-output requests (goal 07B) also key on the schema; chat cassettes are unchanged.
+    ...(req.outputFormat ? { outputFormat: req.outputFormat } : {}),
   });
 }
 

@@ -34,6 +34,6 @@ import { AiToolBackend } from './tool-backend.service';
     QuantClient,
   ],
   controllers: [AiController, MetricsController],
-  exports: [AiService, CalibrationService, MetricsService],
+  exports: [AiService, CalibrationService, MetricsService, DraftsService, BudgetService],
 })
 export class AiModule {}

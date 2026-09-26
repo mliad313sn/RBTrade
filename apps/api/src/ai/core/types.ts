@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { Role } from '@kora/domain';
 
-export type Surface = 'chat' | 'strip' | 'why' | 'robots' | 'explain' | 'eval';
+export type Surface = 'chat' | 'strip' | 'why' | 'robots' | 'explain' | 'eval' | 'radar' | 'news';
 export type AiMode = 'pro' | 'novice';
 
 export interface AiUser {
@@ -44,6 +44,11 @@ export interface ProviderRequest {
   tools: Anthropic.Tool[];
   messages: Anthropic.MessageParam[];
   maxTokens: number;
+  /**
+   * Structured output (goal 07B news scoring / translation): the answer must be JSON matching this
+   * schema (`output_config.format`); no tools are offered. Callers still validate with zod.
+   */
+  outputFormat?: { name: string; schema: Record<string, unknown> };
 }
 
 export interface ProviderUsage {

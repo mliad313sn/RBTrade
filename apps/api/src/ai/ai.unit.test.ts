@@ -92,6 +92,15 @@ const FEATURES = {
 
 const mutations: string[] = [];
 const backend: ToolBackend = {
+  get_market_radar: async () => ({
+    simulated: true,
+    window: 'week',
+    trends: [],
+    movers: [],
+    heatMap: [],
+  }),
+  get_trend_card: async (_c, i) => ({ symbol: i.symbol, horizon: i.horizon, news: [] }),
+  get_news: async () => ({ simulated: true, articles: [] }),
   get_quote: async (_c, i) => ({
     symbol: i.symbol,
     quote: { bid: '1.08419', ask: '1.08421', stale: false },

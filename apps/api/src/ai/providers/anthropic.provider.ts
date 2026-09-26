@@ -16,6 +16,8 @@ import type { AiProvider, ProviderRequest, ProviderTurn } from '../core/types';
  *   are a few ids, and keeping the API's own schema validation is worth more than earlier bytes.
  * - Thinking: adaptive by default (`KORA_AI_THINKING=omit` leaves the parameter out for models that
  *   do not take it); effort only when `KORA_AI_EFFORT` is set.
+ * - Structured outputs (goal 07B news scoring and translation): `output_config.format` with the
+ *   request's JSON schema and no tools; the caller validates the JSON with zod regardless.
  */
 export class AnthropicProvider implements AiProvider {
   readonly kind = 'anthropic' as const;
@@ -38,15 +40,21 @@ export class AnthropicProvider implements AiProvider {
     const tools: Anthropic.Tool[] = req.tools.map((t, i) =>
       i === req.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t,
     );
+    // Structured output (goal 07B): JSON constrained to the schema, no tools on these calls.
+    const outputConfig: Anthropic.OutputConfig = {
+      ...(this.cfg.effort ? { effort: this.cfg.effort } : {}),
+      ...(req.outputFormat
+        ? { format: { type: 'json_schema', schema: req.outputFormat.schema } }
+        : {}),
+    };
     const params: Anthropic.MessageStreamParams = {
       model: this.modelId,
       max_tokens: req.maxTokens,
       system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-      tools,
-      tool_choice: { type: 'auto' },
+      ...(req.outputFormat ? {} : { tools, tool_choice: { type: 'auto' as const } }),
       messages: req.messages,
       ...(this.cfg.thinking === 'adaptive' ? { thinking: { type: 'adaptive' as const } } : {}),
-      ...(this.cfg.effort ? { output_config: { effort: this.cfg.effort } } : {}),
+      ...(Object.keys(outputConfig).length ? { output_config: outputConfig } : {}),
     };
     const stream = this.client.messages.stream(params);
     if (onTextDelta) stream.on('text', (delta) => onTextDelta(delta));

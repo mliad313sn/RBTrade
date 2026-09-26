@@ -137,7 +137,8 @@ export class CalibrationService {
     return rows.length;
   }
 
-  private async insertPredictions(
+  /** Logs predictions (idempotent on model key + subject + time). Also used by goal 07B. */
+  async insertPredictions(
     modelKey: string,
     source: 'backtest_oos' | 'history_replay' | 'live' | 'seed',
     horizon: string,

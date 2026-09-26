@@ -220,6 +220,11 @@ describe('AI copilot (goal 07)', () => {
       get_signal_features: { signalId },
       get_mc_projection: { strategyId },
       get_calibration: { modelKey: 'bias:BTCUSD:1h', rawScore: 0.6 },
+      // Goal 07B tools (read-only): no scan has run in this file, so the radar is empty and the
+      // card is "not scanned yet".
+      get_market_radar: { window: 'week' },
+      get_trend_card: { symbol: 'BTCUSD', horizon: '1d' },
+      get_news: { hours: 24, limit: 5 },
       create_order_draft: {
         symbol: 'BTCUSD',
         side: 'buy',
@@ -248,6 +253,10 @@ describe('AI copilot (goal 07)', () => {
       }
     }
     expect(out.get_quote).toMatchObject({ symbol: 'BTCUSD', quote: { bid: expect.any(String) } });
+    expect(out.get_market_radar).toMatchObject({ simulated: true, window: 'week' });
+    expect(out.get_news).toMatchObject({ simulated: true, articles: expect.any(Array) });
+    const card = out.get_trend_card as { symbol?: string; error?: string };
+    expect(card.symbol === 'BTCUSD' || card.error === 'not_scanned').toBe(true);
     expect((out.get_candles as { candles: unknown[] }).candles).toHaveLength(5);
     expect((out.get_indicators as { values: Record<string, number> }).values.ema20).toEqual(
       expect.any(Number),
