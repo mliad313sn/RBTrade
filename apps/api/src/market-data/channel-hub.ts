@@ -132,7 +132,10 @@ export class ChannelHub implements OnModuleDestroy {
     }
     if (ch !== STATUS_CHANNEL && !this.subscribers.has(ch)) return;
     this.last.set(ch, payload);
-    if (this.subscribers.has(ch)) this.conflator.offer(ch, payload);
+    if (!this.subscribers.has(ch)) return;
+    // Order events are a stream of state changes, not a price: never conflate them (goal 03).
+    if (ch.startsWith('orders:')) this.fanOut(ch, payload);
+    else this.conflator.offer(ch, payload);
   }
 
   private checkHeartbeat(): void {

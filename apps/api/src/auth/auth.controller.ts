@@ -89,7 +89,7 @@ export class AuthController {
   @Public()
   @Throttle(authThrottle())
   @Post('signup')
-  @ApiOperation({ summary: 'Create an account (novice or trader; PAPER only). Trader requires MFA enrolment at first login.' })
+  @ApiOperation({ summary: 'Create an account. Everyone starts as novice (PAPER); Pro trading needs the appropriateness assessment, then TOTP enrolment at the next login.' })
   @ApiBody({ schema: openApiSchema(SignupSchema) })
   async signup(@Body(new ZodValidationPipe(SignupSchema)) body: z.infer<typeof SignupSchema>, @Req() req: KoraRequest) {
     this.assertDevIdp();

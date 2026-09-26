@@ -4,7 +4,7 @@ import type { Duplex } from 'node:stream';
 
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { parseChannel, requiresMfa } from '@kora/domain';
+import { AUDIT_READ_ALL_ROLES, hasAnyRole, isPrivateChannelKind, parseChannel, requiresMfa } from '@kora/domain';
 import { decodeJwt } from 'jose';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { ACCESS_COOKIE } from '../auth/cookies';
 import type { Principal } from '../auth/principal';
 import { TokenService } from '../auth/token.service';
+import { DbService } from '../db/db.service';
 import { ChannelHub, type HubClient } from './channel-hub';
 import { InstrumentsRepository } from './instruments.repository';
 import { MD_CONFIG, type MdConfig } from './md-config';
@@ -35,6 +36,8 @@ type Op = z.infer<typeof OpSchema>;
 class Connection implements HubClient {
   principal: Principal | null = null;
   readonly channels = new Set<string>();
+  /** Account ownership checks already answered for this connection. */
+  readonly accounts = new Map<string, boolean>();
   alive = true;
   chain: Promise<void> = Promise.resolve();
   ops: number[] = [];
@@ -112,7 +115,8 @@ class Flusher {
 /**
  * Market data WebSocket gateway (goal 02), attached to the Nest HTTP server at /ws.
  * Auth: the `kora_at` cookie (browsers; Origin must be allowed) or a first `{op:"auth"}` message.
- * Channels: quotes:{symbol}, depth:{symbol}, candles:{symbol}:{tf}, status.
+ * Channels: quotes:{symbol}, depth:{symbol}, candles:{symbol}:{tf}, status; and the private
+ * trading channels orders:{account}, positions:{account}, account:{account} (goal 03).
  */
 @Injectable()
 export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestroy {
@@ -130,6 +134,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     private readonly tokens: TokenService,
     private readonly repo: InstrumentsRepository,
     @Inject(MD_CONFIG) private readonly cfg: MdConfig,
+    private readonly db: DbService,
   ) {
     this.flusher = new Flusher(cfg.wsFlushMs);
   }
@@ -226,6 +231,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     for (const ch of op.channels) {
       const p = parseChannel(ch);
       if (!p) rejected.push({ channel: ch, code: 'invalid_channel' });
+      else if (isPrivateChannelKind(p.kind) && !(await this.canReadAccount(conn, p.accountId!))) rejected.push({ channel: ch, code: 'forbidden' });
       else if (p.symbol && !registry.instruments.has(p.symbol)) rejected.push({ channel: ch, code: 'unknown_symbol' });
       else if (!conn.channels.has(ch) && !accepted.includes(ch) && conn.channels.size + accepted.length >= this.cfg.wsMaxChannels) rejected.push({ channel: ch, code: 'too_many_channels' });
       else if (!conn.channels.has(ch) && !accepted.includes(ch)) accepted.push(ch);
@@ -238,6 +244,18 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       // The client may have closed or unsubscribed while we awaited Redis: never leak a subscriber.
       if (!this.conns.has(conn) || !conn.channels.has(ch)) this.hub.unsubscribe(conn, ch);
     }
+  }
+
+  /** Private trading channels (goal 03): the account owner, or a risk officer / admin. */
+  private async canReadAccount(conn: Connection, accountId: string): Promise<boolean> {
+    const p = conn.principal!;
+    if (hasAnyRole(p.roles, AUDIT_READ_ALL_ROLES)) return true;
+    const cached = conn.accounts.get(accountId);
+    if (cached !== undefined) return cached;
+    const rows = await this.db.query<{ ok: boolean }>('SELECT true AS ok FROM accounts WHERE id = $1 AND user_id = $2', [accountId, p.sub]);
+    const ok = rows.length > 0;
+    conn.accounts.set(accountId, ok);
+    return ok;
   }
 
   private async authenticate(conn: Connection, token: string): Promise<void> {

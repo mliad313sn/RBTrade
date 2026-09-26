@@ -22,5 +22,11 @@ export function hasAnyRole(roles: readonly Role[], required: readonly Role[]): b
   return required.length === 0 || roles.some((r) => required.includes(r));
 }
 
-/** Sign-up can self-assign only these account types. Others are admin-granted. */
-export const SELF_SERVICE_ROLES: readonly Role[] = ['novice', 'trader'];
+/**
+ * Sign-up creates `novice` only (Sponsor decision OQ-S2, B-018). `trader` is granted by passing the
+ * appropriateness assessment; quant, risk_officer and admin are admin-granted.
+ */
+export const SELF_SERVICE_ROLES: readonly Role[] = ['novice'];
+
+/** Role granted by passing the appropriateness assessment. */
+export const APPROPRIATENESS_GRANTED_ROLE: Role = 'trader';

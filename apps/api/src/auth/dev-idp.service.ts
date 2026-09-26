@@ -65,7 +65,7 @@ export class DevIdpService {
     return { id: u.id, email: u.email, displayName: u.display_name, roles };
   }
 
-  async signup(input: { email: string; password: string; displayName: string; accountType: 'novice' | 'trader' }, ip: string) {
+  async signup(input: { email: string; password: string; displayName: string; accountType: 'novice' }, ip: string) {
     const passwordHash = await hashPassword(input.password, this.config.auth.scryptN);
     const roles: Role[] = [input.accountType];
     try {

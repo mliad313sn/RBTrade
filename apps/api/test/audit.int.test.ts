@@ -62,7 +62,7 @@ describe('audit log', () => {
     await request(http).get(`/audit?actorId=${b.id}`).set(bearer(a.token)).expect(403);
 
     const risk = await createUser(app, 'trader', ['risk_officer']);
-    const all = await request(http).get(`/audit?entity=kill_switch&actorId=${a.id}`).set(bearer(risk.token)).expect(200);
+    const all = await request(http).get(`/audit?entity=kill_switch&action=kill_switch.requested&actorId=${a.id}`).set(bearer(risk.token)).expect(200);
     expect(all.body.events).toHaveLength(1);
     const future = new Date(Date.now() + 86_400_000).toISOString();
     const none = await request(http).get(`/audit?from=${encodeURIComponent(future)}`).set(bearer(risk.token)).expect(200);

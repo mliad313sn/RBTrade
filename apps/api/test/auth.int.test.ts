@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { TokenService } from '../src/auth/token.service';
 import { base32Decode, totp } from '../src/auth/totp';
-import { bearer, createUser, CSRF, login, nextTotpWindow, ownerQuery, PASSWORD, startApp, uniqueEmail } from './helpers';
+import { bearer, createUser, CSRF, login, nextTotpWindow, ownerQuery, passAppropriateness, PASSWORD, startApp, uniqueEmail } from './helpers';
 
 describe('identity: sign-up, MFA, login, RBAC', () => {
   let app: INestApplication;
@@ -30,10 +30,15 @@ describe('identity: sign-up, MFA, login, RBAC', () => {
     expect(me.body).toMatchObject({ roles: ['novice'], mfa: false, preferences: { viewMode: 'novice' }, capabilities: { orderTypes: ['market'], robotBuilder: false } });
   });
 
-  it('trader: sign-up → forced MFA enrolment → login with TOTP; replay and bad codes rejected', async () => {
+  it('no self-service trader (B-018): sign-up is novice only; trader comes from the assessment, then forced MFA enrolment; replay and bad codes rejected', async () => {
     const email = uniqueEmail('trd');
-    const s = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'T', accountType: 'trader' }).expect(201);
-    expect(s.body.mfaRequired).toBe(true);
+    const refused = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'T', accountType: 'trader' }).expect(400);
+    expect(JSON.stringify(refused.body)).toContain('appropriateness');
+    const s = await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'T' }).expect(201);
+    expect(s.body).toMatchObject({ user: { roles: ['novice'] }, mfaRequired: false });
+    const l0 = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
+    expect(l0.body.status).toBe('ok');
+    await passAppropriateness(app, l0.body.accessToken);
 
     const l1 = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
     expect(l1.body.status).toBe('mfa_enrollment_required');
@@ -51,7 +56,7 @@ describe('identity: sign-up, MFA, login, RBAC', () => {
     const v = await request(http).post('/auth/mfa/verify').set(CSRF).send({ mfaToken: l1.body.mfaToken, code }).expect(200);
     expect(v.body.enrolled).toBe(true);
     const me = await request(http).get('/me').set(bearer(v.body.accessToken)).expect(200);
-    expect(me.body).toMatchObject({ roles: ['trader'], mfa: true, preferences: { viewMode: 'pro' } });
+    expect(me.body).toMatchObject({ roles: ['novice', 'trader'], mfa: true, preferences: { viewMode: 'pro' } });
 
     // enrolment cannot be restarted once active
     const l2 = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);

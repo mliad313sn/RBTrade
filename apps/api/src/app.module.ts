@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AdminController } from './admin/admin.controller';
+import { AppropriatenessModule } from './appropriateness/appropriateness.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
@@ -11,11 +12,11 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
-import { KillSwitchController } from './kill-switch/kill-switch.controller';
 import { MarketDataModule } from './market-data/market-data.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { RobotsController } from './robots/robots.controller';
 import { SimModule } from './sim/sim.module';
+import { TradingModule } from './trading/trading.module';
 
 @Module({
   imports: [
@@ -47,8 +48,10 @@ import { SimModule } from './sim/sim.module';
     PreferencesModule,
     MarketDataModule,
     SimModule,
+    TradingModule,
+    AppropriatenessModule,
   ],
-  controllers: [HealthController, KillSwitchController, RobotsController, AdminController],
+  controllers: [HealthController, RobotsController, AdminController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

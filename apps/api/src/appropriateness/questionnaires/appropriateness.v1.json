@@ -1,0 +1,122 @@
+{
+  "id": "appropriateness",
+  "version": 1,
+  "kind": "appropriateness",
+  "title": "Pro trading appropriateness assessment",
+  "intro": "SIMULATED placeholder questions pending Compliance review (OQ-C1). This short check makes sure you understand the risks of leveraged, fast-moving trading before the Pro terminal is unlocked. Your answers are graded on our server and not stored; only your score and the questionnaire version are kept.",
+  "locale": "en",
+  "simulated": true,
+  "reviewStatus": "placeholder_pending_compliance_review",
+  "passMarkPct": 75,
+  "cooldownMinutes": 1440,
+  "questions": [
+    {
+      "id": "leverage",
+      "topic": "Leverage",
+      "prompt": "You open a position worth 30,000 with 1,000 of margin (1:30). The price moves 2% against you. Roughly what happens to your margin?",
+      "options": [
+        { "id": "a", "label": "I lose about 2% of my 1,000 margin (about 20).", "points": 0 },
+        { "id": "b", "label": "I lose about 600, which is 60% of my margin.", "points": 1 },
+        { "id": "c", "label": "Nothing, because losses only count when I close.", "points": 0 }
+      ]
+    },
+    {
+      "id": "stop_gap",
+      "topic": "Stop orders and gaps",
+      "prompt": "Your stop loss is at 100. The market closes at 101 and opens the next day at 95. At what price is your stop most likely to fill?",
+      "options": [
+        { "id": "a", "label": "Exactly 100, a stop always fills at its price.", "points": 0 },
+        {
+          "id": "b",
+          "label": "Around 95, the next available price, so the loss is bigger than planned.",
+          "points": 1
+        },
+        { "id": "c", "label": "It does not fill until the price returns to 100.", "points": 0 }
+      ]
+    },
+    {
+      "id": "costs",
+      "topic": "Costs",
+      "prompt": "Which costs reduce the result of a leveraged trade held for several days?",
+      "options": [
+        { "id": "a", "label": "Only the commission when I open.", "points": 0 },
+        {
+          "id": "b",
+          "label": "The spread, commissions and overnight funding (swap) for every night the position is open.",
+          "points": 1
+        },
+        { "id": "c", "label": "None, paper and leveraged trading have no costs.", "points": 0 }
+      ]
+    },
+    {
+      "id": "margin_call",
+      "topic": "Margin",
+      "prompt": "Your losses grow and your equity falls below the margin your positions need. What can happen?",
+      "options": [
+        { "id": "a", "label": "Positions can be closed automatically at a loss.", "points": 1 },
+        { "id": "b", "label": "The broker must wait until the market recovers.", "points": 0 },
+        {
+          "id": "c",
+          "label": "Losses are capped at the margin I deposited in every case.",
+          "points": 0
+        }
+      ]
+    },
+    {
+      "id": "position_size",
+      "topic": "Position size",
+      "prompt": "You plan to risk at most 1% of a 10,000 account on a trade with a stop 50 points away. Each point is worth 1 per unit. What is the largest size?",
+      "options": [
+        { "id": "a", "label": "2 units (2 × 50 = 100, which is 1% of 10,000).", "points": 1 },
+        { "id": "b", "label": "20 units.", "points": 0 },
+        { "id": "c", "label": "As many units as my margin allows.", "points": 0 }
+      ]
+    },
+    {
+      "id": "volatility",
+      "topic": "Volatility and news",
+      "prompt": "A major economic announcement is due in five minutes. What is most likely around the release?",
+      "options": [
+        { "id": "a", "label": "Spreads stay the same and prices move slowly.", "points": 0 },
+        {
+          "id": "b",
+          "label": "Spreads can widen and prices can jump, so orders may fill far from what I expect.",
+          "points": 1
+        },
+        { "id": "c", "label": "The market closes during announcements.", "points": 0 }
+      ]
+    },
+    {
+      "id": "robots",
+      "topic": "Automated trading",
+      "prompt": "A trading robot's backtest shows a smooth, rising equity curve. What should you assume?",
+      "options": [
+        { "id": "a", "label": "The robot will keep producing the same returns live.", "points": 0 },
+        {
+          "id": "b",
+          "label": "Past and simulated results do not guarantee future results; live trading can lose money.",
+          "points": 1
+        },
+        {
+          "id": "c",
+          "label": "A robot cannot lose more than the backtest's worst day.",
+          "points": 0
+        }
+      ]
+    },
+    {
+      "id": "loss_capacity",
+      "topic": "Capacity for loss",
+      "prompt": "Which money is appropriate to trade with leverage?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Money I can afford to lose without affecting my essential expenses.",
+          "points": 1
+        },
+        { "id": "b", "label": "My emergency savings, because returns are quick.", "points": 0 },
+        { "id": "c", "label": "Borrowed money, to increase my position size.", "points": 0 }
+      ]
+    }
+  ]
+}

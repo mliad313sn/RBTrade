@@ -43,11 +43,11 @@ describe('preferences and kill switch', () => {
     expect(ok.body.preferences).toMatchObject({ colourConvention: 'green_red', hotkeys: { killSwitch: 'Ctrl+Alt+K', commandPalette: 'Mod+K' } });
   });
 
-  it.each(['robots', 'robots_cancel', 'robots_cancel_flatten'] as const)('kill switch scope %s writes an audit event', async (scope) => {
+  it.each(['robots', 'robots_cancel', 'robots_cancel_flatten'] as const)('kill switch scope %s keeps the goal 01 contract and writes an audit event', async (scope) => {
     const u = await createUser(app, 'novice');
     const res = await request(http).post('/kill-switch').set(bearer(u.token)).send({ scope, source: 'hotkey' }).expect(202);
-    expect(res.body).toMatchObject({ accepted: true, scope, engine: 'not_wired_goal_03' });
-    const audit = await request(http).get('/audit?action=kill_switch.*').set(bearer(u.token)).expect(200);
+    expect(res.body).toMatchObject({ accepted: true, scope, engine: 'paper', halted: true, auditEventId: expect.stringMatching(/^\d+$/) });
+    const audit = await request(http).get('/audit?action=kill_switch.requested').set(bearer(u.token)).expect(200);
     expect(audit.body.events).toHaveLength(1);
     expect(audit.body.events[0]).toMatchObject({
       id: res.body.auditEventId,
@@ -56,7 +56,7 @@ describe('preferences and kill switch', () => {
       action: 'kill_switch.requested',
       entity: 'kill_switch',
       entityId: scope,
-      payload: { scope, source: 'hotkey', environment: 'PAPER' },
+      payload: { scope, source: 'hotkey', environment: 'PAPER', engine: 'paper' },
     });
   });
 

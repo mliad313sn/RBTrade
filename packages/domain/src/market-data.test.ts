@@ -7,6 +7,10 @@ import {
   depthChannel,
   isTimeframe,
   parseChannel,
+  ordersChannel,
+  positionsChannel,
+  accountChannel,
+  isPrivateChannelKind,
   QuoteSchema,
   quoteChannel,
   STATUS_CHANNEL,
@@ -33,11 +37,17 @@ describe('market data schema helpers', () => {
   });
 
   it('builds and parses channels', () => {
-    expect(parseChannel(quoteChannel('EURUSD'))).toEqual({ kind: 'quotes', symbol: 'EURUSD', tf: null });
-    expect(parseChannel(depthChannel('7203.XTKS'))).toEqual({ kind: 'depth', symbol: '7203.XTKS', tf: null });
-    expect(parseChannel(candleChannel('BTCUSD', '1D'))).toEqual({ kind: 'candles', symbol: 'BTCUSD', tf: '1D' });
-    expect(parseChannel(STATUS_CHANNEL)).toEqual({ kind: 'status', symbol: null, tf: null });
-    for (const bad of ['quotes:', 'quotes:eurusd', 'candles:EURUSD:2m', 'candles:EURUSD', 'depth:A:B', 'trades:EURUSD', '']) {
+    expect(parseChannel(quoteChannel('EURUSD'))).toEqual({ kind: 'quotes', symbol: 'EURUSD', tf: null, accountId: null });
+    expect(parseChannel(depthChannel('7203.XTKS'))).toEqual({ kind: 'depth', symbol: '7203.XTKS', tf: null, accountId: null });
+    expect(parseChannel(candleChannel('BTCUSD', '1D'))).toEqual({ kind: 'candles', symbol: 'BTCUSD', tf: '1D', accountId: null });
+    expect(parseChannel(STATUS_CHANNEL)).toEqual({ kind: 'status', symbol: null, tf: null, accountId: null });
+    const id = '0b3c9a4e-1f2d-4c5b-9a8e-7d6c5b4a3f21';
+    expect(parseChannel(ordersChannel(id))).toEqual({ kind: 'orders', symbol: null, tf: null, accountId: id });
+    expect(parseChannel(positionsChannel(id))?.kind).toBe('positions');
+    expect(parseChannel(accountChannel(id))?.kind).toBe('account');
+    expect(isPrivateChannelKind('orders')).toBe(true);
+    expect(isPrivateChannelKind('quotes')).toBe(false);
+    for (const bad of ['orders:EURUSD', 'account:', `orders:${id}:x`, 'quotes:', 'quotes:eurusd', 'candles:EURUSD:2m', 'candles:EURUSD', 'depth:A:B', 'trades:EURUSD', '']) {
       expect(parseChannel(bad)).toBeNull();
     }
   });

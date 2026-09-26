@@ -1,4 +1,3 @@
-import { SELF_SERVICE_ROLES } from '@kora/domain';
 import { z } from 'zod';
 
 import { MIN_PASSWORD_LENGTH } from './password';
@@ -8,7 +7,11 @@ export const SignupSchema = z
     email: z.email().max(320).transform((e) => e.toLowerCase()),
     password: z.string().min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`).max(256),
     displayName: z.string().trim().min(1).max(80),
-    accountType: z.enum(SELF_SERVICE_ROLES as ['novice', 'trader']).default('novice'),
+    /**
+     * Sponsor decision OQ-S2 (B-018): no self-service trader. Only `novice` is accepted; `trader`
+     * is granted by passing the appropriateness assessment (POST /appropriateness/attempts).
+     */
+    accountType: z.literal('novice', { error: 'Everyone starts as novice. Pass the appropriateness assessment to unlock Pro trading.' }).default('novice'),
   })
   .strict();
 

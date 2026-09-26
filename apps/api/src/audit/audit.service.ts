@@ -117,6 +117,70 @@ export class AuditService {
     return { ...fields, prevHash, hash };
   }
 
+  /**
+   * Appends many events under one chain lock with a single multi-row insert (B-006: the kill switch
+   * audits every child action; one lock and one round trip keep 1,000 events well under a second).
+   * Pass the caller's transaction so the events commit atomically with the business change.
+   */
+  async recordMany(inputs: AuditRecordInput[], client?: Queryable): Promise<AuditEvent[]> {
+    if (inputs.length === 0) return [];
+    for (const i of inputs) canonicalJson(i.payload ?? {});
+    if (client) return this.appendMany(client, inputs);
+    return this.db.tx((c) => this.appendMany(c, inputs));
+  }
+
+  private async appendMany(c: Queryable, inputs: AuditRecordInput[]): Promise<AuditEvent[]> {
+    const iso = await c.query<{ transaction_isolation: string }>('SHOW transaction_isolation');
+    if (iso.rows[0]?.transaction_isolation !== 'read committed') {
+      throw new Error('AuditService.recordMany requires a READ COMMITTED transaction');
+    }
+    await c.query(`SELECT pg_advisory_xact_lock(${CHAIN_LOCK})`);
+    const head = await c.query<{ id: string; hash: string; ts: string }>(
+      `SELECT h.id, h.hash, to_char(date_trunc('microseconds', clock_timestamp()) AT TIME ZONE 'UTC', ${TS_FORMAT}) AS ts
+       FROM (SELECT id::text AS id, hash FROM audit_events ORDER BY audit_events.id DESC LIMIT 1) h
+       RIGHT JOIN (SELECT 1) one ON true`,
+    );
+    let prevHash = head.rows[0]?.hash ?? GENESIS_HASH;
+    let nextId = BigInt(head.rows[0]?.id ?? '0') + 1n;
+    const ts = head.rows[0]!.ts;
+    const events: AuditEvent[] = [];
+    for (const input of inputs) {
+      const fields = {
+        id: nextId.toString(),
+        ts,
+        actorId: input.actorId,
+        actorType: input.actorType,
+        action: input.action,
+        entity: input.entity,
+        entityId: input.entityId ?? null,
+        payload: input.payload ?? {},
+      };
+      const hash = computeAuditHash(fields, prevHash);
+      events.push({ ...fields, prevHash, hash });
+      prevHash = hash;
+      nextId += 1n;
+    }
+    await c.query(
+      `INSERT INTO audit_events (id, ts, actor_id, actor_type, action, entity, entity_id, payload, prev_hash, hash)
+       SELECT u.id, $2::timestamptz, u.actor_id, u.actor_type, u.action, u.entity, u.entity_id, u.payload::jsonb, u.prev_hash, u.hash
+       FROM unnest($1::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[])
+         AS u(id, actor_id, actor_type, action, entity, entity_id, payload, prev_hash, hash)`,
+      [
+        events.map((e) => e.id),
+        ts,
+        events.map((e) => e.actorId),
+        events.map((e) => e.actorType),
+        events.map((e) => e.action),
+        events.map((e) => e.entity),
+        events.map((e) => e.entityId),
+        events.map((e) => JSON.stringify(e.payload)),
+        events.map((e) => e.prevHash),
+        events.map((e) => e.hash),
+      ],
+    );
+    return events;
+  }
+
   async list(q: AuditQuery): Promise<{ events: AuditEvent[]; nextBeforeId: string | null }> {
     const where: string[] = [];
     const params: unknown[] = [];

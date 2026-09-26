@@ -306,4 +306,6 @@ export interface PositionDto {
   notional: string | null;
   marginUsed: string | null;
   updatedAt: string;
+  /** Mark or FX rate is stale or missing: values are indicative. */
+  stale: boolean;
 }

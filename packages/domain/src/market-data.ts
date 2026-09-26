@@ -245,23 +245,39 @@ export interface Venue {
 
 // ---- Channels -------------------------------------------------------------------------------
 
-export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'status';
+export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'status' | 'orders' | 'positions' | 'account';
+/** Private trading channels (goal 03), keyed by account id; the gateway checks ownership. */
+export const PRIVATE_CHANNEL_KINDS = ['orders', 'positions', 'account'] as const;
+export type PrivateChannelKind = (typeof PRIVATE_CHANNEL_KINDS)[number];
 export interface ParsedChannel {
   kind: ChannelKind;
   symbol: string | null;
   tf: Timeframe | null;
+  accountId: string | null;
 }
 export const quoteChannel = (s: string): string => `quotes:${s}`;
 export const depthChannel = (s: string): string => `depth:${s}`;
 export const candleChannel = (s: string, tf: Timeframe): string => `candles:${s}:${tf}`;
+export const ordersChannel = (accountId: string): string => `orders:${accountId}`;
+export const positionsChannel = (accountId: string): string => `positions:${accountId}`;
+export const accountChannel = (accountId: string): string => `account:${accountId}`;
 export const STATUS_CHANNEL = 'status';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export function isPrivateChannelKind(kind: ChannelKind): kind is PrivateChannelKind {
+  return (PRIVATE_CHANNEL_KINDS as readonly string[]).includes(kind);
+}
+
 export function parseChannel(ch: string): ParsedChannel | null {
-  if (ch === STATUS_CHANNEL) return { kind: 'status', symbol: null, tf: null };
+  if (ch === STATUS_CHANNEL) return { kind: 'status', symbol: null, tf: null, accountId: null };
   const parts = ch.split(':');
   const [kind, sym, tf] = parts;
+  if ((kind === 'orders' || kind === 'positions' || kind === 'account') && parts.length === 2 && sym && UUID_RE.test(sym)) {
+    return { kind, symbol: null, tf: null, accountId: sym };
+  }
   if (!sym || !SYMBOL_RE.test(sym)) return null;
-  if ((kind === 'quotes' || kind === 'depth') && parts.length === 2) return { kind, symbol: sym, tf: null };
-  if (kind === 'candles' && parts.length === 3 && tf && isTimeframe(tf)) return { kind, symbol: sym, tf };
+  if ((kind === 'quotes' || kind === 'depth') && parts.length === 2) return { kind, symbol: sym, tf: null, accountId: null };
+  if (kind === 'candles' && parts.length === 3 && tf && isTimeframe(tf)) return { kind, symbol: sym, tf, accountId: null };
   return null;
 }

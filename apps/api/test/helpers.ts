@@ -4,6 +4,7 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { vi } from 'vitest';
 
+import appropriatenessV1 from '../src/appropriateness/questionnaires/appropriateness.v1.json';
 import { base32Decode, totp } from '../src/auth/totp';
 import { createApp } from '../src/create-app';
 
@@ -57,7 +58,30 @@ export interface TestUser {
 }
 
 /**
- * Real flow: sign-up → login → (MFA enrolment + verify when required).
+ * The appropriateness answer key, derived from the reviewed questionnaire data (best-scoring option
+ * per question). Tests submit it through the real API; nothing bypasses the assessment.
+ */
+export function passingAnswers(def: { questions: Array<{ id: string; options: Array<{ id: string; points: number }> }> } = appropriatenessV1): Record<string, string> {
+  return Object.fromEntries(def.questions.map((q) => [q.id, [...q.options].sort((a, b) => b.points - a.points)[0]!.id]));
+}
+
+export function failingAnswers(def: { questions: Array<{ id: string; options: Array<{ id: string; points: number }> }> } = appropriatenessV1): Record<string, string> {
+  return Object.fromEntries(def.questions.map((q) => [q.id, [...q.options].sort((a, b) => a.points - b.points)[0]!.id]));
+}
+
+/** Passes the appropriateness assessment through the API with a novice session token. */
+export async function passAppropriateness(app: INestApplication, token: string): Promise<void> {
+  const http = app.getHttpServer();
+  const q = await request(http).get('/appropriateness/questionnaire').set(bearer(token)).expect(200);
+  const { id, version } = q.body.questionnaire as { id: string; version: number };
+  const res = await request(http).post('/appropriateness/attempts').set(bearer(token)).send({ questionnaireId: id, version, answers: passingAnswers() }).expect(200);
+  if (!res.body.passed) throw new Error(`appropriateness not passed: ${JSON.stringify(res.body)}`);
+}
+
+/**
+ * Real flow: sign-up (always novice, B-018) → login. For `trader`: pass the appropriateness
+ * assessment through the API, then log in again, which forces TOTP enrolment + verify.
+ * `extraRoles` (quant, risk_officer, admin) are admin-granted roles, inserted as the owner.
  * `realClock: true` skips the faked clock advance (fresh users have no TOTP replay history), for
  * tests that need a moving Date.now (e.g. the market data feed).
  */
@@ -72,14 +96,21 @@ export async function createUser(
   const signup = await request(http)
     .post('/auth/signup')
     .set(CSRF)
-    .send({ email, password: PASSWORD, displayName: `Test ${accountType}`, accountType })
+    .send({ email, password: PASSWORD, displayName: `Test ${accountType}` })
     .expect(201);
   const id = signup.body.user.id as string;
-  let roles: Role[] = [accountType];
-  if (extraRoles.length) {
-    roles = [...new Set([...roles, ...extraRoles])];
-    await ownerQuery('INSERT INTO user_roles (user_id, role) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING', [id, roles]);
+  let roles: Role[] = ['novice'];
+  if (accountType === 'trader') {
+    const first = await login(app, email, undefined, opts);
+    await passAppropriateness(app, first.token);
+    roles = ['novice', 'trader'];
   }
+  const admin = extraRoles.filter((r) => r !== 'trader' && r !== 'novice');
+  if (admin.length) {
+    roles = [...new Set([...roles, ...admin])];
+    await ownerQuery('INSERT INTO user_roles (user_id, role) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING', [id, admin]);
+  }
+  if (extraRoles.includes('trader') && accountType !== 'trader') throw new Error('Use accountType "trader" (passes the assessment)');
   return { id, email, roles, ...(await login(app, email, undefined, opts)) };
 }
 
