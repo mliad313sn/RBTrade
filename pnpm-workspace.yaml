@@ -8,3 +8,7 @@ onlyBuiltDependencies:
   - esbuild
   - "@nestjs/core"
   - sharp
+
+ignoredBuiltDependencies:
+  - "@scarf/scarf"
+  - protobufjs

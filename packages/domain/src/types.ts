@@ -25,7 +25,12 @@ export interface Instrument {
 export type Side = 'buy' | 'sell';
 export type OrderType = 'market' | 'limit' | 'stop' | 'stop_limit' | 'trailing' | 'bracket' | 'oco';
 export const ADVANCED_ORDER_TYPES: readonly OrderType[] = ['stop_limit', 'trailing', 'bracket', 'oco'];
-export const NOVICE_ORDER_TYPES: readonly OrderType[] = ['market', 'limit'];
+export const NOVICE_ORDER_TYPES: readonly OrderType[] = ['market'];
+export const PRO_ORDER_TYPES: readonly OrderType[] = ['market', 'limit', 'stop', 'stop_limit', 'trailing', 'bracket', 'oco'];
+
+export function orderTypesFor(viewMode: 'pro' | 'novice'): readonly OrderType[] {
+  return viewMode === 'pro' ? PRO_ORDER_TYPES : NOVICE_ORDER_TYPES;
+}
 export type TimeInForce = 'gtc' | 'day' | 'ioc' | 'fok';
 export type OrderStatus = 'new' | 'working' | 'partially_filled' | 'filled' | 'cancelled' | 'rejected';
 

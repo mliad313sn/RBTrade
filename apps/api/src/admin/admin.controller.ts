@@ -1,0 +1,52 @@
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Put } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ROLES } from '@kora/domain';
+import { z } from 'zod';
+
+import { AuditService } from '../audit/audit.service';
+import { CurrentPrincipal, Roles } from '../auth/decorators';
+import type { Principal } from '../auth/principal';
+import { UsersRepository } from '../auth/users.repository';
+import { openApiSchema, ZodValidationPipe } from '../common/zod';
+import { DbService } from '../db/db.service';
+
+const SetRolesSchema = z.object({ roles: z.array(z.enum(ROLES)).min(1).max(5) }).strict();
+
+@ApiTags('admin')
+@Controller('admin/users')
+@Roles('admin')
+export class AdminController {
+  constructor(
+    private readonly db: DbService,
+    private readonly users: UsersRepository,
+    private readonly audit: AuditService,
+  ) {}
+
+  @Get()
+  async list() {
+    const rows = await this.users.list();
+    return rows.map((u) => ({ id: u.id, email: u.email, displayName: u.display_name, roles: u.roles, mfaEnabled: u.mfa_enabled, status: u.status }));
+  }
+
+  @Put(':id/roles')
+  @ApiOperation({ summary: 'Replace a user\'s roles (audited). Users with non-novice roles must enrol MFA at next login.' })
+  @ApiBody({ schema: openApiSchema(SetRolesSchema) })
+  async setRoles(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body(new ZodValidationPipe(SetRolesSchema)) body: z.infer<typeof SetRolesSchema>,
+  ) {
+    const roles = [...new Set(body.roles)];
+    if (id === p.sub && !roles.includes('admin')) {
+      throw new BadRequestException({ error: 'self_demotion', message: 'You cannot remove your own admin role' });
+    }
+    return this.db.tx(async (c) => {
+      const user = await this.users.findById(id, c);
+      if (!user) throw new NotFoundException({ error: 'not_found', message: 'User not found' });
+      const before = await this.users.roles(id, c);
+      await this.users.setRoles(c, id, roles, p.sub);
+      await this.audit.record({ actorId: p.sub, actorType: 'user', action: 'admin.roles_changed', entity: 'user', entityId: id, payload: { before, after: roles } }, c);
+      return { id, roles };
+    });
+  }
+}

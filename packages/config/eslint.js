@@ -18,7 +18,7 @@ const noFloatMoney = {
   ],
 };
 
-export function koraConfig({ react = false, ignores = [] } = {}) {
+export function koraConfig({ react = false, nest = false, ignores = [] } = {}) {
   return tseslint.config(
     { ignores: ['dist/**', '.next/**', 'coverage/**', 'storybook-static/**', 'next-env.d.ts', ...ignores] },
     js.configs.recommended,
@@ -30,7 +30,8 @@ export function koraConfig({ react = false, ignores = [] } = {}) {
       rules: {
         ...noFloatMoney,
         '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-        '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
+        // NestJS DI reads constructor param types via emitDecoratorMetadata: type-only imports break it.
+        '@typescript-eslint/consistent-type-imports': nest ? 'off' : ['error', { fixStyle: 'inline-type-imports' }],
         'no-console': ['warn', { allow: ['warn', 'error'] }],
         eqeqeq: ['error', 'always'],
       },

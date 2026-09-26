@@ -22,3 +22,14 @@ describe('preferences', () => {
     expect(UpdatePreferencesSchema.safeParse({ hotkeys: many }).success).toBe(false);
   });
 });
+
+describe('order types by view mode', () => {
+  it('hides advanced order types in novice view', async () => {
+    const { orderTypesFor, ADVANCED_ORDER_TYPES } = await import('./types.js');
+    expect(orderTypesFor('novice')).toEqual(['market']);
+    for (const t of ADVANCED_ORDER_TYPES) {
+      expect(orderTypesFor('pro')).toContain(t);
+      expect(orderTypesFor('novice')).not.toContain(t);
+    }
+  });
+});
