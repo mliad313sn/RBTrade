@@ -69,16 +69,16 @@ test('Market Radar: filter by region → open a trend → drivers and news → D
   await grantAndRelogin(page, email, secret!, 'quant');
 
   // A small SIMULATED global universe with 700 one-hour bars each (planted rises on two of them).
-  await db("DELETE FROM md_candles_history WHERE tf = '1h' AND source <> 'e2e-simulated'");
   await seed1h('7203.XTKS', 2800, 0.004, 60, 11, 1);
   await seed1h('0700.XHKG', 380, 0.005, 0, 23, 1);
   await seed1h('SAP.XETR', 190, 0.004, 0, 37, 2);
   await seed1h('BHP.XASX', 45, 0.005, 0, 41, 2);
+  // ETH/USD trades 24/7 in the SIMULATED feed (the robot specs own the BTCUSD history).
   const q = (
-    (await (await page.request.get('/api/quotes?symbols=BTCUSD')).json()) as { quotes: Array<{ quote: { bid: string; ask: string } | null }> }
+    (await (await page.request.get('/api/quotes?symbols=ETHUSD')).json()) as { quotes: Array<{ quote: { bid: string; ask: string } | null }> }
   ).quotes[0]!.quote;
-  const btc = q ? (Number(q.bid) + Number(q.ask)) / 2 : 64000;
-  await seed1h('BTCUSD', btc * 0.9, 0.003, 60, 53, 1);
+  const eth = q ? (Number(q.bid) + Number(q.ask)) / 2 : 3000;
+  await seed1h('ETHUSD', eth * 0.9, 0.003, 60, 53, 2);
 
   const scan = await page.request.post('/api/intel/scan', { headers: CSRF, timeout: 120_000 });
   expect(scan.status()).toBe(200);
@@ -119,15 +119,15 @@ test('Market Radar: filter by region → open a trend → drivers and news → D
 
   // 2. A tradable instrument (24/7 SIMULATED crypto): Draft to ticket.
   await radar.getByTestId('radar-region').selectOption('global');
-  const btcRow = radar.locator('[data-testid="radar-trend"][data-symbol="BTCUSD"]');
-  await expect(btcRow).toBeVisible({ timeout: 15_000 });
-  await btcRow.click();
-  await expect(card.getByRole('heading', { name: /BTCUSD/ })).toBeVisible({ timeout: 15_000 });
+  const ethRow = radar.locator('[data-testid="radar-trend"][data-symbol="ETHUSD"]');
+  await expect(ethRow).toBeVisible({ timeout: 15_000 });
+  await ethRow.click();
+  await expect(card.getByRole('heading', { name: /ETHUSD/ })).toBeVisible({ timeout: 15_000 });
   const before = (await (await page.request.get('/api/orders?status=all')).json()) as { orders: unknown[] };
   expect(before.orders).toHaveLength(0);
   await card.getByTestId('trend-draft').click();
 
-  await expect(page).toHaveURL(/\/terminal\?symbol=BTCUSD&aiDraft=[0-9a-f-]{36}/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/terminal\?symbol=ETHUSD&aiDraft=[0-9a-f-]{36}/, { timeout: 20_000 });
   const ticket = page.getByTestId('order-ticket');
   await expect(ticket).toBeVisible({ timeout: 20_000 });
   await expect(ticket.getByTestId('ticket-note')).toContainText('AI draft', { timeout: 15_000 });
