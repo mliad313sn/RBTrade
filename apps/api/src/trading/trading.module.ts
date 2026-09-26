@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { DisclosuresModule } from '../disclosures/disclosures.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { AccountsController } from './accounts.controller';
 import { AccountsService } from './accounts.service';
@@ -20,7 +21,7 @@ import { TradingRegistryService } from './trading-registry.service';
 
 /** Goal 03: OMS, paper engine, pre-trade risk, kill switch, reconciliation (ADR 0003). */
 @Module({
-  imports: [MarketDataModule],
+  imports: [MarketDataModule, DisclosuresModule],
   providers: [
     { provide: TRADING_CONFIG, useFactory: () => loadTradingConfig() },
     TradingRegistryService,

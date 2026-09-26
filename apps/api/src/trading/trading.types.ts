@@ -28,6 +28,8 @@ export interface AccountRow {
   halt_reason: string | null;
   settings: Record<string, unknown>;
   risk_limits: Record<string, unknown>;
+  /** Goal 09: platform limits raised for this account through an approved four-eyes request. */
+  limit_overrides?: Record<string, string>;
   created_at: Date;
 }
 

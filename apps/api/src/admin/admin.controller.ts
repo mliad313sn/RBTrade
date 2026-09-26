@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Put } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ROLES } from '@kora/domain';
+import { ROLES, rolesConflict } from '@kora/domain';
 import { z } from 'zod';
 
 import { AuditService } from '../audit/audit.service';
@@ -10,7 +10,7 @@ import { UsersRepository } from '../auth/users.repository';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { DbService } from '../db/db.service';
 
-const SetRolesSchema = z.object({ roles: z.array(z.enum(ROLES)).min(1).max(5) }).strict();
+const SetRolesSchema = z.object({ roles: z.array(z.enum(ROLES)).min(1).max(6) }).strict();
 
 @ApiTags('admin')
 @Controller('admin/users')
@@ -37,6 +37,14 @@ export class AdminController {
     @Body(new ZodValidationPipe(SetRolesSchema)) body: z.infer<typeof SetRolesSchema>,
   ) {
     const roles = [...new Set(body.roles)];
+    // Goal 09 segregation of duties: the internal auditor (3rd line) holds no operating role.
+    const conflict = rolesConflict(roles);
+    if (conflict) {
+      throw new BadRequestException({
+        error: 'segregation_of_duties',
+        message: `Segregation of duties: ${conflict[0]} cannot be combined with ${conflict[1]}.`,
+      });
+    }
     if (id === p.sub && !roles.includes('admin')) {
       throw new BadRequestException({ error: 'self_demotion', message: 'You cannot remove your own admin role' });
     }

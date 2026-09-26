@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import { parseChannel, STATUS_CHANNEL, type FeedStatus } from '@kora/domain';
+import { parseChannel, RISK_ALERTS_CHANNEL, STATUS_CHANNEL, type FeedStatus } from '@kora/domain';
 import { Conflator } from '@kora/market-data';
 import { Redis } from 'ioredis';
 
@@ -133,8 +133,8 @@ export class ChannelHub implements OnModuleDestroy {
     if (ch !== STATUS_CHANNEL && !this.subscribers.has(ch)) return;
     this.last.set(ch, payload);
     if (!this.subscribers.has(ch)) return;
-    // Order events are a stream of state changes, not a price: never conflate them (goal 03).
-    if (ch.startsWith('orders:')) this.fanOut(ch, payload);
+    // Order events and risk alerts are streams of events, not a price: never conflate them.
+    if (ch.startsWith('orders:') || ch === RISK_ALERTS_CHANNEL) this.fanOut(ch, payload);
     else this.conflator.offer(ch, payload);
   }
 

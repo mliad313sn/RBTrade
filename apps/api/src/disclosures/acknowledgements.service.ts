@@ -20,6 +20,7 @@ interface AckRow {
   rendered_values: Record<string, string>;
   context: AcknowledgementContext;
   created_at: Date;
+  jurisdiction?: string;
 }
 
 const toRecord = (r: AckRow): AcknowledgementRecord => ({
@@ -31,7 +32,18 @@ const toRecord = (r: AckRow): AcknowledgementRecord => ({
   values: r.rendered_values,
   context: r.context,
   at: r.created_at.toISOString(),
+  jurisdiction: r.jurisdiction ?? 'GLOBAL',
 });
+
+export interface AcknowledgementWithDocument extends AcknowledgementRecord {
+  userId: string;
+  /** The document exactly as acknowledged, re-rendered from the registry version and stored values. */
+  document: DisclosureDocument | null;
+  /** True when the re-rendered text hashes to the stored content hash. */
+  verified: boolean;
+  /** True when this acknowledgement still matches the version and values in force now. */
+  inForceNow: boolean;
+}
 
 /**
  * Acknowledgements bound to the exact document shown (version + content hash + rendered values).
@@ -97,8 +109,8 @@ export class DisclosureAcknowledgements {
       });
     return this.db.tx(async (c) => {
       const r = await c.query<AckRow>(
-        `INSERT INTO disclosure_acknowledgements (user_id, disclosure_id, version, content_hash, locale, rendered_values, context)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        `INSERT INTO disclosure_acknowledgements (user_id, disclosure_id, version, content_hash, locale, rendered_values, context, jurisdiction)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
         [
           userId,
           id,
@@ -107,6 +119,7 @@ export class DisclosureAcknowledgements {
           body.locale,
           JSON.stringify(doc.values),
           body.context,
+          doc.jurisdiction ?? 'GLOBAL',
         ],
       );
       const row = r.rows[0]!;
@@ -126,11 +139,42 @@ export class DisclosureAcknowledgements {
             values: doc.values,
             placeholder: doc.placeholder,
             context: body.context,
+            jurisdiction: doc.jurisdiction ?? 'GLOBAL',
           },
         },
         c,
       );
       return toRecord(row);
     });
+  }
+
+  /**
+   * Goal 09: every acknowledgement of a user (optionally one disclosure), each with the document
+   * version in force when it was given, re-rendered from the registry and verified by content hash.
+   */
+  async history(userId: string, id?: string): Promise<AcknowledgementWithDocument[]> {
+    const rows = await this.db.query<AckRow & { user_id: string }>(
+      `SELECT * FROM disclosure_acknowledgements WHERE user_id = $1 ${id ? 'AND disclosure_id = $2' : ''} ORDER BY created_at DESC LIMIT 500`,
+      id ? [userId, id] : [userId],
+    );
+    const out: AcknowledgementWithDocument[] = [];
+    for (const r of rows) {
+      const rec = toRecord(r);
+      const doc =
+        this.registry.render?.(rec.disclosureId, rec.version, rec.jurisdiction ?? 'GLOBAL', rec.locale, rec.values) ?? null;
+      const now = this.registry.current(rec.disclosureId, rec.locale);
+      out.push({
+        ...rec,
+        userId: r.user_id,
+        document: doc,
+        verified: !!doc && doc.contentHash === rec.contentHash,
+        inForceNow:
+          !!now &&
+          now.version === rec.version &&
+          now.contentHash === rec.contentHash &&
+          JSON.stringify(now.values) === JSON.stringify(rec.values),
+      });
+    }
+    return out;
   }
 }

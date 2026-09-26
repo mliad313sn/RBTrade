@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,6 +19,8 @@ import {
 } from '@kora/domain';
 
 import { DbService } from '../db/db.service';
+import { FourEyesStore, toFourEyesView } from '../governance/four-eyes.store';
+import { GOVERNANCE_CONFIG, type GovernanceConfig } from '../governance/governance-config';
 import { AccountsService } from './accounts.service';
 import { MarketViewService } from './market-view.service';
 import { OmsService } from './oms.service';
@@ -62,12 +65,27 @@ export class KillSwitchService {
     private readonly registry: TradingRegistryService,
     private readonly market: MarketViewService,
     private readonly events: TradingEventsService,
+    private readonly fourEyes: FourEyesStore,
+    @Inject(GOVERNANCE_CONFIG) private readonly gov: GovernanceConfig,
   ) {}
 
   async trigger(userId: string, req: KillSwitchRequestWithReason): Promise<KillSwitchResult> {
+    return this.triggerAccount(userId, await this.accounts.ensure(userId), req);
+  }
+
+  /**
+   * Runs the kill switch on one account for `actorId` (the owner, or a risk officer for a firm
+   * halt). `extra` is merged into the parent audit events (e.g. the global kill switch id).
+   */
+  async triggerAccount(
+    actorId: string,
+    account: AccountRow,
+    req: KillSwitchRequestWithReason,
+    extra: Record<string, string> = {},
+  ): Promise<KillSwitchResult> {
     const t0 = performance.now();
-    const account = await this.accounts.ensure(userId);
-    const actor: Actor = { type: 'user', id: userId };
+    const userId = actorId;
+    const actor: Actor = { type: 'user', id: actorId };
     const killSwitchId = randomUUID();
     const out = await this.oms.withAccount(account.id, async (tx) => {
       const a = tx.account;
@@ -80,13 +98,22 @@ export class KillSwitchService {
           ? a.halt_scope!
           : req.scope;
       const upd = await tx.c.query<AccountRow>(
-        `UPDATE accounts SET trading_halted = true, halt_scope = $2, halted_at = COALESCE(halted_at, $3), halted_by = COALESCE(halted_by, $4),
+        // A firm halt (actor ≠ owner) always takes ownership of the halt, so only four eyes lift it.
+        `UPDATE accounts SET trading_halted = true, halt_scope = $2, halted_at = COALESCE(halted_at, $3),
+           halted_by = CASE WHEN $6 THEN $4 ELSE COALESCE(halted_by, $4) END,
            halt_reason = COALESCE($5, halt_reason), updated_at = now() WHERE id = $1 RETURNING *`,
-        [a.id, scope, new Date(tx.now), userId, req.reason ?? null],
+        [a.id, scope, new Date(tx.now), userId, req.reason ?? null, a.user_id !== userId],
       );
       tx.account = upd.rows[0]!;
       tx.changes.accounts.add(a.id);
-      const common = { killSwitchId, accountId: a.id, scope: req.scope, environment: 'PAPER' };
+      const common = {
+        killSwitchId,
+        accountId: a.id,
+        scope: req.scope,
+        environment: 'PAPER',
+        firm: a.user_id !== actorId,
+        ...extra,
+      };
       tx.audit(actor, 'kill_switch.requested', 'kill_switch', req.scope, {
         ...common,
         source: req.source,
@@ -120,6 +147,16 @@ export class KillSwitchService {
         }
       }
       const durationMs = Math.round(performance.now() - t0);
+      // Goal 09: every kill switch reaches the risk officer console as an alert.
+      await tx.c.query(
+        `INSERT INTO alerts (severity, kind, account_id, message, details) VALUES ($1, 'kill_switch.fired', $2, $3, $4::jsonb)`,
+        [
+          common.firm ? 'critical' : 'warning',
+          a.id,
+          `Kill switch (${KILL_SWITCH_SCOPE_LABELS[req.scope].title}) ${common.firm ? 'fired by the firm' : 'fired by the account holder'}: ${cancelled.length} order(s) cancelled, ${flattened} position(s) flattened${pending.length ? `, ${pending.length} flatten order(s) held` : ''}.`,
+          JSON.stringify({ killSwitchId, scope: req.scope, actorId, firm: common.firm, ...extra }),
+        ],
+      );
       tx.audit(actor, 'kill_switch.completed', 'kill_switch', req.scope, {
         ...common,
         ordersCancelled: cancelled.length,
@@ -217,6 +254,16 @@ export class KillSwitchService {
     return { id: order.id, status: order.status, reason };
   }
 
+  /**
+   * Four-eyes policy for resuming (goal 09): a firm halt (set by someone other than the owner, e.g.
+   * a risk officer or the global kill switch) needs a second person; with `KORA_FOUR_EYES_RESUME=all`
+   * every resume does.
+   */
+  resumeNeedsFourEyes(account: AccountRow): boolean {
+    if (this.gov.resumePolicy === 'all') return true;
+    return !!account.halted_by && account.halted_by !== account.user_id;
+  }
+
   async resume(userId: string, roles: Role[], reason: string, accountId?: string) {
     if (!hasAnyRole(roles, RESUME_ROLES)) {
       throw new ForbiddenException({
@@ -236,8 +283,44 @@ export class KillSwitchService {
       if (!other) throw new NotFoundException({ error: 'not_found', message: 'Account not found' });
       target = other;
     }
-    const actor: Actor = { type: 'user', id: userId };
-    return this.oms.withAccount(target.id, async (tx) => {
+    if (!target.trading_halted)
+      throw new ConflictException({ error: 'not_halted', message: 'Trading is not halted.' });
+    if (this.resumeNeedsFourEyes(target)) {
+      const req = await this.fourEyes.create({
+        kind: 'kill_switch_resume',
+        subjectType: 'account',
+        subjectId: target.id,
+        payload: {
+          accountId: target.id,
+          ownerId: target.user_id,
+          haltScope: target.halt_scope,
+          haltedBy: target.halted_by,
+          haltedAt: target.halted_at?.toISOString() ?? null,
+          policy: this.gov.resumePolicy,
+        },
+        reason,
+        requestedBy: userId,
+      });
+      return {
+        resumed: false as const,
+        accountId: target.id,
+        pendingApproval: toFourEyesView(req),
+        message:
+          'This halt was set by the firm. A second authorised person (risk officer or admin) must approve the resume.',
+      };
+    }
+    return this.executeResume(userId, target.id, reason);
+  }
+
+  /** Lifts the halt (after the policy check, or as the executor of an approved four-eyes request). */
+  async executeResume(
+    actorId: string,
+    accountId: string,
+    reason: string,
+    approval?: { requestId: string; requestedBy: string },
+  ) {
+    const actor: Actor = { type: 'user', id: actorId };
+    return this.oms.withAccount(accountId, async (tx) => {
       if (!tx.account.trading_halted)
         throw new ConflictException({ error: 'not_halted', message: 'Trading is not halted.' });
       const prev = {
@@ -257,6 +340,9 @@ export class KillSwitchService {
         haltedAt: prev.haltedAt,
         haltedBy: prev.haltedBy,
         environment: 'PAPER',
+        ...(approval
+          ? { fourEyesRequestId: approval.requestId, requestedBy: approval.requestedBy, approvedBy: actorId }
+          : {}),
       });
       this.events.robotControl({
         action: 'resume',
@@ -265,12 +351,15 @@ export class KillSwitchService {
         reason,
         auditEventId: '',
       });
-      return { resumed: true, accountId: tx.account.id, previous: prev };
+      return { resumed: true as const, accountId: tx.account.id, previous: prev };
     });
   }
 
   async state(userId: string) {
     const a = await this.accounts.ensure(userId);
+    const pending = a.trading_halted
+      ? (await this.fourEyes.list({ status: 'pending', kind: 'kill_switch_resume', subjectId: a.id, limit: 1 }))[0]
+      : undefined;
     return {
       accountId: a.id,
       halted: a.trading_halted,
@@ -278,6 +367,9 @@ export class KillSwitchService {
       haltedAt: a.halted_at?.toISOString() ?? null,
       haltedBy: a.halted_by,
       reason: a.halt_reason,
+      /** Goal 09: resuming needs a second person (firm halt, or policy `all`). */
+      resumeNeedsApproval: a.trading_halted ? this.resumeNeedsFourEyes(a) : false,
+      pendingResume: pending ? toFourEyesView(pending) : null,
     };
   }
 }

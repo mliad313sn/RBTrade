@@ -30,6 +30,8 @@ export interface AuditQuery {
   to?: string;
   beforeId?: string;
   limit?: number;
+  /** B-303: restrict to a user's own events and events about their accounts (payload.accountId). */
+  visibleTo?: { userId: string; accountIds: string[] };
 }
 
 const TS_FORMAT = `'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'`;
@@ -199,6 +201,10 @@ export class AuditService {
     if (q.from) add('ts >= ?::timestamptz', q.from);
     if (q.to) add('ts < ?::timestamptz', q.to);
     if (q.beforeId) add('id < ?::bigint', q.beforeId);
+    if (q.visibleTo) {
+      params.push(q.visibleTo.userId, q.visibleTo.accountIds);
+      where.push(`(actor_id = $${params.length - 1} OR (payload ? 'accountId' AND payload->>'accountId' = ANY($${params.length}::text[])))`);
+    }
     const limit = Math.min(Math.max(q.limit ?? 100, 1), 500);
     params.push(limit + 1);
     const rows = await this.db.query<AuditRow>(
@@ -208,6 +214,16 @@ export class AuditService {
     );
     const page = rows.slice(0, limit).map(toEvent);
     return { events: page, nextBeforeId: rows.length > limit ? (page[page.length - 1]?.id ?? null) : null };
+  }
+
+  /** Events by id, in id order (internal-audit sampling). */
+  async byIds(ids: string[]): Promise<AuditEvent[]> {
+    if (!ids.length) return [];
+    const rows = await this.db.query<AuditRow>(
+      `SELECT ${SELECT_COLUMNS} FROM audit_events WHERE id = ANY($1::bigint[]) ORDER BY audit_events.id`,
+      [ids],
+    );
+    return rows.map(toEvent);
   }
 
   /** Recomputes the entire chain in id order, streamed in pages. */

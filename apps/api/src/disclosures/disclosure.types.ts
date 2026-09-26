@@ -27,11 +27,25 @@ export interface DisclosureDocument {
   reviewStatus: string;
   /** sha256 of the rendered title, banner, body, statement and values in this locale. */
   contentHash: string;
+  /** Goal 09 registry: jurisdiction of this version (`GLOBAL` or ISO 3166 alpha-2) and when it took effect. */
+  jurisdiction?: string;
+  effectiveFrom?: string;
 }
 
 export interface DisclosureRegistry {
   /** The document in force for this id and locale, or null when none is published. */
   current(id: string, locale: DisclosureLocale): DisclosureDocument | null;
+  /**
+   * Goal 09 (optional): the exact document of a stored version rendered with the stored values, to
+   * show and re-verify what a user acknowledged. Null when the version is unknown.
+   */
+  render?(
+    id: string,
+    version: string,
+    jurisdiction: string,
+    locale: DisclosureLocale,
+    values: Record<string, string>,
+  ): DisclosureDocument | null;
 }
 
 export interface AcknowledgementRecord {
@@ -43,9 +57,13 @@ export interface AcknowledgementRecord {
   values: Record<string, string>;
   context: AcknowledgementContext;
   at: string;
+  jurisdiction?: string;
 }
 
 export const ACK_CONTEXTS = ['onboarding', 'banner', 'settings', 'reconfirm'] as const;
 export type AcknowledgementContext = (typeof ACK_CONTEXTS)[number];
 
 export const DISCLOSURE_REGISTRY = Symbol('DISCLOSURE_REGISTRY');
+
+/** The risk warning a novice acknowledges before the first order (goal 08 onboarding, B-801 gate). */
+export const RISK_WARNING_DISCLOSURE_ID = 'risk-warning';

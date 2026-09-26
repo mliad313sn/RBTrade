@@ -1,11 +1,12 @@
 import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { ACTOR_TYPES, AUDIT_READ_ALL_ROLES, hasAnyRole } from '@kora/domain';
+import { ACTOR_TYPES, AUDIT_READ_ROLES, hasAnyRole } from '@kora/domain';
 import { z } from 'zod';
 
 import { CurrentPrincipal } from '../auth/decorators';
 import type { Principal } from '../auth/principal';
 import { ZodValidationPipe } from '../common/zod';
+import { DbService } from '../db/db.service';
 import { AuditService } from './audit.service';
 
 const AuditQuerySchema = z
@@ -29,10 +30,16 @@ const AuditQuerySchema = z
 @ApiTags('audit')
 @Controller('audit')
 export class AuditController {
-  constructor(private readonly audit: AuditService) {}
+  constructor(
+    private readonly audit: AuditService,
+    private readonly db: DbService,
+  ) {}
 
   @Get()
-  @ApiOperation({ summary: 'List audit events (newest first). Non-privileged users see their own events.' })
+  @ApiOperation({
+    summary:
+      'List audit events (newest first). Non-privileged users see their own events and system/robot events about their own account (B-303); risk officers, admins and auditors see all.',
+  })
   @ApiQuery({ name: 'actorId', required: false })
   @ApiQuery({ name: 'actorType', required: false, enum: ACTOR_TYPES })
   @ApiQuery({ name: 'entity', required: false })
@@ -46,11 +53,13 @@ export class AuditController {
     @CurrentPrincipal() principal: Principal,
     @Query(new ZodValidationPipe(AuditQuerySchema)) q: z.infer<typeof AuditQuerySchema>,
   ) {
-    if (!hasAnyRole(principal.roles, AUDIT_READ_ALL_ROLES)) {
+    if (!hasAnyRole(principal.roles, AUDIT_READ_ROLES)) {
       if (q.actorId && q.actorId !== principal.sub) {
         throw new ForbiddenException({ error: 'forbidden', message: 'You can only read your own audit events' });
       }
-      q.actorId = principal.sub;
+      // B-303: your own events, plus engine/robot/system events about your own paper account.
+      const accounts = await this.db.query<{ id: string }>('SELECT id FROM accounts WHERE user_id = $1', [principal.sub]);
+      return this.audit.list({ ...q, actorId: undefined, visibleTo: { userId: principal.sub, accountIds: accounts.map((a) => a.id) } });
     }
     return this.audit.list(q);
   }

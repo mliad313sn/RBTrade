@@ -38,6 +38,6 @@ import { ServiceTokenGuard } from './service-token.guard';
     SignalsController,
     InternalRobotsController,
   ],
-  exports: [RobotsService, RobotSupervisorService],
+  exports: [RobotsService, RobotSupervisorService, RobotBookService],
 })
 export class RobotsModule {}

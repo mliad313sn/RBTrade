@@ -232,6 +232,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       const p = parseChannel(ch);
       if (!p) rejected.push({ channel: ch, code: 'invalid_channel' });
       else if (isPrivateChannelKind(p.kind) && !(await this.canReadAccount(conn, p.accountId!))) rejected.push({ channel: ch, code: 'forbidden' });
+      else if (p.kind === 'risk' && !hasAnyRole(conn.principal!.roles, AUDIT_READ_ALL_ROLES)) rejected.push({ channel: ch, code: 'forbidden' });
       else if (p.symbol && !registry.instruments.has(p.symbol)) rejected.push({ channel: ch, code: 'unknown_symbol' });
       else if (!conn.channels.has(ch) && !accepted.includes(ch) && conn.channels.size + accepted.length >= this.cfg.wsMaxChannels) rejected.push({ channel: ch, code: 'too_many_channels' });
       else if (!conn.channels.has(ch) && !accepted.includes(ch)) accepted.push(ch);

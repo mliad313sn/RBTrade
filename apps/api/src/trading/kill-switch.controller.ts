@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Res } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   KillSwitchRequestWithReasonSchema,
@@ -6,6 +6,7 @@ import {
   type KillSwitchRequestWithReason,
   type KillSwitchResume,
 } from '@kora/domain';
+import type { Response } from 'express';
 import { z } from 'zod';
 
 import { CurrentPrincipal } from '../auth/decorators';
@@ -44,16 +45,19 @@ export class KillSwitchController {
   @HttpCode(200)
   @ApiOperation({
     summary:
-      'Resume trading after a halt (trader, quant, risk officer or admin; MFA). Risk officers/admins may pass accountId.',
+      'Resume trading after a halt (trader, quant, risk officer or admin; MFA). Risk officers/admins may pass accountId. A firm halt (goal 09) answers 202 with a four-eyes request that a second person approves.',
   })
   @ApiBody({ schema: openApiSchema(KillSwitchResumeSchema) })
   @ApiQuery({ name: 'accountId', required: false })
-  resume(
+  async resume(
     @CurrentPrincipal() p: Principal,
     @Body(new ZodValidationPipe(KillSwitchResumeSchema)) body: KillSwitchResume,
     @Query(new ZodValidationPipe(ResumeQuery)) q: z.infer<typeof ResumeQuery>,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.ks.resume(p.sub, p.roles, body.reason, q.accountId);
+    const out = await this.ks.resume(p.sub, p.roles, body.reason, q.accountId);
+    if (!out.resumed) res.status(202);
+    return out;
   }
 
   @Get()

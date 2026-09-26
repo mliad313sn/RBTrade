@@ -184,7 +184,7 @@ export class AccountsService {
    * (goal 08: a pending loosening applies itself once its wait is over).
    */
   limits(a: AccountRow, now = Date.now()): RiskLimits {
-    const d = this.cfg.riskDefaults;
+    const d = this.platformLimits(a);
     const own = effectiveOwnLimits(a.risk_limits as StoredLimits, now);
     const tighter = (p: string, o: string | undefined) =>
       o !== undefined && dec(o).lt(dec(p)) ? o : p;
@@ -205,6 +205,28 @@ export class AccountsService {
           : d.maxOrdersPerMinute,
       ),
       ...(monthly !== undefined ? { monthlyLossLimit: monthly } : {}),
+    };
+  }
+
+  /**
+   * The platform ceiling for this account: the configured defaults, raised only by an approved
+   * four-eyes override (goal 09). Overrides never lower a limit (the account's own limits do that).
+   */
+  platformLimits(a: AccountRow): TradingConfig['riskDefaults'] {
+    const d = this.cfg.riskDefaults;
+    const o = a.limit_overrides ?? {};
+    const higher = (p: string, v: string | undefined) => (v !== undefined && dec(v).gt(dec(p)) ? v : p);
+    return {
+      ...d,
+      maxOrderNotional: higher(d.maxOrderNotional, o.maxOrderNotional),
+      maxPositionNotional: higher(d.maxPositionNotional, o.maxPositionNotional),
+      maxLeverage: higher(d.maxLeverage, o.maxLeverage),
+      dailyLossLimit: higher(d.dailyLossLimit, o.dailyLossLimit),
+      weeklyLossLimit: higher(d.weeklyLossLimit, o.weeklyLossLimit),
+      maxOrdersPerMinute:
+        o.maxOrdersPerMinute !== undefined && Number(o.maxOrdersPerMinute) > d.maxOrdersPerMinute
+          ? Number(o.maxOrdersPerMinute)
+          : d.maxOrdersPerMinute,
     };
   }
 

@@ -17,6 +17,7 @@ import {
   evaluateRisk,
   execTypeFor,
   isNoviceOnly,
+  LIMIT_BREACH_CODES,
   notional,
   OPEN_ORDER_STATUSES,
   sessionStatus,
@@ -33,6 +34,8 @@ import {
 
 import { AuditService } from '../audit/audit.service';
 import { DbService, type Queryable } from '../db/db.service';
+import { DisclosureAcknowledgements } from '../disclosures/acknowledgements.service';
+import { RISK_WARNING_DISCLOSURE_ID } from '../disclosures/disclosure.types';
 import { AccountsService, type Valuation } from './accounts.service';
 import { FxService } from './fx.service';
 import { MarketViewService, type MarketSnapshot } from './market-view.service';
@@ -83,6 +86,7 @@ export class OmsService {
     private readonly fx: FxService,
     private readonly engine: PaperEngineService,
     private readonly publisher: TradingPublisher,
+    private readonly disclosures: DisclosureAcknowledgements,
   ) {}
 
   /** Guardrails apply to novice-only accounts and to anyone using the Novice view (goal 08). */
@@ -150,6 +154,10 @@ export class OmsService {
     const novice = await this.isNovice(sub.userId, sub.roles, tx?.c);
     // Goal 08: cooling-off and the borrowing cap only matter for guarded accounts.
     const guard = novice ? await this.accounts.guardState(account, valuation, now, tx?.c) : null;
+    // Goal 09 (B-801): a novice-only user needs the risk warning in force acknowledged first.
+    const disclosureRequired =
+      isNoviceOnly(sub.roles) &&
+      !(await this.disclosures.isCurrent(sub.userId, RISK_WARNING_DISCLOSURE_ID, tx?.c));
     const rate = await this.fx.rate(inst.spec.quoteCcy, account.base_currency, now);
     const pos = valuation.positions.find((p) => p.symbol === req.symbol);
     const posQty = pos?.qty ?? new Decimal(0);
@@ -279,6 +287,7 @@ export class OmsService {
       noviceMaxLeverage: guard ? dec(guard.noviceMaxLeverage) : undefined,
       coolingOff: guard?.coolingOff.reason ?? null,
       monthPnl: valuation.monthPnl,
+      disclosureRequired,
       halted: account.trading_halted,
       previewIssues: preview?.issues ?? [],
       availableNow:
@@ -432,6 +441,25 @@ export class OmsService {
       });
       if (ev.violations.length) {
         const first = ev.violations[0]!;
+        // Goal 09: a limit breach reaches the risk officer console (alerts → NOTIFY → risk:alerts).
+        const breaches = ev.violations.filter((v) => LIMIT_BREACH_CODES.includes(v.code));
+        if (breaches.length)
+          await tx.c.query(
+            `INSERT INTO alerts (severity, kind, account_id, message, details) VALUES ('warning', 'risk.limit_breach', $1, $2, $3::jsonb)`,
+            [
+              account.id,
+              `Pre-trade limit hit: ${breaches.map((b) => b.code).join(', ')} (${req.side} ${req.qty} ${req.symbol}).`,
+              JSON.stringify({
+                orderId: order.id,
+                symbol: req.symbol,
+                side: req.side,
+                qty: req.qty,
+                source: sub.source,
+                codes: breaches.map((b) => b.code),
+                message: breaches[0]!.message,
+              }),
+            ],
+          );
         order = await this.engine.transition(
           tx,
           order,
