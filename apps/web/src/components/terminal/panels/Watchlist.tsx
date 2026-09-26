@@ -2,17 +2,17 @@
 
 import { assetClassLabel, dec, quoteBadge, sessionBadge, type Quote, type WatchlistDto } from '@kora/domain';
 import type { InstrumentDto } from '@kora/sdk';
-import { formatPercent, formatPrice, useToast } from '@kora/ui';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useToast } from '@kora/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 
 import { api } from '@/lib/api-browser';
-import { formatSpread, midOf } from '@/lib/terminal/format';
 import { useRegistry } from '@/lib/terminal/registry';
 import { useTerminal } from '@/lib/terminal/store';
+import { watchRowView } from '@/lib/terminal/views';
 
 import { useMarket, useTerminalSettings } from '../TerminalContext';
+import { VirtualRows, type VirtualRowsHandle } from '../VirtualRows';
 
 const ACTIVE_KEY = 'kora.terminal.watchlist';
 const FLASH_MS = 150;
@@ -47,28 +47,6 @@ function requestDayOpen(symbol: string, cb: () => void): () => void {
       .catch(() => undefined);
   }, 50);
   return () => set.delete(cb);
-}
-
-export interface WatchRowView {
-  /** Mid at registry precision (plain decimal string). */
-  mid: string;
-  last: string;
-  change: string | null;
-  dir: 'up' | 'down' | 'flat';
-  spread: string;
-}
-
-/** Pure row computation (decimals at registry precision). Exported for tests. */
-export function watchRowView(q: Pick<Quote, 'bid' | 'ask'>, dayOpen: string | null | undefined, spec: Pick<InstrumentDto, 'pricePrecision' | 'pipSize' | 'tickSize'>): WatchRowView {
-  const mid = midOf(q.bid, q.ask, spec.pricePrecision);
-  let change: string | null = null;
-  let dir: WatchRowView['dir'] = 'flat';
-  if (dayOpen && !dec(dayOpen).isZero()) {
-    const ratio = dec(mid).sub(dec(dayOpen)).div(dec(dayOpen));
-    dir = ratio.isZero() ? 'flat' : ratio.isNegative() ? 'down' : 'up';
-    change = formatPercent(ratio);
-  }
-  return { mid, last: formatPrice(mid, spec.pricePrecision), change, dir, spread: formatSpread(q.bid, q.ask, spec) };
 }
 
 const Row = memo(function Row({
@@ -261,12 +239,11 @@ export function WatchlistPanel({ onTitle }: { onTitle?: (t: string) => void }) {
   const symbol = useTerminal((s) => s.symbol);
   const setSymbol = useTerminal((s) => s.setSymbol);
   const settings = useTerminalSettings();
-  const parentRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<VirtualRowsHandle>(null);
   const [focusIdx, setFocusIdx] = useState(0);
   const dragFrom = useRef<number | null>(null);
   const symbols = useMemo(() => active?.symbols ?? [], [active]);
   const rowH = settings.density === 'comfortable' ? 38 : 30;
-  const virtual = useVirtualizer({ count: symbols.length, getScrollElement: () => parentRef.current, estimateSize: () => rowH, overscan: 6 });
 
   useEffect(() => {
     onTitle?.(`Watchlist · ${active?.name ?? '…'}`);
@@ -296,8 +273,8 @@ export function WatchlistPanel({ onTitle }: { onTitle?: (t: string) => void }) {
     const focusRow = (j: number) => {
       const k = Math.max(0, Math.min(symbols.length - 1, j));
       setFocusIdx(k);
-      virtual.scrollToIndex(k);
-      requestAnimationFrame(() => parentRef.current?.querySelector<HTMLElement>(`[data-index="${k}"]`)?.focus());
+      listRef.current?.scrollToIndex(k);
+      requestAnimationFrame(() => listRef.current?.element()?.querySelector<HTMLElement>(`[data-index="${k}"]`)?.focus());
     };
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
@@ -354,44 +331,41 @@ export function WatchlistPanel({ onTitle }: { onTitle?: (t: string) => void }) {
         <span className="text-right">Last</span>
         <span className="text-right">Chg</span>
       </div>
-      <div
-        ref={parentRef}
+      <VirtualRows
+        handleRef={listRef}
+        items={symbols}
+        rowHeight={rowH}
+        getKey={(s) => s}
         className="wl-body"
         role="listbox"
         aria-label={`Watchlist ${active?.name ?? ''}: arrow keys move, Enter opens, Alt+arrow reorders, Delete removes`}
         data-testid="watchlist-rows"
         data-total={symbols.length}
-      >
-        <div style={{ height: virtual.getTotalSize(), position: 'relative' }}>
-          {virtual.getVirtualItems().map((vi) => {
-            const s = symbols[vi.index]!;
-            return (
-              <Row
-                key={s}
-                symbol={s}
-                spec={instruments.get(s)}
-                active={s === symbol}
-                focused={vi.index === focusIdx}
-                index={vi.index}
-                size={vi.size}
-                start={vi.start}
-                onSelect={(x) => {
-                  setFocusIdx(vi.index);
-                  setSymbol(x);
-                }}
-                onKey={onKey}
-                onDragStart={(i) => (dragFrom.current = i)}
-                onDrop={(i) => {
-                  if (dragFrom.current !== null) move(dragFrom.current, i);
-                  dragFrom.current = null;
-                }}
-                onRemove={removeSymbol}
-              />
-            );
-          })}
-        </div>
-        {active && symbols.length === 0 ? <p className="text-muted text-xs px-2">Empty list. Press ⌘K to add symbols.</p> : null}
-      </div>
+        renderRow={(s, index, pos) => (
+          <Row
+            key={s}
+            symbol={s}
+            spec={instruments.get(s)}
+            active={s === symbol}
+            focused={index === focusIdx}
+            index={index}
+            size={pos.size}
+            start={pos.start}
+            onSelect={(x) => {
+              setFocusIdx(index);
+              setSymbol(x);
+            }}
+            onKey={onKey}
+            onDragStart={(i) => (dragFrom.current = i)}
+            onDrop={(i) => {
+              if (dragFrom.current !== null) move(dragFrom.current, i);
+              dragFrom.current = null;
+            }}
+            onRemove={removeSymbol}
+          />
+        )}
+      />
+      {active && symbols.length === 0 ? <p className="text-muted text-xs px-2">Empty list. Press ⌘K to add symbols.</p> : null}
       <p className="wl-foot">Simulated feed · not market data</p>
     </div>
   );

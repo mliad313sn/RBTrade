@@ -40,6 +40,7 @@ import { api } from '@/lib/api-browser';
 import { useRegistry } from '@/lib/terminal/registry';
 import { useTerminal } from '@/lib/terminal/store';
 import { refreshTrading, useTrading } from '@/lib/terminal/trading';
+import { orderLine } from '@/lib/terminal/views';
 
 import { SessionBadge } from '../Badges';
 import { useMarket } from '../TerminalContext';
@@ -97,15 +98,6 @@ function saveJson(key: string, v: unknown): void {
 const toTime = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 const line = (values: Array<number | null>, bars: Bar[]) =>
   values.flatMap((v, i) => (v === null || !Number.isFinite(v) ? [] : [{ time: toTime(bars[i]!.t), value: v }]));
-
-/** Price and field an order line represents (null = not drawn). */
-export function orderLine(o: Pick<OrderDto, 'execType' | 'limitPrice' | 'stopPrice' | 'status'>): { price: string; field: 'limitPrice' | 'stopPrice'; draggable: boolean } | null {
-  if (!['working', 'partially_filled', 'accepted', 'new'].includes(o.status)) return null;
-  if (o.execType === 'limit' && o.limitPrice) return { price: o.limitPrice, field: 'limitPrice', draggable: true };
-  if ((o.execType === 'stop' || o.execType === 'stop_limit') && o.stopPrice) return { price: o.stopPrice, field: 'stopPrice', draggable: true };
-  if (o.execType === 'trailing' && o.stopPrice) return { price: o.stopPrice, field: 'stopPrice', draggable: false };
-  return null;
-}
 
 /**
  * Chart panel (goal 04): lightweight-charts candles on 1m–1D, volume, indicators from the shared

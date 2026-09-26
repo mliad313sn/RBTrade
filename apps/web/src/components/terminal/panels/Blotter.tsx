@@ -10,6 +10,7 @@ import { clockLabel, formatClock, formatQty, playFillSound } from '@/lib/termina
 import { useRegistry } from '@/lib/terminal/registry';
 import { useTerminal } from '@/lib/terminal/store';
 import { refreshTrading, useTrading } from '@/lib/terminal/trading';
+import { protectiveLevels } from '@/lib/terminal/views';
 
 import { useTerminalSettings } from '../TerminalContext';
 
@@ -33,17 +34,6 @@ function sourceLabel(src: string | undefined): string {
 
 function Empty({ what }: { what: string }) {
   return <p className="text-muted text-xs px-2 m-0 py-2">{what}</p>;
-}
-
-/** Protective (reduce-only, opposite side) orders per symbol → stop and target columns. */
-export function protectiveLevels(orders: OrderDto[], p: Pick<PositionDto, 'symbol' | 'qty'>): { stop: OrderDto | null; target: OrderDto | null } {
-  const long = !p.qty.startsWith('-');
-  const exitSide = long ? 'sell' : 'buy';
-  const mine = orders.filter((o) => o.symbol === p.symbol && o.side === exitSide && (o.reduceOnly || o.role === 'stop_loss' || o.role === 'take_profit' || o.role === 'oco_leg'));
-  return {
-    stop: mine.find((o) => (o.execType === 'stop' || o.execType === 'stop_limit' || o.execType === 'trailing') && o.stopPrice) ?? null,
-    target: mine.find((o) => o.execType === 'limit' && o.limitPrice) ?? null,
-  };
 }
 
 // ---- Positions ------------------------------------------------------------------------------

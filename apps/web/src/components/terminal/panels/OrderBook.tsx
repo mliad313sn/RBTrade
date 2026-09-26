@@ -1,54 +1,17 @@
 'use client';
 
-import { dec, type DepthSnapshot } from '@kora/domain';
+import { dec } from '@kora/domain';
 import { formatDecimal, formatPrice } from '@kora/ui';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import { formatSpread } from '@/lib/terminal/format';
 import { useRegistry } from '@/lib/terminal/registry';
 import { useTerminal } from '@/lib/terminal/store';
+import { bookView, type BookLevel, type BookView } from '@/lib/terminal/views';
 
 import { useMarket } from '../TerminalContext';
 
 const LEVELS = 10;
-
-export interface BookLevel {
-  price: string;
-  size: string;
-  total: string;
-  /** Cumulative size as a share of the deepest side (0–1), for the bar. */
-  depth: number;
-}
-
-export interface BookView {
-  asks: BookLevel[];
-  bids: BookLevel[];
-  mid: string | null;
-  spread: string | null;
-}
-
-/** Cumulative levels (Decimal sums), best first, bars scaled to the larger cumulative side. Exported for tests. */
-export function bookView(d: Pick<DepthSnapshot, 'bids' | 'asks'>, levels = 10): BookView {
-  const cum = (side: Array<[string, string]>) => {
-    let run = dec(0);
-    return side.slice(0, levels).map(([price, size]) => {
-      run = run.add(dec(size));
-      return { price, size, total: run.toFixed() };
-    });
-  };
-  const bids = cum(d.bids);
-  const asks = cum(d.asks);
-  const max = Math.max(Number(bids.at(-1)?.total ?? 0), Number(asks.at(-1)?.total ?? 0)) || 1; // bar width only
-  const withDepth = (xs: typeof bids) => xs.map((x) => ({ ...x, depth: Number(x.total) / max }));
-  const bestBid = d.bids[0]?.[0];
-  const bestAsk = d.asks[0]?.[0];
-  return {
-    bids: withDepth(bids),
-    asks: withDepth(asks),
-    mid: bestBid && bestAsk ? dec(bestBid).add(dec(bestAsk)).div(2).toFixed() : null,
-    spread: bestBid && bestAsk ? dec(bestAsk).sub(dec(bestBid)).toFixed() : null,
-  };
-}
 
 /**
  * Order book / depth (goal 04): 10 levels per side from the `depth:{symbol}` channel, cumulative
