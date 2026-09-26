@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AdminController } from './admin/admin.controller';
+import { AiModule } from './ai/ai.module';
 import { AppropriatenessModule } from './appropriateness/appropriateness.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthGuard } from './auth/auth.guard';
@@ -55,6 +56,7 @@ import { TradingModule } from './trading/trading.module';
     TerminalModule,
     StrategiesModule,
     RobotsModule,
+    AiModule,
   ],
   controllers: [HealthController, AdminController],
   providers: [

@@ -88,7 +88,7 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
 
 export function reliabilityLine(saidAs: number, hitRate: number, n: number): string {
-  return `When we said ${saidAs.toFixed(1)}, it worked ${Math.round(hitRate * 100)}% of the time (n=${n})`;
+  return `When we said ${Math.round(saidAs * 100) / 100}, it worked ${Math.round(hitRate * 100)}% of the time (n=${n})`;
 }
 
 export function calibrationView(
