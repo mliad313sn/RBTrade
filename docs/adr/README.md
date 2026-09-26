@@ -11,3 +11,4 @@ Numbering:
 | [0002](0002-market-data.md) | Market data layer: global registry, sessions, adapters, simulator, storage, gateway | Accepted |
 | [0101](0101-dev-identity-provider.md) | Identity: OIDC abstraction, dev IdP, TOTP MFA | Accepted |
 | [0102](0102-audit-hash-chain.md) | Append-only hash-chained audit log | Accepted |
+| [0005](0005-gain-simulator.md) | Gain simulator: engine, determinism, numbers, service boundary | Accepted |

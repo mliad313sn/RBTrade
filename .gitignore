@@ -31,3 +31,5 @@ __pycache__/
 *.log
 # agent worktrees
 .claude/worktrees/
+services/quant/.coverage
+.coverage

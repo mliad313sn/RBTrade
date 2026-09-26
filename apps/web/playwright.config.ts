@@ -11,6 +11,7 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const API_PORT = process.env.E2E_API_PORT ?? '4010';
 const WEB_PORT = process.env.E2E_WEB_PORT ?? '3010';
+const QUANT_PORT = process.env.E2E_QUANT_PORT ?? '8010';
 const e2eDb = process.env.DATABASE_URL_E2E;
 if (!e2eDb) throw new Error('DATABASE_URL_E2E is not set (see .env.example)');
 
@@ -31,6 +32,13 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
   webServer: [
     {
+      command: `bash ../../scripts/py-run.sh python -m uvicorn kora_quant.app:app --host 127.0.0.1 --port ${QUANT_PORT} --app-dir src`,
+      cwd: resolve(__dirname, '../../services/quant'),
+      url: `http://127.0.0.1:${QUANT_PORT}/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
       command: 'node dist/main.js',
       cwd: resolve(__dirname, '../api'),
       url: `http://127.0.0.1:${API_PORT}/health`,
@@ -43,6 +51,7 @@ export default defineConfig({
         KORA_ENV: 'test',
         KORA_SCRYPT_N: '16384',
         KORA_AUTH_RATE_LIMIT: '10000',
+        QUANT_URL: `http://127.0.0.1:${QUANT_PORT}`,
         LOG_LEVEL: 'warn',
         // Market data (goal 02): in-process SIMULATED feed for the prototype majors, own Redis namespace.
         KORA_MD_FEED: 'inprocess',

@@ -891,6 +891,419 @@
           "market-data"
         ]
       }
+    },
+    "/sim/project": {
+      "post": {
+        "operationId": "SimController_project",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "startingCapital": {
+                    "default": 10000,
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000000000
+                  },
+                  "tradesPerPeriod": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  },
+                  "horizonPeriods": {
+                    "default": 24,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  "ruinFloorPct": {
+                    "default": 50,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 99
+                  },
+                  "withdrawals": {
+                    "default": {
+                      "perPeriod": 0,
+                      "oneOff": []
+                    },
+                    "type": "object",
+                    "properties": {
+                      "perPeriod": {
+                        "default": 0,
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "oneOff": {
+                        "default": [],
+                        "maxItems": 120,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "period": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 600
+                            },
+                            "amount": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000000000
+                            }
+                          },
+                          "required": [
+                            "period",
+                            "amount"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "seed": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "paths": {
+                    "default": 10000,
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 50000
+                  },
+                  "sizingModel": {
+                    "default": "fixed_fractional",
+                    "type": "string",
+                    "enum": [
+                      "fixed_fractional",
+                      "fixed_amount",
+                      "kelly_fraction"
+                    ]
+                  },
+                  "riskPct": {
+                    "default": 1,
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 25
+                  },
+                  "fixedAmount": {
+                    "default": 100,
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000000000
+                  },
+                  "kellyFraction": {
+                    "default": 0.5,
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 2
+                  },
+                  "winRatePct": {
+                    "default": 45,
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 99
+                  },
+                  "avgWinR": {
+                    "default": 1.8,
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 20
+                  },
+                  "costPerTradeR": {
+                    "default": 0.08,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "fatTailProbPct": {
+                    "default": 0,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 50
+                  },
+                  "fatTailMultiple": {
+                    "default": 3,
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "stressEdgeCutPct": {
+                    "default": 0,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Monte Carlo projection of a trading edge (costs included). SIMULATED. Audited.",
+        "tags": [
+          "simulator"
+        ]
+      }
+    },
+    "/sim/from-trades": {
+      "post": {
+        "operationId": "SimController_fromTrades",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "startingCapital": {
+                    "default": 10000,
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000000000
+                  },
+                  "tradesPerPeriod": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  },
+                  "horizonPeriods": {
+                    "default": 24,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  "ruinFloorPct": {
+                    "default": 50,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 99
+                  },
+                  "withdrawals": {
+                    "default": {
+                      "perPeriod": 0,
+                      "oneOff": []
+                    },
+                    "type": "object",
+                    "properties": {
+                      "perPeriod": {
+                        "default": 0,
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "oneOff": {
+                        "default": [],
+                        "maxItems": 120,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "period": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 600
+                            },
+                            "amount": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000000000
+                            }
+                          },
+                          "required": [
+                            "period",
+                            "amount"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "seed": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "paths": {
+                    "default": 10000,
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 50000
+                  },
+                  "trades": {
+                    "minItems": 2,
+                    "maxItems": 20000,
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "tradeUnit": {
+                    "default": "r_multiple",
+                    "type": "string",
+                    "enum": [
+                      "r_multiple",
+                      "pct_return"
+                    ]
+                  },
+                  "riskPct": {
+                    "default": 1,
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 25
+                  },
+                  "extraCostPerTradeR": {
+                    "default": 0,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "blockSize": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "default": "manual",
+                    "type": "string",
+                    "enum": [
+                      "backtest_in_sample",
+                      "backtest_out_of_sample",
+                      "paper",
+                      "manual"
+                    ]
+                  }
+                },
+                "required": [
+                  "trades"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Block-bootstrap projection of a trade list (backtest or paper). SIMULATED. Audited.",
+        "tags": [
+          "simulator"
+        ]
+      }
+    },
+    "/sim/paper/analytics": {
+      "get": {
+        "operationId": "SimController_paper",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Paper-account analytics (SIMULATED fixture fills until the goal 03 paper engine).",
+        "tags": [
+          "simulator"
+        ]
+      }
+    },
+    "/sim/paper/project": {
+      "post": {
+        "operationId": "SimController_paperProject",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tradesPerPeriod": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                  },
+                  "horizonPeriods": {
+                    "default": 24,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  "ruinFloorPct": {
+                    "default": 50,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 99
+                  },
+                  "seed": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "paths": {
+                    "default": 10000,
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 50000
+                  },
+                  "blockSize": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "\"Project from my paper results\": analytics, then a block bootstrap of the paper trades. Audited.",
+        "tags": [
+          "simulator"
+        ]
+      }
     }
   },
   "info": {

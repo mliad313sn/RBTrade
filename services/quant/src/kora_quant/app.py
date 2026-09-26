@@ -1,7 +1,9 @@
-"""FastAPI application (goal 01 skeleton: health only; Monte Carlo arrives in goal 05)."""
+"""FastAPI application: health plus the gain simulator (goal 05)."""
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -10,6 +12,8 @@ from pydantic import BaseModel
 
 from . import __version__
 from .config import Settings, load_settings
+from .sim.engine import warm_up
+from .sim.routes import router as sim_router
 
 
 class Health(BaseModel):
@@ -21,9 +25,15 @@ class Health(BaseModel):
     time: datetime
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    warm_up()  # compile (or load cached) numba kernels before the first request
+    yield
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     cfg = settings or load_settings()
-    app = FastAPI(title="KORA quant", version=__version__, docs_url="/docs")
+    app = FastAPI(title="KORA quant", version=__version__, docs_url="/docs", lifespan=lifespan)
 
     @app.get("/health", response_model=Health)
     def health() -> Health:
@@ -36,6 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             time=datetime.now(UTC),
         )
 
+    app.include_router(sim_router)
     return app
 
 
