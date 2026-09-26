@@ -193,6 +193,16 @@ export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
 
 export type MarketDataMessage = Quote | Trade | DepthSnapshot | DepthDelta | Candle;
 
+/**
+ * Payload of `trades:{symbol}` (B-210). The feed publishes the prints of one flush interval as a
+ * batch, so channel conflation (latest value wins) never drops a print.
+ */
+export interface TradesBatch {
+  type: 'trades';
+  symbol: string;
+  trades: Array<Pick<Trade, 'tradeId' | 'price' | 'qty' | 'side' | 'exchangeTs' | 'seq'>>;
+}
+
 export const INSTRUMENT_STATUSES = ['active', 'halted', 'delisted'] as const;
 export type InstrumentStatus = (typeof INSTRUMENT_STATUSES)[number];
 
@@ -245,7 +255,7 @@ export interface Venue {
 
 // ---- Channels -------------------------------------------------------------------------------
 
-export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'status' | 'orders' | 'positions' | 'account';
+export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'trades' | 'status' | 'orders' | 'positions' | 'account';
 /** Private trading channels (goal 03), keyed by account id; the gateway checks ownership. */
 export const PRIVATE_CHANNEL_KINDS = ['orders', 'positions', 'account'] as const;
 export type PrivateChannelKind = (typeof PRIVATE_CHANNEL_KINDS)[number];
@@ -257,6 +267,8 @@ export interface ParsedChannel {
 }
 export const quoteChannel = (s: string): string => `quotes:${s}`;
 export const depthChannel = (s: string): string => `depth:${s}`;
+/** Time and sales (B-210): batches of prints, see `TradesBatch`. */
+export const tradesChannel = (s: string): string => `trades:${s}`;
 export const candleChannel = (s: string, tf: Timeframe): string => `candles:${s}:${tf}`;
 export const ordersChannel = (accountId: string): string => `orders:${accountId}`;
 export const positionsChannel = (accountId: string): string => `positions:${accountId}`;
@@ -277,7 +289,7 @@ export function parseChannel(ch: string): ParsedChannel | null {
     return { kind, symbol: null, tf: null, accountId: sym };
   }
   if (!sym || !SYMBOL_RE.test(sym)) return null;
-  if ((kind === 'quotes' || kind === 'depth') && parts.length === 2) return { kind, symbol: sym, tf: null, accountId: null };
+  if ((kind === 'quotes' || kind === 'depth' || kind === 'trades') && parts.length === 2) return { kind, symbol: sym, tf: null, accountId: null };
   if (kind === 'candles' && parts.length === 3 && tf && isTimeframe(tf)) return { kind, symbol: sym, tf, accountId: null };
   return null;
 }
