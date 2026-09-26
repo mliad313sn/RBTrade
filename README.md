@@ -55,6 +55,14 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - WebSocket private channels: `orders:{accountId}`, `positions:{accountId}`, `account:{accountId}`.
 - `LIVE_TRADING_ENABLED` stays `false`; the LIVE broker is a refusing stub. Design: ADR 0003. Results: `docs/plans/03-oms.md`.
 
+## Robot trader (goal 06, PAPER only)
+
+- Builder: `/robots/builder` (trader, quant or admin; novices get the friendly 403 and use `GET /strategy-templates`). Strategies are `kora.strategy` v1 JSON (`GET /strategies/schema`), saved as immutable, content-hashed versions: `POST /strategies`, `POST /strategies/:id/versions {definition, reason, baseVersionId}`, `POST /strategies/validate`.
+- Research (SIMULATED data, registry cost model, trials counted server-side): `POST /backtests`, `/backtests/walk-forward`, `/backtests/optimise`, `/backtests/sensitivity`; `GET /backtests/:id/trades?segment=oos` feeds "Send to Monte Carlo" (`POST /sim/from-trades`).
+- Robots: `POST /robots`, `POST /robots/:id/start|pause`, `PUT /robots/:id/version|limits`, `GET /robots/:id` (book, limit usage, KPIs), `/signals`, `/audit`, `/promotion`, `POST /robots/:id/promote {totpCode}` (always refused while `LIVE_TRADING_ENABLED=false`, but recorded); risk officers sign limits at `POST /robot-reviews/:id/signoff`.
+- The bot runner (`services/bot-runner`) evaluates each closed bar through `/internal/robots/*` (service token `KORA_SERVICE_TOKEN`, generated for dev by `scripts/dev-db.sh`) and quant `/bt/signal`; orders go through the OMS with source `robot:{id}`.
+- Design: ADR 0006, `docs/quant/backtester.md`. Results: `docs/plans/06-robot-trader.md`.
+
 ## Layout
 
 ```

@@ -33,13 +33,13 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-209 | OpenAPI response schemas for the market data endpoints, then SDK generation (B-004) | G2 | 03 | Open |
 | B-210 | `trades:{symbol}` WebSocket channel (time and sales) and the chart / order book / calendar panels | G2 | 04 | Open |
 | B-501 | Replace the SIMULATED paper fixture in `apps/api/src/sim/paper-fixture.ts` with the account's real paper fills from the goal 03 engine (same `Fill[]` contract into `/analytics/paper`); add contract multipliers from the instrument registry | goal 05 | 03 | Done (fixture kept, labelled, only for accounts with no fills) |
-| B-502 | "Import from backtest" / Robots "Send to Monte Carlo": post the goal 06 trade list (R multiples, `source` IS/OOS) to `/sim/from-trades`; enable the button | goal 05 | 06 | Open |
+| B-502 | "Import from backtest" / Robots "Send to Monte Carlo": post the goal 06 trade list (R multiples, `source` IS/OOS) to `/sim/from-trades`; enable the button | goal 05 | 06 | Done in goal 06 (monitor button + simulator import of the latest or `?backtest=` run) |
 | B-503 | Shared simulation result cache (Redis, keyed by the same input hash) if the quant service scales beyond one process | ADR 0005 | 10 | Open |
 | B-504 | Human plain-language review of the Novice Practice copy (S1 + S8), including FR once B-013 lands; the automated jargon scan is in place | goal 05 | 08 | Open |
 | B-505 | Save and name scenarios per user (A/B compare is in-session only today) | goal 05 | 08 | Open |
 | B-506 | Regenerate `packages/sdk/openapi.json` after merging goals 02 and 05, and add typed `/sim/*` methods to the SDK (the web uses `apps/web/src/lib/sim/client.ts` meanwhile) | goal 05 | 04 | Partly done: `openapi.json` regenerated in goal 03; typed `/sim/*` SDK methods still open |
 | B-507 | OpenTelemetry spans in the quant service (FastAPI instrumentation, trace context from the api); today it has structured logs with the input hash only | goal 05 | 10 | Open |
-| B-301 | Bot runner: subscribe to `kora:ctl:robots` (halt/resume), submit robot orders through `OmsService.submit` (`actor.type='robot'`, `source='robot:{id}'`) with service authentication and robot ownership checks; REST `source=robot:*` stays refused until then | goal 03 | 06 | Open |
+| B-301 | Bot runner: subscribe to `kora:ctl:robots` (halt/resume), submit robot orders through `OmsService.submit` (`actor.type='robot'`, `source='robot:{id}'`) with service authentication and robot ownership checks; REST `source=robot:*` stays refused until then | goal 03 | 06 | Done in goal 06 (ADR 0006 §6: `/internal/robots/*` with `KORA_SERVICE_TOKEN`, robot → owner → account resolved server-side) |
 | B-302 | Matching loop scale-out: advisory-lock leader or per-account sharding across api replicas; move the loop to its own process | goal 03 | 10 | Open |
 | B-303 | Audit visibility: let owners read system-actor events about their own orders/accounts (engine fills, triggers, swaps) through `/audit` (today only risk officers/admins see them) | goal 03 | 09 | Open |
 | B-304 | Paper realism: queue position for resting limits, matching on trade prints (`md_trades`), latency model, triple-swap and holiday roll days, maker/taker fee tiers | goal 03 | 06/10 | Open |
@@ -54,4 +54,17 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-313 | Appropriateness content: Compliance-authored questions per jurisdiction and language, periodic re-assessment; add knowledge-check (goal 08) and suitability (goal 09) definitions to the questionnaire engine | goal 03 | 08/09 | Open |
 | B-314 | Kill switch global scope for risk officers/admins (halt every account's robots, platform-wide cancel) | goal 03 | 09 | Open |
 | B-315 | Distributed order-rate limits (per account and per robot) in Redis for multi-replica deployments | goal 03 | 10 | Open |
-
+| B-601 | AI regime filter: goal 07's regime model feeds the `ai_regime` condition (probability per bar, point-in-time, calibrated); backtests replay stored regime probabilities; `whenUnavailable` keeps working when the model is down | goal 06 | 07 | Open |
+| B-602 | Copilot on `/robots`: explain a signal from `GET /signals/:id/features`, draft a new strategy version through `POST /strategies/:id/versions` (human saves), draft optimisation suggestions ranked by OOS | goal 06 | 07 | Open |
+| B-603 | Quant service on the robots' live path: health-gated runner (skip, alert), OpenTelemetry spans api → runner → quant (with B-507), horizontal scale-out of quant and runner | ADR 0006 | 10 | Open |
+| B-604 | Research history: a data-provider interface for long licensed histories per venue (today SIMULATED backfill, 10 days in dev); per-bar FX history for `fxToBase` | goal 06 | post-RC (Sponsor, OQ-M2/OQ-B2) | Open |
+| B-605 | Robot position segregation (sub-accounts or per-robot position keys) so manual trades in the same symbol cannot interfere with a robot's reduce-only exits | ADR 0006 | 09 | Open |
+| B-606 | Robot equity snapshots (per bar close) → live column of the KPI table (live Sharpe, DD, etc.) and a mark-to-market tracking error next to today's realised-basis one | goal 06 | 09 | Open |
+| B-607 | Backtester realism: depth/impact beyond the top of book, partial fills, triple-swap roll days, per-venue funding calendars (links B-304) | goal 06 | 10 | Open |
+| B-608 | Service authentication for the bot runner: mTLS or short-lived signed service JWTs with rotation from the vault, per-runner identity (today a shared secret) | ADR 0006 | 10 | Open |
+| B-609 | Promotion step-up through Keycloak (AUTH_PROVIDER=keycloak) and the real LIVE path (broker adapter, compliance sign-off, per-session 2FA) — Sponsor decision | ADR 0006 | post-RC (Sponsor) | Open |
+| B-610 | Robot supervisor and runner HA: leader election across api replicas (with B-302), distributed per-robot order-rate counting (with B-315), BullMQ job retention and dead-letter dashboard | goal 06 | 10 | Open |
+| B-611 | SDK: typed strategies / backtests / robots / signals methods (the web uses `apps/web/src/lib/robots/client.ts` meanwhile), with B-004 | goal 06 | 04/10 | Open |
+| B-612 | Builder UX: keyboard reordering of chips, undo/redo, inline editing of literal values, multi-window sessions, per-template onboarding; visual regression against the prototype (B-011) | goal 06 | 08/10 | Open |
+| B-613 | Long optimisations and walk-forwards as async BullMQ jobs with progress and cancellation; result cache keyed by input hash (with B-503) | goal 06 | 10 | Open |
+| B-614 | Templates for goal 08: plain-language copy review (S1 + S8, like B-504), FR translations (B-013), risk-level rationale per template | goal 06 | 08 | Open |
