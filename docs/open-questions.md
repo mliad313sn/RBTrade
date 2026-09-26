@@ -10,6 +10,8 @@ Anything legal, regulatory, contractual or involving real money escalates to the
 | OQ-R4 | Record-retention period for audit events and order records | retain indefinitely in dev | Compliance | goal 01 | Open |
 | OQ-B1 | Broker partner(s) and adapter capabilities (order types, FX conversion, swaps) | simulated paper engine only | Sponsor | goal 00 | Open |
 | OQ-B2 | Market data licensing for real feeds | simulated feed labelled "Simulated feed · not market data" | Sponsor | goal 00 | Open |
+| OQ-M1 | Initial margin rates by client tier per asset class (registry `margin_rates`) | SIMULATED placeholders (`retail`/`professional`), e.g. FX majors `0.0333` echoing the prototype's illustrative 1:30 | Sponsor / Compliance | goal 02 | Open |
+| OQ-M2 | Reference-data source and licence for venue calendars, holidays, tick-size bands, ISIN/FIGI | sample calendars labelled "SIMULATED sample calendar … not authoritative" | Sponsor | goal 02 | Open |
 | OQ-S1 | Production IdP: self-hosted Keycloak vs managed OIDC; password policy and MFA recovery (backup codes) policy | dev IdP; no recovery codes yet | S9 / Sponsor | goal 01 | Open |
 | OQ-S2 | Is self-service `trader` account type acceptable at sign-up, or must it pass an appropriateness test first? | **Decided by Sponsor 2026-09-26:** no self-service `trader`. Everyone signs up as `novice`; `trader` is granted only after passing an appropriateness assessment (questionnaire engine, goal 08/09), recorded with the questionnaire version and audit-logged. See B-018. | S8 / Compliance | goal 01 | Resolved |
 | OQ-D1 | The `.dc.html` prototype sources are referenced but only PNG exports are in the repo | PNGs used as reference | Product Owner | goal 00 | Open |

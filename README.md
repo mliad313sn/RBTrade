@@ -36,12 +36,20 @@ pnpm contrast                                      # WCAG text contrast, both th
 pnpm --filter @kora/api test:integration           # real Postgres + Redis
 pnpm --filter @kora/ui build-storybook && pnpm --filter @kora/ui test:storybook-axe
 pnpm build && pnpm test:e2e                        # Playwright (PLAYWRIGHT_BROWSERS_PATH from .env)
+pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket fan-out load test (goal 02)
 ```
+
+## Market data (goal 02, all SIMULATED)
+
+- The api runs a deterministic simulated feed in-process (`KORA_MD_FEED=inprocess`). Or run it standalone: `KORA_MD_FEED=off` plus `pnpm --filter @kora/api md:feed`.
+- REST: `/instruments`, `/venues`, `/candles?symbol=EURUSD&tf=15m&limit=500`, `/quotes?symbols=…`, `/depth/:symbol`, `/calendar`, `/market-data/status`.
+- WebSocket: `ws://<host>:4000/ws`, with channels `quotes:{symbol}`, `depth:{symbol}`, `candles:{symbol}:{tf}` and `status`. Use `MarketDataSocket` from `@kora/sdk`.
+- Design: ADR 0002. Results: `docs/plans/02-market-data.md`.
 
 ## Layout
 
 ```
 apps/web  apps/api  services/quant  services/bot-runner
-packages/ui  packages/domain  packages/sdk  packages/config
+packages/ui  packages/domain  packages/sdk  packages/config  packages/market-data
 infra/  scripts/  docs/ (goals, plans, ADRs, STATUS, BACKLOG, open questions)
 ```
