@@ -1,4 +1,10 @@
-import { BadGatewayException, BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 /** Where the quant service lives. Read per call so tests and deployments can point it elsewhere. */
 export function quantBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
@@ -51,11 +57,20 @@ export class QuantClient {
             code: d.type ?? 'invalid',
           }))
         : [{ path: '', message: String(detail ?? 'invalid input'), code: 'invalid' }];
-      throw new BadRequestException({ statusCode: 400, error: 'validation_failed', message: 'Request validation failed', issues });
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'validation_failed',
+        message: 'Request validation failed',
+        issues,
+      });
     }
     if (!res.ok) {
       this.log.error(`quant ${path} returned ${res.status}`);
-      throw new BadGatewayException({ statusCode: 502, error: 'quant_error', message: 'The simulation service failed. Nothing was simulated.' });
+      throw new BadGatewayException({
+        statusCode: 502,
+        error: 'quant_error',
+        message: 'The simulation service failed. Nothing was simulated.',
+      });
     }
     return data as T;
   }

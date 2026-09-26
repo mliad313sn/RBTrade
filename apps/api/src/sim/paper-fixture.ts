@@ -7,7 +7,8 @@ import type { Fill } from '@kora/domain';
  * EURUSD and GBPUSD, 10,000 units each, stop 100 pips ($100), target 160 pips ($160), 48% hit rate,
  * $0.70 fee and $0.50 embedded slippage per fill. Not market data; not a real account.
  */
-export const PAPER_FIXTURE_LABEL = 'SIMULATED fills (fixture) · the paper engine arrives in goal 03';
+export const PAPER_FIXTURE_LABEL =
+  'SIMULATED fills (fixture) · the paper engine arrives in goal 03';
 export const PAPER_FIXTURE_STARTING_CAPITAL = '10000';
 export const PAPER_FIXTURE_TRADES = 80;
 
@@ -42,7 +43,14 @@ export function paperFixtureFills(seed = 20260601): Fill[] {
     const exit = side === 'buy' ? entry + move : entry - move;
     const holdMs = (4 + Math.floor(rnd() * 16)) * 3_600_000;
     const common = { symbol, qty: '10000', fee: '0.70', slippage: '0.50' };
-    fills.push({ id: `sim-f${2 * i + 1}`, orderId: `sim-o${2 * i + 1}`, side, price: price(entry), ts: new Date(t).toISOString(), ...common });
+    fills.push({
+      id: `sim-f${2 * i + 1}`,
+      orderId: `sim-o${2 * i + 1}`,
+      side,
+      price: price(entry),
+      ts: new Date(t).toISOString(),
+      ...common,
+    });
     fills.push({
       id: `sim-f${2 * i + 2}`,
       orderId: `sim-o${2 * i + 2}`,
