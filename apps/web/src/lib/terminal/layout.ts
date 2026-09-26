@@ -75,13 +75,32 @@ export function buildDefaultLayout(api: DockviewApi): void {
   api.getPanel('chart')?.api.setActive();
 }
 
-/** True if a serialized layout contains every panel exactly once (older or foreign JSON is rejected). */
+/** Panel ids placed in the grid's groups (leaf `data.views`) of a serialized dockview layout. */
+function placedViews(node: unknown, out: string[] = []): string[] {
+  if (!node || typeof node !== 'object') return out;
+  const n = node as { type?: string; data?: unknown };
+  if (n.type === 'leaf') {
+    const views = (n.data as { views?: unknown })?.views;
+    if (Array.isArray(views)) out.push(...views.filter((v): v is string => typeof v === 'string'));
+  } else if (Array.isArray(n.data)) {
+    for (const child of n.data) placedViews(child, out);
+  }
+  return out;
+}
+
+/**
+ * True if a serialized layout places every panel exactly once in its grid (floating groups count
+ * too). Older, partial or foreign JSON is rejected and the default layout is built instead.
+ */
 export function isCompleteLayout(json: unknown): json is SerializedDockview {
   if (!json || typeof json !== 'object') return false;
-  const panels = (json as { panels?: Record<string, unknown> }).panels;
-  if (!panels || typeof panels !== 'object') return false;
-  const ids = Object.keys(panels);
-  return PANEL_IDS.every((id) => ids.includes(id)) && ids.every((id) => (PANEL_IDS as readonly string[]).includes(id));
+  const j = json as { panels?: Record<string, unknown>; grid?: { root?: unknown }; floatingGroups?: Array<{ data?: { views?: unknown } }> };
+  if (!j.panels || typeof j.panels !== 'object' || !j.grid) return false;
+  const ids = Object.keys(j.panels);
+  if (!(PANEL_IDS.every((id) => ids.includes(id)) && ids.every((id) => (PANEL_IDS as readonly string[]).includes(id)))) return false;
+  const placed = placedViews(j.grid.root);
+  for (const f of j.floatingGroups ?? []) if (Array.isArray(f.data?.views)) placed.push(...(f.data.views as string[]));
+  return PANEL_IDS.every((id) => placed.filter((v) => v === id).length === 1);
 }
 
 export function loadLocalLayout(): SerializedDockview | null {

@@ -8,7 +8,7 @@ test.describe('market data', () => {
     await page.goto('/terminal');
     const wl = page.getByTestId('watchlist');
     await expect(wl).toContainText('Simulated feed · not market data');
-    await expect(page.getByTestId('feed-status')).toHaveText('feed ok', { timeout: 15_000 });
+    await expect(page.getByTestId('status-feed')).toContainText('Feed: simulated · ok', { timeout: 15_000 });
     const eur = page.getByTestId('wl-EURUSD-mid');
     await expect(eur).toHaveText(/^\d\.\d{5}$/, { timeout: 15_000 }); // EURUSD precision 5 from the registry
     await expect(page.getByTestId('wl-USDJPY-mid')).toHaveText(/^\d{3}\.\d{3}$/);

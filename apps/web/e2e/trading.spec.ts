@@ -23,11 +23,16 @@ test('order ticket: server preview (notional, fees, margin, loss at stop) → pl
   await expect(page.getByTestId('preview-margin')).toContainText('USD');
   await expect(page.getByTestId('preview-loss')).toContainText('No stop');
   await page.getByTestId('place-order').click();
-  // Confirmation is required when there is no stop loss.
-  await page.getByTestId('confirm-place').click();
+  // Confirmation is required when there is no stop loss; a market order above the threshold needs a 600 ms hold (goal 04).
+  const hold = page.getByTestId('confirm-hold');
+  const box = (await hold.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(750);
+  await page.mouse.up();
   await expect(page.getByTestId('ticket-result')).toContainText('Order filled: buy 0.01 BTCUSD');
   await page.getByRole('tab', { name: /Positions/ }).click();
-  await expect(page.getByTestId('blotter-positions')).toContainText('BTCUSD');
+  await expect(page.getByTestId('blotter-positions')).toContainText('BTC/USD');
   await expect(page.getByTestId('account-margin')).not.toContainText('0.00 USD ·');
   // Close from the blotter.
   await page.getByTestId('close-BTCUSD').click();

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api as client } from '@/lib/api-browser';
 import type { AiStripMode } from '@/lib/terminal/ai-strip';
 import { isTypingTarget, isMacPlatform, matchHotkey } from '@/lib/terminal/hotkeys';
-import { buildDefaultLayout, clearLocalLayout, FOCUS_PANELS, isCompleteLayout, loadLocalLayout, LOCAL_ACTIVE_KEY, PANEL_TITLES, saveLocalLayout, type PanelId } from '@/lib/terminal/layout';
+import { buildDefaultLayout, clearLocalLayout, FOCUS_PANELS, isCompleteLayout, loadLocalLayout, LOCAL_ACTIVE_KEY, PANEL_IDS, PANEL_TITLES, saveLocalLayout, type PanelId } from '@/lib/terminal/layout';
 import { useTerminal, type PanelTarget } from '@/lib/terminal/store';
 import { useTrading } from '@/lib/terminal/trading';
 
@@ -109,7 +109,8 @@ function LayoutDialog({ dock, onClose }: { dock: DockviewApi; onClose: () => voi
     if (!isCompleteLayout(l.layout)) return toast.push('That layout is from an older version; reset and save it again.', 'critical');
     try {
       dock.fromJSON(l.layout as unknown as SerializedDockview);
-      saveLocalLayout(dock.toJSON());
+      const now = dock.toJSON();
+      if (isCompleteLayout(now)) saveLocalLayout(now);
       toast.push(`Layout "${l.name}" loaded`, 'success', 3000);
       onClose();
     } catch {
@@ -178,6 +179,14 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
   const openOrders = useTrading((s) => s.orders.filter((o) => o.execType !== 'none' || o.type === 'oco').length);
   const positionsCount = useTrading((s) => s.positions.length);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disposed = useRef(false);
+  useEffect(() => {
+    disposed.current = false;
+    return () => {
+      disposed.current = true;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
   const { density } = useTerminalSettings();
 
   const onReady = (e: DockviewReadyEvent) => {
@@ -186,15 +195,20 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
     if (local) {
       try {
         e.api.fromJSON(local);
-        restored = true;
+        restored = e.api.panels.length === PANEL_IDS.length;
       } catch {
         restored = false;
       }
     }
     if (!restored) buildDefaultLayout(e.api);
     e.api.onDidLayoutChange(() => {
+      if (disposed.current) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => saveLocalLayout(e.api.toJSON()), 400);
+      saveTimer.current = setTimeout(() => {
+        const json = e.api.toJSON();
+        // Never persist a partial layout (e.g. while the terminal unmounts).
+        if (!disposed.current && isCompleteLayout(json)) saveLocalLayout(json);
+      }, 400);
     });
     setDock(e.api);
   };
