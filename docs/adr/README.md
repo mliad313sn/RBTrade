@@ -13,3 +13,4 @@ Numbering:
 | [0101](0101-dev-identity-provider.md) | Identity: OIDC abstraction, dev IdP, TOTP MFA | Accepted |
 | [0102](0102-audit-hash-chain.md) | Append-only hash-chained audit log | Accepted |
 | [0005](0005-gain-simulator.md) | Gain simulator: engine, determinism, numbers, service boundary | Accepted |
+| [0004](0004-pro-terminal.md) | Pro terminal: docking, hot path, indicators, ticket, alerts, risk tab, test aids | Accepted |

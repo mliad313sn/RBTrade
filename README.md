@@ -55,6 +55,13 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - WebSocket private channels: `orders:{accountId}`, `positions:{accountId}`, `account:{accountId}`.
 - `LIVE_TRADING_ENABLED` stays `false`; the LIVE broker is a refusing stub. Design: ADR 0003. Results: `docs/plans/03-oms.md`.
 
+## Pro terminal (goal 04)
+
+- `/terminal`: dockable panels (dockview): watchlists, chart (lightweight-charts, indicators from `@kora/domain`), order book, time and sales, the full ticket, and a streaming blotter (Positions, Orders, Fills, Alerts, Risk). The default layout follows `design/prototype/Main.png`. Named layouts are saved per user (`/me/layouts`); "Reset to default" rebuilds the grid.
+- ⌘K / Ctrl+K opens the palette: every registry instrument, grouped by region and asset class, plus actions. Press `?` for the hotkey cheat sheet; change the bindings in Settings.
+- API: `/me/layouts`, `/me/watchlists`, `/price-alerts` (evaluated by the server), `GET /risk/summary`, `DELETE /orders?symbol=` (cancel all). WebSocket: `trades:{symbol}` (time and sales).
+- Design: ADR 0004. Results and evidence: `docs/plans/04-pro-terminal.md`.
+
 ## Layout
 
 ```
