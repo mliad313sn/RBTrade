@@ -74,6 +74,43 @@ allocation, limits, peak equity, pause reason, paper start), `robot_signals` (ap
 - API integration: version immutability/new hash on param change + audit; novice 403 and templates for everyone; backtest via real quant; trial counting; runner parity (paper fills vs backtest trades within the slippage-model tolerance); simulated crash → auto-pause; kill switch → runner halted ≤ 1 s; heartbeat loss → pause + alert; promotion RBAC (every item, four-eyes, TOTP, LIVE flag).
 - E2E: build Trend-X from blocks → backtest → heatmap → walk-forward → send to MC → paper-run → pause → edit params (new hash) → audit trail; novice sees the friendly 403.
 
-## 6. Results
+## 6. Results (2026-09-26)
 
-(filled in at the end of the goal)
+### 6.1 Gate (worktree branch, all green)
+
+| Step | Result |
+|---|---|
+| `pnpm build` | 7/7 tasks |
+| `pnpm lint` / `pnpm typecheck` | 12/12 tasks each |
+| `pnpm test` | domain 123, api unit 40, bot-runner 11, web 18, sdk 11, market-data 60, ui 113, quant 124 (97.7 % coverage) |
+| `pnpm test:integration` | 20 files, **137 passed** (19 new: strategies 7, robots 7, promotion 5) |
+| `pnpm test:e2e` | **29 passed** (3 new in `robots.spec.ts`) |
+| `pnpm py:check` | ruff, ruff format, mypy --strict clean; 124 passed |
+
+### 6.2 Acceptance criteria
+
+| Criterion | Evidence | Result |
+|---|---|---|
+| Look-ahead guard fails when future data is injected; toy strategy matches hand-computed trades exactly | `services/quant/tests/test_bt_guard.py` (leaky `highest` → `LookAheadError`, HTTP 422 `look_ahead`; perturbed future bars leave past trades identical); `test_bt_toy.py` (4 trades, every price, reason, stop, target, commission, net P&L, R multiple, bar index and final equity 99,987.91 computed by hand in the docstring) | **Pass** |
+| Paper-run fills match the backtest trade list within the slippage-model tolerance | `apps/api/test/robots.int.test.ts` "parity": real bot runner process + real quant + real OMS over 70 SIMULATED 1-minute BTC bars; every fill's side and quantity equal the backtest legs and every price is within `ceil_tick(volFactor × |Δmid|) + 1 tick` | **Pass** |
+| Deflated Sharpe matches the paper's reference values | `test_bt_dsr.py`: Bailey & López de Prado (2014) example → SR₀ 0.1132, DSR 0.9004 (±5e-5); E[max SR] vs Monte Carlo; PSR properties | **Pass** |
+| Bot auto-pauses on a max-DD breach in a simulated crash; halts within 1 s of the global kill switch | `robots.int.test.ts`: −30 % crash → `paused / max_drawdown` in < 2 s with a critical alert and a `robot.auto_paused` audit event; `POST /kill-switch` → runner `halted` event received in < 1 s (runner reaction ≈ 1 ms), robot `paused / kill_switch` in < 1 s, later bars ignored, restart refused until resume. Also heartbeat loss (runner killed) → `heartbeat_lost` + alert | **Pass** |
+| Promotion impossible without every checklist item and a different user's risk sign-off (RBAC) | `apps/api/test/promotion.int.test.ts`: novice 403; trader cannot sign; owner-risk-officer refused (API 403 `four_eyes` and DB trigger); stale limits hash 409; each item added one by one keeps it blocked; complete checklist + TOTP → 409 `live_trading_disabled`, recorded and audited; limits change invalidates the sign-off; `mode = 'LIVE'` refused by trigger | **Pass** |
+| e2e: Trend-X from blocks → backtest → heatmap → walk-forward → MC → paper-run → pause → edit params (new hash) → audit trail | `apps/web/e2e/robots.spec.ts` (drag-and-drop of 7 blocks, inline params, JSON view, save v1, backtest, heatmap, walk-forward, Send to Monte Carlo, paper-run with runner heartbeat, pause, edit stop 1.5 → 1.4 as v2 with a reason, switch robot to v2 with a new hash, audit feed shows the parameter diff, start, pause, version change); axe on builder and monitor | **Pass** |
+| STATUS update | `docs/STATUS.md` goal 06 section + G6 row | **Done** |
+
+Also verified: tracking error per day (live vs backtest on the same bars, < 0.1 % of the allocation), B-301 (internal API refuses without the service token, REST still refuses `robot:*`), B-502 (simulator imports the latest backtest), novice 403 on builder APIs with templates open to all.
+
+### 6.3 Deferred (with reasons)
+
+- AI regime model (goal 07), copilot on `/robots` (goal 07): B-601, B-602.
+- Licensed / long research history (Sponsor contracts): B-604.
+- Live KPI ratios and mark-to-market tracking error need robot equity snapshots: B-606.
+- Production service auth (mTLS / service JWT), HA of supervisor and runner, async long research jobs: B-608, B-610, B-613 (goal 10).
+- Real LIVE promotion (broker, compliance, Keycloak step-up): Sponsor only, B-609.
+
+### 6.4 Notes found while building
+
+- A test caught the supervisor defaulting to "off" when `KORA_ROBOT_SUPERVISOR_MS` was unset; fixed.
+- Unhandled async errors in the supervisor's Redis listener could crash the api when another environment published on the shared `kora:ctl:robots` channel before migrations; handlers now catch and log.
+- Pre-trade fat-finger bands apply to protective prices: a stop further than the asset-class band (crypto 5 %) is refused, as for manual orders.

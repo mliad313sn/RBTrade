@@ -9,6 +9,7 @@ Last updated: 2026-09-26 (goal 03 done; goals 02 and 05 merged earlier).
 | G2 | 02 market data | **Done, with deferrals**: see `docs/plans/02-market-data.md` §7 and §8 |
 | G3 | 03 OMS, paper engine, risk, kill switch (+ B-018 appropriateness, B-501) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/03-oms.md` §6 (deferred items in §6.3) |
 | G5 | 05 gain simulator | **Done, with deferrals**: see `docs/plans/05-gain-simulator.md` (paper import now uses real fills, B-501 done in goal 03; human copy review owed) |
+| G6 | 06 robot trader (+ B-301, B-502) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/06-robot-trader.md` §6 (deferred items in §6.3) |
 
 ## What shipped in goal 01
 
@@ -222,3 +223,39 @@ B-301 robot runner wiring, B-302 matching-loop scale-out, B-303 owner access to 
 - **Numbers:** quantities follow the registry grid (`qtyStep`, `minQty`); prices the `tickSize`; `multiplier` comes from `asset_class_trading.multiplier_mode` (FX/metals/crypto/equities in units). Marks are exit-side (bid for longs, ask for shorts). FX sessions close at weekends, so day-independent tests use BTC/USD.
 - **Env:** `KORA_PAPER_*`, `KORA_RISK_*`, `KORA_ORDER_RATE_LIMIT`, `KORA_ENGINE_*`, `KORA_TRADING_*`, `KORA_RECONCILIATION_INTERVAL_MS`, `KORA_APPROPRIATENESS_*` (see `.env.example`). Integration tests set `KORA_ENGINE_ENABLED=false` and drive matching with `EngineLoopService.matchSymbol`; `test/market-fixture.ts` writes quotes/depth/status into Redis.
 
+## Goal 06: Robot trader (G6: done, with deferrals)
+
+Plan and evidence: `docs/plans/06-robot-trader.md` §6. ADR 0006, `docs/quant/backtester.md`. Lead seats S5, S2, S4, S8. Built in a worktree in parallel with goal 04 (migrations `0060+`).
+
+### What shipped
+
+- **DSL (`packages/domain/src/strategy`):** `kora.strategy` v1 zod schema (ENTRY / FILTERS / EXIT / SIZE; `compare`, `cross`, `session_window`, `venue_open`, `no_event`, `ai_regime`; ATR/% stops, ATR/R/% targets, trailing after x R, time stop; % risk, fixed, volatility-target sizing, max open positions), named parameters, semantic validation with plain messages, warm-up, parameter diff, canonical JSON + `strategyContentHash` (`@kora/domain/server`), templates (Trend-X, MeanRev-Gold, Breakout-Crypto), builder block catalog with pure `addBlock`/`removeBlock`, robot limits and research request schemas. Cross-language fixture shared with Python.
+- **Quant (`services/quant/src/kora_quant/bt`):** event-driven portfolio bar backtester (fill at next open, conservative stop-first intrabar policy, gaps, trailing, time stops, end-of-data close, commission and funding from the registry cost model), mandatory look-ahead guard, IS/OOS split, anchored/rolling walk-forward with optional per-fold re-optimisation, metrics (CAGR, Sharpe, Sortino, Calmar, max DD + duration, win rate, profit factor, expectancy R/ccy, trades, exposure, turnover, cost drag), PSR/DSR, capped grid/random optimisation ranked by OOS, sensitivity grid, and `/bt/signal` (the live decision, same code). Endpoints `/bt/run`, `/bt/walk-forward`, `/bt/optimise`, `/bt/sensitivity`, `/bt/signal`.
+- **API:**
+  - `apps/api/src/strategies`: strategies + immutable versions (author, reason, audited parameter diff, optimistic concurrency), `/strategies/validate|schema|catalog`, research runs with SIMULATED point-in-time data (candles, registry session flags, SIMULATED calendar) and the paper engine's registry cost model, server-counted trials, `GET /strategy-templates` for every role.
+  - `apps/api/src/robots`: robots (create/start/pause/version switch/limits, book from the robot's own fills, limit usage, KPIs, signals, audit feed), internal bot-runner API (B-301, service token), supervisor (heartbeats, loss/drawdown auto-pause with alerts, kill-switch listener), daily tracking error, promotion (evidence checklist, four-eyes risk sign-off bound to the limits hash, TOTP step-up, LIVE refused but recorded), `GET /signals/:id/features`.
+  - Migration `0060_robots.sql` (append-only versions, runs, trials, signals, sign-offs, promotions; LIVE robots refused by trigger; four-eyes trigger).
+  - Small additive changes: `OmsService.amend/cancel` optional actor; `DevIdpService.verifyStepUp` exported from `AuthModule`.
+- **Bot runner (`services/bot-runner`):** BullMQ `bar_close` jobs from the goal 02 candle channels (one job per robot/symbol/bar), context → quant → decision through the api, 5 s heartbeats, kill-switch reaction on `kora:ctl:robots` (≈ 1 ms in the runner), reaction events on `kora:robots:events`, daily tracking job, `/health` with robot counts.
+- **Web:** `/robots` monitor (robot list with run/pause and P&L, rule chips, IS/OOS equity with divider and drawdown, KPI table IS/OOS/WF/live, overfitting checks, sensitivity heatmap, walk-forward folds, Send to Monte Carlo, risk-limit meters, live audit feed, heartbeat, signal feature contributions, promotion checklist with 2FA dialog, hold-to-halt-all) and `/robots/builder` (drag-and-drop blocks with + buttons, inline parameter editing, live validation panel, JSON view, import/export, versioned save with a reason). The simulator's "Import from backtest" works (B-502).
+- **Tests:** domain 21 new; quant 39 new (124 total, 97.7 % coverage); api unit 3 new; api integration 19 new (137 total); runner 11; web unit 3 new; e2e 3 new (29 total). See plan §6 for the per-criterion evidence.
+
+### Stubbed or placeholder
+
+- The AI regime condition evaluates to `not_available` until goal 07 (skipped or blocking, by the strategy's choice, and recorded on every signal). The copilot panel on `/robots` shows the stored feature contributions only.
+- Research data is the SIMULATED candle history (10 days in dev by default); licensed history is a Sponsor item (B-604).
+- Default robot limits and promotion thresholds are SIMULATED placeholders (OQ-R7, OQ-R8). Promotion is always refused (`LIVE_TRADING_ENABLED=false`).
+- The live column of the KPI table shows P&L, fills and tracking error; live ratios need robot equity snapshots (B-606).
+
+### Deferred
+
+B-601 AI regime wiring, B-602 copilot on `/robots`, B-603 quant on the live path (health gating, tracing, scale), B-604 licensed history, B-605 robot position segregation, B-606 robot equity snapshots and live KPIs, B-607 backtester depth/impact realism, B-608 runner mTLS / service JWT, B-609 Keycloak step-up and the real LIVE path, B-610 supervisor/runner HA, B-611 SDK methods, B-612 builder UX extras, B-613 async long research jobs, B-614 template copy review.
+
+### What goals 07, 07B and 08 need to know
+
+- **Signal feature store (goal 07 `get_signal_features`):** `GET /signals/:id/features` (owner, risk officer, admin) → `{id, robotId, versionId, symbol, barTs, action, reason, outcome, outcomeDetail, orderId, features: {"ema:20": 1.0842, …}, conditions: [{block, index, type, label, result: true|false|'not_available', values, contribution (−1…1, tanh of the scaled margin), skipped}], explanation}`. List a robot's signals with `GET /robots/:id/signals?limit=`; every non-hold decision is also an audit event `robot.signal` (actor `robot`). Backtest trades carry the same `entrySignal.conditions` inside `backtest_runs.result` (`GET /backtests/:id`).
+- **Strategy draft API (AI suggests, never executes):** build a candidate definition, check it with `POST /strategies/validate {definition}` → `{valid, issues[{path, message, severity}], contentHash, shortHash, warmupBars}`; show the diff with `paramsDiff()` from `@kora/domain`. Only a human saves it: `POST /strategies/:id/versions {definition, reason, baseVersionId}` (audited as the user; 409 `stale_version` when the base moved). Goal 07 should record its own `ai.suggestion` audit event (actor `ai`) and may add a `strategy_drafts` table; it must not call the robot endpoints.
+- **Templates API (goal 08):** `GET /strategy-templates` (any signed-in role) → `{templates: [{id, name, summary, riskLevel: 'lower'|'medium'|'higher', symbols, timeframe, definition}], disclaimer}`. Everything else under `/strategies`, `/backtests`, `/robots` is trader/quant/admin only; a Novice auto-invest flow needs a server-side, guard-railed path decided in goal 08 (B-614).
+- **Calibration hooks (goals 07/07B):** the `ai_regime` condition is `{regime: 'trending'|'ranging'|'volatile', minProbability, whenUnavailable: 'ignore'|'block'}`; the evaluator's `AiRegimeCondition` branch in `services/quant/src/kora_quant/bt/evaluate.py` is where per-bar, point-in-time regime probabilities (sent with each symbol's data) should be read, inside the look-ahead guard. For calibration ("when I said 0.6 it worked 57 %"), join `robot_signals` with the robot's subsequent fills (orders with `source = 'robot:{id}'`) or use backtest trades' `entrySignal` + `rMultiple`; trials per strategy are in `strategy_trials` (IS/OOS per-period Sharpe).
+- **Runner / control plane:** `kora:ctl:robots` now also carries `{action: 'sync', robotId, accountId, status}`; the runner reports `{type: 'halted'|'decision', …}` on `kora:robots:events`. Heartbeat keys `kora:robots:hb:{robotId}`.
+- **Env:** `KORA_SERVICE_TOKEN` (generated by `scripts/dev-db.sh`), `KORA_ROBOT_*`, `KORA_BOT_RUNNER_*`, `KORA_BT_*`, `KORA_PROMOTE_*`; e2e adds `E2E_BOT_RUNNER_PORT` and `E2E_MD_REDIS_PREFIX` (see `.env.example`). Integration tests spawn the real quant service (`scripts/py-run.sh`) and the runner (`tsx`).
