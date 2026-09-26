@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "i18n:check": "vitest run src/lib/i18n/i18n.test.ts",
+    "readability": "KORA_WRITE_READABILITY=1 vitest run src/lib/i18n/readability.test.ts",
+    "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.2.8",

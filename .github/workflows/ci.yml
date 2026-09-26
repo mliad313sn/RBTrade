@@ -68,6 +68,8 @@ jobs:
         run: pnpm test
       - name: Contrast check (both themes)
         run: pnpm contrast
+      - name: Novice copy complete in EN and FR (goal 08, no missing keys)
+        run: pnpm --filter @kora/web i18n:check
       - name: API integration tests (real Postgres + Redis)
         run: pnpm --filter @kora/api test:integration
       - name: Playwright browsers
