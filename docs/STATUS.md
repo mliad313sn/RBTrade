@@ -1,6 +1,6 @@
 # KORA — delivery status
 
-Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot).
+Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B market intelligence).
 
 | Gate | Goal | State |
 |---|---|---|
@@ -12,6 +12,7 @@ Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot).
 | G5 | 05 gain simulator | **Done, with deferrals**: see `docs/plans/05-gain-simulator.md` (paper import now uses real fills, B-501 done in goal 03; human copy review owed) |
 | G6 | 06 robot trader (+ B-301, B-502) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/06-robot-trader.md` §6 (deferred items in §6.3) |
 | G7 | 07 AI copilot (+ B-602) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07-ai-copilot.md` §6 (live-provider eval pending a key, OQ-A2; deferred items in §6.3) |
+| G7B | 07B market intelligence (+ B-601, B-701) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07b-market-intelligence.md` §6 (all data SIMULATED, providers flagged stubs, OQ-M3/OQ-M4; live-provider evals pending a key, OQ-A2; deferred items in §6.3) |
 
 ## What shipped in goal 01
 
@@ -373,3 +374,36 @@ B-701 … B-708 (see BACKLOG); OQ-A1 (provider DPA), OQ-A2 (key, model, prices, 
 - **Novice (08):** `import { ExplainThis } from '@/components/ai'` → `<ExplainThis topic="stop loss" screenText={visibleText} />` (plain words, grade ≤ 8 checked on the server, no suggestions, no drafts; `POST /ai/explain`, any signed-in role; novice-only users are always in novice mode). Nothing in the novice routes was changed. The chat forces novice mode for novice-only accounts.
 - **Ticket (04/08):** `TicketDraft.aiDraftId` (optional) carries the audited draft; the ticket records accepted/rejected after the user acts.
 - **Env:** `KORA_AI_MODEL`, `ANTHROPIC_API_KEY`, `KORA_AI_PROVIDER`, `KORA_AI_THINKING`, `KORA_AI_EFFORT`, `KORA_AI_MAX_TOKENS`, `KORA_AI_MAX_TOOL_ROUNDS`, `KORA_AI_USER_DAILY_TOKENS`, `KORA_AI_ORG_DAILY_TOKENS`, `KORA_AI_RATE_PER_MIN`, `KORA_AI_ORG_ID`, `KORA_AI_CACHE_TTL_S`, `KORA_AI_CALIBRATION_MIN_N`, `KORA_AI_DRAFT_RISK_PCT`, `KORA_AI_PRICE_*`, `KORA_AI_PSEUDONYM_SALT`, `KORA_METRICS_TOKEN`, `KORA_AI_STRIP=on` (see `.env.example`). e2e sets `KORA_AI_PROVIDER=scripted`.
+
+## Goal 07B: Market intelligence (G7B: done, with deferrals)
+
+Plan and evidence: `docs/plans/07b-market-intelligence.md` §6. ADR 0007B (threat model additions T14–T19). Lead seats S7, S5, S2, S8. Built in parallel with goal 08 (migrations `0075–0077`).
+
+### What shipped
+
+- **Global coverage**: provider adapter matrix per continent (`packages/market-data/src/providers/matrix.ts`, `GET /intel/providers`), every entry a flagged, unlicensed stub with its licensing need (OQ-M3, OQ-M4); holiday + DST session tests on the seeded calendars of XNYS, XLON, XTKS, XHKG, XJSE, BVMF, XASX; radar regions = continents (+ `global` OTC); SIMULATED sector labels.
+- **Scanner (`services/quant/src/kora_quant/scanner`, `POST /scanner/run`)**: 20 detectors (trend strength, regime, breakout/compression, momentum and mean-reversion z, relative strength vs sector and region, correlation break, volume/volatility anomalies, seasonality, event proximity) as numbers only; numba kernels; prefix look-ahead guard (leaky detector / injected future data → 422); incremental bar-close state; emerging-trend labels. **Benchmark**: 10,000 SIMULATED synthetic instruments × 500 one-hour bars in 10.4 s worst of 3 (budget 60 s), `bench/SCANNER_RESULTS.md`.
+- **Regime model and `ai_regime`**: point-in-time volatility-clustering filter; the goal 06 condition reads it inside the backtester's guard when `aiRegime: model` (api default via `KORA_AI_REGIME=model`; `off` = goal 06 behaviour).
+- **Forecasts**: walk-forward (embargo = horizon) L2 logistic per instrument × horizon (`1d/1w/1m`), isotonic/Platt calibration, skill after costs, linear SHAP drivers. Live forecasts written to `ai_predictions` at the bar close (`trend:logit:<region>:<horizon>`), resolved later from candles; OOS forecasts stored as `history_replay`; bins via `CalibrationService`. A probability is shown only with an edge after costs and a large enough bin, else **"No reliable signal"** (the normal state on SIMULATED data).
+- **News**: `NewsAdapter`, SIMULATED multilingual fixtures (8 languages, duplicates, 8 injection attempts), dedup, entity linking, translation and scoring through the gateway as structured outputs (`output_config.format`, no tools, zod-validated, invalid → stored without scores), audited `ai.request` (surface `news`), budgeted.
+- **API (`apps/api/src/intel`)**: `/intel/radar`, `/intel/trends/:symbol` (card), `POST /intel/trends/:symbol/explain` (grounded summary, SSE), `POST /intel/trends/:symbol/draft` (trader; audited draft, surface `radar`), `/intel/news`, `POST /intel/news/ingest` + `POST /intel/scan` (admin/quant), `/intel/alerts` (server-evaluated after every scan), `/intel/whats-moving`, `/intel/providers`, public `/intel/reliability`. Copilot tools `get_market_radar`, `get_trend_card`, `get_news`.
+- **Web**: Pro `/radar` "Market Radar" (nav entry), public `/reliability`, `WhatsMovingCard` exported from `@/components/intel`, `/terminal?aiDraft=` draft loader, builder `?symbol=`.
+- **Evals**: 117 cases (37 new: news injection 13, news schema 8, trend explanation 9, market radar 7), 117/117 scripted; thresholds: news injection and trend-explanation fidelity 100 %.
+- **Tests**: quant 160 (36 new), market-data 71 (+11), api unit 131 (+29), api integration 168 (+12), web unit 39 (+3), e2e (+2: radar flow, public reliability).
+
+### Stubbed or placeholder
+
+- All market data and news are SIMULATED; every provider is a flagged stub (OQ-M3, OQ-M4). Sector labels and round-trip cost assumptions are SIMULATED (OQ-M2, OQ-M6).
+- No API key here: news scoring, translations and summaries run on the scripted provider; the live eval is pending (OQ-A2, B-759).
+- Regime probabilities are raw filter outputs inside backtests; calibrated regime display is B-752. Gradient boosting is B-751.
+
+### Deferred
+
+B-751 … B-761 (see BACKLOG); B-708 moved to goal 10; OQ-A4 (publishing the track record), OQ-M6.
+
+### What goals 08, 09 and 10 need to know
+
+- **Novice (08):** `import { WhatsMovingCard } from '@/components/intel'` → `<WhatsMovingCard />` on the novice Home (reads `GET /intel/whats-moving`, any signed-in role: plain words, grade ≤ 8, no suggestion, a figure only when calibrated, news source link). No novice route was edited. The `/radar` → `/home` counterpart is in `lib/modes.ts`. `POST /intel/trends/:symbol/explain` forces novice mode for novice-only accounts.
+- **Risk & compliance (09):** review OQ-A4 (public `/reliability` page and novice exposure), the plain-language copy, and translations shown to users (B-756); alerts only notify (B-757 for delivery). Audit actions: `intel.scan`, `intel.alert_created|deleted`, `ai.request` (surface `news`/`radar`), `ai.draft` (surface `radar`).
+- **QA/SRE (10):** scan scale-out and a true incremental kernel (B-753), Grafana panels (B-758), live-provider evals (B-759), radar visual baseline (B-761). The quant perf test runs 10,000 × 500 bars in CI (`test_scanner_perf.py`).
+- **Env:** `KORA_INTEL_SCAN`, `KORA_INTEL_SCAN_CHECK_MS`, `KORA_INTEL_TIMEFRAME`, `KORA_INTEL_BARS`, `KORA_INTEL_HORIZONS`, `KORA_INTEL_MIN_TRAIN`, `KORA_INTEL_GUARD_CHECKPOINTS`, `KORA_INTEL_TIMEOUT_MS`, `KORA_INTEL_NEWS`, `KORA_INTEL_NEWS_INTERVAL_MS`, `KORA_AI_REGIME`, `KORA_NEWS_ADAPTER_*` (see `.env.example`). Integration tests and e2e run with scans and news timers off and trigger them through the API.

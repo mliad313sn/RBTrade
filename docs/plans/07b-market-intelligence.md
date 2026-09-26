@@ -35,7 +35,7 @@ the "What's moving and why" card is exported for goal 08 to place.
 
 ## 2. Files
 
-- Quant: `scanner/{__init__,panel,kernels,detectors,regime,guard,forecast,calibrate,synthetic,models,routes}.py`; `bt/indicators.py` (+ regime features), `bt/evaluate.py` (hook), `bt/models.py` (`aiRegime`), `bench/bench_scanner.py`, `bench/SCANNER_RESULTS.md`, tests `test_scanner_*.py`, `test_bt_regime.py`.
+- Quant: `scanner/{__init__,panel,kernels,detectors,guard,incremental,forecast,calibrate,synthetic,service,routes}.py` (the regime filter is `kernels.regime_filter`); `bt/indicators.py` (+ regime features), `bt/evaluate.py` (hook), `bt/models.py` (`aiRegime`), `bench/bench_scanner.py`, `bench/SCANNER_RESULTS.md`, tests `test_scanner_*.py`, `test_bt_regime.py`.
 - Domain / market data: `packages/market-data/src/providers/matrix.ts` (+ test), `packages/market-data/src/seed/global-sessions.test.ts` (holidays + DST on seeded calendars for the 7 venues).
 - API: `migrations/0075_intel.sql` (scans, features, trends, forecasts), `0076_news.sql` (articles, entities, scores), `0077_intel_alerts.sql` (alerts, alert events, `radar` draft surface); `src/intel/core/*` (framework-free: sectors, news pipeline pieces, schemas, trend card, radar aggregation), `src/intel/*.service.ts`, `intel.controller.ts`, `intel.module.ts`; AI core additions (`ProviderRequest.outputFormat`, three tools, scripted policies); `test/intel.int.test.ts`.
 - Evals: `services/ai-evals/src/cases/{news,trends,radar}.json`, fixtures + harness task `news_score`.
@@ -74,6 +74,38 @@ the "What's moving and why" card is exported for goal 08 to place.
 - Evals: news injection (100 %), schema validity, trend explanation numeric fidelity (100 %), novice readability, radar Q&A.
 - E2E: Market Radar: filter by region → open a trend → drivers and news visible → draft to ticket → ticket prefilled, no order until preview/confirm; reliability page renders without login.
 
-## 6. Results
+## 6. Results (2026-09-26)
 
-(Filled in at the end of the goal.)
+### 6.1 Acceptance criteria
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | Registry and simulated feed cover ≥ 1 venue per continent across all listed asset classes; session status correct across DST and holidays (XNYS, XLON, XTKS, XHKG, XJSE, BVMF, XASX) | **Pass** | `packages/market-data/src/seed/global-sessions.test.ts` (7 tests: DST switch days, lunch breaks, and a seeded holiday per venue — XNYS Good Friday/Thanksgiving + early close, XLON Easter Monday + Christmas Eve early close, XTKS 2 Jan, XHKG Christmas, XJSE Freedom Day, BVMF Natal, XASX Australia Day); `providers/matrix.test.ts` (every continent has market-data and news sources, every seeded venue and asset class covered, one venue with instruments per continent); goal 02 seed tests (13 asset classes, sim profile for every instrument); goal 02 domain DST tests unchanged. |
+| 2 | Scanner detectors match hand-computed values on fixed series; look-ahead guard fails when future data is injected | **Pass** | `services/quant/tests/test_scanner_detectors.py` (14 tests: breakout/channel, mean-reversion z, ATR/ADX by hand and vs goal 06 reference, momentum/return z, volatility ratio, relative strength vs sector and region, volume z, event minutes, slope t = 3√3, percentile rank, rolling correlation, seasonality t = 2, regime filter first step 2/7, numba = Python source for every kernel); `test_scanner_guard.py`: guard passes on the real detectors, future bars ×3 leave past features identical, a centred-window detector raises `LookAheadError`, the route returns 422 `look_ahead`; `test_bt_regime.py`: a leaky regime feature is caught by the backtester's guard. |
+| 3 | Displayed probability comes from the calibration table (seeded-table test); a model without OOS skill displays "No reliable signal" | **Pass** | `apps/api/test/intel.int.test.ts` "shows No reliable signal by default and a calibrated probability only from the seeded table": after a real scan the 7203.XTKS 1d card says `No reliable signal` (random walk → no edge); seeded `ai_calibration_bins` (n=212, hits=121, edge after costs) → `{status: calibrated, value: 0.57, n: 212}` and "When we said 0.xx, it happened 57% of the time (n=212)"; bins shrunk to n=5 → no number; 1w card → "Not enough SIMULATED history". Quant: random walks never show skill, a planted signal is detected OOS (`test_scanner_forecast.py`); unit tests for every branch of `probabilityView`; e2e card shows `No reliable signal`. |
+| 4 | News prompt-injection suite passes 100 %; every sentiment output validates against the schema; explanations cite stored article ids | **Pass** | `pnpm evals`: news_injection 13/13 (100 %: prompt integrity, no tools offered, canary absent, schema valid, scores identical to the same article without the injection, adversarial output rejected), news_schema 8/8. Integration: 28 of 28 non-duplicate SIMULATED articles stored `ok` and re-validated against the schema; injection articles keep sentiment 0 and leak no canary; the adversarial persona's output is stored `invalid` with no scores; no model → `unavailable`; the explanation's `[news:<id>]` citations all exist in `news_articles` (integration + e2e). |
+| 5 | Numeric-fidelity eval: 100 % of numbers in explanations match tool outputs; novice readability ≤ 8 | **Pass** | `pnpm evals`: trend_explanation 9/9 (100 %, exact numeric fidelity on the raw text), market_radar 7/7; novice trend cards grade ≤ 8 with no suggestion. Integration: `ungroundedNumbers(answer, [card], 'exact') = []` and guard flags empty for the pro summary; novice summary grade ≤ 8, no fallback; "What's moving" headlines grade ≤ 8. |
+| 6 | Scanner benchmark committed; Market Radar e2e: filter by region → open a trend → drivers and news → draft to ticket, preview/confirm still required | **Pass** | `services/quant/bench/SCANNER_RESULTS.md`: 10,000 × 500 one-hour bars, full scan 8.60 s mean / 10.42 s worst of 3 (budget 60 s); CI guard `test_scanner_perf.py`. `apps/web/e2e/radar.spec.ts`: real scan + news ingest → `/radar` region Asia → 7203.XTKS card (drivers, SIMULATED news, invalidation, `No reliable signal`, summary cites `[news:…]`, axe clean) → region Global → BTCUSD → Draft to ticket → `/terminal?aiDraft=…` ticket shows "AI draft … Market Radar", no order exists → Review opens the confirmation (hold for market orders) → order with `source: ai-draft-accepted`; draft row surface `radar`. |
+| 7 | Every data provider is a flagged stub, licensing need logged; no real market or news data committed | **Pass** | Provider matrix (all `flagged: true, licensed: false`, licensing need per entry, test), news stubs refuse (unit + integration), OQ-M3 / OQ-M4 updated, OQ-M6 added; fixtures are invented and labelled SIMULATED with `.invalid` links; synthetic benchmark symbols never enter the registry. |
+| 8 | `docs/adr/0007b-market-intelligence.md` and the STATUS update are written | **Pass** | ADR 0007B (with threat model additions T14–T19), STATUS G7B row + section, BACKLOG B-751…B-761, README section. |
+
+### 6.2 Gate runs (this environment)
+
+- `pnpm build` ✓, `pnpm lint` ✓, `pnpm typecheck` ✓ (13 tasks each).
+- `pnpm test` ✓: quant 160 (36 new; 97 % coverage), market-data 71 (+11), api 131 (+29: intel core, static no-execution scan of `apps/api/src/intel`), web 39 (+3), domain 153, ui 113, sdk 13, bot-runner 11, ai-evals 4 (+1: a gullible model fails every news-injection case).
+- `pnpm test:integration` ✓ twice: 23 files, 168 tests each (12 new in `intel.int.test.ts`), ~133 s.
+- `pnpm test:e2e` ✓: 43 passed (2 new in `radar.spec.ts`). A first full run had 2 goal 06 failures because the radar spec replaced the BTCUSD 1h history the robot specs use; the spec now drafts on ETHUSD and leaves other history alone (the `ai_regime` model default did not cause them: robots specs pass with `KORA_AI_REGIME=model`).
+- `pnpm py:check` ✓ (ruff, mypy --strict, 160 passed, 97 %). Benchmark: `bench/SCANNER_RESULTS.md`.
+- `pnpm evals` ✓ 117/117 (news_injection 13/13, news_schema 8/8, trend_explanation 9/9, market_radar 7/7). `pnpm evals:live` exits 2: "Live eval not possible: no model is configured" (no key here, OQ-A2).
+
+### 6.3 Deferred (with reason)
+
+- Live-provider runs of the news/translation/summary evals: no API key here (OQ-A2) → B-759.
+- Gradient-boosted models (no ML dependency installed; logistic regression suffices to show the pipeline and is honest about skill) → B-751.
+- Calibrated regime display (`trend:regime:<tf>`): the raw point-in-time filter feeds `ai_regime`; a calibrated figure needs realised regime labels → B-752.
+- True per-bar incremental kernel and sharding: the bar-close mode recomputes a 600-bar window (8.8 s for 10,000 instruments) → B-753.
+- Wall-clock (session-aware) alignment for cross-sectional detectors and licensed sectors/constituents → B-754 (OQ-M2).
+- Re-scoring articles stored while the model was unavailable; Batches API for backfills → B-755.
+- Localised instrument names and translated Radar copy (goal 08 owns i18n) → B-756.
+- Alert delivery beyond the Radar panel → B-757. Grafana panels → B-758. Licensed event calendar → B-760. Radar UX extras → B-761.
+- The strip's bias rule still uses the goal 07 fixed-weight score (switching it to the 07B models is a terminal change) → B-708 (goal 10).
