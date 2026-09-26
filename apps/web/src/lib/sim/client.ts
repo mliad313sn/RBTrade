@@ -1,4 +1,7 @@
-import type { PaperProjection, ProjectRequest, SimResult } from './types';
+import { KoraApiError } from '@kora/sdk';
+
+import { api } from '../api-browser';
+import type { PaperProjectRequest, ProjectRequest } from './types';
 
 export class SimApiError extends Error {
   constructor(
@@ -12,45 +15,29 @@ export class SimApiError extends Error {
   }
 }
 
-async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api/sim${path}`, {
-    method,
-    headers: {
-      accept: 'application/json',
-      'x-kora-csrf': '1',
-      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'include',
-    cache: 'no-store',
-  });
-  const text = await res.text();
-  const data: unknown = text ? JSON.parse(text) : undefined;
-  if (!res.ok) {
-    const b = (data ?? {}) as {
-      error?: string;
-      message?: string;
-      issues?: { path: string; message: string }[];
-    };
-    const issues = b.issues ?? [];
-    const message = issues.length
-      ? issues.map((i) => i.message).join(' ')
-      : (b.message ?? res.statusText);
-    throw new SimApiError(res.status, b.error ?? `http_${res.status}`, message, issues);
+/** Maps SDK errors to the simulator's plain-language error (validation issues joined). */
+async function call<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof KoraApiError) {
+      const issues = ((e.body ?? {}) as { issues?: { path: string; message: string }[] }).issues ?? [];
+      const message = issues.length ? issues.map((i) => i.message).join(' ') : e.message;
+      throw new SimApiError(e.status, e.code, message, issues);
+    }
+    throw e;
   }
-  return data as T;
 }
 
-/** Browser client for the api /sim routes (same-origin proxy, HttpOnly cookie, CSRF header). */
+/** Browser client for the /sim routes, on the typed SDK (B-506). */
 export const simApi = {
-  project: (req: ProjectRequest) => call<SimResult>('POST', '/project', req),
-  paperProject: (req: {
-    tradesPerPeriod: number;
-    horizonPeriods: number;
-    ruinFloorPct: number;
-    seed: number;
-    paths: number;
-  }) => call<PaperProjection>('POST', '/paper/project', req),
+  project: (req: ProjectRequest) => call(() => api.simProject(req)),
+  paperProject: (req: PaperProjectRequest) => call(() => api.simPaperProject(req)),
   /** Block bootstrap of a trade list (goal 06 backtests send their OOS R multiples here, B-502). */
-  fromTrades: (req: Record<string, unknown>) => call<SimResult>('POST', '/from-trades', req),
+  fromTrades: (req: Record<string, unknown>) => call(() => api.simFromTrades(req)),
+  /** B-505: saved scenarios. */
+  scenarios: (kind: 'practice' | 'pro') => call(() => api.simScenarios(kind)),
+  saveScenario: (body: { kind: 'practice' | 'pro'; name: string; input: Record<string, unknown>; overwrite?: boolean }) =>
+    call(() => api.saveSimScenario(body)),
+  deleteScenario: (id: string) => call(() => api.deleteSimScenario(id)),
 };
