@@ -62,6 +62,7 @@ If a module prompt needs a different choice, write an ADR in `docs/adr/` first a
 | 05 | Gain Simulator (quant service + UI) | 01 (03 for paper history) |
 | 06 | Robot Trader: DSL, backtester, bot runner | 02, 03, 05 |
 | 07 | AI Copilot | 03, 04, 06 |
+| 07B | Market Intelligence: global scanner, news, trend forecasts (sponsor add 2026-09-26) | 02, 05, 06, 07 |
 | 08 | Novice view (desktop + mobile PWA) | 03, 04, 05 |
 | 09 | Risk, compliance and governance layer | all |
 | 10 | QA, security hardening, observability, release | all |
@@ -86,3 +87,8 @@ If a module prompt needs a different choice, write an ADR in `docs/adr/` first a
 8. see every one of those actions in the audit log.
 
 All CI checks must be green.
+
+## Scope amendment (Sponsor, 2026-09-26)
+- **Global coverage:** KORA must support any asset class on any exchange on all five continents (venues by ISO 10383 MIC, time zones, calendars, multi-currency). Real data providers need licensed contracts (Sponsor); until then they are flagged stubs and all data is SIMULATED.
+- **Market Intelligence (goal 07B):** an AI helper that scans markets and news and detects or forecasts trends, with calibrated probabilities and clear, cited explanations. It never executes and never gives personalised advice.
+- **Appropriateness:** `trader` access requires passing an appropriateness assessment (B-018). There is no self-service trader sign-up.
