@@ -1,4 +1,13 @@
 import type {
+  AssetClass,
+  CalendarEvent,
+  FeedStatus,
+  InstrumentSpec,
+  Quote,
+  Region,
+  SessionState,
+  Timeframe,
+  Venue,
   AuditEvent,
   ChainVerification,
   KillSwitchScope,
@@ -90,3 +99,76 @@ export interface AuditListResponse {
 }
 
 export type AuditVerifyResponse = ChainVerification;
+
+// ---- Market data (goal 02) --------------------------------------------------------------------
+
+export interface SessionInfo {
+  state: SessionState;
+  localDate: string;
+  localTime: string;
+  nextChange: string | null;
+  nextState: SessionState | null;
+  timezone?: string;
+  source?: 'instrument' | 'venue';
+}
+
+export interface InstrumentDto extends InstrumentSpec {
+  assetClassLabel: string;
+  session: SessionInfo | null;
+}
+
+export interface InstrumentDetail extends InstrumentDto {
+  staleAfterMs: number | null;
+  venueInfo: (Venue & { session: SessionInfo }) | null;
+}
+
+export interface InstrumentsQuery {
+  assetClass?: AssetClass;
+  venue?: string;
+  region?: Region;
+  q?: string;
+}
+
+export interface CandleDto {
+  t: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  trades: number;
+}
+
+export interface CandlesResponse {
+  symbol: string;
+  tf: Timeframe;
+  simulated: boolean;
+  source: string;
+  candles: CandleDto[];
+}
+
+export interface QuotesResponse {
+  quotes: Array<{ symbol: string; quote: Quote | null; dayOpen: string | null }>;
+}
+
+export interface MarketStatusResponse {
+  status: FeedStatus | null;
+  gateway: {
+    channels: number;
+    subscriptions: number;
+    messagesIn: number;
+    framesOut: number;
+    dropped: number;
+    slowClosed: number;
+    conflated: number;
+    feedLost: boolean;
+    connections: number;
+  };
+  feedMode: 'inprocess' | 'off';
+}
+
+export interface CalendarResponse {
+  source: string;
+  simulated: boolean;
+  events: CalendarEvent[];
+}

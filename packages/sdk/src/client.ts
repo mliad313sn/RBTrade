@@ -1,6 +1,15 @@
 import type { KillSwitchScope } from '@kora/domain';
 
+import type { DepthSnapshot, Timeframe } from '@kora/domain';
+
 import type {
+  CalendarResponse,
+  CandlesResponse,
+  InstrumentDetail,
+  InstrumentDto,
+  InstrumentsQuery,
+  MarketStatusResponse,
+  QuotesResponse,
   AuditListQuery,
   AuditListResponse,
   AuditVerifyResponse,
@@ -113,15 +122,49 @@ export class KoraClient {
   }
 
   audit(q: AuditListQuery = {}) {
-    const qs = new URLSearchParams(
-      Object.entries(q)
-        .filter(([, v]) => v !== undefined && v !== '')
-        .map(([k, v]) => [k, String(v)]),
-    ).toString();
-    return this.request<AuditListResponse>('GET', `/audit${qs ? `?${qs}` : ''}`);
+    return this.request<AuditListResponse>('GET', `/audit${query(q)}`);
+  }
+
+  // ---- market data (goal 02) ----
+
+  instruments(q: InstrumentsQuery = {}) {
+    return this.request<{ instruments: InstrumentDto[] }>('GET', `/instruments${query(q)}`);
+  }
+
+  instrument(symbol: string) {
+    return this.request<InstrumentDetail>('GET', `/instruments/${encodeURIComponent(symbol)}`);
+  }
+
+  candles(q: { symbol: string; tf: Timeframe; limit?: number; from?: number; to?: number }) {
+    return this.request<CandlesResponse>('GET', `/candles${query(q)}`);
+  }
+
+  quotes(symbols: string[]) {
+    return this.request<QuotesResponse>('GET', `/quotes${query({ symbols: symbols.join(',') })}`);
+  }
+
+  depth(symbol: string) {
+    return this.request<{ symbol: string; depth: DepthSnapshot | null }>('GET', `/depth/${encodeURIComponent(symbol)}`);
+  }
+
+  marketStatus() {
+    return this.request<MarketStatusResponse>('GET', '/market-data/status');
+  }
+
+  calendar(q: { from?: number; to?: number } = {}) {
+    return this.request<CalendarResponse>('GET', `/calendar${query(q)}`);
   }
 
   verifyAudit() {
     return this.request<AuditVerifyResponse>('GET', '/audit/verify');
   }
+}
+
+function query(q: object): string {
+  const qs = new URLSearchParams(
+    Object.entries(q)
+      .filter(([, v]) => v !== undefined && v !== '')
+      .map(([k, v]) => [k, String(v)]),
+  ).toString();
+  return qs ? `?${qs}` : '';
 }
