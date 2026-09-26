@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { TIMEFRAME_SECONDS, type InstrumentSpec, type Timeframe } from '@kora/domain';
-import { formatPrice, formatSize } from '@kora/market-data';
+import { formatPrice, formatVolume } from '@kora/market-data';
 
 import { DbService } from '../db/db.service';
 import { InstrumentsRepository } from './instruments.repository';
@@ -90,7 +90,7 @@ export class CandlesService {
         high: formatPrice(r.high, spec),
         low: formatPrice(r.low, spec),
         close: formatPrice(r.close, spec),
-        volume: formatSize(r.volume, spec),
+        volume: formatVolume(r.volume, spec),
         trades: r.trades,
       })),
     };

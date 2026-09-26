@@ -67,6 +67,11 @@ export function formatSize(value: Decimal | string, spec: Pick<InstrumentSpec, '
   return roundToTick(dec(value), spec.qtyStep, Decimal.ROUND_FLOOR).toFixed(spec.qtyPrecision);
 }
 
+/** Aggregate amounts (volume): quantised to qty precision only (a sum need not sit on the step grid). */
+export function formatVolume(value: Decimal | string, spec: Pick<InstrumentSpec, 'qtyPrecision'>): string {
+  return dec(value).toDecimalPlaces(spec.qtyPrecision, Decimal.ROUND_DOWN).toFixed(spec.qtyPrecision);
+}
+
 export function floatToQty(x: number, spec: QtySpec): string {
   return formatQty(floatToDecimal(Math.max(0, x)), spec);
 }

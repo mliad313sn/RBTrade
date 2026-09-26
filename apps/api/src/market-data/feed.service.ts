@@ -163,6 +163,12 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     await this.adapter(source).connect();
   }
 
+  /** The simulated adapter (chaos drills and tests). */
+  simulated(): SimulatedAdapter | null {
+    const a = this.adapters.get('simulated');
+    return a instanceof SimulatedAdapter ? a : null;
+  }
+
   status(): FeedStatus {
     const now = Date.now();
     const feeds: FeedHealth[] = [...this.adapters.values()].map((a) => {
@@ -184,14 +190,16 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     const live = feeds.filter((f) => f.state !== 'disabled');
     const down = live.filter((f) => f.state === 'down');
     const staleSymbols = [...this.stale].sort();
+    // 'down' is reserved for the gateway losing this process's heartbeat; adapter outages while the
+    // feed process is alive are 'degraded' (quotes go stale, REST and history keep working).
     let state: FeedStatus['state'] = 'ok';
     let reason: string | null = null;
-    if (live.length > 0 && down.length === live.length) {
-      state = 'down';
-      reason = `all feeds down (${down.map((f) => f.source).join(', ')})`;
-    } else if (down.length > 0 || staleSymbols.length > 0 || live.some((f) => f.state === 'resyncing')) {
+    if (down.length > 0) {
       state = 'degraded';
-      reason = down.length ? `feed down: ${down.map((f) => f.source).join(', ')}` : staleSymbols.length ? `${staleSymbols.length} stale symbol(s)` : 'resync in progress';
+      reason = `${down.length === live.length ? 'all feeds down' : 'feed down'}: ${down.map((f) => f.source).join(', ')}`;
+    } else if (staleSymbols.length > 0 || live.some((f) => f.state === 'resyncing')) {
+      state = 'degraded';
+      reason = staleSymbols.length ? `${staleSymbols.length} stale symbol(s)` : 'resync in progress';
     }
     return { type: 'status', state, ts: now, feeds, staleSymbols, reason };
   }

@@ -56,8 +56,17 @@ export interface TestUser {
   roles: Role[];
 }
 
-/** Real flow: sign-up → login → (MFA enrolment + verify when required). */
-export async function createUser(app: INestApplication, accountType: 'novice' | 'trader', extraRoles: Role[] = []): Promise<TestUser> {
+/**
+ * Real flow: sign-up → login → (MFA enrolment + verify when required).
+ * `realClock: true` skips the faked clock advance (fresh users have no TOTP replay history), for
+ * tests that need a moving Date.now (e.g. the market data feed).
+ */
+export async function createUser(
+  app: INestApplication,
+  accountType: 'novice' | 'trader',
+  extraRoles: Role[] = [],
+  opts: { realClock?: boolean } = {},
+): Promise<TestUser> {
   const http = app.getHttpServer();
   const email = uniqueEmail(accountType);
   const signup = await request(http)
@@ -71,10 +80,15 @@ export async function createUser(app: INestApplication, accountType: 'novice' | 
     roles = [...new Set([...roles, ...extraRoles])];
     await ownerQuery('INSERT INTO user_roles (user_id, role) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING', [id, roles]);
   }
-  return { id, email, roles, ...(await login(app, email)) };
+  return { id, email, roles, ...(await login(app, email, undefined, opts)) };
 }
 
-export async function login(app: INestApplication, email: string, secret?: string): Promise<{ token: string; secret?: string }> {
+export async function login(
+  app: INestApplication,
+  email: string,
+  secret?: string,
+  opts: { realClock?: boolean } = {},
+): Promise<{ token: string; secret?: string }> {
   const http = app.getHttpServer();
   const res = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
   if (res.body.status === 'ok') return { token: res.body.accessToken };
@@ -84,7 +98,7 @@ export async function login(app: INestApplication, email: string, secret?: strin
     s = enr.body.secret as string;
   }
   if (!s) throw new Error('MFA secret needed');
-  nextTotpWindow();
+  if (!opts.realClock) nextTotpWindow();
   const code = totp(base32Decode(s));
   const v = await request(http).post('/auth/mfa/verify').set(CSRF).send({ mfaToken: res.body.mfaToken, code }).expect(200);
   return { token: v.body.accessToken, secret: s };

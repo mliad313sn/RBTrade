@@ -176,12 +176,17 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       const p = parseChannel(ch);
       if (!p) rejected.push({ channel: ch, code: 'invalid_channel' });
       else if (p.symbol && !registry.instruments.has(p.symbol)) rejected.push({ channel: ch, code: 'unknown_symbol' });
-      else if (!conn.channels.has(ch) && conn.channels.size >= this.cfg.wsMaxChannels) rejected.push({ channel: ch, code: 'too_many_channels' });
-      else if (!conn.channels.has(ch)) accepted.push(ch);
+      else if (!conn.channels.has(ch) && !accepted.includes(ch) && conn.channels.size + accepted.length >= this.cfg.wsMaxChannels) rejected.push({ channel: ch, code: 'too_many_channels' });
+      else if (!conn.channels.has(ch) && !accepted.includes(ch)) accepted.push(ch);
     }
     for (const ch of accepted) conn.channels.add(ch);
     conn.json({ type: 'subscribed', channels: accepted, rejected, id: op.id });
-    for (const ch of accepted) await this.hub.subscribe(conn, ch);
+    for (const ch of accepted) {
+      if (!this.conns.has(conn) || !conn.channels.has(ch)) continue;
+      await this.hub.subscribe(conn, ch);
+      // The client may have closed or unsubscribed while we awaited Redis: never leak a subscriber.
+      if (!this.conns.has(conn) || !conn.channels.has(ch)) this.hub.unsubscribe(conn, ch);
+    }
   }
 
   private async authenticate(conn: Connection, token: string): Promise<void> {

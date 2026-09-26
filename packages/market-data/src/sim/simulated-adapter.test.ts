@@ -117,6 +117,21 @@ describe('SimulatedAdapter', () => {
     expect(adapter.isActive('NOPE', 0)).toBe(false);
   });
 
+  it('freeze() stalls delivery silently while staying connected', async () => {
+    const { adapter, advance } = setup();
+    const seqs: number[] = [];
+    adapter.subscribeQuotes(['EURUSD'], (q) => seqs.push(q.seq));
+    await adapter.connect();
+    advance(200);
+    adapter.freeze();
+    advance(500);
+    expect(adapter.health().state).toBe('connected');
+    expect(seqs).toEqual([1, 2]);
+    adapter.unfreeze();
+    advance(100);
+    expect(seqs).toEqual([1, 2, 8]);
+  });
+
   it('long stalls fast-forward instead of flooding subscribers', async () => {
     const { adapter, advance } = setup();
     let n = 0;

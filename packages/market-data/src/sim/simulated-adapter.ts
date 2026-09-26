@@ -80,6 +80,7 @@ export class SimulatedAdapter implements MarketDataAdapter {
   private state: AdapterState = 'disconnected';
   private lastMessageTs: number | null = null;
   private detail: string | null = null;
+  private frozen = false;
 
   constructor(private readonly opts: SimulatedAdapterOptions) {
     this.source = 'simulated';
@@ -116,6 +117,18 @@ export class SimulatedAdapter implements MarketDataAdapter {
     if (this.timer !== null) this.timers.clearInterval(this.timer);
     this.timer = null;
     this.setState('disconnected', 'stopped');
+  }
+
+  /**
+   * Chaos drill: a silent stall (connection stays up, nothing is delivered). Staleness must then
+   * come from quote age, per asset class. `unfreeze()` resumes and the skipped steps show as a gap.
+   */
+  freeze(): void {
+    this.frozen = true;
+  }
+
+  unfreeze(): void {
+    this.frozen = false;
   }
 
   subscribeQuotes(symbols: string[], onQuote: (q: Quote) => void): Unsubscribe {
@@ -205,7 +218,7 @@ export class SimulatedAdapter implements MarketDataAdapter {
     if (target - this.market.steps > max) this.fastForward(target - max);
     while (this.market.steps < target) {
       const s = this.market.step();
-      if (this.state === 'connected') this.deliver(s);
+      if (this.state === 'connected' && !this.frozen) this.deliver(s);
     }
   }
 

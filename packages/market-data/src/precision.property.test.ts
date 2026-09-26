@@ -12,6 +12,7 @@ import {
   floatToQty,
   formatPrice,
   formatQty,
+  formatVolume,
   isOnTick,
   RegistrySpecError,
   roundQty,
@@ -118,6 +119,8 @@ describe('registry-driven precision (fast-check)', () => {
     expect(() => assertPriceSpec({ tickSize: '0.001', pricePrecision: 2 })).toThrow(RegistrySpecError);
     expect(() => assertPriceSpec({ tickSize: '0', pricePrecision: 2 })).toThrow(RegistrySpecError);
     expect(toPips('0.0002', { pipSize: '0.0001' })?.toFixed()).toBe('2');
+    expect(formatVolume('13500.987', { qtyPrecision: 0 })).toBe('13500');
+    expect(formatVolume('0.5', { qtyPrecision: 3 })).toBe('0.500');
     expect(toPips('1', { pipSize: null })).toBeNull();
     expect(() => floatToPrice(Number.NaN, { tickSize: '1', pricePrecision: 0 })).toThrow(RangeError);
   });
