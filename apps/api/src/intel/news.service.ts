@@ -35,6 +35,7 @@ export interface IngestSummary {
   languages: Record<string, number>;
 }
 
+// nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_username -- constant system actor id, not a credential, reviewed goal 10
 const SYSTEM_USER = 'system:news';
 const ZERO: ProviderUsage = {
   inputTokens: 0,

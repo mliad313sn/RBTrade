@@ -36,6 +36,7 @@ export const ROUTE_RULES: Rule[] = [
 export type RouteDecision = { allow: true } | { allow: false; feature: string; requiredRoles: readonly Role[] };
 
 export function checkRoute(pathname: string, roles: readonly Role[]): RouteDecision {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   const rule = ROUTE_RULES.find((r) => r.pattern.test(pathname));
   if (!rule || hasAnyRole(roles, rule.roles)) return { allow: true };
   return { allow: false, feature: rule.feature, requiredRoles: rule.roles };

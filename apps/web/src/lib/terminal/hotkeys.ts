@@ -41,7 +41,9 @@ export interface KeyLike {
 }
 
 function keyMatches(k: string, e: KeyLike): boolean {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   if (/^[a-z]$/i.test(k)) return e.code ? e.code === `Key${k.toUpperCase()}` : e.key.toLowerCase() === k.toLowerCase();
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   if (/^[0-9]$/.test(k)) return e.code ? e.code === `Digit${k}` || e.code === `Numpad${k}` : e.key === k;
   if (k.toLowerCase() === 'esc' || k.toLowerCase() === 'escape') return e.key === 'Escape';
   return e.key.toLowerCase() === k.toLowerCase();

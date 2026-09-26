@@ -14,3 +14,10 @@ onlyBuiltDependencies:
 ignoredBuiltDependencies:
   - "@scarf/scarf"
   - protobufjs
+
+# Supply-chain hardening (goal 10, Semgrep pnpm rules): new versions must be seven days old before they
+# can be resolved, trust evidence may not downgrade between versions, and transitive dependencies
+# may not come from git/tarball URLs.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+blockExoticSubdeps: true

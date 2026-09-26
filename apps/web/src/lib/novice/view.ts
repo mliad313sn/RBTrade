@@ -63,6 +63,7 @@ export function ticketDisplay(ticket: NoviceTicketResponse | null, locale: Local
 
 /** Reads a formatted money string back to a decimal string (tests: shown value == preview value). */
 export function parseShownMoney(shown: string, locale: Locale): string {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   const negative = /[−-]/.test(shown);
   const body = shown.replace(/[^\d.,]/g, '');
   const normal =

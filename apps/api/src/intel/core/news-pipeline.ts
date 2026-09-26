@@ -79,6 +79,7 @@ export function findDuplicate(
   text: string,
   earlier: readonly DedupCandidate[],
 ): { id: string; kind: 'exact' | 'near'; similarity: number } | null {
+  // nosemgrep: ajinabraham.njsscan.crypto.timing_attack_node.node_timing_attack -- compares public content hashes, not secrets, reviewed goal 10
   const exact = earlier.find((e) => e.contentHash === hash);
   if (exact) return { id: exact.id, kind: 'exact', similarity: 1 };
   const sh = shingles(text);

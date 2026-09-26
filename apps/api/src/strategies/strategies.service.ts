@@ -272,6 +272,7 @@ export class StrategiesService {
           message: `The strategy changed since you opened it (now v${latest.version}). Reload and apply your edit again.`,
           latestVersionId: latest.id,
         });
+      // nosemgrep: ajinabraham.njsscan.crypto.timing_attack_node.node_timing_attack -- compares public content hashes, not secrets, reviewed goal 10
       if (latest.content_hash === hash) return { ...strategyDto(s, latest), created: false };
       const next = s.latest_version + 1;
       const v = (

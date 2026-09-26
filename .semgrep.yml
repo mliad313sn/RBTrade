@@ -1,0 +1,39 @@
+# KORA invariants as SAST rules (goal 10). Run by scripts/security/sast.sh with the registry rulesets.
+rules:
+  - id: kora-no-hardcoded-ai-model
+    message: AI model ids come from KORA_AI_MODEL only (master goal); do not hard-code one.
+    severity: ERROR
+    languages: [typescript, javascript, python]
+    paths:
+      exclude: ["**/*.test.ts", "**/tests/**", "services/ai-evals/**"]
+    pattern-regex: "['\"](claude-(opus|sonnet|haiku|instant|[0-9])[a-z0-9.-]*)['\"]"
+  - id: kora-live-trading-never-enabled-in-code
+    message: LIVE_TRADING_ENABLED must never be switched on in code (Sponsor only).
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern-either:
+          - pattern: process.env.LIVE_TRADING_ENABLED = "true"
+          - pattern: "liveTradingEnabled: true"
+  - id: kora-no-float-money
+    message: Money and prices are decimals; parseFloat/Number() on a price in domain code loses precision.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: ["packages/domain/src/trading/**", "packages/domain/src/novice/**"]
+      exclude: ["**/*.test.ts"]
+    pattern: parseFloat(...)
+  - id: kora-no-tls-verify-off
+    message: Never disable TLS verification.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern-either:
+      - pattern: "rejectUnauthorized: false"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+  - id: kora-no-eval
+    message: No dynamic code execution.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)

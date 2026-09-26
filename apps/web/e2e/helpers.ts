@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
+// nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_password -- test-only password for throwaway local accounts, reviewed goal 10
 export const PASSWORD = 'correct-horse-battery-staple';
 let n = 0;
 export const uniqueEmail = (p: string) => `${p}.${Date.now()}.${++n}@e2e.kora.local`;

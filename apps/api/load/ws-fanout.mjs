@@ -235,6 +235,7 @@ if (isMainThread) {
     await new Promise((r) => setTimeout(r, 200));
   }
   const email = `load.${Date.now()}@test.kora.local`;
+  // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_password -- test-only password for throwaway local accounts, reviewed goal 10
   const password = 'correct-horse-battery-staple';
   const headers = { 'content-type': 'application/json', 'x-kora-csrf': '1' };
   await fetch(`${base}/auth/signup`, { method: 'POST', headers, body: JSON.stringify({ email, password, displayName: 'Load test', accountType: 'novice' }) });

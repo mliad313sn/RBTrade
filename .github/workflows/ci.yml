@@ -38,13 +38,13 @@ jobs:
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.pw-browsers
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Install
@@ -82,7 +82,7 @@ jobs:
         run: pnpm --filter @kora/ui test:storybook-axe
       - name: Playwright e2e
         run: pnpm test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: playwright-report
@@ -96,8 +96,8 @@ jobs:
       matrix:
         python: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python }}
       - name: ruff · mypy --strict · pytest
@@ -106,19 +106,30 @@ jobs:
         run: services/quant/.venv/bin/pip install pip-audit && services/quant/.venv/bin/pip-audit --skip-editable
 
   security:
-    name: dependency audit · Trivy
+    name: dependency audit · SAST · secrets · Trivy
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
       - name: pnpm audit (prod, high+)
         run: pnpm audit --prod --audit-level high
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install Semgrep and detect-secrets
+        run: pip install semgrep==1.178.0 detect-secrets==1.5.0
+      - name: SAST (Semgrep registry rulesets + KORA rules, fail on any finding)
+        run: bash scripts/security/sast.sh
+      - name: Secrets scan of the whole git history
+        run: python scripts/security/secrets-history.py
       - name: Trivy filesystem scan (deps, secrets, misconfig)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (the 0.28.0 tag no longer exists upstream)
         with:
           scan-type: fs
           scan-ref: .
@@ -149,11 +160,11 @@ jobs:
             dockerfile: services/quant/Dockerfile
             context: services/quant
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Build
         run: docker build -f ${{ matrix.dockerfile }} -t kora-${{ matrix.image }}:ci ${{ matrix.context }}
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (the 0.28.0 tag no longer exists upstream)
         with:
           image-ref: kora-${{ matrix.image }}:ci
           severity: CRITICAL,HIGH

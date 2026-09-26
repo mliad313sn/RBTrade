@@ -80,6 +80,7 @@ export function sum(list: TextStats[]): TextStats {
 /** Keys that are labels or names, not prose (excluded from the corpus). */
 export function isProse(key: string, text: string): boolean {
   if (
+    // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
     /^(ccy|nav|mode|shell\.nav|shell\.lang|kc\.topic|term\.[\w-]+\.name|ai\.t\.[\w-]+\.name)/.test(
       key,
     )

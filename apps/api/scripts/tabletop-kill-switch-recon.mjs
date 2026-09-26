@@ -24,6 +24,7 @@ const root = resolve(here, '../../..');
 if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env'));
 const PORT = Number(process.env.TABLETOP_API_PORT ?? 4020);
 const BASE = `http://127.0.0.1:${PORT}`;
+// nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_password -- test-only password for throwaway local accounts, reviewed goal 10
 const PASSWORD = 'correct-horse-battery-staple';
 const CSRF = { 'x-kora-csrf': '1', 'content-type': 'application/json' };
 const t0 = Date.now();

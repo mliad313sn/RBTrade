@@ -63,7 +63,7 @@ vs goal 02 (WS p99 < 50 ms, candles p95 < 150 ms), goal 03 (risk < 5 ms, kill sw
 - SAST: Semgrep (registry rulesets for TS/JS/Python/secrets + a repo `.semgrep.yml` for KORA
   invariants) — zero high/critical after fixes; config + CI job committed.
 - Dependencies: `pnpm audit` (all, prod gate high+) and `pip-audit` — zero high/critical.
-- Secrets: `scripts/security/secrets-history.sh` (detect-secrets on every unique blob in history +
+- Secrets: `scripts/security/secrets-history.py` (detect-secrets on every unique blob in history +
   regex) with a reviewed allowlist of dev-only values.
 - DAST: ZAP baseline job in the staging pipeline; **deferred to staging**, owner S9.
 - **Authz matrix:** integration test enumerates every Nest route (path, method, `@Public`, `@Roles`)

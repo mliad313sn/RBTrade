@@ -158,6 +158,7 @@ const CCY = new Set([
 const KNOWN = /\b(US500|NAS100|AAPL|NVDA|WTI|MSFT|TSLA)\b/;
 
 export function symbolIn(question: string, fallback?: string): string | undefined {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   const up = question.toUpperCase();
   const pair = /\b([A-Z]{3})\s*\/\s*([A-Z]{3})\b/.exec(up);
   if (pair && CCY.has(pair[1]!) && CCY.has(pair[2]!)) return `${pair[1]}${pair[2]}`;
@@ -387,8 +388,11 @@ interface CardLike {
 }
 
 function radarFilters(q: string, focus: Record<string, string>): Record<string, unknown> {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   const region = REGION_WORDS.find(([re]) => re.test(q))?.[1];
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   const assetClass = CLASS_WORDS.find(([re]) => re.test(q))?.[1];
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   const window = /\b(today|day|24 ?h)\b/i.test(q) ? 'day' : 'week';
   void focus;
   return { ...(region ? { region } : {}), ...(assetClass ? { assetClass } : {}), window };

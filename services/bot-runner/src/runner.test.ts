@@ -103,6 +103,7 @@ describe.skipIf(!redisUrl)('heartbeat-only runner (no service token)', () => {
   });
 
   it('serves /health', async () => {
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- test double on loopback, reviewed goal 10
     const res = await fetch('http://127.0.0.1:4199/health');
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
@@ -111,6 +112,7 @@ describe.skipIf(!redisUrl)('heartbeat-only runner (no service token)', () => {
       redis: 'up',
       robots: { enabled: false },
     });
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- test double on loopback, reviewed goal 10
     expect((await fetch('http://127.0.0.1:4199/nope')).status).toBe(404);
   });
 });
@@ -294,6 +296,7 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
     expect(
       await runner.queue.getJob(barJobId({ robotId: ROBOT, symbol: 'BTCUSD', barTs: 180_000 })),
     ).toBeUndefined();
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- test double on loopback, reviewed goal 10
     const res = await fetch('http://127.0.0.1:4198/health');
     expect(await res.json()).toMatchObject({
       robots: { enabled: true, running: 1, haltedAccounts: 1 },

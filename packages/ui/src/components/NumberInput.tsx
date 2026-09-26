@@ -25,6 +25,7 @@ export interface NumberInputProps
 export function isPartialDecimal(s: string, precision: number, allowNegative: boolean): boolean {
   const sign = allowNegative ? '-?' : '';
   const frac = precision > 0 ? `(\\.\\d{0,${precision}})?` : '';
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   return new RegExp(`^${sign}\\d*${frac}$`).test(s);
 }
 

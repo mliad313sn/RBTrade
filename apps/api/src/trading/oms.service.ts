@@ -378,6 +378,7 @@ export class OmsService {
       );
       if (existing.rows[0]) {
         const o = existing.rows[0];
+        // nosemgrep: ajinabraham.njsscan.crypto.timing_attack_node.node_timing_attack -- compares public content hashes, not secrets, reviewed goal 10
         if (o.request_hash !== hash) {
           throw new ConflictException({
             error: 'client_order_id_reused',

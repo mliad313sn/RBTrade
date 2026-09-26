@@ -40,6 +40,7 @@ export function fmtPctNumber(
   locale: Locale,
   opts: { signed?: boolean; decimals?: number } = {},
 ): string {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
   if (!/^[-+]?\d+(\.\d+)?$/.test(pct)) return '—';
   const s = formatDecimal(pct, opts.decimals ?? 1, { signed: opts.signed });
   return locale === 'fr' ? frNumber(s) : s;

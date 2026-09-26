@@ -25,7 +25,7 @@ export class CryptoBox {
   open(sealed: string, aad = ''): string {
     const [v, iv, tag, ct] = sealed.split('.');
     if (v !== 'v1' || !iv || !tag || ct === undefined) throw new Error('Unsupported sealed format');
-    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'));
+    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'), { authTagLength: 16 });
     decipher.setAAD(Buffer.from(aad));
     decipher.setAuthTag(Buffer.from(tag, 'base64url'));
     return Buffer.concat([decipher.update(Buffer.from(ct, 'base64url')), decipher.final()]).toString('utf8');
