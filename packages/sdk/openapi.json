@@ -556,6 +556,341 @@
           "me"
         ]
       }
+    },
+    "/instruments": {
+      "get": {
+        "operationId": "InstrumentsController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "symbol or name contains",
+            "schema": {}
+          },
+          {
+            "name": "region",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "africa",
+                "asia",
+                "europe",
+                "north_america",
+                "south_america",
+                "oceania",
+                "global"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "venue",
+            "required": false,
+            "in": "query",
+            "description": "ISO 10383 MIC",
+            "schema": {}
+          },
+          {
+            "name": "assetClass",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "equity",
+                "etf",
+                "bond",
+                "future",
+                "option",
+                "fx",
+                "metal",
+                "energy",
+                "agri",
+                "crypto",
+                "index",
+                "cfd",
+                "fund"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Instrument registry (SIMULATED seed). Precision, tick, qty step and sessions for every instrument.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/instruments/{symbol}": {
+      "get": {
+        "operationId": "InstrumentsController_one",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One instrument with its venue and current session status.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/venues": {
+      "get": {
+        "operationId": "InstrumentsController_venues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Venues (ISO 10383 MIC; SIMULATED sample calendars) with current session status.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/venues/{mic}": {
+      "get": {
+        "operationId": "InstrumentsController_venue",
+        "parameters": [
+          {
+            "name": "mic",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One venue with its calendar and current session status.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/candles": {
+      "get": {
+        "operationId": "MarketDataController_getCandles",
+        "parameters": [
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "epoch ms or ISO-8601, exclusive",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "epoch ms or ISO-8601, inclusive",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 500
+            }
+          },
+          {
+            "name": "tf",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "1s",
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1D"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "EURUSD"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "OHLCV candles, oldest first, registry precision. SIMULATED data.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/quotes": {
+      "get": {
+        "operationId": "MarketDataController_quotes",
+        "parameters": [
+          {
+            "name": "symbols",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "EURUSD,GBPUSD"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Last quote per symbol (with stale flag) and the UTC day open.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/depth/{symbol}": {
+      "get": {
+        "operationId": "MarketDataController_depth",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Last L2 depth snapshot for a symbol.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/market-data/status": {
+      "get": {
+        "operationId": "MarketDataController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Feed status (as published on the status channel) and gateway counters.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/calendar": {
+      "get": {
+        "operationId": "MarketDataController_events",
+        "parameters": [
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Economic calendar (SIMULATED provider; times and events are invented). Max 31 days.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/market-data/feeds/{source}/stop": {
+      "post": {
+        "operationId": "MarketDataController_stop",
+        "parameters": [
+          {
+            "name": "source",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Stop a feed adapter (ops/chaos drill). Admin only, audited.",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/market-data/feeds/{source}/start": {
+      "post": {
+        "operationId": "MarketDataController_start",
+        "parameters": [
+          {
+            "name": "source",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Start a stopped feed adapter (resyncs on the resulting gap). Admin only, audited.",
+        "tags": [
+          "market-data"
+        ]
+      }
     }
   },
   "info": {
