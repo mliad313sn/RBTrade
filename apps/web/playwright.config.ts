@@ -57,7 +57,11 @@ export default defineConfig({
         KORA_MD_FEED: 'inprocess',
         KORA_MD_BACKFILL: 'false',
         KORA_MD_SYMBOLS: 'EURUSD,GBPUSD,USDJPY,XAUUSD,BTCUSD,ETHUSD,US500,NAS100,AAPL,NVDA,WTI',
-        KORA_MD_REDIS_PREFIX: 'kora:e2e:md:',
+        KORA_MD_REDIS_PREFIX: process.env.E2E_MD_REDIS_PREFIX ?? 'kora:e2e:md:',
+        // Goal 04: FX is closed at weekends and the engine refuses fills then. The acceptance flow trades
+        // EUR/USD, so the e2e api treats EURUSD as in session (test-only; refused outside dev/test, ADR 0004).
+        KORA_TRADING_SESSION_OVERRIDE: 'EURUSD',
+        KORA_ALERTS_EVAL_MS: '500',
         KORA_MD_WS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
       },
     },
@@ -67,7 +71,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${WEB_PORT}/login`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { ...(process.env as Record<string, string>), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}` },
+      env: { ...(process.env as Record<string, string>), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.KORA_AI_STRIP ?? 'placeholder' },
     },
   ],
 });

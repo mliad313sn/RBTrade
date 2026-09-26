@@ -1,32 +1,16 @@
-import { Banner, Panel } from '@kora/ui';
-
-import { OrderTicketPreview } from '@/components/OrderTicketPreview';
-import { Blotter } from '@/components/terminal/Blotter';
-import { LiveWatchlist } from '@/components/terminal/LiveWatchlist';
+import { TerminalLoader } from '@/components/terminal/TerminalLoader';
+import { parseAiStripMode } from '@/lib/terminal/ai-strip';
 import { apiWsPort } from '@/lib/market-ws';
 import { DEFAULT_SYMBOL } from '@/lib/modes';
 
 export const metadata = { title: 'Terminal' };
 
 export default async function TerminalPage({ searchParams }: { searchParams: Promise<{ symbol?: string }> }) {
-  const symbol = ((await searchParams).symbol ?? DEFAULT_SYMBOL).toUpperCase().replace(/[^A-Z0-9._-]/g, '').slice(0, 32);
+  const symbol = ((await searchParams).symbol ?? DEFAULT_SYMBOL).toUpperCase().replace(/[^A-Z0-9._-]/g, '').slice(0, 32) || DEFAULT_SYMBOL;
   return (
-    <div className="grid gap-2 h-full grid-cols-1 lg:grid-cols-[240px_1fr_320px] lg:grid-rows-[1fr_220px]">
-      <h1 className="k-sr-only">Pro terminal — {symbol}</h1>
-      <Panel title="Watchlist · Majors" className="lg:row-span-1">
-        <LiveWatchlist wsPort={apiWsPort()} />
-      </Panel>
-      <Panel title={`${symbol} · chart`}>
-        <Banner tone="info" title="Simulated feed · not market data.">
-          The chart, order book and calendar panels arrive with the Pro terminal (goal 04).
-        </Banner>
-      </Panel>
-      <Panel title="Order ticket" className="lg:row-span-2">
-        <OrderTicketPreview symbol={symbol} />
-      </Panel>
-      <Panel className="lg:col-span-2" aria-label="Blotter">
-        <Blotter />
-      </Panel>
+    <div className="h-full min-h-[560px]" data-testid="terminal">
+      <h1 className="k-sr-only">Pro terminal</h1>
+      <TerminalLoader initialSymbol={symbol} wsPort={apiWsPort()} aiStrip={parseAiStripMode(process.env.KORA_AI_STRIP)} />
     </div>
   );
 }

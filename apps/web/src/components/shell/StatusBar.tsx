@@ -3,6 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { clockLabel, formatClock } from '@/lib/terminal/format';
+import { useFeedState } from '@/lib/terminal/store';
+
+import { useShell } from './ShellContext';
+
 type Conn = { state: 'connecting' | 'connected' | 'degraded' | 'offline'; latencyMs: number | null };
 
 function useApiHealth(): Conn {
@@ -29,14 +34,14 @@ function useApiHealth(): Conn {
   return conn;
 }
 
-function useUtcClock(): string {
+function useClock(mode: 'utc' | 'local'): string {
   const [now, setNow] = useState<string>('--:--:--');
   useEffect(() => {
-    const tick = () => setNow(new Date().toISOString().slice(11, 19));
+    const tick = () => setNow(formatClock(Date.now(), mode));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [mode]);
   return now;
 }
 
@@ -53,12 +58,18 @@ const LABEL: Record<Conn['state'], string> = {
   offline: 'Offline',
 };
 
-/** Connection = API /health (REST, measured client-side). Feed and robots arrive in goals 02/06. */
+/**
+ * Connection = API /health (REST, measured client-side); feed state and tick-to-paint come from the
+ * Pro terminal's market store while it is open. Robots arrive in goal 06.
+ */
 export function StatusBar() {
   const conn = useApiHealth();
-  const utc = useUtcClock();
+  const { me } = useShell();
+  const mode = me.preferences.terminal?.timeDisplay ?? 'utc';
+  const utc = useClock(mode);
+  const feed = useFeedState();
   return (
-    <footer className="flex items-center gap-5 px-3 h-7 border-t border-border bg-bg text-xs text-muted k-num" data-testid="status-bar">
+    <footer className="flex items-center gap-5 px-3 h-[23px] border-t border-border bg-bg text-xs text-muted k-num" data-testid="status-bar">
       <span role="status" aria-live="polite" className="flex items-center gap-1">
         <span aria-hidden="true" className={DOT[conn.state]}>
           ●
@@ -66,10 +77,14 @@ export function StatusBar() {
         <span className="text-text">{LABEL[conn.state]}</span>
       </span>
       <span>Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}</span>
-      <span className="hidden md:inline">Feed: simulated · not started</span>
+      <span className="hidden md:inline" data-testid="status-feed">
+        Feed: simulated{feed.feed ? ` · ${feed.feed}` : ''}
+        {feed.socket === 'reconnecting' ? ' · reconnecting' : ''}
+      </span>
+      {feed.tickP95 !== null ? <span className="hidden lg:inline">Tick→paint p95 {Math.round(feed.tickP95)} ms</span> : null}
       <span className="hidden lg:inline">Robots: none</span>
-      <span className="ml-auto" aria-label={`UTC time ${utc}`}>
-        UTC {utc}
+      <span className="ml-auto" aria-label={`${clockLabel(mode)} time ${utc}`} data-testid="status-clock">
+        {clockLabel(mode)} {utc}
       </span>
       <span>Env: PAPER</span>
       <Link href="/audit" className="text-text underline-offset-2 hover:underline">

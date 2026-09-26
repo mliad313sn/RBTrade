@@ -25,7 +25,7 @@ export function LeftRail() {
           aria-label={locked ? `${label} (not on your account)` : label}
           title={label}
           aria-current={active ? 'page' : undefined}
-          className={`flex items-center justify-center w-10 h-10 rounded ${active ? 'bg-raised text-accent' : 'text-muted hover:text-text'} ${locked ? 'opacity-60' : ''}`}
+          className={`flex items-center justify-center w-9 h-9 rounded ${active ? 'bg-raised text-accent' : 'text-muted hover:text-text'} ${locked ? 'opacity-60' : ''}`}
         >
           <Icon size={18} aria-hidden="true" />
         </Link>
@@ -33,7 +33,7 @@ export function LeftRail() {
     );
   };
   return (
-    <nav aria-label="Modules" className="flex flex-col items-center justify-between w-14 py-2 border-r border-border bg-bg">
+    <nav aria-label="Modules" className="flex flex-col items-center justify-between w-12 py-2 border-r border-border bg-bg">
       <ul className="flex flex-col gap-1 list-none m-0 p-0">
         {ITEMS.map((i) => link(i.href, i.label, i.Icon, i.needs ? !me.capabilities[i.needs] : false))}
       </ul>
