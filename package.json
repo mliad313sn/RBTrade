@@ -1,0 +1,33 @@
+{
+  "name": "kora",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "bash scripts/dev-db.sh start && pnpm db:migrate && turbo run dev --parallel",
+    "dev:apps": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "pnpm --filter @kora/web test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:start": "bash scripts/dev-db.sh start",
+    "db:stop": "bash scripts/dev-db.sh stop",
+    "db:reset": "bash scripts/dev-db.sh reset",
+    "db:migrate": "pnpm --filter @kora/api db:migrate",
+    "db:seed": "pnpm --filter @kora/api db:seed",
+    "contrast": "pnpm --filter @kora/ui contrast",
+    "py:setup": "bash scripts/py-setup.sh",
+    "py:check": "bash scripts/py-check.sh"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2",
+    "turbo": "2.5.8",
+    "typescript": "5.9.3"
+  }
+}

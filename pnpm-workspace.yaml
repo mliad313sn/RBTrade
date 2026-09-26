@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "services/bot-runner"
+
+onlyBuiltDependencies:
+  - "@swc/core"
+  - esbuild
+  - "@nestjs/core"
+  - sharp

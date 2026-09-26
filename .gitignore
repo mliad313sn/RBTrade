@@ -1,0 +1,31 @@
+node_modules/
+.pnpm-store/
+dist/
+.next/
+out/
+build/
+coverage/
+storybook-static/
+.turbo/
+.data/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+blob-report/
+# python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+# os/editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
