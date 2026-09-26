@@ -1,0 +1,41 @@
+# ADR 0102 — Append-only, hash-chained audit log
+
+- Status: Accepted (2026-09-26)
+- Deciders: S3, S9, S8
+
+## Decision
+
+- Table `audit_events`:
+  - `id bigint identity` (chain order);
+  - `ts timestamptz` (µs, UTC, set by the DB via `clock_timestamp()`);
+  - `actor_id text`;
+  - `actor_type` (`user|robot|ai|system`);
+  - `action`, `entity`, `entity_id`;
+  - `payload jsonb`;
+  - `prev_hash`, `hash` (hex SHA-256).
+- `hash = sha256(canonical_json({id, ts, actor_id, actor_type, action, entity, entity_id, payload}) + prev_hash)`.
+  - The genesis `prev_hash` is 64 zeros.
+  - `ts` is rendered as `YYYY-MM-DDTHH:MM:SS.ffffffZ` by Postgres, both when writing and when verifying.
+- **Canonical JSON:**
+  - keys are sorted at every depth, with no whitespace;
+  - strings use JSON escaping;
+  - only safe integers are allowed as numbers. Floats are rejected, so decimals must be strings, which also enforces the no-float money rule.
+- **Serialisation:** `AuditService.record()` runs in one transaction:
+  - `pg_advisory_xact_lock(hashtext('kora.audit_chain'))`;
+  - read the last hash;
+  - `nextval` plus `clock_timestamp()`;
+  - compute the hash;
+  - insert.
+
+  Callers can pass their own `PoolClient`, so the audit row commits atomically with the business change.
+- **Immutability** has two layers:
+  1. privileges: `kora_app` has only `SELECT, INSERT` on `audit_events`, and `UPDATE, DELETE, TRUNCATE` are revoked;
+  2. a `BEFORE UPDATE OR DELETE` trigger and a `BEFORE TRUNCATE` trigger raise an exception for everyone, including the owner.
+
+  A deliberate tamper has to disable the trigger as the owner. The tamper test does exactly that, and `/audit/verify` then detects it.
+- `GET /audit/verify` recomputes the whole chain in id order (streamed in pages). It returns `{valid, count, firstBrokenId, reason, headHash}`. `reason` is one of `hash_mismatch`, `prev_hash_mismatch` or `id_gap`.
+
+## Consequences
+
+- One global chain means writes are serialised. That is fine for goal 01–03 volumes. If contention appears under goal 03 load (1,000 orders in a kill switch), we will move to per-partition chains anchored in a periodic global checkpoint (BACKLOG B-006).
+- Hash anchoring outside the DB (for example daily head hash to WORM storage) is in goal 09 (BACKLOG B-007).
