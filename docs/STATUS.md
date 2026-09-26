@@ -55,7 +55,7 @@ Last updated: 2026-09-26 (end of goal 01).
 
 ## What goal 02/03 needs to know
 
-- **Start the DB:** `bash scripts/dev-db.sh start`, or just `pnpm dev`. Migrate with `pnpm db:migrate`; add `-- --all` to also migrate `kora_test`.
+- **Start the DB:** `bash scripts/dev-db.sh start`, or just `pnpm dev`. Migrate with `pnpm db:migrate`; use `pnpm db:migrate --all` to also migrate `kora_test`.
 - **Add migrations:** as `apps/api/migrations/NNNN_name.sql`. They are forward-only and checksummed. Each one must `GRANT` explicitly to `kora_app` (and `kora_audit_reader` for read-only). Timescale: `create_hypertable` only inside `IF EXISTS (select from pg_extension where extname='timescaledb')`.
 - **Audit:** inject `AuditService` and call `record({actorId, actorType, action, entity, entityId, payload}, client?)`.
   - Pass the transaction `client` so the audit row commits atomically with the business change. The transaction must be READ COMMITTED.
