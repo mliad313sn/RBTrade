@@ -1,0 +1,20 @@
+{
+  "_label": "HAND-CRAFTED FIXTURE. SIMULATED values typed by hand; not recorded from any live provider, contains no credentials. Shape: generic equities event-array stream (see src/stubs/equities-provider.ts).",
+  "frames": [
+    [{ "ev": "status", "status": "connected", "message": "SIMULATED fixture" }],
+    [
+      { "ev": "Q", "sym": "AAPL", "bp": 221.36, "bs": 300, "ap": 221.38, "as": 200, "t": 1790330400100, "q": 101 },
+      { "ev": "T", "sym": "AAPL", "p": 221.37, "s": 100, "t": 1790330400110, "q": 201, "i": "t-1" }
+    ],
+    [
+      { "ev": "Q", "sym": "NVDA", "bp": 118.915, "bs": 500, "ap": 118.935, "as": 400, "t": 1790330400120, "q": 301 },
+      { "ev": "Q", "sym": "AAPL", "bp": 221.37, "bs": 100, "ap": 221.39, "as": 100, "t": 1790330400130, "q": 102 }
+    ],
+    [{ "ev": "Q", "sym": "AAPL", "bp": 221.35, "bs": 100, "ap": 221.4, "as": 100, "t": 1790330400140, "q": 104 }],
+    { "not": "an array" }
+  ],
+  "responses": {
+    "/aggs/AAPL/15/minute": { "results": [{ "t": 1790328600000, "o": 221.1, "h": 221.5, "l": 220.98, "c": 221.37, "v": 152340, "n": 1432 }] },
+    "/last/quote/AAPL": { "results": { "bp": 221.36, "bs": 3, "ap": 221.38, "as": 2, "t": 1790330401000, "q": 110 } }
+  }
+}

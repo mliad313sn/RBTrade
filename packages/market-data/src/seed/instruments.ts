@@ -1,0 +1,179 @@
+import type { AssetClass, InstrumentSessions, InstrumentSpec } from '@kora/domain';
+
+import { GLOBEX_LIKE_CALENDAR } from './venues.js';
+
+/**
+ * SIMULATED instrument registry seed (goal 02). The first 31 rows match the prototype watchlist
+ * families; the rest give every seeded venue and every asset class at least one instrument.
+ * Margin rates are SIMULATED placeholders pending sponsor/regulatory values (OQ-M1 / OQ-R3).
+ * ISINs are public identifiers (check digit verified by test); FIGIs are left null.
+ * This array is the single source for migration 0002 (drift is caught by an api integration test).
+ */
+
+interface Row {
+  symbol: string;
+  name: string;
+  venue: string;
+  cls: AssetClass;
+  under?: AssetClass;
+  base?: string;
+  quote: string;
+  tick: string;
+  prec: number;
+  pip?: string;
+  contract: string;
+  min: string;
+  step: string;
+  qprec: number;
+  margin: [string, string];
+  fee: string;
+  venueSymbol?: string;
+  isin?: string;
+  sessions?: InstrumentSessions;
+}
+
+const US_INDEX_CFD_SESSIONS: InstrumentSessions = { timezone: 'America/Chicago', ...GLOBEX_LIKE_CALENDAR };
+const EU_CFD_SESSIONS = (tz: string): InstrumentSessions => ({
+  timezone: tz,
+  weekly: { mon: [['08:00', '22:00']], tue: [['08:00', '22:00']], wed: [['08:00', '22:00']], thu: [['08:00', '22:00']], fri: [['08:00', '22:00']] },
+});
+
+const fx = (symbol: string, base: string, quote: string, jpy: boolean, major: boolean): Row => ({
+  symbol,
+  name: `${base}/${quote}`,
+  venue: 'KSIM',
+  cls: 'fx',
+  base,
+  quote,
+  tick: jpy ? '0.001' : '0.00001',
+  prec: jpy ? 3 : 5,
+  pip: jpy ? '0.01' : '0.0001',
+  contract: '100000',
+  min: '1000',
+  step: '1000',
+  qprec: 0,
+  margin: major ? ['0.0333', '0.005'] : ['0.05', '0.01'],
+  fee: 'sim-fx',
+});
+
+const eq = (symbol: string, name: string, venue: string, quote: string, tick: string, prec: number, isin: string | undefined, lot = '1', venueSymbol?: string): Row => ({
+  symbol,
+  name,
+  venue,
+  cls: 'equity',
+  quote,
+  tick,
+  prec,
+  contract: '1',
+  min: lot,
+  step: lot,
+  qprec: 0,
+  margin: ['0.20', '0.10'],
+  fee: `sim-equity-${venue.toLowerCase()}`,
+  isin,
+  venueSymbol: venueSymbol ?? symbol,
+});
+
+const ROWS: Row[] = [
+  // ---- FX (prototype: EUR/USD, GBP/USD, USD/JPY) --------------------------------------
+  fx('EURUSD', 'EUR', 'USD', false, true),
+  fx('GBPUSD', 'GBP', 'USD', false, true),
+  fx('USDJPY', 'USD', 'JPY', true, true),
+  fx('USDCHF', 'USD', 'CHF', false, true),
+  fx('AUDUSD', 'AUD', 'USD', false, true),
+  fx('USDCAD', 'USD', 'CAD', false, true),
+  fx('NZDUSD', 'NZD', 'USD', false, false),
+  fx('EURGBP', 'EUR', 'GBP', false, false),
+  fx('EURJPY', 'EUR', 'JPY', true, false),
+  fx('GBPJPY', 'GBP', 'JPY', true, false),
+  // ---- Metals ----------------------------------------------------------------------------
+  { symbol: 'XAUUSD', name: 'XAU/USD', venue: 'KSIM', cls: 'metal', base: 'XAU', quote: 'USD', tick: '0.01', prec: 2, pip: '0.1', contract: '100', min: '1', step: '1', qprec: 0, margin: ['0.05', '0.02'], fee: 'sim-metal' },
+  { symbol: 'XAGUSD', name: 'XAG/USD', venue: 'KSIM', cls: 'metal', base: 'XAG', quote: 'USD', tick: '0.001', prec: 3, pip: '0.01', contract: '5000', min: '10', step: '10', qprec: 0, margin: ['0.10', '0.02'], fee: 'sim-metal' },
+  // ---- Crypto ----------------------------------------------------------------------------
+  { symbol: 'BTCUSD', name: 'BTC/USD', venue: 'KCRY', cls: 'crypto', base: 'BTC', quote: 'USD', tick: '0.1', prec: 1, contract: '1', min: '0.0001', step: '0.0001', qprec: 4, margin: ['0.50', '0.20'], fee: 'sim-crypto' },
+  { symbol: 'ETHUSD', name: 'ETH/USD', venue: 'KCRY', cls: 'crypto', base: 'ETH', quote: 'USD', tick: '0.01', prec: 2, contract: '1', min: '0.001', step: '0.001', qprec: 3, margin: ['0.50', '0.20'], fee: 'sim-crypto' },
+  { symbol: 'SOLUSD', name: 'SOL/USD', venue: 'KCRY', cls: 'crypto', base: 'SOL', quote: 'USD', tick: '0.01', prec: 2, contract: '1', min: '0.01', step: '0.01', qprec: 2, margin: ['0.50', '0.20'], fee: 'sim-crypto' },
+  { symbol: 'XRPUSD', name: 'XRP/USD', venue: 'KCRY', cls: 'crypto', base: 'XRP', quote: 'USD', tick: '0.0001', prec: 4, contract: '1', min: '1', step: '1', qprec: 0, margin: ['0.50', '0.20'], fee: 'sim-crypto' },
+  // ---- Index CFDs --------------------------------------------------------------------------
+  { symbol: 'US500', name: 'US 500', venue: 'KSIM', cls: 'cfd', under: 'index', quote: 'USD', tick: '0.1', prec: 1, contract: '1', min: '0.1', step: '0.1', qprec: 1, margin: ['0.05', '0.01'], fee: 'sim-index-cfd', sessions: US_INDEX_CFD_SESSIONS },
+  { symbol: 'NAS100', name: 'US Tech 100', venue: 'KSIM', cls: 'cfd', under: 'index', quote: 'USD', tick: '0.1', prec: 1, contract: '1', min: '0.1', step: '0.1', qprec: 1, margin: ['0.05', '0.01'], fee: 'sim-index-cfd', sessions: US_INDEX_CFD_SESSIONS },
+  { symbol: 'US30', name: 'US 30', venue: 'KSIM', cls: 'cfd', under: 'index', quote: 'USD', tick: '1', prec: 0, contract: '1', min: '0.1', step: '0.1', qprec: 1, margin: ['0.05', '0.01'], fee: 'sim-index-cfd', sessions: US_INDEX_CFD_SESSIONS },
+  { symbol: 'GER40', name: 'Germany 40', venue: 'KSIM', cls: 'cfd', under: 'index', quote: 'EUR', tick: '0.5', prec: 1, contract: '1', min: '0.1', step: '0.1', qprec: 1, margin: ['0.05', '0.01'], fee: 'sim-index-cfd', sessions: EU_CFD_SESSIONS('Europe/Berlin') },
+  { symbol: 'UK100', name: 'UK 100', venue: 'KSIM', cls: 'cfd', under: 'index', quote: 'GBP', tick: '0.1', prec: 1, contract: '1', min: '0.1', step: '0.1', qprec: 1, margin: ['0.05', '0.01'], fee: 'sim-index-cfd', sessions: EU_CFD_SESSIONS('Europe/London') },
+  { symbol: 'JPN225', name: 'Japan 225', venue: 'KSIM', cls: 'cfd', under: 'index', quote: 'JPY', tick: '5', prec: 0, contract: '1', min: '0.1', step: '0.1', qprec: 1, margin: ['0.05', '0.01'], fee: 'sim-index-cfd' },
+  // ---- US equities (prototype: AAPL, NVDA) -----------------------------------------------
+  eq('AAPL', 'Apple Inc.', 'XNAS', 'USD', '0.01', 2, 'US0378331005'),
+  eq('NVDA', 'NVIDIA Corporation', 'XNAS', 'USD', '0.01', 2, 'US67066G1040'),
+  eq('MSFT', 'Microsoft Corporation', 'XNAS', 'USD', '0.01', 2, 'US5949181045'),
+  eq('AMZN', 'Amazon.com, Inc.', 'XNAS', 'USD', '0.01', 2, 'US0231351067'),
+  eq('TSLA', 'Tesla, Inc.', 'XNAS', 'USD', '0.01', 2, 'US88160R1014'),
+  eq('GOOGL', 'Alphabet Inc. Class A', 'XNAS', 'USD', '0.01', 2, 'US02079K3059'),
+  // ---- Energy (prototype: WTI) -----------------------------------------------------------
+  { symbol: 'WTI', name: 'WTI Crude Oil', venue: 'KSIM', cls: 'energy', quote: 'USD', tick: '0.01', prec: 2, contract: '1000', min: '1', step: '1', qprec: 0, margin: ['0.10', '0.05'], fee: 'sim-energy', sessions: US_INDEX_CFD_SESSIONS },
+  { symbol: 'BRENT', name: 'Brent Crude Oil', venue: 'KSIM', cls: 'energy', quote: 'USD', tick: '0.01', prec: 2, contract: '1000', min: '1', step: '1', qprec: 0, margin: ['0.10', '0.05'], fee: 'sim-energy', sessions: US_INDEX_CFD_SESSIONS },
+  { symbol: 'NATGAS', name: 'Natural Gas', venue: 'KSIM', cls: 'energy', quote: 'USD', tick: '0.001', prec: 3, contract: '10000', min: '1', step: '1', qprec: 0, margin: ['0.10', '0.05'], fee: 'sim-energy', sessions: US_INDEX_CFD_SESSIONS },
+  // ---- Global equities: one per non-US venue -----------------------------------------------
+  eq('7203.XTKS', 'Toyota Motor Corporation', 'XTKS', 'JPY', '0.5', 1, 'JP3633400001', '100', '7203'),
+  eq('0700.XHKG', 'Tencent Holdings Ltd.', 'XHKG', 'HKD', '0.2', 1, 'KYG875721634', '100', '0700'),
+  eq('600519.XSHG', 'Kweichow Moutai Co., Ltd.', 'XSHG', 'CNY', '0.01', 2, undefined, '100', '600519'),
+  eq('RELIANCE.XNSE', 'Reliance Industries Ltd.', 'XNSE', 'INR', '0.05', 2, 'INE002A01018', '1', 'RELIANCE'),
+  eq('NPN.XJSE', 'Naspers Ltd.', 'XJSE', 'ZAR', '0.01', 2, undefined, '1', 'NPN'),
+  eq('PETR4.BVMF', 'Petróleo Brasileiro S.A. PN', 'BVMF', 'BRL', '0.01', 2, 'BRPETRACNPR6', '100', 'PETR4'),
+  eq('BHP.XASX', 'BHP Group Ltd.', 'XASX', 'AUD', '0.01', 2, 'AU000000BHP4', '1', 'BHP'),
+  eq('AIR.XNZE', 'Air New Zealand Ltd.', 'XNZE', 'NZD', '0.005', 3, undefined, '1', 'AIR'),
+  eq('HSBA.XLON', 'HSBC Holdings plc', 'XLON', 'GBP', '0.001', 3, 'GB0005405286', '1', 'HSBA'),
+  eq('SAP.XETR', 'SAP SE', 'XETR', 'EUR', '0.02', 2, 'DE0007164600', '1', 'SAP'),
+  eq('MC.XPAR', 'LVMH Moët Hennessy Louis Vuitton', 'XPAR', 'EUR', '0.1', 1, 'FR0000121014', '1', 'MC'),
+  eq('SHOP.XTSE', 'Shopify Inc.', 'XTSE', 'CAD', '0.01', 2, undefined, '1', 'SHOP'),
+  // ---- Other asset classes -------------------------------------------------------------------
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', venue: 'ARCX', cls: 'etf', quote: 'USD', tick: '0.01', prec: 2, contract: '1', min: '1', step: '1', qprec: 0, margin: ['0.20', '0.10'], fee: 'sim-equity-arcx', isin: 'US78462F1030', venueSymbol: 'SPY' },
+  { symbol: 'ESZ6', name: 'E-mini S&P 500 Dec 2026 (simulated)', venue: 'XCME', cls: 'future', under: 'index', quote: 'USD', tick: '0.25', prec: 2, contract: '50', min: '1', step: '1', qprec: 0, margin: ['0.06', '0.05'], fee: 'sim-future', venueSymbol: 'ESZ6' },
+  { symbol: 'ZCZ6', name: 'Corn Dec 2026 (simulated)', venue: 'XCME', cls: 'future', under: 'agri', quote: 'USD', tick: '0.0025', prec: 4, contract: '5000', min: '1', step: '1', qprec: 0, margin: ['0.06', '0.05'], fee: 'sim-future', venueSymbol: 'ZCZ6' },
+  { symbol: 'SPY261218C550', name: 'SPY 18 Dec 2026 550 Call (simulated)', venue: 'XCBO', cls: 'option', under: 'etf', quote: 'USD', tick: '0.05', prec: 2, contract: '100', min: '1', step: '1', qprec: 0, margin: ['1.00', '1.00'], fee: 'sim-option' },
+  { symbol: 'UST10Y', name: 'US Treasury 10Y (simulated)', venue: 'KSIM', cls: 'bond', quote: 'USD', tick: '0.015625', prec: 6, contract: '1000', min: '1000', step: '1000', qprec: 0, margin: ['0.05', '0.02'], fee: 'sim-bond' },
+  { symbol: 'N225.IDX', name: 'Nikkei 225 index level (reference, simulated)', venue: 'XTKS', cls: 'index', quote: 'JPY', tick: '0.01', prec: 2, contract: '1', min: '1', step: '1', qprec: 0, margin: ['1.00', '1.00'], fee: 'sim-none' },
+  { symbol: 'WHEAT', name: 'Wheat (simulated)', venue: 'KSIM', cls: 'agri', quote: 'USD', tick: '0.0025', prec: 4, contract: '5000', min: '1', step: '1', qprec: 0, margin: ['0.10', '0.05'], fee: 'sim-agri', sessions: US_INDEX_CFD_SESSIONS },
+  { symbol: 'KGEF', name: 'KORA Simulated Global Equity Fund', venue: 'KSIM', cls: 'fund', under: 'equity', quote: 'USD', tick: '0.0001', prec: 4, contract: '1', min: '0.001', step: '0.001', qprec: 3, margin: ['1.00', '1.00'], fee: 'sim-fund' },
+];
+
+export const SEED_INSTRUMENTS: InstrumentSpec[] = ROWS.map((r) => ({
+  symbol: r.symbol,
+  displayName: r.name,
+  venue: r.venue,
+  venueSymbol: r.venueSymbol ?? null,
+  isin: r.isin ?? null,
+  figi: null,
+  assetClass: r.cls,
+  underlyingClass: r.under ?? null,
+  baseCcy: r.base ?? null,
+  quoteCcy: r.quote,
+  tickSize: r.tick,
+  pricePrecision: r.prec,
+  pipSize: r.pip ?? null,
+  contractSize: r.contract,
+  minQty: r.min,
+  qtyStep: r.step,
+  qtyPrecision: r.qprec,
+  tradingSessions: r.sessions ?? null,
+  marginRates: { retail: r.margin[0], professional: r.margin[1] },
+  feeScheduleId: r.fee,
+  status: 'active',
+  simulated: true,
+}));
+
+/** Stale thresholds per asset class (ms). Defaults from goal 02 (FX 2 s, crypto 2 s, equities 5 s). */
+export const SEED_ASSET_CLASSES: Array<{ assetClass: AssetClass; label: string; staleAfterMs: number }> = [
+  { assetClass: 'fx', label: 'FX', staleAfterMs: 2000 },
+  { assetClass: 'metal', label: 'Metal', staleAfterMs: 2000 },
+  { assetClass: 'crypto', label: 'Crypto', staleAfterMs: 2000 },
+  { assetClass: 'equity', label: 'Equity', staleAfterMs: 5000 },
+  { assetClass: 'etf', label: 'ETF', staleAfterMs: 5000 },
+  { assetClass: 'bond', label: 'Bond', staleAfterMs: 5000 },
+  { assetClass: 'future', label: 'Future', staleAfterMs: 5000 },
+  { assetClass: 'option', label: 'Option', staleAfterMs: 5000 },
+  { assetClass: 'energy', label: 'Energy', staleAfterMs: 5000 },
+  { assetClass: 'agri', label: 'Agri', staleAfterMs: 5000 },
+  { assetClass: 'index', label: 'Index', staleAfterMs: 5000 },
+  { assetClass: 'cfd', label: 'CFD', staleAfterMs: 5000 },
+  { assetClass: 'fund', label: 'Fund', staleAfterMs: 3_600_000 },
+];

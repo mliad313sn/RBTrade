@@ -131,6 +131,11 @@ export const DepthDeltaSchema = MdMetaSchema.extend({
   /** Size "0" removes the level. */
   bids: z.array(DepthLevelSchema),
   asks: z.array(DepthLevelSchema),
+  /**
+   * Venues with ranged update ids: the delta applies to any book whose seq is in [prevSeq, seq).
+   * Absent = strictly contiguous (book seq must be seq - 1).
+   */
+  prevSeq: z.number().int().nonnegative().optional(),
 });
 export type DepthDelta = z.infer<typeof DepthDeltaSchema>;
 
@@ -201,7 +206,9 @@ export interface InstrumentSpec {
   figi: string | null;
   assetClass: AssetClass;
   underlyingClass: AssetClass | null;
-  baseCcy: string;
+  /** ISO 4217 / crypto code for FX, metals and crypto; null for equities, futures, etc. */
+  baseCcy: string | null;
+  /** Trading (quote) currency. */
   quoteCcy: string;
   tickSize: string;
   pricePrecision: number;
@@ -211,13 +218,15 @@ export interface InstrumentSpec {
   qtyStep: string;
   qtyPrecision: number;
   /** Instrument-level override of the venue calendar (null = use the venue's). */
-  tradingSessions: SessionCalendar | null;
+  tradingSessions: InstrumentSessions | null;
   /** Initial margin rate by client tier. SIMULATED placeholders (OQ-M1). */
   marginRates: Record<string, string>;
   feeScheduleId: string;
   status: InstrumentStatus;
   simulated: boolean;
 }
+
+export type InstrumentSessions = SessionCalendar & { timezone: string };
 
 export interface Venue {
   mic: string;

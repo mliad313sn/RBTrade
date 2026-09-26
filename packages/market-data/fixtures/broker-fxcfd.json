@@ -1,0 +1,23 @@
+{
+  "_label": "HAND-CRAFTED FIXTURE. SIMULATED values typed by hand; not recorded from any live venue, contains no credentials. Shape: generic broker pricing stream (see src/stubs/fxcfd-broker.ts).",
+  "frames": [
+    { "type": "HEARTBEAT", "time": "2026-09-25T10:00:00.000000Z" },
+    { "type": "PRICE", "instrument": "EUR_USD", "time": "2026-09-25T10:00:00.125000Z", "tradeable": true, "bids": [{ "price": "1.08419", "liquidity": 1000000 }], "asks": [{ "price": "1.08421", "liquidity": 1000000 }] },
+    { "type": "PRICE", "instrument": "USD_JPY", "time": "2026-09-25T10:00:00.250000Z", "tradeable": true, "bids": [{ "price": "148.2141", "liquidity": 2000000 }], "asks": [{ "price": "148.2165", "liquidity": 2000000 }] },
+    { "type": "PRICE", "instrument": "EUR_USD", "time": "2026-09-25T10:00:00.375000Z", "tradeable": false, "bids": [{ "price": "1.08418", "liquidity": 500000 }], "asks": [{ "price": "1.08422", "liquidity": 500000 }] },
+    { "type": "SOMETHING_ELSE", "instrument": "EUR_USD" },
+    { "type": "PRICE", "instrument": "XAU_USD", "time": "2026-09-25T10:00:00.500000Z", "tradeable": true, "bids": [{ "price": 2395.3, "liquidity": 100 }], "asks": [{ "price": 2395.5, "liquidity": 100 }] }
+  ],
+  "responses": {
+    "/instruments/EUR_USD/candles?granularity=M15": {
+      "candles": [
+        { "time": "2026-09-25T09:30:00.000000Z", "mid": { "o": "1.08390", "h": "1.08425", "l": "1.08381", "c": "1.08410" }, "volume": 1843, "complete": true },
+        { "time": "2026-09-25T09:45:00.000000Z", "mid": { "o": "1.08410", "h": "1.08433", "l": "1.08402", "c": "1.08419" }, "volume": 1650, "complete": true },
+        { "time": "2026-09-25T10:00:00.000000Z", "mid": { "o": "1.08419", "h": "1.08422", "l": "1.08415", "c": "1.08420" }, "volume": 120, "complete": false }
+      ]
+    },
+    "/pricing?instruments=EUR_USD": {
+      "prices": [{ "instrument": "EUR_USD", "time": "2026-09-25T10:00:01.000000Z", "tradeable": true, "bids": [{ "price": "1.08420", "liquidity": 1000000 }], "asks": [{ "price": "1.08422", "liquidity": 1000000 }] }]
+    }
+  }
+}
