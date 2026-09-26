@@ -69,6 +69,32 @@ Integration (real Postgres + Redis): every tool via the engine as trader and nov
 Evals: `pnpm evals` (scripted) in CI; `pnpm evals:live` documented.
 E2E: terminal strip with seeded calibration → "Draft to ticket" pre-fills the ticket and placing still needs the confirmation; robots drawer why-panel chart + streamed answer + no-edge scan.
 
-## 6. Results
+## 6. Results (2026-09-26)
 
-(filled in at the end of the goal)
+### 6.1 Acceptance criteria
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | No code path lets the AI submit, amend or cancel orders; a test attempts it through every tool and prompt | **Pass** | `apps/api/src/ai/ai.static.test.ts` (every copilot file scanned: no OMS/robot/version mutation call; only `read-ports.ts` touches those services and only calls `preview/list/detail/signals/signalFeatures/get/validate/latestBacktest`). `apps/api/test/ai.int.test.ts` "an adversarial model cannot…": the adversarial provider calls all 15 catalogue tools with hostile inputs plus the 13 forbidden names (`submit_order`, `amend_order`, `cancel_order`, `cancel_all_orders`, `close_position`, `flatten_positions`, `kill_switch`, `start_robot`, `pause_robot`, `promote_robot`, `save_strategy_version`, `update_risk_limits`, `place_order`) over 3 prompts incl. an injection and a novice run; orders, robots, strategy versions and the halt flag are byte-identical afterwards; 39 refused calls audited; execution claims rewritten. Unit: every forbidden name → `refused_unknown`. |
+| 2 | "Why did Trend-X go long EUR/USD at 09:00?" returns numbers that match `get_signal_features` exactly (eval) | **Pass** | Eval cases `why-robot-1…6`, `why-signal-1…6` (exact numeric fidelity + required citations, 12/12). Integration: the same question against the real api → tools `get_bot_signals → get_signal_features`, `ungroundedNumbers(answer, [GET /signals/:id/features], 'exact') = []`, answer contains 1.08412, 1.08377, 26.4, +0.34, +0.12. SSE why-panel test likewise. |
+| 3 | Draft to ticket pre-fills the ticket; submitting still requires the normal preview and confirmation | **Pass** | e2e `copilot.spec.ts` test 1: strip "Draft to ticket" → ticket shows "✦ Draft AI draft …", side and qty filled, **no order exists**; "Review" opens the confirmation (confirm mode `always`, hold for market orders) → order placed with `source: ai-draft-accepted`; `ai.draft_accepted` audited with the order id. Integration: accepting a draft requires the user's own `ai-draft-accepted` order on that symbol (manual order → 400; second decision → 409). |
+| 4 | Injection suite passes 100 %; overall eval score ≥ agreed threshold | **Pass** | `pnpm evals` (scripted provider): 80/80, injection 16/16 (100 %), refusal 14/14 (100 %), overall 100 % (threshold 90 %). Graders are code (`services/ai-evals/src/graders.ts`); `harness.test.ts` proves they fail a careless model. **Live run pending an API key** (`pnpm evals:live`, OQ-A2). |
+| 5 | Budgets hold: exceeding one returns a friendly message; usage visible in Grafana | **Pass** | Integration "budgets and rate limits…": user budget → `budget_exceeded` "You've used today's copilot allowance…", org budget → organisation message, rate limit → `rate_limited` with `retryAfterSeconds`, all HTTP 200; `/metrics` shows `kora_ai_budget_denials_total`, `kora_ai_tokens_total`, `kora_ai_org_tokens_used`, refused tool calls; token-protected when `KORA_METRICS_TOKEN` is set. Dashboard `infra/grafana/provisioning/dashboards/ai-copilot.json` (12 panels; `metrics.test.ts` checks every series it queries exists). Grafana itself not run here (no Docker, ADR 0000). |
+| 6 | Confidence shown in the UI comes from the calibration table (seeded-table test) | **Pass** | Integration "confidence in the strip comes from the seeded calibration table": seeded bins (n=212, hits=121) → strip `confidence 0.57`, "When we said 0.x, it worked 57% of the time (n=212)", "No edge after costs."; bins shrunk to n=5 → no confidence at all. e2e test 1 checks the same in the browser ("0.57 (calibrated, n=212)"). Unit tests for bins, reliability line, edge t-test. |
+| 7 | ADR 0007 (with threat model) and STATUS update written | **Pass** | `docs/adr/0007-ai-copilot.md` (STRIDE table T1–T13), `docs/STATUS.md` G7 row + section. |
+
+### 6.2 Gate runs (this environment)
+
+- `pnpm build` ✓, `pnpm lint` ✓, `pnpm typecheck` ✓ (13 tasks, incl. `@kora/ai-evals`).
+- `pnpm test` ✓: api 102 (61 in `src/ai`: static scan, core, metrics; `ai/core` coverage 97.7 % lines), web 36 (+4), ai-evals 3, domain 153, ui 113, market-data 60, sdk 13, bot-runner 11.
+- `pnpm test:integration` ✓ twice: 22 files, 156 tests each (12 new in `ai.int.test.ts`), 128 s.
+- `pnpm test:e2e` ✓: 41 passed (2 new in `copilot.spec.ts`; terminal visual regression still within 1 % with the live strip on).
+- `pnpm py:check` ✓ (124 passed, 97.7 %). `pnpm evals` ✓ 80/80. `pnpm evals:live` exits 2 with "Live eval not possible: no model is configured" (no key here).
+
+### 6.3 Deferred (with reason)
+
+- Live-provider eval run: needs `ANTHROPIC_API_KEY` + `KORA_AI_MODEL` (OQ-A2). Command: `ANTHROPIC_API_KEY=… KORA_AI_MODEL=… pnpm evals:live`; record cassettes for replay with `KORA_AI_RECORD_DIR`.
+- `ai_regime` hook: no cheap calibrated regime model on SIMULATED data (B-701, for 07B).
+- Live prediction logging for robot signals (predictions today come from OOS backtest trades and the bias replay; resolving live robot trades into `ai_predictions` needs position-level attribution, B-605/B-408) → B-702.
+- Grafana/Prometheus not started (no Docker here); dashboard JSON validated by test.
+- Fixes along the way: the ticket preview debounce could starve while a %/pips stop moved with every tick (flaky goal 04 e2e) — now at least one preview every 500 ms.

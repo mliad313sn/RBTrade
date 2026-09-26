@@ -36,6 +36,7 @@ pnpm contrast                                      # WCAG text contrast, both th
 pnpm --filter @kora/api test:integration           # real Postgres + Redis
 pnpm --filter @kora/ui build-storybook && pnpm --filter @kora/ui test:storybook-axe
 pnpm build && pnpm test:e2e                        # Playwright (PLAYWRIGHT_BROWSERS_PATH from .env)
+pnpm evals                                         # AI copilot evals (scripted provider, goal 07)
 pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket fan-out load test (goal 02)
 ```
 
@@ -68,6 +69,14 @@ pnpm --filter @kora/api build && pnpm --filter @kora/api load:ws   # WebSocket f
 - Robots: `POST /robots`, `POST /robots/:id/start|pause`, `PUT /robots/:id/version|limits`, `GET /robots/:id` (book, limit usage, KPIs), `/signals`, `/audit`, `/promotion`, `POST /robots/:id/promote {totpCode}` (always refused while `LIVE_TRADING_ENABLED=false`, but recorded); risk officers sign limits at `POST /robot-reviews/:id/signoff`.
 - The bot runner (`services/bot-runner`) evaluates each closed bar through `/internal/robots/*` (service token `KORA_SERVICE_TOKEN`, generated for dev by `scripts/dev-db.sh`) and quant `/bt/signal`; orders go through the OMS with source `robot:{id}`.
 - Design: ADR 0006, `docs/quant/backtester.md`. Results: `docs/plans/06-robot-trader.md`.
+
+## AI copilot (goal 07: explains, drafts, never executes)
+
+- Model id **only** from `KORA_AI_MODEL`, key from `ANTHROPIC_API_KEY` (env / vault). Without them every copilot answer is a friendly "Copilot unavailable"; the terminal strip's data (bias, calibrated confidence, drivers) still works. `KORA_AI_PROVIDER=scripted` is a deterministic test double (dev/test only).
+- API: `POST /ai/chat` (SSE with `Accept: text/event-stream`, focused-panel context), `POST /ai/explain` (novice, plain words), `GET /ai/strip`, `POST /ai/strip/draft`, `POST /ai/signals/:id/why`, `GET /ai/robots/:id/insights`, `GET /ai/scan/no-edge`, `GET /ai/calibration`, `POST /ai/drafts/:id/decision`, `GET /metrics` (Prometheus; Grafana dashboard in `infra/grafana/provisioning/dashboards`).
+- The copilot's tools are read-only plus two draft tools; nothing can place, amend or cancel an order or control a robot (enforced on the server). Drafts open in the ticket / as an unapproved strategy change; you confirm or save.
+- Evals: `pnpm evals` (80 graded cases, scripted provider, thresholds enforced in CI); `ANTHROPIC_API_KEY=… KORA_AI_MODEL=… pnpm evals:live` for the real model.
+- Design: ADR 0007 (with the threat model). Results: `docs/plans/07-ai-copilot.md`.
 
 ## Layout
 
