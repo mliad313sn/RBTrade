@@ -100,7 +100,7 @@ export function GainSimulator() {
   const [current, setCurrent] = useState<Scenario | null>(null);
   const [pinned, setPinned] = useState<Scenario | null>(null);
   const [paper, setPaper] = useState<PaperProjection | null>(null);
-  const [busy, setBusy] = useState<null | 'project' | 'paper'>(null);
+  const [busy, setBusy] = useState<null | 'project' | 'paper' | 'backtest'>(null);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -145,6 +145,61 @@ export function GainSimulator() {
       setStale(false);
     } catch (e) {
       setError(e instanceof SimApiError ? e.message : 'The paper import failed.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Import from backtest (goal 06, B-502): the out-of-sample R multiples of the chosen (or latest)
+   * robot backtest are block-bootstrapped at the current risk per trade.
+   */
+  async function importBacktest() {
+    setBusy('backtest');
+    setError(null);
+    setNote(null);
+    try {
+      const wanted = new URLSearchParams(window.location.search).get('backtest');
+      let runId = wanted;
+      if (!runId) {
+        const list = await fetch('/api/backtests?kind=backtest&limit=1', { credentials: 'include', cache: 'no-store' });
+        if (list.status === 403) {
+          setNote('Backtests come from the robot builder, which needs a trader, quant or admin account.');
+          return;
+        }
+        const runs = ((await list.json()) as { runs?: Array<{ id: string }> }).runs ?? [];
+        runId = runs[0]?.id ?? null;
+      }
+      if (!runId) {
+        setNote('No backtest yet: build a robot and run a backtest first, then import its out-of-sample trades here.');
+        return;
+      }
+      const tr = await fetch(`/api/backtests/${runId}/trades?segment=oos`, { credentials: 'include', cache: 'no-store' });
+      if (!tr.ok) throw new SimApiError(tr.status, 'import_failed', 'That backtest could not be loaded.');
+      const body = (await tr.json()) as { trades: number[]; source: string };
+      if (body.trades.length < 2) {
+        setNote('That backtest has fewer than two out-of-sample trades: too few to project.');
+        return;
+      }
+      const r = toRequest(form);
+      const result = await simApi.fromTrades({
+        trades: body.trades,
+        tradeUnit: 'r_multiple',
+        source: body.source,
+        riskPct: r.riskPct,
+        startingCapital: r.startingCapital,
+        tradesPerPeriod: r.tradesPerPeriod,
+        horizonPeriods: r.horizonPeriods,
+        ruinFloorPct: r.ruinFloorPct,
+        seed: r.seed,
+        paths: r.paths,
+      });
+      setCurrent({ label: label(), origin: 'backtest', request: r, result });
+      setPaper(null);
+      setStale(false);
+      setNote(`Imported ${body.trades.length} out-of-sample backtest trades (R multiples), block-bootstrapped at ${r.riskPct.toFixed(2)}% risk per trade.`);
+    } catch (e) {
+      setError(e instanceof SimApiError ? e.message : 'The backtest import failed.');
     } finally {
       setBusy(null);
     }
@@ -196,6 +251,8 @@ export function GainSimulator() {
   const origin =
     current?.origin === 'paper'
       ? `Paper results · block bootstrap (${r?.effective.blockSize ?? '—'}-trade blocks)`
+      : current?.origin === 'backtest'
+        ? `Backtest out-of-sample trades · block bootstrap (${r?.effective.blockSize ?? '—'}-trade blocks)`
       : 'Equity projection · percentile fan';
 
   return (
@@ -237,19 +294,14 @@ export function GainSimulator() {
         <Panel
           title="Assumptions"
           actions={
-            <button
-              type="button"
-              className="k-btn k-btn--sm opacity-70"
-              aria-disabled="true"
+            <Button
+              size="sm"
+              onClick={() => void importBacktest()}
+              disabled={busy !== null}
               data-testid="import-backtest"
-              onClick={() =>
-                setNote(
-                  'Import from backtest arrives with the robot builder and backtester (goal 06). Until then, import the paper account or enter assumptions.',
-                )
-              }
             >
-              Import from backtest
-            </button>
+              {busy === 'backtest' ? 'Importing…' : 'Import from backtest'}
+            </Button>
           }
           className="xl:flex xl:flex-col xl:min-h-0"
           bodyClassName="flex flex-col gap-4 xl:overflow-y-auto xl:min-h-0 xl:flex-1"
