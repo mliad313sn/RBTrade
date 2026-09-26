@@ -5,6 +5,7 @@ export * from './gap-detector.js';
 export * from './order-book.js';
 export * from './precision.js';
 export * from './prng.js';
+export * from './providers/matrix.js';
 export * from './seed/aliases.js';
 export * from './seed/instruments.js';
 export * from './seed/sim-profiles.js';
