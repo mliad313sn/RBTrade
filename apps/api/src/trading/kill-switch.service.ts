@@ -206,7 +206,13 @@ export class KillSwitchService {
     };
   }
 
-  /** Market reduce-only order through the engine; if the market is not safe it stays working (held). */
+  /**
+   * Market reduce-only order through the engine; if the market is not safe it stays working (held).
+   * Invariant (IRTC R6-03): the flatten skips pre-trade risk on purpose (it must always be able to
+   * reduce), so its only fill-safety gate is `PaperEngineService.work`: stale or unhealthy data, a
+   * closed session or a missing FX route hold the order. `irtc-r6.int.test.ts` fires scope 3 after
+   * the close and expects the order held with a session reason and the position untouched.
+   */
   private async flatten(
     tx: Parameters<Parameters<OmsService['withAccount']>[1]>[0],
     p: PositionRow,
