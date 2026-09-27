@@ -1,5 +1,6 @@
 import type { CalibrationView } from '../../ai/core/calibration';
 import { DISCLAIMER } from '../../ai/core/types';
+import { unsafeDisplayText } from './news-score';
 import { FEATURE_LABELS, REGION_LABELS, TREND_KIND_LABELS, type RadarRegion } from './taxonomy';
 
 /**
@@ -291,7 +292,11 @@ export function movingItem(card: TrendCard): MovingItem {
             : 'quiet';
   const headline = HEADLINES[move](name);
   const top = card.news[0] ?? null;
-  const why = top ? `In the news: "${top.translatedTitle ?? top.title}" (${top.source}).` : null;
+  // IRTC R4-05: a title that fails the advice/injection check is never shown to a novice.
+  const title = top
+    ? ([top.translatedTitle, top.title].find((t) => !!t && !unsafeDisplayText(t)) ?? null)
+    : null;
+  const why = top && title ? `In the news: "${title}" (${top.source}).` : null;
   const odds =
     card.probability.status === 'calibrated'
       ? { per100: Math.round(card.probability.value * 100), n: card.probability.n }
@@ -307,7 +312,7 @@ export function movingItem(card: TrendCard): MovingItem {
     whySource: top ? { id: top.id, source: top.source, url: top.url } : null,
     confidence,
     move,
-    news: top ? { title: top.translatedTitle ?? top.title, source: top.source } : null,
+    news: top && title ? { title, source: top.source } : null,
     odds,
   };
 }
