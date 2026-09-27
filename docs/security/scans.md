@@ -11,7 +11,7 @@ building images.
 | Python dependencies | `pip-audit` over the quant venv (48 packages, editable package skipped) | **No known vulnerabilities** | any vulnerability fails |
 | Secrets in git history | `python scripts/security/secrets-history.py` (detect-secrets default plugins + regexes for PEM keys, private JWK `d`, vendor tokens, DB URL passwords over **every blob in every ref**) | 1,651 blobs, 220 findings, **220 reviewed / 0 unreviewed**. Every reviewed entry is a dev-only or test value, listed by fingerprint only in `docs/security/secrets-allowlist.json` | any unreviewed finding fails |
 | Container images (Trivy) | CI `security` job | **Not run here** (no Docker daemon); runs in CI and the release pipeline | high/critical fails |
-| DAST (OWASP ZAP baseline) | `release.yml` job `zap-baseline` against staging | **Deferred to staging**, owner S9 (ZAP cannot be installed here and there is no staging) | high fails |
+| DAST (OWASP ZAP baseline) | `release.yml` job `zap-baseline` against staging (report uploaded as the `zap-baseline-report` artifact, IRTC R6-14) | **Not run until staging exists**, owner S9 (ZAP cannot be installed here and there is no staging) | high fails |
 
 Moderate advisory follow-up: upgrade `vitest` to ≥ 4.1.11 when it clears the 7-day
 `minimumReleaseAge` window and the suite passes on it (B-1011, owner S10).
