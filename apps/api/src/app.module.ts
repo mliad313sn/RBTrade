@@ -9,6 +9,7 @@ import { AppropriatenessModule } from './appropriateness/appropriateness.module'
 import { AuditModule } from './audit/audit.module';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
+import { authLimit, ipAccountTracker, skipUnlessAccountThrottled } from './common/auth-throttle';
 import { ObservabilityModule } from './observability/observability.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ComplianceModule } from './compliance/compliance.module';
@@ -54,7 +55,13 @@ import { TradingModule } from './trading/trading.module';
       },
     }),
     // Per-client default for every route (KORA_API_RATE_LIMIT per minute, read per request; goal 10 load runs raise it).
-    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: () => Number(process.env.KORA_API_RATE_LIMIT ?? 600) || 600 }] }),
+    // IRTC R1-05: `account` is an opt-in per (IP, account) throttler for the sign-in routes.
+    ThrottlerModule.forRoot({
+      throttlers: [
+        { name: 'default', ttl: 60_000, limit: () => Number(process.env.KORA_API_RATE_LIMIT ?? 600) || 600 },
+        { name: 'account', ttl: 60_000, limit: () => authLimit(), getTracker: ipAccountTracker, skipIf: skipUnlessAccountThrottled },
+      ],
+    }),
     DbModule,
     // Goal 10: shared Prometheus registry and operational metrics (global).
     ObservabilityModule,

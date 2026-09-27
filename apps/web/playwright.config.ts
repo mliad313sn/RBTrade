@@ -99,7 +99,8 @@ export default defineConfig({
       url: `http://127.0.0.1:${WEB_PORT}/login`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { ...(process.env as Record<string, string>), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on', KORA_EXPLAIN_THIS: process.env.E2E_EXPLAIN_THIS ?? 'on' },
+      // IRTC R1-05: the same peer-address preload as `pnpm start` and the Docker image.
+      env: { ...(process.env as Record<string, string>), NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${resolve(__dirname, 'peer-address.cjs')}`.trim(), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on', KORA_EXPLAIN_THIS: process.env.E2E_EXPLAIN_THIS ?? 'on' },
     },
   ],
 });

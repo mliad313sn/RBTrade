@@ -20,6 +20,7 @@ import type { Response } from 'express';
 import type { z } from 'zod';
 
 import { AuditService } from '../audit/audit.service';
+import { authThrottle } from '../common/auth-throttle';
 import { clientIp, type KoraRequest } from '../common/request';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
@@ -51,8 +52,6 @@ function mapAuthError(e: unknown, res?: Response): never {
   throw e;
 }
 
-// Read per request (goal 10 tests change it at runtime).
-const authThrottle = () => ({ default: { limit: () => Number(process.env.KORA_AUTH_RATE_LIMIT ?? 20) || 20, ttl: 60_000 } });
 
 @ApiTags('auth')
 @Controller('auth')
