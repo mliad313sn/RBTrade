@@ -549,6 +549,12 @@
   font-family: var(--k-font-num);
   font-variant-numeric: tabular-nums;
 }
+/* IRTC R5-01: figures computed for an earlier edit (a new preview is on its way). Not colour-only:
+ * the "Updating the preview…" line says it in text. */
+.tk-preview.is-updating dd {
+  font-style: italic;
+  text-decoration: underline dotted var(--k-text-muted);
+}
 .tk-warn {
   margin: 0;
   padding: 4px 8px;

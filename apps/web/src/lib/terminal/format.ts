@@ -1,5 +1,5 @@
 import { dec, isDecimalString, pipSizeOf, type InstrumentSpec } from '@kora/domain';
-import { formatDecimal } from '@kora/ui';
+import { formatDecimal, formatPrice } from '@kora/ui';
 
 /** Clock time for tables: "14:03:27" in UTC or the viewer's local zone (Settings → time display). */
 export function formatClock(ts: number | string, mode: 'utc' | 'local'): string {
@@ -27,6 +27,19 @@ export function formatSpread(bid: string, ask: string, spec: Pick<InstrumentSpec
   const diff = dec(ask).sub(dec(bid));
   if (spec.pipSize) return `${formatDecimal(diff.div(pipSizeOf(spec)), 1)} pip`;
   return formatDecimal(diff, spec.pricePrecision);
+}
+
+/**
+ * Result line and toast after placing an order: "Order filled: buy 900,000 EURUSD at 1.08349."
+ * The average fill price is a volume-weighted mean with up to 40 decimals on the wire; it is shown
+ * at the instrument's price precision like every other price (IRTC R5-07).
+ */
+export function orderResultText(
+  o: { status: string; side: string; qty: string; symbol: string; avgFillPrice?: string | null },
+  precision: { qty: number; price: number },
+): string {
+  const at = o.avgFillPrice && isDecimalString(o.avgFillPrice) ? ` at ${formatPrice(o.avgFillPrice, precision.price)}` : '';
+  return `Order ${o.status.replace('_', ' ')}: ${o.side} ${formatQty(o.qty, precision.qty)} ${o.symbol}${at}.`;
 }
 
 /** Mid price from a quote at registry precision. */

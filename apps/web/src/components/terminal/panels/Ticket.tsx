@@ -21,8 +21,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useShell } from '@/components/shell/ShellContext';
 import { recordAiDecision } from '@/lib/ai/decision';
 import { api } from '@/lib/api-browser';
-import { formatQty } from '@/lib/terminal/format';
+import { formatQty, orderResultText } from '@/lib/terminal/format';
 import { useTerminal } from '@/lib/terminal/store';
+import { inputKey as makeInputKey, previewSummary, requestKey, SettledAnnouncer } from '@/lib/terminal/ticket-preview';
 import { refreshTrading, useTrading } from '@/lib/terminal/trading';
 
 import { useMarket, useTerminalSettings } from '../TerminalContext';
@@ -42,6 +43,22 @@ export const PREVIEW_DEBOUNCE_MS = 150;
 /** Upper bound between previews while the body keeps changing (market-relative stops move every tick). */
 export const PREVIEW_MAX_WAIT_MS = 500;
 export const MARKET_HOLD_MS = 600;
+/** Screen-reader summary of the preview: once per settled edit, this long after it settles (IRTC R5-05). */
+export const PREVIEW_ANNOUNCE_MS = 1000;
+
+/** A server preview and the exact request it was computed for (IRTC R5-01). */
+interface KeyedPreview {
+  /** JSON of the preview request body; equals the order body only if nothing changed since. */
+  key: string;
+  /** What the user had typed/chosen when it was requested (market moves do not change it). */
+  inputKey: string;
+  res: PreviewResponse;
+}
+
+/** An order bound to the preview the user is confirming: the dialog shows `res`, Place sends `body`. */
+interface BoundOrder extends KeyedPreview {
+  body: Record<string, unknown>;
+}
 
 interface OcoLegInput {
   type: 'limit' | 'stop' | 'stop_limit';
@@ -119,10 +136,13 @@ export function TicketPanel() {
   const [note, setNote] = useState<string | null>(null);
   const [aiDraftId, setAiDraftId] = useState<string | null>(null);
   const [quote, setQuote] = useState<{ bid: string; ask: string; stale: boolean } | null>(null);
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
+  const [preview, setPreview] = useState<KeyedPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState(false);
+  /** The order in the confirm dialog, frozen with the preview it was confirmed against. */
+  const [confirm, setConfirm] = useState<BoundOrder | null>(null);
+  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
   const [result, setResult] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [fxRate, setFxRate] = useState<string | null>(null);
@@ -227,7 +247,7 @@ export function TicketPanel() {
   const tick = inst?.tickSize ?? '0.00001';
   // B-202: minor-unit quotes (GBX, ZAc) scale prices to the quote currency until the preview answers.
   const multiplier =
-    preview?.instrument.multiplier ??
+    preview?.res.instrument.multiplier ??
     (inst?.priceUnitFactor ? dec(inst.contractSize).mul(dec(inst.priceUnitFactor)).toFixed() : (inst?.contractSize ?? '1'));
   const needsLimit = type === 'limit' || type === 'stop_limit' || (type === 'bracket' && entryType === 'limit');
   const needsStop = type === 'stop' || type === 'stop_limit';
@@ -280,7 +300,14 @@ export function TicketPanel() {
     return b;
   }, [inst, units, symbol, side, type, tif, expireAt, reduceOnly, postOnly, origin, legs, needsLimit, needsStop, limitPrice, stopPrice, trailAmount, entryType, slPrice, tpPrice]);
 
-  const bodyKey = body ? JSON.stringify(body) : null;
+  const bodyKey = requestKey(body);
+  // What the user typed or chose. Market-relative stops and notional sizing change `bodyKey` on every
+  // tick; this key only changes on a user edit (IRTC R5-01, R5-05).
+  const inputKey = makeInputKey({ symbol, side, type, qtyMode, qtyInput, limitPrice, stopPrice, trailMode, trailInput, slMode, slInput, tpMode, tpInput, tif, expireAt, reduceOnly, postOnly, entryType, legs, origin });
+  const latest = useRef({ bodyKey, inputKey });
+  /** The preview request in flight, so Review can wait for it instead of sending a duplicate. */
+  const inflight = useRef<{ key: string; promise: Promise<PreviewResponse> } | null>(null);
+  latest.current = { bodyKey, inputKey };
   useEffect(() => {
     if (!bodyKey) {
       setPreview(null);
@@ -288,15 +315,17 @@ export function TicketPanel() {
       return;
     }
     const seq = ++previewSeq.current;
+    const ik = inputKey;
     // Debounce, but never starve: with a stop in % or pips the body changes on every tick.
     const delay = Date.now() - lastPreviewAt.current >= PREVIEW_MAX_WAIT_MS ? 0 : PREVIEW_DEBOUNCE_MS;
     const t = setTimeout(() => {
       lastPreviewAt.current = Date.now();
-      api
-        .previewOrder(JSON.parse(bodyKey) as PreviewInput)
+      const promise = api.previewOrder(JSON.parse(bodyKey) as PreviewInput);
+      inflight.current = { key: bodyKey, promise };
+      promise
         .then((p) => {
           if (seq !== previewSeq.current) return;
-          setPreview(p);
+          setPreview({ key: bodyKey, inputKey: ik, res: p });
           setPreviewError(null);
         })
         .catch((e: unknown) => {
@@ -306,11 +335,29 @@ export function TicketPanel() {
         });
     }, delay);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bodyKey]);
 
-  const p = preview?.preview ?? null;
-  const ccy = p?.currency ?? accountCcy;
-  const violations = preview?.risk.violations ?? [];
+  // A draft or any edit that lands while the confirm dialog is open invalidates it (IRTC R5-01).
+  useEffect(() => {
+    if (confirm && confirm.inputKey !== inputKey) setConfirm(null);
+  }, [confirm, inputKey]);
+
+  /** The preview on screen is for the user's current inputs (possibly a few ticks old, never an older edit). */
+  const previewCurrent = Boolean(preview && bodyKey && preview.inputKey === inputKey);
+  const updating = Boolean(bodyKey) && !previewCurrent && !previewError;
+  const p = previewCurrent ? (preview?.res.preview ?? null) : null;
+  const shown = preview?.res.preview ?? null;
+  const ccy = shown?.currency ?? accountCcy;
+  const violations = previewCurrent ? (preview?.res.risk.violations ?? []) : [];
+
+  // IRTC R5-05: one short polite announcement per settled edit, never on tick-driven re-previews.
+  const announcer = useRef<SettledAnnouncer | null>(null);
+  if (!announcer.current) announcer.current = new SettledAnnouncer(setAnnouncement, PREVIEW_ANNOUNCE_MS);
+  useEffect(() => {
+    announcer.current?.offer(previewCurrent ? inputKey : null, previewCurrent ? previewSummary(p, violations.length) : '');
+  }, [previewCurrent, inputKey, p, violations.length]);
+  useEffect(() => () => announcer.current?.clear(), []);
   const warnings = ticketWarnings({
     lossPctEquity: p?.lossIfStopHit?.pctEquity ?? null,
     perTradeRiskPct: settings.perTradeRiskPct,
@@ -318,23 +365,24 @@ export function TicketPanel() {
     events,
     currencies: [inst?.baseCcy, inst?.quoteCcy].filter((c): c is string => Boolean(c)),
     now: Date.now(),
-    session: preview?.market.session ?? inst?.session?.state ?? null,
-    dataState: preview?.market.dataState ?? null,
+    session: preview?.res.market.session ?? inst?.session?.state ?? null,
+    dataState: preview?.res.market.dataState ?? null,
   });
-  const isMarketLike = type === 'market' || (type === 'bracket' && entryType === 'market') || type === 'trailing';
-  const canSubmit = Boolean(p && body && !busy && violations.length === 0);
+  const isMarketLikeType = (t: unknown, e: unknown) => t === 'market' || (t === 'bracket' && e === 'market') || t === 'trailing';
+  // Review is possible whenever there is an order; it always re-checks against an exact preview.
+  const canSubmit = Boolean(body && !busy && !checking && violations.length === 0);
 
-  const place = useCallback(async () => {
-    if (!body) return;
+  /** Places exactly the body the user confirmed (never the live inputs). */
+  const place = useCallback(async (orderBody: Record<string, unknown>) => {
     setBusy(true);
     setResult(null);
     try {
-      const r = await api.placeOrder({ ...body, clientOrderId: newClientOrderId() } as unknown as OrderInput);
+      const r = await api.placeOrder({ ...orderBody, clientOrderId: newClientOrderId() } as unknown as OrderInput);
       const o = r.order;
-      const text = `Order ${o.status.replace('_', ' ')}: ${o.side} ${formatQty(o.qty, inst?.qtyPrecision ?? 0)} ${o.symbol}${o.avgFillPrice ? ` at ${o.avgFillPrice}` : ''}.`;
+      const text = orderResultText(o, { qty: inst?.qtyPrecision ?? 0, price: precision });
       setResult({ tone: 'ok', text });
       toast.push(text, 'success', 4000);
-      setConfirm(false);
+      setConfirm(null);
       // Goal 07: the user placed the order from an AI draft; record the human decision (audited).
       if (origin === 'ai' && aiDraftId) void recordAiDecision(aiDraftId, { decision: 'accepted', orderId: o.id });
       setOrigin('manual');
@@ -344,17 +392,45 @@ export function TicketPanel() {
     } catch (e) {
       const b = e instanceof KoraApiError ? (e.body as Partial<RiskRejectionBody> | undefined) : undefined;
       setResult({ tone: 'error', text: b?.code ? `Rejected (${b.code}): ${b.message}` : e instanceof KoraApiError ? e.message : 'The order failed.' });
-      setConfirm(false);
+      setConfirm(null);
     } finally {
       setBusy(false);
     }
-  }, [body, inst?.qtyPrecision, toast, origin, aiDraftId]);
+  }, [inst?.qtyPrecision, precision, toast, origin, aiDraftId]);
 
-  const review = useCallback(() => {
-    if (!canSubmit || !p) return;
-    if (p.confirmation.required) setConfirm(true);
-    else void place();
-  }, [canSubmit, p, place]);
+  /**
+   * IRTC R5-01: freeze the order as it is now, get a preview for exactly that request (reusing the
+   * one on screen only if its key matches), decide confirmation and risk from that preview, and bind
+   * the dialog to it. Place then sends the frozen body, so what was shown is what is sent.
+   */
+  const review = useCallback(async () => {
+    if (!body || !bodyKey || busy || checking) return;
+    const key = bodyKey;
+    const ik = inputKey;
+    let res = preview && preview.key === key ? preview.res : null;
+    if (!res) {
+      setChecking(true);
+      try {
+        const pending = inflight.current?.key === key ? inflight.current.promise : null;
+        res = (pending ? await pending.catch(() => null) : null) ?? (await api.previewOrder(JSON.parse(key) as PreviewInput));
+      } catch (e) {
+        setPreviewError(e instanceof KoraApiError ? e.message : 'Preview unavailable');
+        return;
+      } finally {
+        setChecking(false);
+      }
+      if (latest.current.bodyKey === key) setPreview({ key, inputKey: ik, res });
+    }
+    // The user changed something while we checked: act on nothing they have not seen.
+    if (latest.current.inputKey !== ik) return;
+    if (!res.preview || res.risk.violations.length) {
+      setPreview({ key, inputKey: ik, res });
+      return;
+    }
+    const bound: BoundOrder = { key, inputKey: ik, res, body: JSON.parse(key) as Record<string, unknown> };
+    if (res.preview.confirmation.required) setConfirm(bound);
+    else void place(bound.body);
+  }, [body, bodyKey, inputKey, busy, checking, preview, place]);
 
   // Hotkeys (B/S focus the side, Ctrl+Enter reviews), requested through the terminal store.
   useEffect(() => {
@@ -364,7 +440,7 @@ export function TicketPanel() {
       setSide(s);
       (s === 'buy' ? buyRef : sellRef).current?.focus();
     } else if (focus.target === 'ticket-submit') {
-      review();
+      void review();
     } else if (focus.target === 'ticket') {
       qtyRef.current?.focus();
     }
@@ -375,7 +451,11 @@ export function TicketPanel() {
   const distPrecision = (m: DistanceMode) => (m === 'price' ? precision : m === 'pips' ? 1 : 2);
   const displayName = inst?.displayName ?? symbol;
   const qtyLabel = units ? formatQty(units.toFixed(), inst?.qtyPrecision ?? 0) : qtyInput || '';
-  const marginRatio = p && dec(p.margin.rate).gt(0) ? `1:${dec(1).div(dec(p.margin.rate)).toDecimalPlaces(0).toFixed()}` : null;
+  const marginRatio = shown && dec(shown.margin.rate).gt(0) ? `1:${dec(1).div(dec(shown.margin.rate)).toDecimalPlaces(0).toFixed()}` : null;
+  const cp = confirm?.res.preview ?? null;
+  const cBody = confirm?.body;
+  const cQty = cBody && typeof cBody.qty === 'string' ? formatQty(cBody.qty, inst?.qtyPrecision ?? 0) : '';
+  const cMarketLike = cBody ? isMarketLikeType(cBody.type, cBody.entryType) : false;
 
   return (
     <div className="tk flex flex-col gap-2 h-full overflow-auto" data-testid="order-ticket" data-panel-root="ticket" tabIndex={-1}>
@@ -521,30 +601,40 @@ export function TicketPanel() {
           </label>
         ) : null}
       </div>
-      <dl className="tk-preview" data-testid="ticket-preview" aria-live="polite">
+      {/* IRTC R5-05: no aria-live on the figures (they re-render on every tick); a separate short status
+          is announced once per settled edit. IRTC R5-01: figures for an older edit are marked as updating. */}
+      <dl className={`tk-preview ${updating ? 'is-updating' : ''}`} data-testid="ticket-preview" data-state={previewCurrent ? 'current' : updating ? 'updating' : 'empty'} aria-busy={updating || checking}>
         <dt>Notional</dt>
-        <dd data-testid="preview-notional">{p ? formatMoney(p.notional.base, ccy) : '—'}</dd>
+        <dd data-testid="preview-notional">{shown ? formatMoney(shown.notional.base, ccy) : '—'}</dd>
         <dt>Est. fees + spread</dt>
-        <dd data-testid="preview-fees">{p ? formatMoney(p.fees.total, ccy) : '—'}</dd>
-        {p?.fx ? (
+        <dd data-testid="preview-fees">{shown ? formatMoney(shown.fees.total, ccy) : '—'}</dd>
+        {shown?.fx ? (
           <>
             <dt>
-              FX {p.fx.from}→{p.fx.to}
+              FX {shown.fx.from}→{shown.fx.to}
             </dt>
             <dd data-testid="preview-fx">
-              {p.fx.rate} · {formatMoney(p.fx.conversionCost, ccy)}
+              {shown.fx.rate} · {formatMoney(shown.fx.conversionCost, ccy)}
             </dd>
           </>
         ) : null}
         <dt>Margin impact{marginRatio ? ` (${marginRatio})` : ''}</dt>
-        <dd data-testid="preview-margin">{p ? formatMoney(p.margin.required, ccy) : '—'}</dd>
+        <dd data-testid="preview-margin">{shown ? formatMoney(shown.margin.required, ccy) : '—'}</dd>
         <dt>Loss if stop hit</dt>
-        <dd data-testid="preview-loss" className={p?.lossIfStopHit ? 'k-dir--down' : ''}>
-          {p?.lossIfStopHit ? `−${formatMoney(p.lossIfStopHit.total, ccy)} · ${p.lossIfStopHit.pctEquity}% eq.` : p ? 'No stop: not capped' : '—'}
+        <dd data-testid="preview-loss" className={shown?.lossIfStopHit ? 'k-dir--down' : ''}>
+          {shown?.lossIfStopHit ? `−${formatMoney(shown.lossIfStopHit.total, ccy)} · ${shown.lossIfStopHit.pctEquity}% eq.` : shown ? 'No stop: not capped' : '—'}
         </dd>
         <dt>Reward : risk</dt>
-        <dd data-testid="preview-rr">{p?.rewardRisk ? `1 : ${p.rewardRisk}` : '—'}</dd>
+        <dd data-testid="preview-rr">{shown?.rewardRisk ? `1 : ${shown.rewardRisk}` : '—'}</dd>
       </dl>
+      {updating && shown ? (
+        <p className="m-0 text-[11px] text-muted" data-testid="preview-updating">
+          Updating the preview for your change…
+        </p>
+      ) : null}
+      <p className="k-sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="ticket-announce">
+        {announcement}
+      </p>
       {warnings.length || violations.length || previewError ? (
         <ul className="tk-warn" data-testid="ticket-warnings">
           {violations.map((v) => (
@@ -561,10 +651,11 @@ export function TicketPanel() {
           {previewError ? <li className="k-error">{previewError}</li> : null}
         </ul>
       ) : null}
-      <p className="tk-foot">PAPER · simulated fills. Fees are SIMULATED placeholders{preview?.instrument.feesSimulated === false ? '' : ' (pending broker schedule)'}.</p>
+      <p className="tk-foot">PAPER · simulated fills. Fees are SIMULATED placeholders{preview?.res.instrument.feesSimulated === false ? '' : ' (pending broker schedule)'}.</p>
       <div className="tk-submit">
-        <Button variant={side === 'buy' ? 'buy' : 'sell'} block disabled={!canSubmit} onClick={review} data-testid="place-order" aria-keyshortcuts="Control+Enter">
-          Review {side === 'buy' ? 'Buy' : 'Sell'} {qtyLabel} {displayName}
+        <Button variant={side === 'buy' ? 'buy' : 'sell'} block disabled={!canSubmit} onClick={() => void review()} data-testid="place-order" aria-keyshortcuts="Control+Enter" aria-busy={checking}>
+          {checking ? 'Checking… ' : 'Review '}
+          {side === 'buy' ? 'Buy' : 'Sell'} {qtyLabel} {displayName}
         </Button>
         {result ? (
           <p className={`m-0 text-xs ${result.tone === 'error' ? 'k-error' : ''}`} role="status" data-testid="ticket-result">
@@ -572,26 +663,41 @@ export function TicketPanel() {
           </p>
         ) : null}
       </div>
-      <Dialog open={confirm} onOpenChange={setConfirm} title={`Confirm ${side} ${qtyLabel} ${displayName}`} description="Paper order with simulated market data. Esc to go back." data-testid="confirm-order">
-        {p ? (
-          <ul className="m-0 pl-4 text-sm">
-            {p.confirmation.reasons.map((r) => (
+      <Dialog
+        open={confirm !== null}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title={confirm ? `Confirm ${String(cBody?.side)} ${cQty} ${displayName}` : ''}
+        description="Paper order with simulated market data. Esc to go back."
+        data-testid="confirm-order"
+      >
+        {cp ? (
+          <ul className="m-0 pl-4 text-sm" data-testid="confirm-figures" data-qty={String(cBody?.qty ?? '')}>
+            {cp.confirmation.reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}
             <li>
-              Notional {formatMoney(p.notional.base, ccy)}; fees + spread {formatMoney(p.fees.total, ccy)}; margin {formatMoney(p.margin.required, ccy)}
-              {p.lossIfStopHit ? `; loss if the stop is hit −${formatMoney(p.lossIfStopHit.total, ccy)}` : '; no stop loss'}.
+              Notional <span data-testid="confirm-notional">{formatMoney(cp.notional.base, cp.currency)}</span>; fees + spread {formatMoney(cp.fees.total, cp.currency)}; margin{' '}
+              <span data-testid="confirm-margin">{formatMoney(cp.margin.required, cp.currency)}</span>
+              {cp.lossIfStopHit ? `; loss if the stop is hit −${formatMoney(cp.lossIfStopHit.total, cp.currency)}` : '; no stop loss'}.
             </li>
           </ul>
         ) : null}
         <div className="k-dialog__actions">
-          <Button onClick={() => setConfirm(false)}>Back</Button>
-          {isMarketLike ? (
-            <HoldToConfirmButton variant={side === 'buy' ? 'buy' : 'sell'} holdMs={MARKET_HOLD_MS} onConfirm={() => void place()} disabled={busy} description="Market order above your confirmation threshold." data-testid="confirm-hold">
+          <Button onClick={() => setConfirm(null)}>Back</Button>
+          {cMarketLike ? (
+            <HoldToConfirmButton
+              variant={cBody?.side === 'buy' ? 'buy' : 'sell'}
+              holdMs={MARKET_HOLD_MS}
+              onConfirm={() => confirm && void place(confirm.body)}
+              disabled={busy}
+              description="Market order above your confirmation threshold."
+              confirmTitle={`Place this market order now: ${String(cBody?.side)} ${cQty} ${displayName}?`}
+              data-testid="confirm-hold"
+            >
               Hold to place
             </HoldToConfirmButton>
           ) : (
-            <Button variant="primary" onClick={() => void place()} disabled={busy} data-testid="confirm-place" autoFocus>
+            <Button variant="primary" onClick={() => confirm && void place(confirm.body)} disabled={busy} data-testid="confirm-place" autoFocus>
               Place order
             </Button>
           )}
