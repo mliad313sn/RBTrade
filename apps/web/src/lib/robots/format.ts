@@ -98,3 +98,15 @@ export function auditText(e: { action: string; payload: Record<string, unknown> 
       return e.action;
   }
 }
+
+/**
+ * Status-bar robots label from the robots API (IRTC R5-03): "Robots: none", "Robots: 2 running",
+ * "Robots: 1 running · 1 paused"; "Robots: —" when the list could not be loaded.
+ */
+export function robotsStatusLabel(robots: ReadonlyArray<{ status: string }> | null): string {
+  if (!robots) return 'Robots: —';
+  const running = robots.filter((r) => r.status === 'running').length;
+  const paused = robots.filter((r) => r.status === 'paused').length;
+  if (!running && !paused) return 'Robots: none';
+  return `Robots: ${running} running${paused ? ` · ${paused} paused` : ''}`;
+}
