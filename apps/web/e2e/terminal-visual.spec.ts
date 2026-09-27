@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
 
-import { installTerminalFixtures } from './fixtures/terminal';
+import { contractViolations, installTerminalFixtures } from './fixtures/terminal';
 import { apiSignIn } from './helpers';
 
 /**
@@ -28,7 +28,7 @@ export const MAX_PERCEPTUAL_DIFF = 0.12;
 
 async function openFixtureTerminal(page: Page) {
   await apiSignIn(page, 'trader');
-  await installTerminalFixtures(page);
+  const fixtures = await installTerminalFixtures(page);
   await page.goto('/terminal?symbol=EURUSD');
   await expect(page.getByTestId('wl-EURUSD-mid')).toHaveText('1.08420', { timeout: 15_000 });
   await expect(page.getByTestId('ob-mid')).toContainText('1.08420');
@@ -38,6 +38,10 @@ async function openFixtureTerminal(page: Page) {
   await page.evaluate(() => document.fonts.ready);
   await page.mouse.move(0, 899); // keep the crosshair off the chart
   await page.waitForTimeout(500);
+  // IRTC R6-16: the bodies behind these pixels match the published API contract.
+  expect(fixtures.violations, 'fixture bodies vs packages/sdk/openapi.json').toEqual([]);
+  for (const t of ['/accounts/me', '/positions', '/orders', '/quotes', '/candles', '/calendar', '/me/watchlists'])
+    expect(fixtures.served, `fixture served ${t}`).toContain(t);
 }
 
 /** DOM rectangles of the terminal regions (dockview groups) in page coordinates. */
@@ -185,4 +189,9 @@ test('≥ 1280 px breakpoint: no horizontal scroll, every panel visible and at l
   }
   await expect(page.getByTestId('place-order')).toBeVisible();
   await expect(page.getByTestId('kill-switch')).toBeInViewport();
+});
+
+test('the fixture contract check rejects a drifted body (IRTC R6-16 self-check)', () => {
+  expect(contractViolations('/accounts/me', { id: 'not-a-uuid', equity: 1234.5 }).length).toBeGreaterThan(0);
+  expect(contractViolations('/no/such/path', {})).toEqual(['get /no/such/path: no 200 JSON response schema in openapi.json']);
 });

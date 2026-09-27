@@ -1,4 +1,37 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+
 import type { Page, WebSocketRoute } from '@playwright/test';
+
+/**
+ * IRTC R6-16: every fixture body is validated against the response schema the api publishes
+ * (packages/sdk/openapi.json, the same document the contract tests use), so the pixels cannot stay
+ * green while the real API shape drifts. ajv comes from the api package (its contract-test dependency).
+ */
+const apiRequire = createRequire(fileURLToPath(new URL('../../../api/package.json', import.meta.url)));
+type AjvLike = { compile: (s: object) => ((d: unknown) => boolean) & { errors?: Array<{ instancePath: string; message?: string }> | null } };
+const Ajv2020 = (apiRequire('ajv/dist/2020') as { default: new (o: object) => AjvLike }).default;
+const addFormats = (apiRequire('ajv-formats') as { default: (a: AjvLike) => void }).default;
+const OPENAPI = JSON.parse(readFileSync(fileURLToPath(new URL('../../../../packages/sdk/openapi.json', import.meta.url)), 'utf8')) as {
+  paths: Record<string, Record<string, { responses: Record<string, { content?: Record<string, { schema: object }> }> }>>;
+};
+const ajv = new Ajv2020({ strict: false, allErrors: true });
+addFormats(ajv);
+const validators = new Map<string, ReturnType<AjvLike['compile']>>();
+
+/** Violations of `GET <template>` 200 for `body` (empty when it matches the published schema). */
+export function contractViolations(template: string, body: unknown, method = 'get'): string[] {
+  const key = `${method} ${template}`;
+  let v = validators.get(key);
+  if (!v) {
+    const schema = OPENAPI.paths[template]?.[method]?.responses['200']?.content?.['application/json']?.schema;
+    if (!schema) return [`${key}: no 200 JSON response schema in openapi.json`];
+    v = ajv.compile(schema);
+    validators.set(key, v);
+  }
+  return v(body) ? [] : (v.errors ?? []).map((e) => `${key} ${e.instancePath || '/'} ${e.message ?? 'invalid'}`);
+}
 
 /**
  * Deterministic SIMULATED fixtures for the visual regression run (goal 04). REST calls from the
@@ -158,8 +191,19 @@ const AI_STRIP = {
 
 const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-/** Installs the REST + WebSocket fixtures on a signed-in page (registry specs come from the real api). */
-export async function installTerminalFixtures(page: Page): Promise<void> {
+/**
+ * Installs the REST + WebSocket fixtures on a signed-in page (registry specs come from the real api).
+ * Returns the contract violations found in the bodies served so far (the spec asserts it is empty).
+ */
+export async function installTerminalFixtures(page: Page): Promise<{ violations: string[]; served: Set<string> }> {
+  const violations: string[] = [];
+  const served = new Set<string>();
+  /** A 200 JSON answer, checked against the OpenAPI response schema of `template`. */
+  const ok = (template: string, body: unknown) => {
+    served.add(template);
+    for (const v of contractViolations(template, body)) if (!violations.includes(v)) violations.push(v);
+    return json(body);
+  };
   const reg = (await (await page.request.get('/api/instruments')).json()) as { instruments: Spec[] };
   const ven = (await (await page.request.get('/api/venues')).json()) as { venues: Array<Record<string, unknown>> };
   const openSession = { state: 'open', localDate: '2026-09-28', localTime: '11:07', nextChange: null, nextState: null };
@@ -172,27 +216,27 @@ export async function installTerminalFixtures(page: Page): Promise<void> {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/api/, '');
     const method = route.request().method();
-    if (path === '/instruments') return route.fulfill(json({ instruments }));
-    if (path === '/venues') return route.fulfill(json({ venues }));
+    if (path === '/instruments') return route.fulfill(ok('/instruments', { instruments }));
+    if (path === '/venues') return route.fulfill(ok('/venues', { venues }));
     if (path.startsWith('/instruments/')) {
       const s = bySymbol.get(decodeURIComponent(path.split('/')[2]!));
-      return s ? route.fulfill(json({ ...s, staleAfterMs: 5000, venueInfo: null })) : route.fulfill({ status: 404, body: '{}' });
+      return s ? route.fulfill(ok('/instruments/{symbol}', { ...s, staleAfterMs: 5000, venueInfo: null })) : route.fulfill({ status: 404, body: '{}' });
     }
     if (path === '/quotes') {
       const syms = (url.searchParams.get('symbols') ?? '').split(',').filter(Boolean);
-      return route.fulfill(json({ quotes: syms.map((s) => ({ symbol: s, quote: bySymbol.has(s) ? quoteFor(bySymbol.get(s)!) : null, dayOpen: bySymbol.has(s) ? dayOpenFor(bySymbol.get(s)!) : null })) }));
+      return route.fulfill(ok('/quotes', { quotes: syms.map((s) => ({ symbol: s, quote: bySymbol.has(s) ? quoteFor(bySymbol.get(s)!) : null, dayOpen: bySymbol.has(s) ? dayOpenFor(bySymbol.get(s)!) : null })) }));
     }
-    if (path === '/candles') return route.fulfill(json({ symbol: url.searchParams.get('symbol'), tf: url.searchParams.get('tf'), simulated: true, source: 'fixture', candles: url.searchParams.get('symbol') === 'EURUSD' ? candles() : [] }));
-    if (path === '/accounts/me') return route.fulfill(json(account()));
-    if (path === '/positions') return route.fulfill(json({ accountId: ACCOUNT_ID, currency: 'USD', positions: positions() }));
-    if (path === '/orders' && method === 'GET') return route.fulfill(json({ accountId: ACCOUNT_ID, orders: ORDERS }));
-    if (path === '/fills') return route.fulfill(json({ accountId: ACCOUNT_ID, currency: 'USD', fills: [] }));
-    if (path === '/me/watchlists') return route.fulfill(json({ watchlists: [{ id: '33333333-3333-4333-8333-333333333333', name: 'Majors', position: 0, symbols: MAJORS, updatedAt: iso(0) }] }));
-    if (path === '/me/layouts') return route.fulfill(json({ layouts: [] }));
-    if (path === '/calendar') return route.fulfill(json({ source: 'simulated', simulated: true, events: CAL }));
-    if (path === '/price-alerts') return route.fulfill(json({ alerts: [] }));
-    if (path === '/health') return route.fulfill(json({ status: 'ok', service: 'kora-api', environment: 'PAPER', liveTradingEnabled: false, authProvider: 'dev', checks: {}, time: new Date(FIXED_NOW).toISOString() }));
-    if (path === '/ai/strip') return route.fulfill(json(AI_STRIP));
+    if (path === '/candles') return route.fulfill(ok('/candles', { symbol: url.searchParams.get('symbol'), tf: url.searchParams.get('tf'), simulated: true, source: 'fixture', candles: url.searchParams.get('symbol') === 'EURUSD' ? candles() : [] }));
+    if (path === '/accounts/me') return route.fulfill(ok('/accounts/me', account()));
+    if (path === '/positions') return route.fulfill(ok('/positions', { accountId: ACCOUNT_ID, currency: 'USD', positions: positions() }));
+    if (path === '/orders' && method === 'GET') return route.fulfill(ok('/orders', { accountId: ACCOUNT_ID, orders: ORDERS }));
+    if (path === '/fills') return route.fulfill(ok('/fills', { accountId: ACCOUNT_ID, currency: 'USD', fills: [] }));
+    if (path === '/me/watchlists') return route.fulfill(ok('/me/watchlists', { watchlists: [{ id: '33333333-3333-4333-8333-333333333333', name: 'Majors', position: 0, symbols: MAJORS, updatedAt: iso(0) }] }));
+    if (path === '/me/layouts') return route.fulfill(ok('/me/layouts', { layouts: [] }));
+    if (path === '/calendar') return route.fulfill(ok('/calendar', { source: 'simulated', simulated: true, events: CAL }));
+    if (path === '/price-alerts') return route.fulfill(ok('/price-alerts', { alerts: [] }));
+    if (path === '/health') return route.fulfill(ok('/health', { status: 'ok', service: 'kora-api', environment: 'PAPER', liveTradingEnabled: false, authProvider: 'dev', checks: {}, time: new Date(FIXED_NOW).toISOString() }));
+    if (path === '/ai/strip') return route.fulfill(ok('/ai/strip', AI_STRIP));
     if (path === '/orders/preview') return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'fixture', message: 'Preview is not part of the visual fixture' }) });
     return route.continue();
   });
@@ -211,4 +255,5 @@ export async function installTerminalFixtures(page: Page): Promise<void> {
       }
     });
   });
+  return { violations, served };
 }
