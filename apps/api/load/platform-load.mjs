@@ -294,6 +294,7 @@ async function main() {
       const kt0 = performance.now();
       const ks = await Promise.all(
         owners.map(async (t) => {
+          // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- loopback api started by this harness, reviewed goal 10
           const r = await fetch(`${API}/kill-switch`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${t}` }, body: JSON.stringify({ scope: 'robots_cancel_flatten', source: 'rest_fallback', reason: 'load test' }) });
           return { status: r.status, body: await r.json() };
         }),
