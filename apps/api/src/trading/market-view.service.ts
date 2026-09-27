@@ -3,7 +3,7 @@ import {
   dec,
   depthChannel,
   quoteChannel,
-  sessionStatus,
+  sessionState,
   STATUS_CHANNEL,
   type Decimal,
   type DepthSnapshot,
@@ -61,7 +61,7 @@ export class MarketViewService {
     const tz = inst.spec.tradingSessions?.timezone ?? inst.venue.timezone;
     const session = this.cfg.sessionOverride.has(sym)
       ? 'open'
-      : sessionStatus(inst.spec.tradingSessions ?? inst.venue.calendar, tz, now).state;
+      : sessionState(inst.spec.tradingSessions ?? inst.venue.calendar, tz, now);
     const { safety, reason } = this.safety(quote, status, inst.staleAfterMs, now);
     const bid = quote ? dec(quote.bid) : null;
     const ask = quote ? dec(quote.ask) : null;

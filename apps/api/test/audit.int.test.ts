@@ -34,6 +34,32 @@ describe('audit log', () => {
     expect(v.body.count).toBeGreaterThanOrEqual(50);
   });
 
+  it('the one-round-trip chain head (0102) keeps the chain valid for batched writers too', async () => {
+    const batches = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        audit.recordMany(
+          Array.from({ length: 3 }, (_, k) => ({ actorId: 'system', actorType: 'system' as const, action: 'test.batch', entity: 'test', entityId: `${i}.${k}` })),
+        ),
+      ),
+    );
+    const ids = batches.flat().map((e) => BigInt(e.id)).sort((a, b) => (a < b ? -1 : 1));
+    for (let i = 1; i < ids.length; i++) expect(ids[i]! - ids[i - 1]!).toBe(1n);
+    const u = await createUser(app, 'novice');
+    expect((await request(http).get('/audit/verify').set(bearer(u.token)).expect(200)).body).toMatchObject({ valid: true });
+  });
+
+  it('refuses to append inside a REPEATABLE READ transaction (a stale head would fork the chain)', async () => {
+    const pool = (audit as unknown as { db: { pool: import('pg').Pool } }).db.pool;
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      await expect(audit.record({ actorId: 'system', actorType: 'system', action: 'test.rr', entity: 'test' }, c)).rejects.toThrow(/READ COMMITTED/);
+    } finally {
+      await c.query('ROLLBACK');
+      c.release();
+    }
+  });
+
   it('stores microsecond UTC timestamps and rejects float payloads', async () => {
     const e = await audit.record({ actorId: 'system', actorType: 'system', action: 'test.ts', entity: 'test' });
     expect(e.ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/);

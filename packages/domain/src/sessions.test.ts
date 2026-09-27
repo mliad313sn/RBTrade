@@ -153,3 +153,32 @@ describe('validation', () => {
     ]);
   });
 });
+
+describe('memo (goal 10 load finding)', () => {
+  const cals: Array<[SessionCalendar, string]> = [
+    [XNYS, 'America/New_York'],
+    [XTKS, 'Asia/Tokyo'],
+    [FX24x5, 'America/New_York'],
+    [XASX, 'Australia/Sydney'],
+  ];
+  it('the memoised status equals a fresh computation, second by second across edges', () => {
+    // a range crossing the XNYS open, the Tokyo lunch break and a US DST change
+    const starts = [at('2026-03-09T13:29:00Z'), at('2026-03-10T02:29:30Z'), at('2026-03-08T06:59:00Z')];
+    for (const [cal, tz] of cals) {
+      for (const t0 of starts) {
+        for (let t = t0; t < t0 + 180_000; t += 7_000) {
+          const memo = sessionStatus(cal, tz, t);
+          const fresh = sessionStatus({ ...cal }, tz, t); // new object = no memo entry
+          expect(memo).toEqual(fresh);
+          expect(sessionState(cal, tz, t)).toBe(memo.state);
+        }
+      }
+    }
+  });
+  it('callers cannot corrupt the memo', () => {
+    const t = at('2026-03-09T15:00:00Z');
+    const a = sessionStatus(XNYS, 'America/New_York', t);
+    a.state = 'holiday';
+    expect(sessionStatus(XNYS, 'America/New_York', t).state).toBe('open');
+  });
+});

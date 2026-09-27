@@ -17,6 +17,8 @@ export interface RunnerConfig {
   /** BullMQ cron pattern for the daily tracking-error job (UTC); empty disables it. */
   trackingCron: string;
   requestTimeoutMs: number;
+  /** Bar-close jobs evaluated in parallel (goal 10 load finding: 4 left 50 robots waiting ~8 s). */
+  concurrency: number;
 }
 
 export function loadEnv(): void {
@@ -54,5 +56,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RunnerConfig {
     syncMs: int(env.KORA_BOT_RUNNER_SYNC_MS, 5000),
     trackingCron: env.KORA_BOT_RUNNER_TRACKING_CRON ?? '5 0 * * *',
     requestTimeoutMs: int(env.KORA_BOT_RUNNER_TIMEOUT_MS, 15_000),
+    concurrency: Math.min(64, int(env.KORA_BOT_RUNNER_CONCURRENCY, 16)),
   };
 }

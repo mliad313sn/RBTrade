@@ -35,7 +35,22 @@ export interface AuditQuery {
 }
 
 const TS_FORMAT = `'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'`;
-const CHAIN_LOCK = "hashtext('kora.audit_chain')";
+
+/**
+ * Checks READ COMMITTED, takes the chain lock and reads the head in one round trip (migration 0102,
+ * goal 10 load finding). The lock is held until the caller's transaction ends.
+ */
+async function lockHead(c: Queryable): Promise<{ head_id: string | null; head_hash: string | null; ts: string }> {
+  try {
+    const r = await c.query<{ head_id: string | null; head_hash: string | null; ts: string }>(
+      'SELECT head_id::text AS head_id, head_hash, ts FROM audit_chain_lock_head()',
+    );
+    return r.rows[0]!;
+  } catch (e) {
+    if (/READ COMMITTED/.test((e as Error).message)) throw new Error('AuditService.record requires a READ COMMITTED transaction');
+    throw e;
+  }
+}
 const SELECT_COLUMNS = `id::text AS id, to_char(ts AT TIME ZONE 'UTC', ${TS_FORMAT}) AS ts, actor_id, actor_type,
   action, entity, entity_id, payload, prev_hash, hash`;
 
@@ -86,20 +101,10 @@ export class AuditService {
   }
 
   private async append(c: Queryable, input: AuditRecordInput, payload: Record<string, JsonValue>): Promise<AuditEvent> {
-    const iso = await c.query<{ transaction_isolation: string }>('SHOW transaction_isolation');
-    if (iso.rows[0]?.transaction_isolation !== 'read committed') {
-      throw new Error('AuditService.record requires a READ COMMITTED transaction');
-    }
-    await c.query(`SELECT pg_advisory_xact_lock(${CHAIN_LOCK})`);
-    const head = await c.query<{ id: string; hash: string }>(
-      'SELECT id::text AS id, hash FROM audit_events ORDER BY audit_events.id DESC LIMIT 1',
-    );
-    const prevHash = head.rows[0]?.hash ?? GENESIS_HASH;
-    const id = (BigInt(head.rows[0]?.id ?? '0') + 1n).toString();
-    const tsRes = await c.query<{ ts: string }>(
-      `SELECT to_char(date_trunc('microseconds', clock_timestamp()) AT TIME ZONE 'UTC', ${TS_FORMAT}) AS ts`,
-    );
-    const ts = tsRes.rows[0]!.ts;
+    const head = await lockHead(c);
+    const prevHash = head.head_hash ?? GENESIS_HASH;
+    const id = (BigInt(head.head_id ?? '0') + 1n).toString();
+    const ts = head.ts;
     const fields = {
       id,
       ts,
@@ -132,19 +137,10 @@ export class AuditService {
   }
 
   private async appendMany(c: Queryable, inputs: AuditRecordInput[]): Promise<AuditEvent[]> {
-    const iso = await c.query<{ transaction_isolation: string }>('SHOW transaction_isolation');
-    if (iso.rows[0]?.transaction_isolation !== 'read committed') {
-      throw new Error('AuditService.recordMany requires a READ COMMITTED transaction');
-    }
-    await c.query(`SELECT pg_advisory_xact_lock(${CHAIN_LOCK})`);
-    const head = await c.query<{ id: string; hash: string; ts: string }>(
-      `SELECT h.id, h.hash, to_char(date_trunc('microseconds', clock_timestamp()) AT TIME ZONE 'UTC', ${TS_FORMAT}) AS ts
-       FROM (SELECT id::text AS id, hash FROM audit_events ORDER BY audit_events.id DESC LIMIT 1) h
-       RIGHT JOIN (SELECT 1) one ON true`,
-    );
-    let prevHash = head.rows[0]?.hash ?? GENESIS_HASH;
-    let nextId = BigInt(head.rows[0]?.id ?? '0') + 1n;
-    const ts = head.rows[0]!.ts;
+    const head = await lockHead(c);
+    let prevHash = head.head_hash ?? GENESIS_HASH;
+    let nextId = BigInt(head.head_id ?? '0') + 1n;
+    const ts = head.ts;
     const events: AuditEvent[] = [];
     for (const input of inputs) {
       const fields = {

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Goal 10 platform load test (S10, S3). k6 cannot be downloaded here (GitHub assets blocked), so the
- * load comes from autocannon (npm) for HTTP and `ws` clients in worker threads for streaming. The
+ * load comes from an open-loop node:http generator (constant arrival rate, like k6's
+ * constant-arrival-rate executor) and `ws` clients in worker threads for streaming. The
  * goal 02 fan-out harness (ws-fanout.mjs) covers "200 symbols streaming" on its own.
  *
  * Scenarios (one isolated stack: kora_e2e reset, api build with the in-process SIMULATED feed and
@@ -66,7 +67,6 @@ if (!isMainThread) {
 }
 
 async function main() {
-  const autocannon = req('autocannon');
   const pg = req('pg');
   const args = process.argv.slice(2);
   const opt = (k, d) => {
@@ -78,6 +78,9 @@ async function main() {
   const ONLY = onlyIdx >= 0 ? args[onlyIdx + 1].split(',') : ['A', 'B', 'C'];
   const otelIdx = args.indexOf('--otel');
   const OTEL = otelIdx >= 0 ? args[otelIdx + 1] : '';
+  // --prof DIR: CPU profile of the api process (written when the harness stops it).
+  const profIdx = args.indexOf('--prof');
+  const PROF = profIdx >= 0 ? resolve(args[profIdx + 1]) : '';
   const RATE = opt('rate', 100);
   const DURATION = opt('duration', QUICK ? 10 : 30);
   const envFile = join(ROOT, '.env');
@@ -141,6 +144,7 @@ async function main() {
         KORA_SERVICE_TOKEN: TOKEN, QUANT_URL: `http://127.0.0.1:${QPORT}`, KORA_AI_PROVIDER: 'scripted',
         KORA_INTEL_SCAN: 'off', KORA_INTEL_NEWS: 'off', KORA_ROBOT_MAX_PER_USER: '100',
         ...(OTEL ? { KORA_OTEL_FILE: OTEL } : {}),
+        ...(PROF ? { NODE_OPTIONS: `--cpu-prof --cpu-prof-dir=${PROF} --require ${join(here, 'exit-on-sigterm.cjs')}` } : {}),
         ...(process.env.KORA_DB_POOL_MAX ? { KORA_DB_POOL_MAX: process.env.KORA_DB_POOL_MAX } : {}),
       },
     });
@@ -197,12 +201,11 @@ async function main() {
       await new Promise((r) => setTimeout(r, 3000));
       const paths = ['/quotes?symbols=BTCUSD,ETHUSD,EURUSD,XAUUSD,AAPL', '/accounts/me', '/positions', '/orders?status=open', '/candles?symbol=BTCUSD&tf=1m&limit=200', '/market-data/status'];
       let n = 0;
-      const rest = await autocannon({
+      const rest = await openLoop({
         url: API,
-        connections: QUICK ? 100 : 500,
-        overallRate: QUICK ? 100 : 500, // each terminal user polls about once a second
-        duration: DURATION,
-        requests: [{ method: 'GET', setupRequest: (r) => ({ ...r, path: paths[n % paths.length], headers: { authorization: `Bearer ${users[n++ % users.length]}` } }) }],
+        rate: QUICK ? 100 : 500, // each terminal user polls about once a second
+        durationS: DURATION,
+        next: () => ({ method: 'GET', tag: paths[n % paths.length].split('?')[0], path: paths[n % paths.length], headers: { authorization: `Bearer ${users[n++ % users.length]}` } }),
       });
       const ws = await Promise.all(wsDone);
       const lat = ws.flatMap((x) => x.lat).sort((a, b) => a - b);
@@ -212,7 +215,7 @@ async function main() {
         wsErrors: ws.reduce((s, x) => s + x.errors, 0),
         wsMessages: ws.reduce((s, x) => s + x.msgs, 0),
         wsQuoteAgeMs: { p50: q_(lat, 0.5), p95: q_(lat, 0.95), p99: q_(lat, 0.99), n: lat.length },
-        rest: acSummary(rest),
+        rest,
       };
       log('A done', out.scenarios.A_terminal_users);
     }
@@ -221,28 +224,32 @@ async function main() {
     if (ONLY.includes('B')) {
       let k = 0;
       const tag = `burst-${Date.now()}`;
-      const burst = await autocannon({
+      // Open loop: one order every 1000/RATE ms whatever the server does (a closed-loop generator
+      // slows down with the server and hides queueing). Latency = request written → body read.
+      const burst = await openLoop({
         url: API,
-        connections: 50,
-        overallRate: RATE,
-        duration: DURATION,
-        requests: [
-          {
-            method: 'POST',
-            setupRequest: (r) => {
-              const i = k++;
-              const sym = i % 2 ? 'ETHUSD' : 'BTCUSD';
-              const side = Math.floor(i / 200) % 2 ? 'sell' : 'buy';
-              return { ...r, path: '/orders', headers: { 'content-type': 'application/json', authorization: `Bearer ${users[i % users.length]}` }, body: JSON.stringify({ clientOrderId: `${tag}-${i}`, symbol: sym, side, type: 'market', qty: sym === 'BTCUSD' ? '0.001' : '0.01' }) };
-            },
-          },
-        ],
+        rate: RATE,
+        durationS: DURATION,
+        next: () => {
+          const i = k++;
+          const sym = i % 2 ? 'ETHUSD' : 'BTCUSD';
+          const side = Math.floor(i / 200) % 2 ? 'sell' : 'buy';
+          return { method: 'POST', path: '/orders', headers: { 'content-type': 'application/json', authorization: `Bearer ${users[i % users.length]}` }, body: JSON.stringify({ clientOrderId: `${tag}-${i}`, symbol: sym, side, type: 'market', qty: sym === 'BTCUSD' ? '0.001' : '0.01' }) };
+        },
       });
+      // Spike (informational): 100 orders sent at the same instant, three times, 2 s apart.
+      const spikes = [];
+      for (let sIdx = 0; sIdx < 3; sIdx++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        spikes.push(await openLoop({ url: API, rate: 100_000, durationS: 100 / 100_000, next: () => { const i = k++; return { method: 'POST', path: '/orders', headers: { 'content-type': 'application/json', authorization: `Bearer ${users[i % users.length]}` }, body: JSON.stringify({ clientOrderId: `${tag}-${i}`, symbol: 'BTCUSD', side: i % 2 ? 'sell' : 'buy', type: 'market', qty: '0.001' }) }; } }));
+      }
+      const sl = spikes.flatMap((x) => [x.latencyMs.p50, x.latencyMs.p99, x.latencyMs.max]);
+      const spike = { orders: 300, simultaneous: 100, worstP50Ms: Math.max(...sl.filter((_, i) => i % 3 === 0)), worstP99Ms: Math.max(...sl.filter((_, i) => i % 3 === 1)), maxMs: Math.max(...sl.filter((_, i) => i % 3 === 2)), errors: spikes.reduce((a, x) => a + x.errors, 0), statusCodes: spikes.map((x) => x.statusCodes) };
       await new Promise((r) => setTimeout(r, 3000));
       const rows = await db(`SELECT status, reject_code, count(*)::int AS n FROM orders WHERE client_order_id LIKE $1 GROUP BY 1, 2 ORDER BY 3 DESC`, [`${tag}-%`]);
       const dups = await db(`SELECT count(*)::int AS n FROM (SELECT client_order_id FROM orders WHERE client_order_id LIKE $1 GROUP BY 1 HAVING count(*) > 1) d`, [`${tag}-%`]);
       const fills = await db(`SELECT count(*)::int AS n FROM fills f JOIN orders o ON o.id = f.order_id WHERE o.client_order_id LIKE $1`, [`${tag}-%`]);
-      out.scenarios.B_order_burst = { targetRatePerS: RATE, http: acSummary(burst), ordersByStatus: rows, duplicates: dups[0].n, fills: fills[0].n };
+      out.scenarios.B_order_burst = { targetRatePerS: RATE, http: burst, spike, ordersByStatus: rows, duplicates: dups[0].n, fills: fills[0].n };
       log('B done', out.scenarios.B_order_burst);
     }
 
@@ -311,20 +318,67 @@ async function main() {
 }
 
 // ---------------------------------------------------------------------------------------------
+async function openLoop({ url, rate, durationS, next }) {
+  const http = req('node:http');
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 512 });
+  const u = new URL(url);
+  const lat = [];
+  const byTag = {};
+  const codes = {};
+  let errors = 0;
+  let sent = 0;
+  const pending = [];
+  const t0 = performance.now();
+  const total = Math.round(rate * durationS);
+  while (sent < total) {
+    const due = t0 + (sent * 1000) / rate;
+    const wait = due - performance.now();
+    if (wait > 1) await new Promise((r) => setTimeout(r, wait));
+    const r = next();
+    sent += 1;
+    pending.push(
+      new Promise((done) => {
+        const start = performance.now();
+        const rq = http.request({ agent, host: u.hostname, port: u.port, method: r.method, path: r.path, headers: { ...r.headers, 'content-length': Buffer.byteLength(r.body ?? '') } }, (res) => {
+          res.resume();
+          res.on('end', () => {
+            const ms = performance.now() - start;
+            lat.push(ms);
+            if (r.tag) (byTag[r.tag] ??= []).push(ms);
+            codes[res.statusCode] = (codes[res.statusCode] ?? 0) + 1;
+            done();
+          });
+        });
+        rq.setTimeout(10_000, () => rq.destroy(new Error('timeout')));
+        rq.on('error', () => {
+          errors += 1;
+          done();
+        });
+        rq.end(r.body);
+      }),
+    );
+  }
+  await Promise.all(pending);
+  agent.destroy();
+  const wall = (performance.now() - t0) / 1000;
+  lat.sort((a, b) => a - b);
+  const ok = Object.entries(codes).filter(([c]) => c < 300).reduce((a, [, n]) => a + n, 0);
+  return {
+    generator: 'open loop (node:http)',
+    requests: sent,
+    achievedRatePerS: Math.round((sent / wall) * 10) / 10,
+    latencyMs: { p50: q_(lat, 0.5), p95: q_(lat, 0.95), p99: q_(lat, 0.99), max: q_(lat, 1) },
+    ...(Object.keys(byTag).length
+      ? { perPathMs: Object.fromEntries(Object.entries(byTag).map(([t, v]) => (v.sort((a, b) => a - b), [t, { p50: q_(v, 0.5), p95: q_(v, 0.95), p99: q_(v, 0.99), n: v.length }]))) }
+      : {}),
+    errorRate: Math.round(((sent - ok) / sent) * 10000) / 10000,
+    errors,
+    statusCodes: codes,
+  };
+}
 function q_(sorted, p) {
   if (!sorted.length) return null;
   return Math.round(sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)] * 10) / 10;
-}
-function acSummary(r) {
-  return {
-    requests: r.requests.total,
-    rps: Math.round(r.requests.average),
-    latencyMs: { p50: r.latency.p50, p90: r.latency.p90, p97_5: r.latency.p97_5, p99: r.latency.p99, max: r.latency.max },
-    non2xx: r.non2xx,
-    errors: r.errors,
-    timeouts: r.timeouts,
-    statusCodes: r.statusCodeStats,
-  };
 }
 function histQuantiles(text, name, keep) {
   const buckets = new Map();

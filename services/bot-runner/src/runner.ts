@@ -62,7 +62,7 @@ export async function startRunner(cfg: RunnerConfig): Promise<Runner> {
         throw new UnrecoverableError((e as Error).message);
       }
     },
-    { connection, concurrency: 4 },
+    { connection, concurrency: cfg.concurrency },
   );
   worker.on('failed', (job, err) =>
     log('warn', 'job failed', { jobId: job?.id, attempts: job?.attemptsMade, error: err.message }),

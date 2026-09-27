@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { currencyDecimals, sessionStatus, type StrategyTimeframe } from '@kora/domain';
+import { currencyDecimals, sessionState, type StrategyTimeframe } from '@kora/domain';
 import { SimulatedCalendarProvider, simProfileFor } from '@kora/market-data';
 
 import { CandlesService } from '../market-data/candles.service';
@@ -130,7 +130,7 @@ export class ResearchDataService {
       bars.l.push(Number(k.low));
       bars.c.push(Number(k.close));
       bars.v.push(Number(k.volume));
-      sessionOpen.push(sessionStatus(cal, tz, k.t).state === 'open');
+      sessionOpen.push(sessionState(cal, tz, k.t) === 'open');
     }
     const events: number[] = [];
     if (bars.t.length) {

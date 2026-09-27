@@ -46,6 +46,7 @@ describe('config', () => {
     expect(() => loadConfig({ REDIS_URL: 'redis://x', KORA_SERVICE_TOKEN: 'short' })).toThrow(
       /32 characters/,
     );
+    expect(loadConfig({ REDIS_URL: 'redis://x', KORA_BOT_RUNNER_CONCURRENCY: '500' }).concurrency).toBe(64);
     expect(loadConfig({ REDIS_URL: 'redis://x' })).toMatchObject({
       healthPort: 4100,
       queueName: 'kora-bots',
@@ -53,6 +54,7 @@ describe('config', () => {
       apiUrl: 'http://127.0.0.1:4000',
       quantUrl: 'http://127.0.0.1:8000',
       mdPrefix: 'kora:md:',
+      concurrency: 16,
       heartbeatMs: 5000,
     });
     expect(

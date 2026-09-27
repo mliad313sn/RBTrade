@@ -126,8 +126,26 @@ export function sessionState(cal: SessionCalendar, tz: string, ts: number): Sess
   return stateAt(cal, isoDate(Date.UTC(l.y, l.m - 1, l.d)), l.minutes);
 }
 
+/**
+ * Last answer per calendar object and zone, for the current UTC minute. Every session edge and zone
+ * offset in use falls on a whole minute, so the answer is the same for any instant in that minute.
+ * Goal 10 load finding: the order path asked for the status on every order (about 150 Intl calls).
+ */
+const statusMemo = new WeakMap<SessionCalendar, Map<string, { minute: number; status: SessionStatus }>>();
+
 export function sessionStatus(cal: SessionCalendar, tz: string, at: Date | number): SessionStatus {
   const ts = typeof at === 'number' ? at : at.getTime();
+  const minute = Math.floor(ts / 60_000);
+  let byTz = statusMemo.get(cal);
+  const hit = byTz?.get(tz);
+  if (hit && hit.minute === minute) return { ...hit.status };
+  const status = computeSessionStatus(cal, tz, ts);
+  if (!byTz) statusMemo.set(cal, (byTz = new Map()));
+  byTz.set(tz, { minute, status });
+  return { ...status };
+}
+
+function computeSessionStatus(cal: SessionCalendar, tz: string, ts: number): SessionStatus {
   const l = localParts(ts, tz);
   const today = Date.UTC(l.y, l.m - 1, l.d);
   const state = stateAt(cal, isoDate(today), l.minutes);
