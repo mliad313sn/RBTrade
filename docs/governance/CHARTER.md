@@ -74,3 +74,13 @@ Appointed 2026-09-27 by the Project Owner at the Sponsor's request. Independent 
 | R6 | Test integrity & reliability | Tests that assert nothing, bypasses, flakiness, coverage gaps, weakened assertions, data races, resilience |
 
 Process: **Review** (read-only, every finding with file:line, failure scenario and a reproduction) → **Verify** (a different reviewer tries to refute each finding; only CONFIRMED findings proceed) → **Correct** (fix + regression test that fails before and passes after) → **Re-verify** (full gate + reviewer sign-off). The register lives in `docs/review/IRTC-register.md`. Severity: Critical / High / Medium / Low. Critical and High must be fixed before the committee signs off; Medium fixed or owner-accepted; Low logged.
+
+## 7. Delegation of Sponsor authority (2026-09-27)
+
+The Sponsor delegated all of their decision authority to the **Product Owner** ("I delegate all my authority to po"). From this date the Product Owner decides in place of the Sponsor on product, policy and risk-appetite questions: open questions, placeholder policy values (limits, thresholds, fees schedules for PAPER, close-out levels, pass marks, cool-downs, budgets), acceptance of load and review exceptions, and release-gate acceptance for RC builds. Each such decision is recorded in `docs/open-questions.md` as "Decided by Product Owner (delegated Sponsor authority)", with rationale, and prefers the conservative option.
+
+Limits that delegation cannot remove, because they need real-world facts, contracts or licensed persons rather than a decision:
+- `LIVE_TRADING_ENABLED` stays false. Enabling it still needs a licensed broker contract, legal sign-off per jurisdiction by qualified counsel, and 2FA-confirmed compliance sign-off records. A delegate AI role cannot provide these.
+- Regulatory figures that must come from a regulator or from real data (for example the retail-loss percentage `[XX]%`) are never invented. They stay placeholders until the true value is supplied.
+- Data, news and broker licences, the AI API key and the choice of billed model are external contracts the Sponsor (or their organisation) must obtain.
+- The human reviews (copy review, screen-reader sessions, penetration test) need people.
