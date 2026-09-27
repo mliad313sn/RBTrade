@@ -5,8 +5,11 @@ import {
   applyFill,
   assertTransition,
   availableSize,
-  commission,
+  commissionRaw,
   convert,
+  incrementalCommission,
+  LIMIT_BREACH_CODES,
+  roundMoney,
   dec,
   Decimal,
   fillJournal,
@@ -19,6 +22,7 @@ import {
   walkBook,
   type DepthLevel,
   type OrderStatus,
+  type RiskViolation,
 } from '@kora/domain';
 
 import { OpsMetrics } from '../observability/ops-metrics.service';
@@ -50,7 +54,22 @@ const PATCHABLE = new Set([
 export interface FillPiece {
   qty: Decimal;
   price: Decimal;
+  /** Price of the depth level the piece consumed (for the shared-liquidity book). */
+  level?: string;
 }
+
+/**
+ * IRTC R2-21: account-level risk re-check run before a resting order fills (set by the OMS).
+ * Returns the violations that forbid the fill; empty when the fill may proceed.
+ */
+export type FillGuard = (
+  tx: TradingTx,
+  order: OrderRow,
+  inst: TradableInstrument,
+  qty: Decimal,
+  price: Decimal,
+  fxRate: Decimal,
+) => Promise<RiskViolation[]>;
 
 /**
  * The paper execution engine (goal 03 §3). Works one order at a time inside an account-locked
@@ -63,6 +82,19 @@ export class PaperEngineService {
   private readonly log = new Logger('PaperEngine');
   /** Depth sequence last consumed by a taker order, so one snapshot's liquidity is used once. */
   private readonly consumedSeq = new Map<string, number>();
+  /**
+   * IRTC R2-02: when each limit order was last seen resting (not marketable) on a safe, open market.
+   * Only a limit that was resting when the market moved onto it fills as a maker at its limit; a
+   * limit that is marketable on its first pass after placement, amend, trigger or a pause (session
+   * closed, feed unsafe) takes liquidity like a new order.
+   */
+  private readonly restedAt = new Map<string, number>();
+  /**
+   * IRTC R2-15: visible size already consumed per book side and depth sequence, so consecutive
+   * orders on one snapshot do not re-use the same liquidity.
+   */
+  private readonly bookUse = new Map<string, { seq: number; used: Map<string, Decimal> }>();
+  private fillGuard: FillGuard | null = null;
 
   constructor(
     private readonly registry: TradingRegistryService,
@@ -71,6 +103,10 @@ export class PaperEngineService {
     private readonly ledger: LedgerService,
     @Optional() private readonly metrics?: OpsMetrics,
   ) {}
+
+  setFillGuard(guard: FillGuard): void {
+    this.fillGuard = guard;
+  }
 
   // ---- order row helpers ---------------------------------------------------------------------
 
@@ -141,7 +177,7 @@ export class PaperEngineService {
       { cancel_reason: reason },
       { reason, ...extra },
     );
-    this.consumedSeq.delete(order.id);
+    this.forget(order.id);
     if (row.exec_type === 'none') {
       // OCO container: cancel open legs.
       const legs = await tx.c.query<OrderRow>(
@@ -165,7 +201,7 @@ export class PaperEngineService {
       { cancel_reason: reason },
       { reason },
     );
-    this.consumedSeq.delete(order.id);
+    this.forget(order.id);
     if (row.role === 'oco_leg' && row.parent_order_id)
       await this.settleOcoContainer(tx, row.parent_order_id, ENGINE_ACTOR);
     return row;
@@ -189,8 +225,10 @@ export class PaperEngineService {
     // Fill safety (goal 02): hold resting orders; never fill on stale, unhealthy or closed markets.
     if (snap.safety !== 'ok' || snap.session !== 'open' || !snap.bid || !snap.ask || !snap.quote)
       return order;
+    // IRTC R2-14: FX staleness (e.g. FX closed at the weekend) never holds a trigger or a fill.
+    // The fill is booked with the last known rate and flagged `fx_stale`; only a missing route holds.
     const rate = await this.fx.rate(inst.spec.quoteCcy, tx.account.base_currency, tx.now);
-    if (!rate || !rate.fresh) return order;
+    if (!rate) return order;
 
     const side = order.side;
     const bid = snap.bid;
@@ -251,16 +289,22 @@ export class PaperEngineService {
       justTriggered = true;
     }
 
-    const book: readonly DepthLevel[] = snap.depth
-      ? side === 'buy'
-        ? snap.depth.asks
-        : snap.depth.bids
-      : [
-          [
-            (side === 'buy' ? ask : bid).toFixed(),
-            (side === 'buy' ? snap.quote.askSize : snap.quote.bidSize) || remaining.toFixed(),
+    const bookSeq = snap.depth?.seq ?? snap.quote.seq;
+    const book = this.unusedBook(
+      order.symbol,
+      side,
+      bookSeq,
+      snap.depth
+        ? side === 'buy'
+          ? snap.depth.asks
+          : snap.depth.bids
+        : [
+            [
+              (side === 'buy' ? ask : bid).toFixed(),
+              (side === 'buy' ? snap.quote.askSize : snap.quote.bidSize) || remaining.toFixed(),
+            ],
           ],
-        ];
+    );
     const walkParams = {
       tickSize: inst.spec.tickSize,
       impactTicks: inst.trading.impactTicks,
@@ -269,7 +313,6 @@ export class PaperEngineService {
       lastMidMove: snap.lastMidMove,
     };
     const touch = side === 'buy' ? ask : bid;
-    const bookSeq = snap.depth?.seq ?? snap.quote.seq;
 
     let pieces: FillPiece[] = [];
     let reference: Decimal;
@@ -284,7 +327,7 @@ export class PaperEngineService {
         availableSize(side, book, walkParams.maxLevels).lt(remaining)
       )
         return this.expire(tx, order, 'fok_unfillable');
-      pieces = walkBook(side, book, remaining, walkParams).fills;
+      pieces = levelled(book, walkBook(side, book, remaining, walkParams).fills);
     } else {
       // limit or triggered stop-limit
       const limit = dec(order.limit_price!);
@@ -293,6 +336,7 @@ export class PaperEngineService {
       if (!marketable) {
         if (arrival && (order.tif === 'ioc' || order.tif === 'fok'))
           return this.expire(tx, order, order.tif === 'fok' ? 'fok_unfillable' : 'ioc_remainder');
+        this.restedAt.set(order.id, tx.now);
         return order;
       }
       if (
@@ -301,8 +345,14 @@ export class PaperEngineService {
         availableSize(side, book, walkParams.maxLevels, limit).lt(remaining)
       )
         return this.expire(tx, order, 'fok_unfillable');
-      if (arrival || justTriggered) {
-        pieces = walkBook(side, book, remaining, walkParams, limit).fills;
+      const rested = this.restedAt.get(order.id);
+      const wasResting =
+        !arrival && !justTriggered && rested !== undefined && tx.now - rested <= inst.staleAfterMs;
+      if (!wasResting) {
+        // Marketable on its first pass (placement, amend, trigger, or after a pause in which the
+        // market gapped through it): it takes liquidity at the book, never worse than its limit.
+        if (!arrival && !justTriggered && this.consumedSeq.get(order.id) === bookSeq) return order;
+        pieces = levelled(book, walkBook(side, book, remaining, walkParams, limit).fills);
       } else {
         // A resting limit that the market has reached fills at its limit (maker), up to visible size.
         if (this.consumedSeq.get(order.id) === bookSeq) return order;
@@ -312,15 +362,100 @@ export class PaperEngineService {
         pieces = q.gt(0) ? [{ qty: q, price: limit }] : [];
       }
     }
+    // IRTC R2-21: an order approved earlier is re-checked before it adds exposure now.
+    if (pieces.length && !arrival && !order.reduce_only && this.fillGuard) {
+      const total = pieces.reduce((q, p) => q.add(p.qty), new Decimal(0));
+      const px = pieces.reduce((v, p) => v.add(p.qty.mul(p.price)), new Decimal(0)).div(total);
+      const violations = await this.fillGuard(tx, order, inst, total, px, rate.rate);
+      if (violations.length) return this.refuseAtFill(tx, order, violations);
+    }
     this.consumedSeq.set(order.id, bookSeq);
+    if (liquidity === 'taker') this.useBook(order.symbol, side, bookSeq, pieces);
 
     for (const piece of pieces) {
-      order = await this.bookFill(tx, order, inst, snap, piece, reference, liquidity, rate.rate);
+      order = await this.bookFill(tx, order, inst, snap, piece, reference, liquidity, rate.rate, rate.fresh);
     }
     if (arrival && order.tif === 'ioc' && WORKABLE.includes(order.status))
       order = await this.expire(tx, order, 'ioc_remainder');
     if (pieces.length) await this.afterFill(tx, order, snap, inst);
     return order;
+  }
+
+  /** Cancels an order whose fill the pre-fill risk re-check refused; audited and alerted. */
+  private async refuseAtFill(
+    tx: TradingTx,
+    order: OrderRow,
+    violations: RiskViolation[],
+  ): Promise<OrderRow> {
+    const codes = violations.map((v) => v.code);
+    tx.audit(ENGINE_ACTOR, 'order.risk_recheck_failed', 'order', order.id, {
+      accountId: order.account_id,
+      symbol: order.symbol,
+      side: order.side,
+      qty: order.qty,
+      filledQty: order.filled_qty,
+      source: order.source,
+      codes: codes.join(','),
+      message: violations[0]!.message,
+      environment: 'PAPER',
+    });
+    const breaches = codes.filter((c) => LIMIT_BREACH_CODES.includes(c));
+    if (breaches.length)
+      await tx.c.query(
+        `INSERT INTO alerts (severity, kind, account_id, message, details) VALUES ('warning', 'risk.limit_breach', $1, $2, $3::jsonb)`,
+        [
+          order.account_id,
+          `Resting order refused at fill: ${breaches.join(', ')} (${order.side} ${order.qty} ${order.symbol}).`,
+          JSON.stringify({ orderId: order.id, symbol: order.symbol, codes: breaches, atFill: true }),
+        ],
+      );
+    return this.cancel(tx, order, `risk_recheck:${codes[0]}`, ENGINE_ACTOR, {
+      codes: codes.join(','),
+    });
+  }
+
+  /** Book side minus what earlier orders already took from the same depth sequence (R2-15). */
+  private unusedBook(
+    symbol: string,
+    side: 'buy' | 'sell',
+    seq: number,
+    levels: readonly DepthLevel[],
+  ): readonly DepthLevel[] {
+    const use = this.bookUse.get(`${symbol}:${side}`);
+    if (!use || use.seq !== seq) return levels;
+    return levels.map(([px, sz]): DepthLevel => {
+      const left = dec(sz).sub(use.used.get(px) ?? 0);
+      return [px, (left.isNegative() ? new Decimal(0) : left).toFixed()];
+    });
+  }
+
+  private useBook(symbol: string, side: 'buy' | 'sell', seq: number, pieces: FillPiece[]): void {
+    const key = `${symbol}:${side}`;
+    let use = this.bookUse.get(key);
+    if (!use || use.seq !== seq) {
+      use = { seq, used: new Map() };
+      this.bookUse.set(key, use);
+    }
+    for (const p of pieces)
+      if (p.level) use.used.set(p.level, (use.used.get(p.level) ?? new Decimal(0)).add(p.qty));
+  }
+
+  /**
+   * Why a working order did not fill now (kill-switch flatten, IRTC R2-26): the market data, the
+   * session, a missing FX route, or no visible liquidity.
+   */
+  async holdReason(
+    tx: TradingTx,
+    order: OrderRow,
+    inst: TradableInstrument,
+    snap: MarketSnapshot,
+  ): Promise<string> {
+    if (snap.safety !== 'ok') return `held: market data ${snap.safety}`;
+    if (snap.session !== 'open') return `held: session ${snap.session}`;
+    if (!(await this.fx.rate(inst.spec.quoteCcy, tx.account.base_currency, tx.now)))
+      return `held: no exchange rate ${inst.spec.quoteCcy} to ${tx.account.base_currency}`;
+    if (order.status === 'cancelled') return `cancelled: ${order.cancel_reason ?? 'unknown'}`;
+    return 'held: insufficient depth';
   }
 
   // ---- booking ----------------------------------------------------------------------------------
@@ -343,11 +478,12 @@ export class PaperEngineService {
     reference: Decimal,
     liquidity: 'taker' | 'maker',
     rate: Decimal,
+    fxFresh: boolean,
   ): Promise<OrderRow> {
     return withSpan(
       'engine.fill',
       { 'kora.order_id': order.id, 'kora.symbol': order.symbol, 'kora.side': order.side, 'kora.qty': piece.qty.toString(), 'kora.liquidity': liquidity },
-      () => this.bookFillInSpan(tx, order, inst, snap, piece, reference, liquidity, rate),
+      () => this.bookFillInSpan(tx, order, inst, snap, piece, reference, liquidity, rate, fxFresh),
       contextFrom(order.trace_parent),
     );
   }
@@ -361,6 +497,7 @@ export class PaperEngineService {
     reference: Decimal,
     liquidity: 'taker' | 'maker',
     rate: Decimal,
+    fxFresh: boolean,
   ): Promise<OrderRow> {
     const base = tx.account.base_currency;
     const same = inst.spec.quoteCcy === base;
@@ -371,19 +508,34 @@ export class PaperEngineService {
       { side: order.side, qty: piece.qty, price: piece.price },
       inst.multiplier,
     );
-    const commQuote = commission(
+    // IRTC R2-06: the minimum commission applies once per order, across all its fills.
+    const prior = await tx.c.query<{ qty: string; price: string }>(
+      'SELECT qty::text AS qty, price::text AS price FROM fills WHERE order_id = $1',
+      [order.id],
+    );
+    const rawBefore = prior.rows.reduce(
+      (acc, f) => acc.add(commissionRaw(inst.fees, dec(f.qty), dec(f.price), inst.multiplier)),
+      new Decimal(0),
+    );
+    const commQuote = incrementalCommission(
       inst.fees,
+      rawBefore,
+      prior.rows.length > 0,
       piece.qty,
       piece.price,
       inst.multiplier,
       inst.spec.quoteCcy,
     );
     const realizedBase = applied.realizedPnl.mul(rate);
-    const commBase = commQuote.mul(rate);
+    // IRTC R2-07: charges are converted to the base currency, then rounded to its minor unit.
+    const commBase = roundMoney(commQuote.mul(rate), base);
     const conv = same
       ? new Decimal(0)
-      : convert(commQuote.add(applied.realizedPnl.abs()), rate, inst.fees.fxConversionBps, false)
-          .cost;
+      : roundMoney(
+          convert(commQuote.add(applied.realizedPnl.abs()), rate, inst.fees.fxConversionBps, false)
+            .cost,
+          base,
+        );
     const spread = spreadCost(piece.qty, snap.bid!, snap.ask!, inst.multiplier).mul(rate);
     const slippage = piece.price.sub(reference).mul(sideSign(order.side));
     // Goal 10: fills and slippage (bps of the reference) for the order-quality dashboard.
@@ -401,8 +553,8 @@ export class PaperEngineService {
 
     const fill = await tx.c.query<FillRow>(
       `INSERT INTO fills (order_id, account_id, symbol, side, qty, price, quote_at_decision, reference_price, slippage, commission,
-         spread_cost, fx_rate, fx_conversion_cost, realized_pnl, liquidity)
-       VALUES ($1, $2, $3, $4, $5::numeric, $6::numeric, $7::jsonb, $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13::numeric, $14::numeric, $15)
+         spread_cost, fx_rate, fx_conversion_cost, realized_pnl, liquidity, fx_stale)
+       VALUES ($1, $2, $3, $4, $5::numeric, $6::numeric, $7::jsonb, $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13::numeric, $14::numeric, $15, $16)
        RETURNING *`,
       [
         order.id,
@@ -420,6 +572,7 @@ export class PaperEngineService {
         conv.toDecimalPlaces(10).toFixed(),
         realizedBase.toDecimalPlaces(10).toFixed(),
         liquidity,
+        !fxFresh,
       ],
     );
     const fillRow = fill.rows[0]!;
@@ -478,6 +631,7 @@ export class PaperEngineService {
         fxConversionCost: conv.toDecimalPlaces(10).toFixed(),
         realizedPnl: realizedBase.toDecimalPlaces(10).toFixed(),
         fxRate: rate.toFixed(),
+        fxStale: !fxFresh,
         currency: base,
         liquidity,
         quoteBid: q.bid,
@@ -663,7 +817,10 @@ export class PaperEngineService {
       if (quoteAmt.isZero()) continue;
       const same = inst.spec.quoteCcy === tx.account.base_currency;
       const conv = convert(quoteAmt, rate.rate, inst.fees.fxConversionBps, same);
-      const amount = conv.base.sub(conv.cost);
+      // IRTC R2-07: funding and its conversion fee are rounded to the base currency minor unit.
+      const ccy = tx.account.base_currency;
+      const amount = roundMoney(conv.base, ccy).sub(roundMoney(conv.cost, ccy));
+      if (amount.isZero()) continue;
       await this.ledger.post(tx.c, tx.account.id, swapJournal(amount, tx.account.base_currency), {
         type: 'swap',
         id: `${p.symbol}:${rollDate}`,
@@ -685,9 +842,18 @@ export class PaperEngineService {
 
   forget(orderId: string): void {
     this.consumedSeq.delete(orderId);
+    this.restedAt.delete(orderId);
   }
 
   get logger(): Logger {
     return this.log;
   }
+}
+
+/** Tags walk fills with the price of the depth level they consumed. */
+function levelled(
+  book: readonly DepthLevel[],
+  fills: Array<{ qty: Decimal; price: Decimal; level: number }>,
+): FillPiece[] {
+  return fills.map((f) => ({ qty: f.qty, price: f.price, level: book[f.level]?.[0] }));
 }
