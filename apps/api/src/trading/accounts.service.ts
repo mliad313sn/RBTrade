@@ -12,9 +12,11 @@ import {
   type GuardedLimitField,
   type StoredLimits,
   depositJournal,
+  depositReversalJournal,
   formatAmount,
   formatPct,
   markFor,
+  roundMoney,
   summarizeAccount,
   type AccountSummary,
   type ConfirmSettings,
@@ -39,6 +41,17 @@ const decimal = z
   .string()
   .trim()
   .regex(/^\d+(\.\d+)?$/, 'Use a positive decimal number');
+/** IRTC R2-18: a limit of zero is not a limit (and divides by zero in the account view). */
+const limitValue = decimal.refine((v) => /[1-9]/.test(v), 'A limit must be greater than zero');
+
+/** Own-limit fields expressed in the account currency (converted when the currency changes). */
+const MONEY_LIMIT_FIELDS = [
+  'maxOrderNotional',
+  'maxPositionNotional',
+  'dailyLossLimit',
+  'weeklyLossLimit',
+  'monthlyLossLimit',
+] as const;
 
 export const AccountSettingsSchema = z
   .object({
@@ -49,12 +62,12 @@ export const AccountSettingsSchema = z
     baseCurrency: z.string().regex(CURRENCY_RE, 'Use an ISO 4217 code such as USD').optional(),
     riskLimits: z
       .object({
-        maxOrderNotional: decimal.optional(),
-        maxPositionNotional: decimal.optional(),
-        maxLeverage: decimal.optional(),
-        dailyLossLimit: decimal.optional(),
-        weeklyLossLimit: decimal.optional(),
-        monthlyLossLimit: decimal.optional(),
+        maxOrderNotional: limitValue.optional(),
+        maxPositionNotional: limitValue.optional(),
+        maxLeverage: limitValue.optional(),
+        dailyLossLimit: limitValue.optional(),
+        weeklyLossLimit: limitValue.optional(),
+        monthlyLossLimit: limitValue.optional(),
         maxOrdersPerMinute: z.number().int().min(1).max(100_000).optional(),
       })
       .strict()
@@ -213,7 +226,7 @@ export class AccountsService {
    * four-eyes override (goal 09). Overrides never lower a limit (the account's own limits do that).
    */
   platformLimits(a: AccountRow): TradingConfig['riskDefaults'] {
-    const d = this.cfg.riskDefaults;
+    const d = this.platformDefaults(a);
     const o = a.limit_overrides ?? {};
     const higher = (p: string, v: string | undefined) => (v !== undefined && dec(v).gt(dec(p)) ? v : p);
     return {
@@ -228,6 +241,44 @@ export class AccountsService {
           ? Number(o.maxOrdersPerMinute)
           : d.maxOrdersPerMinute,
     };
+  }
+
+  /**
+   * IRTC R2-05: the platform defaults are set in the platform currency (`KORA_PAPER_BASE_CURRENCY`).
+   * An account in another currency gets them converted at the rate recorded when it chose that
+   * currency (`settings.limitFx`), so a limit keeps its value whatever the account currency.
+   */
+  private platformDefaults(a: AccountRow): TradingConfig['riskDefaults'] {
+    const d = this.cfg.riskDefaults;
+    const fx = (a.settings as { limitFx?: { to?: string; rate?: string } }).limitFx;
+    if (a.base_currency === this.cfg.baseCurrency || !fx?.rate || fx.to !== a.base_currency) return d;
+    const rate = dec(fx.rate);
+    const conv = (v: string) => roundMoney(dec(v).mul(rate), a.base_currency).toFixed();
+    return {
+      ...d,
+      maxOrderNotional: conv(d.maxOrderNotional),
+      maxPositionNotional: conv(d.maxPositionNotional),
+      dailyLossLimit: conv(d.dailyLossLimit),
+      weeklyLossLimit: conv(d.weeklyLossLimit),
+      monthlyLossLimit: d.monthlyLossLimit !== undefined ? conv(d.monthlyLossLimit) : undefined,
+    };
+  }
+
+  /**
+   * IRTC R2-08: records the day/week/month start equity of every active account at the period
+   * boundary (called by the engine loop's sweep), so a loss taken before the account's first request
+   * of the day still counts against the daily loss limit and the Novice cooling-off.
+   */
+  async snapshotPeriodStarts(now = Date.now()): Promise<number> {
+    const rows = await this.db.query<AccountRow>(
+      `SELECT a.* FROM accounts a
+       WHERE (EXISTS (SELECT 1 FROM positions p WHERE p.account_id = a.id AND p.qty <> 0)
+           OR EXISTS (SELECT 1 FROM orders o WHERE o.account_id = a.id AND o.status IN ('working', 'partially_filled')))
+         AND NOT EXISTS (SELECT 1 FROM account_equity_snapshots s WHERE s.account_id = a.id AND s.period = 'day' AND s.period_start = $1::date)`,
+      [utcDate(now)],
+    );
+    for (const a of rows) await this.value(a, undefined, now);
+    return rows.length;
   }
 
   /** Novice borrowing cap in effect ("1" = off), never above the configured novice maximum. */
@@ -380,7 +431,11 @@ export class AccountsService {
       grossExposure: m(v.summary.grossExposure),
       leverage: v.summary.leverage.toDecimalPlaces(2).toFixed(2),
       dailyLossLimit: m(dec(limits.dailyLossLimit)),
-      dailyLossUsedPct: formatPct(dailyLoss.div(dec(limits.dailyLossLimit))),
+      dailyLossUsedPct: dec(limits.dailyLossLimit).gt(0)
+        ? formatPct(dailyLoss.div(dec(limits.dailyLossLimit)))
+        : dailyLoss.gt(0)
+          ? '100.00'
+          : '0.00',
       openPositions: v.positions.length,
       unpriced: v.summary.unpriced,
       halt: {
@@ -455,22 +510,10 @@ export class AccountsService {
       if (patch.confirmNotionalAbove) settings.confirmNotionalAbove = patch.confirmNotionalAbove;
       if (patch.confirmLossPctAbove) settings.confirmLossPctAbove = patch.confirmLossPctAbove;
       const now = Date.now();
-      const eff = this.limits(a, now);
-      const requested = { ...(patch.riskLimits ?? {}), ...(opts.extraLimits ?? {}) };
-      const change = applyLimitChanges(
-        a.risk_limits as StoredLimits,
-        requested,
-        (f) =>
-          f === 'noviceMaxLeverage'
-            ? this.noviceMaxLeverage(a, now)
-            : f === 'maxOrdersPerMinute'
-              ? String(eff.maxOrdersPerMinute)
-              : (eff as unknown as Record<string, string | undefined>)[f],
-        now,
-        opts.guarded ? this.cfg.novice.loosenDelayMs : 0,
-      );
-      const riskLimits = change.stored;
       let base = a.base_currency;
+      let startingCash = a.starting_cash;
+      let storedLimits = a.risk_limits as StoredLimits;
+      let conversion: Record<string, string> | null = null;
       if (patch.baseCurrency && patch.baseCurrency !== a.base_currency) {
         const fills = await c.query('SELECT 1 FROM fills WHERE account_id = $1 LIMIT 1', [a.id]);
         const open = await c.query(
@@ -485,10 +528,57 @@ export class AccountsService {
           });
         }
         base = patch.baseCurrency;
+        // IRTC R2-05: convert, never relabel. The SIMULATED balance is moved to the new currency
+        // at the current rate (reversal + deposit, both journals in their own currency) and the
+        // own limits are converted with it; the platform limits follow via `settings.limitFx`.
+        const rate = await this.fx.rate(a.base_currency, base, now);
+        const platformRate =
+          base === this.cfg.baseCurrency ? null : await this.fx.rate(this.cfg.baseCurrency, base, now);
+        if (!rate || (base !== this.cfg.baseCurrency && !platformRate))
+          throw new ConflictException({
+            error: 'fx_unavailable',
+            message: `No exchange rate from ${a.base_currency} to ${base} is available, so the balance cannot be converted. Try again later.`,
+          });
+        const cashBefore = dec(a.cash);
+        const cashAfter = roundMoney(cashBefore.mul(rate.rate), base);
+        await this.ledger.post(c, a.id, depositReversalJournal(cashBefore, a.base_currency), {
+          type: 'account',
+          id: a.id,
+        });
+        await this.ledger.post(c, a.id, depositJournal(cashAfter, base), { type: 'account', id: a.id });
+        startingCash = roundMoney(dec(a.starting_cash).mul(rate.rate), base).toFixed();
+        storedLimits = convertOwnLimits(storedLimits, rate.rate, base);
+        if (platformRate)
+          settings.limitFx = { from: this.cfg.baseCurrency, to: base, rate: platformRate.rate.toFixed() };
+        else delete settings.limitFx;
+        conversion = {
+          from: a.base_currency,
+          to: base,
+          rate: rate.rate.toFixed(),
+          rateFresh: String(rate.fresh),
+          cashBefore: cashBefore.toFixed(),
+          cashAfter: cashAfter.toFixed(),
+        };
       }
+      const converted: AccountRow = { ...a, base_currency: base, settings, risk_limits: storedLimits };
+      const eff = this.limits(converted, now);
+      const requested = { ...(patch.riskLimits ?? {}), ...(opts.extraLimits ?? {}) };
+      const change = applyLimitChanges(
+        storedLimits,
+        requested,
+        (f) =>
+          f === 'noviceMaxLeverage'
+            ? this.noviceMaxLeverage(converted, now)
+            : f === 'maxOrdersPerMinute'
+              ? String(eff.maxOrdersPerMinute)
+              : (eff as unknown as Record<string, string | undefined>)[f],
+        now,
+        opts.guarded ? this.cfg.novice.loosenDelayMs : 0,
+      );
+      const riskLimits = change.stored;
       const r = await c.query<AccountRow>(
-        'UPDATE accounts SET settings = $2::jsonb, risk_limits = $3::jsonb, base_currency = $4, updated_at = now() WHERE id = $1 RETURNING *',
-        [a.id, JSON.stringify(settings), JSON.stringify(riskLimits), base],
+        'UPDATE accounts SET settings = $2::jsonb, risk_limits = $3::jsonb, base_currency = $4, starting_cash = $5::numeric, updated_at = now() WHERE id = $1 RETURNING *',
+        [a.id, JSON.stringify(settings), JSON.stringify(riskLimits), base, startingCash],
       );
       await this.audit.record(
         {
@@ -501,6 +591,7 @@ export class AccountsService {
             JSON.stringify({
               changed: patch,
               previousBaseCurrency: a.base_currency,
+              currencyConversion: conversion,
               guarded: !!opts.guarded,
               limitsApplied: change.applied,
               limitsPending: change.pending,
@@ -512,4 +603,22 @@ export class AccountsService {
       return r.rows[0]!;
     });
   }
+}
+
+/** Own money limits (and pending loosenings) converted to a new account currency (IRTC R2-05). */
+function convertOwnLimits(stored: StoredLimits, rate: Decimal, ccy: string): StoredLimits {
+  if (!stored) return stored;
+  const conv = (v: unknown): unknown =>
+    typeof v === 'string' || typeof v === 'number'
+      ? roundMoney(dec(String(v)).mul(rate), ccy).toFixed()
+      : v;
+  const out: StoredLimits = { ...stored };
+  for (const f of MONEY_LIMIT_FIELDS) if (out[f] !== undefined) out[f] = conv(out[f]);
+  if (stored.pending) {
+    const pending = { ...stored.pending } as Record<string, { value: string; effectiveAt: string }>;
+    for (const f of MONEY_LIMIT_FIELDS)
+      if (pending[f]) pending[f] = { ...pending[f], value: conv(pending[f].value) as string };
+    out.pending = pending as StoredLimits['pending'];
+  }
+  return out;
 }
