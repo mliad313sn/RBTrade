@@ -1,5 +1,5 @@
 -- 0140 brute-force protection of sign-in (IRTC R1-01, R1-04, R1-07).
--- Policy: docs/open-questions.md OQ-R1-1 (Product Owner, delegated Sponsor authority).
+-- Policy: docs/open-questions.md OQ-SA1 (Product Owner, delegated Sponsor authority).
 --
 -- 1. Second factor (TOTP, recovery code, step-up) failures get their own counter. Only a successful
 --    second factor resets it; a correct password never does (R1-01). `users.locked_until` now means

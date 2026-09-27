@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 /**
  * Brute-force policy for the dev IdP sign-in (IRTC R1-01, R1-04, R1-07).
- * Decided by the Product Owner under delegated Sponsor authority (docs/open-questions.md OQ-R1-1);
+ * Decided by the Product Owner under delegated Sponsor authority (docs/open-questions.md OQ-SA1);
  * the conservative option was taken at each choice.
  *
  * Second factor (TOTP code, recovery code, step-up code): consecutive failures are counted on the

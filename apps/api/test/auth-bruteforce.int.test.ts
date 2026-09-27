@@ -7,7 +7,7 @@ import { bearer, createUser, CSRF, nextTotpWindow, ownerQuery, PASSWORD, startAp
 
 /**
  * IRTC R1-01, R1-04, R1-07: brute-force protection of the password step and the second factor.
- * Policy (docs/open-questions.md OQ-R1-1, decided by the Product Owner under delegated Sponsor authority):
+ * Policy (docs/open-questions.md OQ-SA1, decided by the Product Owner under delegated Sponsor authority):
  * - second factor: 5 consecutive failures (TOTP, recovery code or step-up) lock it; only a
  *   successful second factor resets the count, never a correct password;
  * - password: progressive back-off per (e-mail, IP) and per e-mail, identical for existing and
