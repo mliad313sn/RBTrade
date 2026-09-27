@@ -49,6 +49,15 @@ const Schema = z.object({
   KORA_TRADING_ROLL_UTC_HOUR: z.coerce.number().int().min(0).max(23).default(21),
   KORA_RECONCILIATION_INTERVAL_MS: z.coerce.number().int().min(0).max(86_400_000).default(60_000),
   /**
+   * IRTC R2-20 / OQ-B3 (decided by the Product Owner under delegated Sponsor authority, PAPER only):
+   * margin level = equity / margin used. Below the call level a margin-call alert is raised; below the
+   * close-out level the largest losing position is closed at market until the level recovers.
+   */
+  KORA_MARGIN_CALL_LEVEL_PCT: decimal.default('100'),
+  KORA_MARGIN_CLOSEOUT_LEVEL_PCT: decimal.default('50'),
+  /** How often the engine sweep checks margin levels (0 = every sweep). */
+  KORA_MARGIN_CHECK_MS: z.coerce.number().int().min(0).max(3_600_000).default(5000),
+  /**
    * Test-only: symbols the engine treats as in session regardless of the calendar, so weekday-bound
    * e2e flows (EUR/USD) are deterministic at weekends (goal 04, ADR 0004). Refused outside dev/test.
    */
@@ -69,14 +78,16 @@ export type TradingConfig = ReturnType<typeof loadTradingConfig>;
 
 export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Schema.parse(env);
-  if (
-    e.KORA_TRADING_SESSION_OVERRIDE.length > 0 &&
-    !(e.KORA_ENV === 'dev' || e.KORA_ENV === 'test')
-  ) {
+  // IRTC R2-13: NODE_ENV=production counts as production even when KORA_ENV is unset (same
+  // predicate as the main config), so the test aid can never be enabled in a production build.
+  const devOrTest = (e.KORA_ENV === 'dev' || e.KORA_ENV === 'test') && env.NODE_ENV !== 'production';
+  if (e.KORA_TRADING_SESSION_OVERRIDE.length > 0 && !devOrTest) {
     throw new Error(
-      'KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused outside KORA_ENV=dev|test',
+      'KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused outside KORA_ENV=dev|test (and with NODE_ENV=production)',
     );
   }
+  if (Number(e.KORA_MARGIN_CLOSEOUT_LEVEL_PCT) >= Number(e.KORA_MARGIN_CALL_LEVEL_PCT))
+    throw new Error('KORA_MARGIN_CLOSEOUT_LEVEL_PCT must be below KORA_MARGIN_CALL_LEVEL_PCT');
   return {
     startingCash: e.KORA_PAPER_STARTING_CASH,
     baseCurrency: e.KORA_PAPER_BASE_CURRENCY,
@@ -103,6 +114,11 @@ export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
     engineEnabled: e.KORA_ENGINE_ENABLED,
     rollUtcHour: e.KORA_TRADING_ROLL_UTC_HOUR,
     reconciliationIntervalMs: e.KORA_RECONCILIATION_INTERVAL_MS,
+    margin: {
+      callLevelPct: e.KORA_MARGIN_CALL_LEVEL_PCT,
+      closeOutLevelPct: e.KORA_MARGIN_CLOSEOUT_LEVEL_PCT,
+      checkMs: e.KORA_MARGIN_CHECK_MS,
+    },
     sessionOverride: new Set(e.KORA_TRADING_SESSION_OVERRIDE),
   };
 }

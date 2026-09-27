@@ -72,6 +72,17 @@ describe('trading config', () => {
     expect(() => loadTradingConfig({ KORA_ENV: 'staging', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow(/refused/);
     expect(() => loadTradingConfig({ KORA_ENV: 'test', KORA_TRADING_SESSION_OVERRIDE: 'eurusd' })).toThrow();
   });
+
+  it('IRTC R2-13: NODE_ENV=production refuses the session override even when KORA_ENV is unset', () => {
+    expect(() => loadTradingConfig({ NODE_ENV: 'production', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD,AAPL' })).toThrow(/refused/);
+    expect(() => loadTradingConfig({ NODE_ENV: 'production', KORA_ENV: 'test', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow(/refused/);
+  });
+
+  it('IRTC R2-20: margin call and close-out levels default to 100% / 50% and must be ordered', () => {
+    expect(loadTradingConfig({}).margin).toEqual({ callLevelPct: '100', closeOutLevelPct: '50', checkMs: 5000 });
+    expect(loadTradingConfig({ KORA_MARGIN_CALL_LEVEL_PCT: '120', KORA_MARGIN_CLOSEOUT_LEVEL_PCT: '80' }).margin).toMatchObject({ callLevelPct: '120', closeOutLevelPct: '80' });
+    expect(() => loadTradingConfig({ KORA_MARGIN_CALL_LEVEL_PCT: '50', KORA_MARGIN_CLOSEOUT_LEVEL_PCT: '50' })).toThrow(/below/);
+  });
 });
 
 describe('DAY expiry follows the venue calendar', () => {
