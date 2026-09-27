@@ -8,16 +8,13 @@ import QRCode from 'qrcode';
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { api } from '@/lib/api-browser';
+import { safeNext } from '@/lib/safe-next';
 
 type Step =
   | { kind: 'credentials' }
   | { kind: 'enroll'; mfaToken: string; secret?: string; otpauthUrl?: string; qr?: string }
   | { kind: 'verify'; mfaToken: string; recovery?: boolean }
   | { kind: 'recovery-codes'; codes: string[] };
-
-function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
-}
 
 function message(e: unknown): string {
   if (e instanceof KoraApiError) {

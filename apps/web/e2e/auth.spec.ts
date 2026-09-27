@@ -128,3 +128,25 @@ test('web security headers (goal 10): nonce CSP without unsafe-inline scripts, f
   const b = (await request.get('/login')).headers()['content-security-policy'];
   expect(a).not.toBe(b);
 });
+
+// IRTC R1-06: `next=` must stay a same-origin relative path after a genuine sign-in.
+for (const next of ['/%5Cevil.example/phish', '/%09/evil.example/phish', '//evil.example/phish', '/%2F%2Fevil.example/phish']) {
+  test(`post-login redirect refuses an off-site next (${next})`, async ({ page, baseURL }) => {
+    const email = uniqueEmail('redirect');
+    const signup = await page.request.post('/api/auth/signup', { headers: { 'x-kora-csrf': '1' }, data: { email, password: PASSWORD, displayName: 'Redirect' } });
+    expect(signup.status()).toBe(201);
+    const offsite: string[] = [];
+    await page.route(/evil\.example/, (route) => {
+      offsite.push(route.request().url());
+      return route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>attacker</h1>' });
+    });
+    await page.goto(`/login?next=${next}`);
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).not.toHaveURL(/\/login/);
+    await page.waitForLoadState('networkidle');
+    expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
+    expect(offsite).toEqual([]);
+  });
+}
