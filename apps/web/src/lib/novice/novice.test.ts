@@ -167,13 +167,45 @@ describe('no gamification lint (goal 08 §9)', () => {
     }
   }, 30_000);
 
-  it('does not touch Pro files, and the real novice files pass', async () => {
-    const pro = await lint(
+  it('IRTC R4-19: badges, trophies and achievements are forbidden in novice files too', async () => {
+    for (const code of [
+      "import { TrophyCase } from '@/components/TrophyCase';\nexport const A = () => <TrophyCase />;\n",
+      'export const A = () => <AchievementBadge />;\n',
+      'export const A = () => <Ui.CelebrationBurst />;\n',
+    ]) {
+      const msgs = await lint(code, 'src/components/novice/Fixture.tsx');
+      expect(
+        msgs.some((m) => /No gamification/.test(m.message)),
+        code,
+      ).toBe(true);
+    }
+  }, 30_000);
+
+  it('IRTC R4-19: Pro screens have no gamification or push nudges either; a status badge stays allowed', async () => {
+    for (const code of [
       "import c from 'canvas-confetti';\nexport const x = c;\n",
+      'export const A = () => <Leaderboard />;\n',
+      "export function nudge() { return new Notification('Trade now!'); }\n",
+      'export async function ask() { await Notification.requestPermission(); }\n',
+      'export async function sub(r: ServiceWorkerRegistration) { await r.pushManager.subscribe({ userVisibleOnly: true }); }\n',
+    ]) {
+      const msgs = await lint(code, 'src/components/robots/Fixture.tsx');
+      expect(
+        msgs.some((m) => /gamification|push nudges/i.test(m.message)),
+        code,
+      ).toBe(true);
+    }
+    const badge = await lint(
+      "import { SessionBadge } from '../terminal/Badges';\nexport const A = () => <SessionBadge mic='XNAS' state='open' />;\n",
       'src/components/robots/Fixture.tsx',
     );
-    expect(pro.some((m) => /No gamification/.test(m.message))).toBe(false);
+    expect(badge.some((m) => /gamification/i.test(m.message))).toBe(false);
+  }, 30_000);
+
+  it('the real novice and Pro files pass', async () => {
     const results = await eslint.lintFiles([
+      'src/components/**/*.tsx',
+      'src/app/**/*.tsx',
       'src/components/novice/**/*.tsx',
       'src/app/(app)/home/**/*.tsx',
       'src/lib/novice/**/*.tsx',
@@ -181,7 +213,7 @@ describe('no gamification lint (goal 08 §9)', () => {
       'src/components/intel/WhatsMovingCard.tsx',
     ]);
     expect(
-      results.flatMap((r) => r.messages.filter((m) => /No gamification/.test(m.message))),
+      results.flatMap((r) => r.messages.filter((m) => /gamification|push nudges/i.test(m.message))),
     ).toEqual([]);
   }, 60_000);
 });
