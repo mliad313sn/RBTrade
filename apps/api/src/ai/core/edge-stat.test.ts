@@ -83,7 +83,7 @@ describe('edge after costs accounts for overlapping and cross-correlated predict
     expect(sd(pooledT)).toBeGreaterThan(3);
     expect(clusteredPositive / seeds).toBeLessThanOrEqual(0.06);
     expect(sd(clusteredT)).toBeLessThan(1.4);
-  });
+  }, 60_000); // 120 simulated worlds (slower under coverage instrumentation)
 
   it('uses time buckets of one horizon as the effective sample size', () => {
     const rows = noSkillWorld(7, 264);
