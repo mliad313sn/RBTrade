@@ -161,17 +161,25 @@ test.describe('Pro views (trader), numbers and state', () => {
     await page.getByRole('tab', { name: /Positions/ }).click();
     const row = page.getByTestId('pos-BTCUSD');
     await expect(row).toBeVisible();
-    const marks = new Set<string>();
-    for (let i = 0; i < 16; i++) {
-      // Read the row and the summary in the same frame.
-      const { cells, summary } = await page.evaluate(() => ({
+    // Read the row and the summary in the same frame.
+    const frame = () =>
+      page.evaluate(() => ({
         cells: [...document.querySelectorAll('[data-testid=pos-BTCUSD] td')].map((td) => (td as HTMLElement).innerText),
         summary: (document.querySelector('[data-testid=blotter-summary]') as HTMLElement).innerText.replace(/\s+/g, ' '),
       }));
-      marks.add(cells[4]!.trim());
+    const agrees = (f: { cells: string[]; summary: string }) => f.summary.includes(`Unrealized ${f.cells[7]!.replace(/Stale/g, '').trim()}`);
+    // IRTC R6 (first-read race): the row can render from the positions snapshot before the first
+    // live quote and before the account snapshot that includes the new position; until then the
+    // summary deliberately keeps the engine's figures ("trade in flight"). Sample only once the row
+    // is repriced live and the two snapshots describe the same book.
+    await expect(row).toHaveAttribute('data-live', 'true', { timeout: 15_000 });
+    await expect.poll(async () => agrees(await frame()), { timeout: 25_000 }).toBe(true);
+    const marks = new Set<string>();
+    for (let i = 0; i < 16; i++) {
+      const f = await frame();
+      marks.add(f.cells[4]!.trim());
       // One source of truth: the summary's unrealized equals the only position's P&L (same render).
-      const pnl = cells[7]!.replace(/Stale/g, '').trim();
-      expect(summary).toContain(`Unrealized ${pnl}`);
+      expect(f.summary).toContain(`Unrealized ${f.cells[7]!.replace(/Stale/g, '').trim()}`);
       await page.waitForTimeout(500);
     }
     // The SIMULATED feed ticks several times in 8 s; a frozen mark shows one value until the 20 s reconcile.

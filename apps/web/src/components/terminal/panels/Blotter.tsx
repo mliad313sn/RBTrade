@@ -116,7 +116,7 @@ export function PositionsPanel() {
               const pnl = p.unrealizedPnl ? dec(p.unrealizedPnl) : null;
               const pct = equity && equity.gt(0) && p.notional ? dec(p.notional).div(equity).mul(100).toDecimalPlaces(1).toFixed(1) : null;
               return (
-                <tr key={p.symbol} data-testid={`pos-${p.symbol}`}>
+                <tr key={p.symbol} data-testid={`pos-${p.symbol}`} data-live={p.live ? 'true' : 'false'}>
                   <td>
                     <button type="button" className="bl-link" onClick={() => setSymbol(p.symbol)}>
                       {spec?.displayName ?? p.symbol}
