@@ -30,13 +30,13 @@ Goal 09 control framework aligned with COBIT 2019 (governance and management obj
 | ID | Control | COBIT 2019 | Owner line | Frequency | Nature | Evidence |
 |---|---|---|---|---|---|---|
 | KC-01 | MFA enforced for every privileged role | DSS05.04 | 1st line | continuous | preventive, automated | query |
-| KC-02 | Privileged role changes recorded and reviewed | DSS05.04, DSS06.03 | 1st line | quarterly | detective, semi-automated | log |
+| KC-02 | Privileged role changes recorded, four-eyes approved and reviewed | DSS05.04, DSS06.03 | 1st line | quarterly | detective, semi-automated | log |
 | KC-03 | Failed sign-in monitoring and lockout | DSS05.04, DSS05.07 | 1st line | daily | detective, automated | query |
 | KC-04 | Internal auditor independence (role segregation) | DSS06.03, MEA04 | 2nd line | continuous | preventive, automated | query |
 | KC-05 | Four-eyes risk sign-off before robot promotion | DSS06.03, BAI06.01 | 2nd line | per event | preventive, automated | query |
 | KC-06 | Four-eyes on loosening risk limits above the platform default | DSS06.03, APO12.06 | 2nd line | per event | preventive, automated | query |
 | KC-07 | Four-eyes on resuming trading after a firm halt | DSS06.03, APO12.06 | 2nd line | per event | preventive, automated | query |
-| KC-08 | Four-eyes on MFA resets and disclosure publications | DSS05.04, MEA03.02 | 2nd line | per event | preventive, automated | query |
+| KC-08 | Four-eyes on MFA resets, disclosure publications and privileged role grants, with independent approvers | DSS05.04, MEA03.02 | 2nd line | per event | preventive, automated | query |
 | KC-09 | Strategy changes are versioned, attributed and immutable | BAI06.01, BAI06.04 | 1st line | per event | preventive, automated | query |
 | KC-10 | Database changes through forward-only, checksummed migrations | BAI06.03, BAI10 | 1st line | per event | preventive, automated | query |
 | KC-11 | Releases carry a build identifier and an approval reference | BAI07, BAI06.01 | 1st line | per event | detective, automated | log |
@@ -85,24 +85,25 @@ Test procedure:
 2. Re-perform: call a privileged API with a token issued without the otp claim and confirm 403 mfa_required (automated in test/auth.int.test.ts).
 3. Sample 10 auth.login events of privileged users and confirm the payload records MFA.
 
-#### KC-02 — Privileged role changes recorded and reviewed
+#### KC-02 — Privileged role changes recorded, four-eyes approved and reviewed
 
 | Field | Value |
 |---|---|
-| Objective | Every grant or removal of a role is attributable and reviewed each quarter. |
+| Objective | Every grant or removal of a role is attributable and reviewed each quarter; granting admin, risk officer, auditor or trader needs a second admin and a reason, and nobody grants themselves a role. |
 | COBIT 2019 | DSS05.04, DSS06.03 |
 | Risk addressed | Unreviewed privilege creep gives users capabilities outside their duties. |
 | Owner | 1st line: Platform admin, reviewed by Risk & Compliance |
 | Frequency | quarterly |
 | Nature | detective, semi-automated |
-| Automated evidence (log) | admin.roles_changed audit events in the period + current roster of privileged roles |
+| Automated evidence (log) | admin.roles_changed audit events in the period with the four-eyes request, requester and approver; privileged grants without four-eyes (must be 0); self-granted roles now (must be 0); current roster of privileged roles |
 | Evidence export | `GET /governance/controls/KC-02/evidence?from=…&to=…&format=csv\|pdf` |
 | Sampling audit actions | `admin.roles_changed`, `appropriateness.passed` |
 
 Test procedure:
 
-1. Export the evidence for the quarter; trace every role change to a ticket or approval.
+1. Export the evidence for the quarter; confirm "privileged grants without four-eyes" and "self-granted roles now" are 0, and trace every role change to a ticket or approval.
 2. Compare the roster with the HR joiner/mover/leaver list; any unmatched privileged user is an exception.
+3. Re-perform: an admin granting risk_officer gets 202 and a pending role_grant request; they cannot approve it, a risk officer cannot approve it, a second admin can; an admin adding a role to themselves gets 403 self_grant (test/role-grants.int.test.ts).
 
 #### KC-03 — Failed sign-in monitoring and lockout
 
@@ -202,24 +203,25 @@ Test procedure:
 1. Export the evidence; confirm "firm resumes without four-eyes" is 0.
 2. Re-perform: POST /kill-switch/resume on a firm halt returns 202 and the requester cannot approve it.
 
-#### KC-08 — Four-eyes on MFA resets and disclosure publications
+#### KC-08 — Four-eyes on MFA resets, disclosure publications and privileged role grants, with independent approvers
 
 | Field | Value |
 |---|---|
-| Objective | Resetting a user’s second factor and publishing regulatory text or figures need two people. |
+| Objective | Resetting a user’s second factor, publishing regulatory text or figures and granting a privileged role need two people, and the approver’s own approval role was not granted or approved by the requester. |
 | COBIT 2019 | DSS05.04, MEA03.02 |
 | Risk addressed | Social-engineered MFA reset; unreviewed disclosure text or figures shown to customers. |
 | Owner | 2nd line: Risk & Compliance (S8) with platform admin |
 | Frequency | per event |
 | Nature | preventive, automated |
-| Automated evidence (query) | four_eyes_requests (mfa_reset, disclosure_publish) in the period with requester, approver and outcome |
+| Automated evidence (query) | four_eyes_requests (mfa_reset, disclosure_publish, role_grant) in the period with requester, approver and outcome; decisions whose approver role was granted or approved by the requester (must be 0) |
 | Evidence export | `GET /governance/controls/KC-08/evidence?from=…&to=…&format=csv\|pdf` |
-| Sampling audit actions | `auth.mfa_reset`, `disclosure.published`, `disclosure.value_set` |
+| Sampling audit actions | `auth.mfa_reset`, `disclosure.published`, `disclosure.value_set`, `admin.roles_changed` |
 
 Test procedure:
 
-1. Export the evidence; confirm each approved request has a distinct approver.
+1. Export the evidence; confirm each approved request has a distinct approver and "approver role granted by requester" is 0.
 2. Confirm each published disclosure version has approved_by ≠ drafted_by (disclosure_documents).
+3. Re-perform: a user whose risk_officer role the requester granted cannot approve that requester (403 approver_not_independent, test/role-grants.int.test.ts).
 
 ### Change management
 
@@ -609,11 +611,12 @@ Test procedure:
 | Nature | preventive, automated |
 | Automated evidence (query) | users holding trader without a passed appropriateness attempt (must be 0) + attempts in the period |
 | Evidence export | `GET /governance/controls/KC-28/evidence?from=…&to=…&format=csv\|pdf` |
-| Sampling audit actions | `appropriateness.passed`, `appropriateness.failed` |
+| Sampling audit actions | `appropriateness.passed`, `appropriateness.failed`, `admin.roles_changed` |
 
 Test procedure:
 
-1. Export the evidence; each exception must be an admin-granted role with a documented reason.
+1. Export the evidence; each exception must be a four-eyes role_grant flagged appropriatenessOverride, with a documented reason (KC-02 evidence).
+2. Re-perform: an admin granting trader without a reason gets 400; with a reason it becomes a pending role_grant approved by a second admin; a Keycloak token carrying trader without a passed attempt is stripped of it.
 
 #### KC-29 — Best-execution monitoring
 

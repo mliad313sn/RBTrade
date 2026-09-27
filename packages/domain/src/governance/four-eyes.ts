@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { GUARDED_LIMIT_FIELDS } from '../novice/limits.js';
+import type { Role } from '../roles.js';
 
 /**
  * Four-eyes engine (goal 09). One request/approve workflow for every segregation-of-duties control
@@ -13,10 +14,18 @@ export const FOUR_EYES_KINDS = [
   'kill_switch_resume',
   'mfa_reset',
   'disclosure_publish',
+  // IRTC R4-02: granting an approval-conferring or privileged role (created by PUT /admin/users/:id/roles).
+  'role_grant',
 ] as const;
 export type FourEyesKind = (typeof FOUR_EYES_KINDS)[number];
 
-export const FOUR_EYES_STATUSES = ['pending', 'approved', 'rejected', 'cancelled', 'expired'] as const;
+export const FOUR_EYES_STATUSES = [
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled',
+  'expired',
+] as const;
 export type FourEyesStatus = (typeof FOUR_EYES_STATUSES)[number];
 
 export const FOUR_EYES_LABELS: Record<FourEyesKind, string> = {
@@ -24,6 +33,7 @@ export const FOUR_EYES_LABELS: Record<FourEyesKind, string> = {
   kill_switch_resume: 'Resume trading after a firm halt',
   mfa_reset: 'Reset a user’s two-factor authentication',
   disclosure_publish: 'Publish a disclosure version',
+  role_grant: 'Grant a privileged role (admin, risk officer, auditor or trader)',
 };
 
 /** Limit fields that may be raised above the platform default for one account (not novice caps). */
@@ -39,7 +49,10 @@ export const LimitOverrideRequestSchema = z.strictObject({
   kind: z.literal('limit_override'),
   accountId: z.uuid(),
   limits: z
-    .partialRecord(z.enum(OVERRIDABLE_LIMIT_FIELDS as [OverridableLimitField, ...OverridableLimitField[]]), decimalString)
+    .partialRecord(
+      z.enum(OVERRIDABLE_LIMIT_FIELDS as [OverridableLimitField, ...OverridableLimitField[]]),
+      decimalString,
+    )
     .refine((l) => Object.keys(l).length > 0, 'at least one limit'),
   reason,
 });
@@ -90,4 +103,36 @@ export const FourEyesDecisionSchema = z.strictObject({
 /** The rule itself, shared by the service and its tests. */
 export function fourEyesViolation(requestedBy: string, decidedBy: string): boolean {
   return requestedBy === decidedBy;
+}
+
+/** One of the decider's role rows, as stored in `user_roles`. */
+export interface RoleGrantRecord {
+  role: Role;
+  grantedBy: string | null;
+  approvedBy: string | null;
+  grantedAt: Date;
+}
+
+/**
+ * IRTC R4-02: approver independence. A decider may act on a request only through an approval role
+ * (`approverRoles`) that was neither granted nor approved by the requester, and that is older than
+ * the cooling period. Otherwise one person could create their own approver. Returns null when the
+ * decider is independent, or the reason.
+ */
+export function approverIndependenceIssue(
+  grants: readonly RoleGrantRecord[],
+  requesterId: string,
+  approverRoles: readonly Role[],
+  now: Date,
+  coolingMs: number,
+): 'no_approver_role' | 'granted_by_requester' | 'cooling_period' | null {
+  const eligible = grants.filter((g) => approverRoles.includes(g.role));
+  if (!eligible.length) return 'no_approver_role';
+  const independent = eligible.filter(
+    (g) => g.grantedBy !== requesterId && g.approvedBy !== requesterId,
+  );
+  if (!independent.length) return 'granted_by_requester';
+  if (!independent.some((g) => now.getTime() - g.grantedAt.getTime() >= coolingMs))
+    return 'cooling_period';
+  return null;
 }

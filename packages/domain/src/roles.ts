@@ -44,10 +44,30 @@ export const GOVERNANCE_ROLES: readonly Role[] = ['risk_officer', 'admin', 'audi
 export const APPROVER_ROLES: readonly Role[] = ['risk_officer', 'admin'];
 
 /**
+ * IRTC R4-02/R4-10: roles whose grant needs four eyes (a second admin), never a self-grant: the ones
+ * that confer approval power or read-all access (admin, risk_officer, auditor) and `trader`, which
+ * otherwise only the appropriateness assessment grants.
+ */
+export const PRIVILEGED_GRANT_ROLES: readonly Role[] = [
+  'admin',
+  'risk_officer',
+  'auditor',
+  'trader',
+];
+
+/** Only an admin approves a role grant. */
+export const ROLE_GRANT_APPROVER_ROLES: readonly Role[] = ['admin'];
+
+/**
  * Segregation of duties (goal 09): the internal auditor (3rd line) is independent and may not hold a
  * role that operates or controls trading. Returns the conflicting pair, or null.
  */
-export const AUDITOR_INCOMPATIBLE_ROLES: readonly Role[] = ['trader', 'quant', 'risk_officer', 'admin'];
+export const AUDITOR_INCOMPATIBLE_ROLES: readonly Role[] = [
+  'trader',
+  'quant',
+  'risk_officer',
+  'admin',
+];
 
 export function rolesConflict(roles: readonly Role[]): [Role, Role] | null {
   if (!roles.includes('auditor')) return null;

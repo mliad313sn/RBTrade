@@ -48,6 +48,8 @@ function table(columns: string[], rows: Row[], summary: Record<string, Cell> = {
 }
 
 const PRIVILEGED = `('trader','quant','risk_officer','admin','auditor')`;
+/** Roles whose grant needs four eyes (IRTC R4-02, PRIVILEGED_GRANT_ROLES). */
+const GRANT_PRIVILEGED = `('trader','risk_officer','admin','auditor')`;
 const LIMIT_CODES = `('MAX_ORDER_NOTIONAL','FAT_FINGER','MAX_POSITION','MAX_LEVERAGE','INSUFFICIENT_MARGIN','DAILY_LOSS_LIMIT','WEEKLY_LOSS_LIMIT','MONTHLY_LOSS_LIMIT','ORDER_RATE_LIMIT')`;
 
 /**
@@ -75,15 +77,25 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
     });
   },
   'KC-02': async ({ db }, { from, to }) => {
+    // IRTC R4-02: a change that adds admin, risk_officer, auditor or trader must carry a four-eyes
+    // request (requester ≠ approver); `added_privileged` lists what it granted.
     const rows = await db.query<Row>(
-      `SELECT id::text AS audit_id, ts, actor_id AS changed_by, entity_id AS user_id, payload->'before' AS before, payload->'after' AS after
-       FROM audit_events WHERE action = 'admin.roles_changed' AND ts >= $1 AND ts < $2 ORDER BY id`,
+      `SELECT e.id::text AS audit_id, e.ts, e.actor_id AS changed_by, e.entity_id AS user_id, e.payload->'before' AS before, e.payload->'after' AS after,
+              e.payload->>'requestId' AS four_eyes_request, e.payload->>'requestedBy' AS requested_by, e.payload->>'approvedBy' AS approved_by,
+              (SELECT string_agg(r, ' ' ORDER BY r) FROM jsonb_array_elements_text(e.payload->'after') r
+                WHERE r IN ${GRANT_PRIVILEGED} AND NOT (e.payload->'before') ? r) AS added_privileged
+       FROM audit_events e WHERE e.action = 'admin.roles_changed' AND e.ts >= $1 AND e.ts < $2 ORDER BY e.id`,
       [from, to],
     );
     const roster = await db.query<{ n: string }>(`SELECT count(DISTINCT user_id)::text AS n FROM user_roles WHERE role IN ${PRIVILEGED}`);
-    return table(['audit_id', 'ts', 'changed_by', 'user_id', 'before', 'after'], rows, {
+    const privileged = rows.filter((x) => x.added_privileged);
+    const selfGrants = await db.query<{ n: string }>(`SELECT count(*)::text AS n FROM user_roles WHERE granted_by = user_id OR approved_by = user_id`);
+    return table(['audit_id', 'ts', 'changed_by', 'user_id', 'before', 'after', 'added_privileged', 'four_eyes_request', 'requested_by', 'approved_by'], rows, {
       role_changes: rows.length,
       privileged_roster_now: Number(roster[0]?.n ?? 0),
+      privileged_grants_with_four_eyes: privileged.filter((x) => x.four_eyes_request && x.requested_by !== x.approved_by).length,
+      privileged_grants_without_four_eyes: privileged.filter((x) => !x.four_eyes_request || x.requested_by === x.approved_by).length,
+      self_granted_roles_now: Number(selfGrants[0]?.n ?? 0),
     });
   },
   'KC-03': async ({ db }, { from, to }) => {
@@ -151,7 +163,7 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
       },
     );
   },
-  'KC-08': async ({ db }, r) => fourEyes(db, r, ['mfa_reset', 'disclosure_publish']),
+  'KC-08': async ({ db }, r) => fourEyes(db, r, ['mfa_reset', 'disclosure_publish', 'role_grant']),
   'KC-09': async ({ db }, { from, to }) => {
     const rows = await db.query<Row>(
       `SELECT v.id, v.strategy_id, v.version, v.author_id, v.reason, v.content_hash, v.created_at
@@ -512,18 +524,26 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
 };
 
 async function fourEyes(db: DbService, { from, to }: Range, kinds: string[]): Promise<EvidenceTable> {
+  // IRTC R4-02: `approver_granted_by_requester` is true when every approval role the decider holds
+  // (admin for role grants, risk_officer/admin otherwise) was granted or approved by the requester.
   const rows = await db.query<Row>(
-    `SELECT id, kind, subject_type, subject_id, requested_by, requested_at, status, decided_by, decided_at, reason, decision_note
-     FROM four_eyes_requests WHERE kind = ANY($3::text[]) AND requested_at >= $1 AND requested_at < $2 ORDER BY requested_at`,
+    `SELECT f.id, f.kind, f.subject_type, f.subject_id, f.requested_by, f.requested_at, f.status, f.decided_by, f.decided_at, f.reason, f.decision_note,
+            (f.decided_by IS NOT NULL AND f.status IN ('approved', 'rejected') AND NOT EXISTS (
+               SELECT 1 FROM user_roles ur
+                WHERE ur.user_id = f.decided_by
+                  AND ur.role = ANY(CASE WHEN f.kind = 'role_grant' THEN ARRAY['admin'] ELSE ARRAY['risk_officer', 'admin'] END)
+                  AND ur.granted_by IS DISTINCT FROM f.requested_by AND ur.approved_by IS DISTINCT FROM f.requested_by)) AS approver_granted_by_requester
+     FROM four_eyes_requests f WHERE f.kind = ANY($3::text[]) AND f.requested_at >= $1 AND f.requested_at < $2 ORDER BY f.requested_at`,
     [from, to, kinds],
   );
   return table(
-    ['id', 'kind', 'subject_type', 'subject_id', 'requested_by', 'requested_at', 'status', 'decided_by', 'decided_at', 'reason', 'decision_note'],
+    ['id', 'kind', 'subject_type', 'subject_id', 'requested_by', 'requested_at', 'status', 'decided_by', 'decided_at', 'reason', 'decision_note', 'approver_granted_by_requester'],
     rows,
     {
       requests: rows.length,
       approved: rows.filter((x) => x.status === 'approved').length,
       requester_equals_approver: rows.filter((x) => (x.status === 'approved' || x.status === 'rejected') && x.decided_by === x.requested_by).length,
+      approver_role_granted_by_requester: rows.filter((x) => x.approver_granted_by_requester === true).length,
     },
   );
 }

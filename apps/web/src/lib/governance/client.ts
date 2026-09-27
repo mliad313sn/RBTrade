@@ -49,7 +49,7 @@ export interface AlertView {
 
 export interface FourEyesView {
   id: string;
-  kind: 'limit_override' | 'kill_switch_resume' | 'mfa_reset' | 'disclosure_publish';
+  kind: 'limit_override' | 'kill_switch_resume' | 'mfa_reset' | 'disclosure_publish' | 'role_grant';
   subjectType: string;
   subjectId: string;
   payload: Record<string, unknown>;

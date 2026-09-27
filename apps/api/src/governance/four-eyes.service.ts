@@ -2,14 +2,19 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  approverIndependenceIssue,
   APPROVER_ROLES,
   dec,
   hasAnyRole,
   isNoviceOnly,
+  isRole,
+  ROLE_GRANT_APPROVER_ROLES,
+  rolesConflict,
   type FourEyesCreate,
   type JsonValue,
   type Role,
@@ -23,6 +28,7 @@ import { DbDisclosureRegistry } from '../disclosures/db-disclosure-registry';
 import { AccountsService } from '../trading/accounts.service';
 import { KillSwitchService } from '../trading/kill-switch.service';
 import { FourEyesStore, toFourEyesView, type FourEyesRow, type FourEyesView } from './four-eyes.store';
+import { GOVERNANCE_CONFIG, type GovernanceConfig } from './governance-config';
 
 /**
  * Four-eyes workflow (goal 09): who may request what, who may decide, and what an approval does.
@@ -41,6 +47,7 @@ export class FourEyesService {
     private readonly accounts: AccountsService,
     private readonly killSwitch: KillSwitchService,
     private readonly disclosures: DbDisclosureRegistry,
+    @Inject(GOVERNANCE_CONFIG) private readonly cfg: GovernanceConfig,
   ) {}
 
   async list(q: Parameters<FourEyesStore['list']>[0]): Promise<FourEyesView[]> {
@@ -147,19 +154,53 @@ export class FourEyesService {
       throw new ForbiddenException({ error: 'forbidden', message: 'Only a risk officer or admin can decide four-eyes requests.' });
   }
 
-  /** The approver may not be the person the request is about (account owner, MFA subject, drafter). */
-  private assertIndependent(row: FourEyesRow, deciderId: string): void {
+  /** Roles through which a request of this kind may be decided (role grants: admins only). */
+  private approverRolesFor(row: FourEyesRow): readonly Role[] {
+    return row.kind === 'role_grant' ? ROLE_GRANT_APPROVER_ROLES : APPROVER_ROLES;
+  }
+
+  /** The approver may not be the person the request is about (account owner, MFA/role subject, drafter). */
+  private assertIndependent(row: FourEyesRow, deciderId: string, roles: Role[]): void {
+    if (!hasAnyRole(roles, this.approverRolesFor(row)))
+      throw new ForbiddenException({ error: 'forbidden', message: 'Only an admin can decide a role grant.' });
     const p = row.payload as Record<string, JsonValue>;
     const about =
       row.kind === 'limit_override' || row.kind === 'kill_switch_resume'
         ? (p.ownerId as string | undefined)
-        : row.kind === 'mfa_reset'
+        : row.kind === 'mfa_reset' || row.kind === 'role_grant'
           ? (p.userId as string | undefined)
           : ((p.document as { draftedBy?: string } | undefined)?.draftedBy ?? undefined);
     if (about && about === deciderId)
       throw new ForbiddenException({
         error: 'four_eyes',
-        message: 'Four-eyes rule: you cannot decide a request about your own account, credentials or draft.',
+        message: 'Four-eyes rule: you cannot decide a request about your own account, credentials, roles or draft.',
+      });
+  }
+
+  /**
+   * IRTC R4-02: the decider must hold an approval role that the requester neither granted nor
+   * approved, and that has passed the cooling period. Read from the database, not the token.
+   */
+  private async assertApproverIndependent(c: Queryable, row: FourEyesRow, deciderId: string): Promise<void> {
+    const grants = (
+      await c.query<{ role: string; granted_by: string | null; approved_by: string | null; granted_at: Date }>(
+        'SELECT role, granted_by, approved_by, granted_at FROM user_roles WHERE user_id = $1',
+        [deciderId],
+      )
+    ).rows
+      .filter((g) => isRole(g.role))
+      .map((g) => ({ role: g.role as Role, grantedBy: g.granted_by, approvedBy: g.approved_by, grantedAt: g.granted_at }));
+    const now = (await c.query<{ now: Date }>('SELECT clock_timestamp() AS now')).rows[0]!.now;
+    const issue = approverIndependenceIssue(grants, row.requested_by, this.approverRolesFor(row), now, this.cfg.approverCoolingMs);
+    if (issue === 'no_approver_role')
+      throw new ForbiddenException({ error: 'forbidden', message: 'Your account no longer holds a role that can decide this request.' });
+    if (issue)
+      throw new ForbiddenException({
+        error: 'approver_not_independent',
+        message:
+          issue === 'granted_by_requester'
+            ? 'Four-eyes rule: your approval role was granted or approved by the requester, so you cannot decide their request.'
+            : 'Four-eyes rule: your approval role is too recent to decide requests yet (cooling period).',
       });
   }
 
@@ -168,7 +209,8 @@ export class FourEyesService {
     let refreshDisclosures = false;
     const row = await this.db.tx(async (c) => {
       const r = await this.store.lockPending(c, id, userId);
-      this.assertIndependent(r, userId);
+      this.assertIndependent(r, userId, roles);
+      await this.assertApproverIndependent(c, r, userId);
       const result = await this.execute(c, r, userId);
       if (r.kind === 'disclosure_publish') refreshDisclosures = true;
       return this.store.decide(c, r, userId, 'approved', note, result);
@@ -182,6 +224,9 @@ export class FourEyesService {
     return toFourEyesView(
       await this.db.tx(async (c) => {
         const r = await this.store.lockPending(c, id, userId);
+        // IRTC R4-17: the same independence rules apply to a rejection.
+        this.assertIndependent(r, userId, roles);
+        await this.assertApproverIndependent(c, r, userId);
         return this.store.decide(c, r, userId, 'rejected', note);
       }),
     );
@@ -234,6 +279,39 @@ export class FourEyesService {
           requestedBy: r.requested_by,
         });
         return { resumed: true, accountId: out.accountId, previousScope: out.previous.scope };
+      }
+      case 'role_grant': {
+        const userId = r.subject_id;
+        const before = (p.before as string[]).filter(isRole);
+        const after = (p.after as string[]).filter(isRole);
+        const current = await this.users.roles(userId, c);
+        // The request describes a change from a known state; if the roles moved since, ask again.
+        if ([...current].sort().join(',') !== [...before].sort().join(','))
+          throw new ConflictException({ error: 'stale_request', message: "The user's roles changed since this was requested. Ask again." });
+        const conflict = rolesConflict(after);
+        if (conflict)
+          throw new BadRequestException({ error: 'segregation_of_duties', message: `Segregation of duties: ${conflict[0]} cannot be combined with ${conflict[1]}.` });
+        await this.users.setRoles(c, userId, after, r.requested_by, { approvedBy: approver, requestId: r.id });
+        await this.sessions.invalidateAll(userId, c);
+        await this.audit.record(
+          {
+            actorId: approver,
+            actorType: 'user',
+            action: 'admin.roles_changed',
+            entity: 'user',
+            entityId: userId,
+            payload: {
+              before,
+              after,
+              requestId: r.id,
+              requestedBy: r.requested_by,
+              approvedBy: approver,
+              appropriatenessOverride: (p.appropriatenessOverride as boolean | undefined) ?? false,
+            },
+          },
+          c,
+        );
+        return { userId, roles: after };
       }
       case 'mfa_reset': {
         const del = await c.query('DELETE FROM user_mfa WHERE user_id = $1', [r.subject_id]);

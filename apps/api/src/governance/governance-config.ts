@@ -18,6 +18,11 @@ const Schema = z.object({
    * four eyes (intended for LIVE accounts).
    */
   KORA_FOUR_EYES_RESUME: z.enum(['firm', 'all']).default('firm'),
+  /**
+   * IRTC R4-02: an approver role younger than this cannot approve anything (cooling period after a
+   * grant). Empty = 24 h outside dev/test, 0 in dev/test.
+   */
+  KORA_APPROVER_COOLING_HOURS: z.coerce.number().min(0).max(24 * 90).optional(),
   /** Pending four-eyes requests expire after this many hours. */
   KORA_FOUR_EYES_TTL_HOURS: z.coerce.number().min(1).max(24 * 30).default(72),
   /** A running robot is "near auto-pause" at this % of any of its loss/drawdown limits. */
@@ -55,6 +60,7 @@ export function loadGovernanceConfig(env: NodeJS.ProcessEnv = process.env) {
     env: e.KORA_ENV,
     resumePolicy: e.KORA_FOUR_EYES_RESUME,
     fourEyesTtlMs: Math.round(e.KORA_FOUR_EYES_TTL_HOURS * 3_600_000),
+    approverCoolingMs: Math.round((e.KORA_APPROVER_COOLING_HOURS ?? (devLike ? 0 : 24)) * 3_600_000),
     nearPausePct: e.KORA_RISK_NEAR_PAUSE_PCT,
     nearLimitPct: e.KORA_RISK_NEAR_LIMIT_PCT,
     anchorJwk: e.KORA_AUDIT_ANCHOR_JWK,
