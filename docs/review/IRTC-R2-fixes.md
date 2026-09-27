@@ -257,4 +257,14 @@ The one existing test that changed is `trading-integrity.int.test.ts` › daily 
 
 ## Full gate (after)
 
-The results are in the Project Owner's corrector report for this worktree (branch `worktree-agent-aee6022ce73e6f51e`): build, lint, typecheck, unit tests, integration tests (run twice), e2e, and `py:check`.
+These runs were made on a shared host while other IRTC correctors were running (load average 7 to 21).
+
+| Step | Result |
+|---|---|
+| `pnpm build` | 7/7 tasks ✓ |
+| `pnpm lint` | 13/13 ✓ |
+| `pnpm typecheck` | 13/13 ✓ |
+| `pnpm test` | All packages ✓: domain 195, api 153, web 76, ui 114, market-data 72, sdk 16, ai-evals 4, bot-runner 11. Two timing assertions failed only while turbo ran every package in parallel on the loaded host: the domain `runs well under the 5 ms target` (0.025 ms per call when run alone) and the bot-runner `halts … within milliseconds`. Both pass on rerun: the bot-runner file 5 of 5 times, and the whole suite with `--concurrency=1` apart from that single bot-runner flake. Neither package's code under test was changed. |
+| `pnpm test:integration` | 41 files / 268 tests ✓ in runs 1, 3 and 4. Run 2 had one failure, which was not captured (turbo output) and did not recur in the two later full runs or in four extra repeats of `irtc-r2.int.test.ts`. |
+| `pnpm test:e2e` | Run 1: 61 passed, 3 failed. Run 2: 62 passed, 2 failed. The failures were `terminal-a11y-perf` axe (timeout) and tick-to-paint p95 (195 ms against 100 ms, load-bound), and `terminal.spec` › settings density persist, a race between two preference saves in the settings page. All 7 tests in those two specs pass when the specs run alone. None of them touches trading code; the density race is handed to the frontend owner (R5/S6). |
+| `pnpm py:check` | 164 passed, coverage 97.39 % ✓ |
