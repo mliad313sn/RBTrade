@@ -338,6 +338,7 @@ export class AiController {
         surface: 'robots',
         modelId: 'rules:robot-insights',
         promptHash: 'none',
+        author: 'user',
       },
       {
         strategyId: detail.strategyId,

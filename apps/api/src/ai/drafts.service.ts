@@ -15,8 +15,19 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { DbService } from '../db/db.service';
 import { TradingRegistryService } from '../trading/trading-registry.service';
+import { sha256 } from './core/hash';
 import type { ToolCallCtx, ToolInput } from './core/tools';
+import { neutralise } from './core/untrusted';
 import { AiReadPorts } from './read-ports';
+
+/** Pre-trade risk codes that mean "too big to place" (IRTC R4-15). */
+const DRAFT_SIZE_CODES = [
+  'MAX_ORDER_NOTIONAL',
+  'FAT_FINGER',
+  'MAX_POSITION',
+  'MAX_LEVERAGE',
+  'INSUFFICIENT_MARGIN',
+];
 
 /**
  * Drafts are the copilot's only "write": an order draft pre-fills the goal 04 ticket (the user still
@@ -86,6 +97,17 @@ export class DraftsService {
       };
     }
 
+    // IRTC R4-15: a draft the risk preview says cannot be placed for its size (notional, fat finger,
+    // position, leverage, margin) is not created: the model cannot park an oversized order in a ticket.
+    const sizeCodes = String(preview.violations ?? '')
+      .split(',')
+      .filter((c) => DRAFT_SIZE_CODES.includes(c));
+    if (sizeCodes.length)
+      throw new BadRequestException({
+        error: 'draft_too_large',
+        message: `The draft is refused: the order preview rejects it for size (${sizeCodes.join(', ')}). Ask for a smaller size.`,
+      });
+
     const id = await this.db.tx(async (c) => {
       const r = await c.query<{ id: string }>(
         `INSERT INTO ai_order_drafts (user_id, surface, symbol, side, type, qty, limit_price, stop_loss_price, take_profit_price, rationale, preview, model_id)
@@ -124,13 +146,16 @@ export class DraftsService {
             qty: qty.toFixed(),
             environment: 'PAPER',
             canSubmit: false,
+            // IRTC R4-08: the model-written rationale shown in the ticket is provable.
+            rationaleHash: sha256(input.rationale),
           },
         },
         c,
       );
       return draftId;
     });
-    const note = `AI draft ${id.slice(0, 8)}: ${input.rationale.slice(0, 80)}`;
+    // IRTC R4-15: the rationale is model text; the ticket note says so and it is neutralised.
+    const note = `AI draft ${id.slice(0, 8)} · copilot's words, not advice: ${neutralise(input.rationale).slice(0, 80)}`;
     return {
       draftId: id,
       status: 'draft',
@@ -204,12 +229,13 @@ export class DraftsService {
       await this.audit.record(
         {
           actorId: ctx.user.id,
-          actorType: 'ai',
+          actorType: ctx.author === 'user' ? 'user' : 'ai',
           action: 'ai.draft',
           entity: 'ai_strategy_draft',
           entityId: draftId,
           payload: {
             kind: 'strategy',
+            origin: ctx.author === 'user' ? 'user_from_suggestion' : 'model',
             surface: ctx.surface,
             modelId: ctx.modelId,
             promptHash: ctx.promptHash,

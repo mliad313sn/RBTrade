@@ -43,7 +43,8 @@ export function AiDraftLoader({ draftId }: { draftId: string | null }) {
             takeProfitPrice: d.takeProfitPrice ?? undefined,
             origin: 'ai',
             aiDraftId: d.id,
-            note: `AI draft ${d.id.slice(0, 8)}: ${d.rationale.slice(0, 80)}`,
+            // IRTC R4-15: the rationale is model text, labelled as such.
+            note: `AI draft ${d.id.slice(0, 8)} · copilot's words, not advice: ${d.rationale.slice(0, 80)}`,
           });
         }, 300);
       })
