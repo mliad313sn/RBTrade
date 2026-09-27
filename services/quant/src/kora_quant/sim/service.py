@@ -244,7 +244,8 @@ def from_trades(req: FromTradesRequest) -> SimResult:
             win_rate_pct=win_rate * 100.0,
             avg_win_r=avg_win * scale,
             avg_loss_r=avg_loss * scale,
-            cost_per_trade_r=req.extra_cost_per_trade_r,
+            # The cost actually applied (only R multiples take an extra cost in R, IRTC R3-07).
+            cost_per_trade_r=req.extra_cost_per_trade_r if req.trade_unit == "r_multiple" else 0.0,
             risk_fraction=fraction if req.trade_unit == "r_multiple" else None,
             block_size=block,
         ),

@@ -103,6 +103,12 @@ class FromTradesRequest(RunShape):
                 raise ValueError(f"trade {i}: {t} R is outside ±100 R.")
         if self.block_size is not None and self.block_size > len(self.trades):
             raise ValueError("block size cannot exceed the number of imported trades")
+        if self.trade_unit == "pct_return" and self.extra_cost_per_trade_r > 0:
+            # IRTC R3-07: never accept (and echo) a cost that cannot be applied.
+            raise ValueError(
+                "extra costs in R cannot be applied to % returns: import R multiples, or include "
+                "the costs in the returns."
+            )
         return self
 
 
