@@ -246,6 +246,10 @@ describe('gain simulator proxy (/sim)', () => {
     const md = new MarketFixture();
     await md.standard();
     const u = await createUser(app, 'trader');
+    // IRTC R6 (flake): the fill's volatility slippage is the mid move since the quote the api saw
+    // last for BTCUSD, which an earlier test may have left at another price. Let the api observe
+    // this book first (a preview), then refresh it at the same mid: the move is 0 whatever ran before.
+    await request(http()).post('/orders/preview').set(bearer(u.token)).send({ symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.5' }).expect(200);
     await md.touch();
     const buy = await request(http()).post('/orders').set(bearer(u.token)).send({ clientOrderId: `b501-${process.pid}`, symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.5' }).expect(201);
     await md.quote('BTCUSD', '65811.5', '65813.5');

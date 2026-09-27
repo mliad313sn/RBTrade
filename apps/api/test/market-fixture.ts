@@ -6,10 +6,16 @@ import { Redis } from 'ioredis';
  * into the goal 02 Redis last-value cache (and publishes them on the bus), exactly as the feed does.
  * `touch()` re-stamps everything with the current (possibly faked) clock so nothing goes stale.
  */
+/**
+ * IRTC R6 (sim B-501 flake): sequence numbers are unique across fixture instances and processes.
+ * Every instance used to start at 1, and the api caches the last quote per symbol by `seq`, so a new
+ * fixture's quote could reuse the mid move another fixture's quote with the same number had made.
+ */
+let nextSeq = Date.now() * 1000;
+
 export class MarketFixture {
   private readonly redis: Redis;
   private readonly prefix: string;
-  private seq = 1;
   readonly quotes = new Map<string, Quote>();
   readonly depths = new Map<string, DepthSnapshot>();
   private statusState: FeedStatus['state'] = 'ok';
@@ -59,7 +65,7 @@ export class MarketFixture {
       source: 'simulated',
       exchangeTs: opts.receivedTs ?? now,
       receivedTs: opts.receivedTs ?? now,
-      seq: this.seq++,
+      seq: nextSeq++,
     };
     this.quotes.set(symbol, q);
     await this.put(quoteChannel(symbol), q);
@@ -68,7 +74,7 @@ export class MarketFixture {
 
   async depth(symbol: string, bids: DepthLevel[], asks: DepthLevel[]): Promise<void> {
     const now = Date.now();
-    const d: DepthSnapshot = { type: 'depth_snapshot', symbol, bids, asks, source: 'simulated', exchangeTs: now, receivedTs: now, seq: this.seq++ };
+    const d: DepthSnapshot = { type: 'depth_snapshot', symbol, bids, asks, source: 'simulated', exchangeTs: now, receivedTs: now, seq: nextSeq++ };
     this.depths.set(symbol, d);
     await this.put(depthChannel(symbol), d);
   }

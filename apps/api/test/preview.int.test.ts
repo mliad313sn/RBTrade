@@ -53,7 +53,9 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
     });
     expect(r.risk).toEqual({ ok: true, violations: [] });
     expect(r.market).toMatchObject({ session: 'open', dataState: 'ok' });
-    expect(r.timings.riskMs).toBeLessThan(5);
+    // IRTC R6 (flake): one cold sample is not a latency measurement; the 5 ms budget is enforced on
+    // the p95 of 200 previews below. Here the timing is only reported.
+    expect(r.timings.riskMs).toBeGreaterThanOrEqual(0);
   });
 
   it('XAU/USD sell 10 oz', async () => {
