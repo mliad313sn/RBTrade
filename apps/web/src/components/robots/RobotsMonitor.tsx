@@ -383,7 +383,7 @@ export function RobotsMonitor() {
           </Panel>
           <Panel title="Kill switch" className="border-[var(--k-kill)]">
             <p className="mt-0 text-xs text-muted">
-              Halts every robot, cancels all orders, flattens all positions. Hold 1.5 s.
+              Halts every robot, cancels all orders, flattens all positions. Hold 1.5 s, or click and confirm.
             </p>
             <HoldToConfirmButton
               holdMs={KILL_SWITCH_HOLD_MS}
@@ -391,6 +391,7 @@ export function RobotsMonitor() {
               className="k-btn--block"
               onConfirm={() => void haltAll()}
               description="Kill switch: robots, orders and positions."
+              confirmTitle="Halt every robot, cancel all orders and flatten all positions?"
               data-testid="halt-all"
             >
               ■ HOLD TO HALT ALL

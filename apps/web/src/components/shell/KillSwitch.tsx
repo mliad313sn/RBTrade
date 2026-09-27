@@ -6,11 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { refreshAccount } from '@/lib/account';
 import { api } from '@/lib/api-browser';
+import { useHoldLabels } from '@/lib/i18n/hold';
 import { useI18n } from '@/lib/i18n/react';
 
 /**
- * Kill switch: 1.5 s hold (mouse, touch, keyboard Space/Enter, or the Ctrl+Shift+K hotkey held) →
- * three-scope menu → REST call to the goal 03 engine (halt robots, cancel orders, flatten), which
+ * Kill switch: 1.5 s hold (mouse, touch, keyboard Space/Enter, or the Ctrl+Shift+K hotkey held), or a
+ * single activation (tap, screen reader, voice control; IRTC R5-04) → three-scope menu → REST call to the goal 03 engine (halt robots, cancel orders, flatten), which
  * works without the websocket. The result (orders cancelled, positions closed) is shown and audited.
  */
 export function KillSwitch({ compact = false }: { compact?: boolean }) {
@@ -48,6 +49,7 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
 
   // Goal 08: the Novice view gets plain, localised wording and a 44 px button; Pro is unchanged.
   const { t, novice } = useI18n();
+  const hold18n = useHoldLabels();
   const plainNovice = compact && novice;
 
   const choose = async (scope: KillSwitchScope) => {
@@ -89,6 +91,11 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
         variant="danger"
         size={compact && novice ? 'lg' : 'sm'}
         onConfirm={() => setOpen(true)}
+        // IRTC R5-04: a tap, a screen-reader or voice-control activation opens the scope menu, which is
+        // itself the explicit confirmation (a scope must be chosen); the hold stays as the fast path.
+        onActivate={() => setOpen(true)}
+        labels={hold18n.labels}
+        locale={hold18n.locale}
         description={plainNovice ? t('kill.help') : 'Opens the kill-switch scope menu. Hotkey: hold Control, Shift and K.'}
         data-testid="kill-switch"
         data-ready={ready ? 'true' : undefined}

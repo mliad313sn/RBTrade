@@ -196,7 +196,7 @@ export function RiskConsole({ wsPort }: { wsPort: string }) {
               <span className="k-label">Reason (audited)</span>
               <input className="k-input" value={ksReason} onChange={(e) => setKsReason(e.target.value)} maxLength={500} data-testid="global-ks-reason" />
             </label>
-            <HoldToConfirmButton variant="danger-solid" holdMs={1500} disabled={ksReason.trim().length < 3} onConfirm={() => void killAll()} data-testid="global-ks-hold">
+            <HoldToConfirmButton variant="danger-solid" holdMs={1500} disabled={ksReason.trim().length < 3} onConfirm={() => void killAll()} confirmTitle="Halt every active account?" data-testid="global-ks-hold">
               Hold to halt all accounts
             </HoldToConfirmButton>
           </div>

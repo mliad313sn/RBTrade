@@ -14,7 +14,8 @@ import {
 } from 'react';
 
 import { cx } from '../lib/cx';
-import type { ButtonVariant } from './Button';
+import { Button, type ButtonVariant } from './Button';
+import { Dialog } from './Dialog';
 
 export interface HoldHandle {
   /** Start holding programmatically (e.g. hotkey keydown). */
@@ -80,6 +81,35 @@ export function useHold({ holdMs, onConfirm, onProgress, disabled }: UseHoldOpti
   return { holding, start, cancel };
 }
 
+/** Every user-facing string of the primitive, so callers can localise it (IRTC R5-04). */
+export interface HoldLabels {
+  /** Accessible instruction; receives the hold duration already formatted for the locale. */
+  instruction: (seconds: string) => string;
+  holding: string;
+  confirmed: string;
+  /** Title of the confirm step opened by a single activation (screen reader, voice control, tap). */
+  confirmTitle: string;
+  confirmBody: string;
+  confirm: string;
+  cancel: string;
+}
+
+export const DEFAULT_HOLD_LABELS: HoldLabels = {
+  instruction: (s) => `Press and hold for ${s} seconds to confirm, or activate once to confirm in a dialog.`,
+  holding: 'Holding…',
+  confirmed: 'Confirmed',
+  confirmTitle: 'Confirm this action',
+  confirmBody: 'You can also press and hold the button to confirm directly.',
+  confirm: 'Confirm',
+  cancel: 'Cancel',
+};
+
+/**
+ * A release within this time counts as a tap (opens the confirm step); a longer press released early
+ * is an aborted hold and does nothing. Capped at half the hold for short holds.
+ */
+const TAP_MS = 350;
+
 export interface HoldToConfirmButtonProps {
   children: ReactNode;
   onConfirm: () => void;
@@ -91,20 +121,43 @@ export interface HoldToConfirmButtonProps {
   className?: string;
   /** Extra hint for assistive tech; the hold instruction is always announced. */
   description?: string;
+  /** Localised strings (defaults are English). */
+  labels?: Partial<HoldLabels>;
+  /** Locale used to format the hold duration (e.g. "1,5" in French). */
+  locale?: string;
+  /** Title of the built-in confirm step (overrides `labels.confirmTitle`). */
+  confirmTitle?: string;
+  /**
+   * Called on a single activation (click from assistive tech, voice control, switch access, or a short
+   * tap) instead of opening the built-in confirm dialog, when the caller's next step is already an
+   * explicit confirmation (e.g. the kill-switch scope menu).
+   */
+  onActivate?: () => void;
   'data-testid'?: string;
 }
 
 /**
  * Press-and-hold confirmation for irreversible actions. Works with mouse, touch, pen (pointer
- * events) and keyboard (Space or Enter held down). Releasing early cancels.
+ * events) and keyboard (Space or Enter held down). Releasing a long press early cancels.
+ *
+ * IRTC R5-04: a single activation (a click dispatched by a screen reader, voice control or switch
+ * access, a short tap, or a short Enter/Space press) opens an explicit confirm step (a dialog with a
+ * Confirm button, or the caller's `onActivate`), so the action never depends on holding alone
+ * (WCAG 2.1.1, 2.5.1, 4.1.2).
  */
 export const HoldToConfirmButton = forwardRef<HoldHandle, HoldToConfirmButtonProps>(function HoldToConfirmButton(
-  { children, onConfirm, holdMs = 1500, variant = 'danger', size = 'md', disabled, className, description, ...rest },
+  { children, onConfirm, holdMs = 1500, variant = 'danger', size = 'md', disabled, className, description, labels, locale = 'en', confirmTitle, onActivate, ...rest },
   ref,
 ) {
+  const L: HoldLabels = { ...DEFAULT_HOLD_LABELS, ...labels };
   const btn = useRef<HTMLButtonElement>(null);
   const descId = useId();
   const [announce, setAnnounce] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  /** Set when a hold completed, so the click that follows the release is ignored. */
+  const completed = useRef(false);
+  /** When the current press started (pointer or key), to tell a tap from an aborted hold. */
+  const pressedAt = useRef<number | null>(null);
   const setProgress = useCallback((r: number) => {
     btn.current?.style.setProperty('--k-hold-progress', String(r));
   }, []);
@@ -113,12 +166,28 @@ export const HoldToConfirmButton = forwardRef<HoldHandle, HoldToConfirmButtonPro
     disabled,
     onProgress: setProgress,
     onConfirm: () => {
-      setAnnounce('Confirmed');
+      completed.current = true;
+      pressedAt.current = null;
+      setAnnounce(L.confirmed);
       onConfirm();
     },
   });
   useImperativeHandle(ref, () => ({ start, cancel }), [start, cancel]);
-  const seconds = (holdMs / 1000).toLocaleString('en', { maximumFractionDigits: 1 });
+  const seconds = (holdMs / 1000).toLocaleString(locale, { maximumFractionDigits: 1 });
+
+  const press = () => {
+    completed.current = false;
+    pressedAt.current = performance.now();
+    start();
+  };
+  /** True when the press that just ended was short enough to be a tap. */
+  const wasTap = () => pressedAt.current !== null && performance.now() - pressedAt.current < Math.min(TAP_MS, holdMs / 2);
+  const activate = () => {
+    if (disabled) return;
+    cancel();
+    if (onActivate) onActivate();
+    else setConfirmOpen(true);
+  };
 
   return (
     <>
@@ -136,25 +205,42 @@ export const HoldToConfirmButton = forwardRef<HoldHandle, HoldToConfirmButtonPro
           } catch {
             /* synthetic or already-released pointer: holding still works without capture */
           }
-          start();
+          press();
         }}
         onPointerUp={cancel}
         onPointerCancel={cancel}
         onPointerLeave={cancel}
         onLostPointerCapture={cancel}
         onContextMenu={(e) => e.preventDefault()}
+        onClick={(e) => {
+          // The click that follows a completed hold: already confirmed.
+          if (completed.current) {
+            completed.current = false;
+            pressedAt.current = null;
+            return;
+          }
+          // detail 0 = activation without a pointer press (screen reader, voice control, switch access).
+          const tap = e.detail === 0 || wasTap();
+          pressedAt.current = null;
+          if (tap) activate();
+        }}
         onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
           if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
-            if (!e.repeat) start();
+            if (!e.repeat) press();
           } else if (e.key === 'Escape') {
             cancel();
+            pressedAt.current = null;
           }
         }}
         onKeyUp={(e: KeyboardEvent<HTMLButtonElement>) => {
           if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
-            cancel();
+            const tap = !completed.current && wasTap();
+            completed.current = false;
+            pressedAt.current = null;
+            if (tap) activate();
+            else cancel();
           }
         }}
         onBlur={cancel}
@@ -164,11 +250,31 @@ export const HoldToConfirmButton = forwardRef<HoldHandle, HoldToConfirmButtonPro
         {children}
       </button>
       <span id={descId} className="k-sr-only">
-        {`Press and hold for ${seconds} seconds to confirm.${description ? ` ${description}` : ''}`}
+        {`${L.instruction(seconds)}${description ? ` ${description}` : ''}`}
       </span>
       <span className="k-sr-only" role="status" aria-live="polite">
-        {holding ? 'Holding…' : announce}
+        {holding ? L.holding : announce}
       </span>
+      {onActivate ? null : (
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen} alert title={confirmTitle ?? L.confirmTitle} description={L.confirmBody}>
+          <div className="k-dialog__actions">
+            <Button onClick={() => setConfirmOpen(false)} autoFocus>
+              {L.cancel}
+            </Button>
+            <Button
+              variant={variant}
+              onClick={() => {
+                setConfirmOpen(false);
+                setAnnounce(L.confirmed);
+                onConfirm();
+              }}
+              data-testid={rest['data-testid'] ? `${rest['data-testid']}-confirm` : undefined}
+            >
+              {L.confirm}
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </>
   );
 });
