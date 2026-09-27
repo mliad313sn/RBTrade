@@ -277,6 +277,21 @@ REDIS_URL=redis://:<password>@127.0.0.1:56391 pnpm vitest health + ws-gateway + 
 | Deployment: set `KORA_TRUSTED_PROXY_HOPS` and `KORA_API_TRUST_PROXY` to the real ingress; a Redis ACL user per service | Operations / S9 (deployment checklist) |
 | `services/bot-runner` "halts … within milliseconds" unit test failed once in the first gate run (`haltedAccounts` 11 instead of 1) and passed on re-run. It appears to be cross-talk from other sessions' tests on the shared dev Redis (the kill-switch channel is not namespaced per test). Not caused by these changes | R6 (test integrity) |
 
-## Final gate
+## Final gate (2026-09-27, worktree databases `kora_fix_r1_test` / `kora_fix_r1_e2e`, e2e ports 4061/3061/8061/4161)
 
-Recorded after the last commit; see the section appended below.
+| Step | Result |
+|---|---|
+| `pnpm build` | pass |
+| `pnpm lint` | pass |
+| `pnpm typecheck` | pass |
+| `pnpm test` (with coverage gates) | pass: api 157, web 87, domain 185, ui 114, market-data 72, sdk 16, bot-runner 12, ai-evals 4. The first run hit the bot-runner kill-switch cross-talk flake noted above; the re-run passed |
+| `pnpm test:integration`, run 1 | 45 files, 269 tests passed |
+| `pnpm test:integration`, run 2 | 45 files, 269 tests passed |
+| `pnpm test:e2e` | 69 passed |
+| `pnpm py:check` | 164 passed, coverage 97 % |
+| History secrets scan (`scripts/security/secrets-history.py`, detect-secrets 1.5.0) | 284 findings, 284 reviewed (five test-only literals added to the allowlist) |
+
+**Other checks.**
+
+- **R1-06 e2e on unfixed code.** The pre-fix `AuthFlow.tsx` was restored temporarily and rebuilt. The new e2e test then failed for `/%5Cevil.example/phish` and `/%09/evil.example/phish`: `Received string: "http://evil.example/phish"`. The fixed build passes all four values.
+- **Earlier integration run.** A run made while another session was loading the machine (load average above 13 on 4 CPUs) failed two timing- or data-sensitive tests: `preview.int.test.ts` (`riskMs < 5` measured 6.1 ms) and a `strategies.int.test.ts` OOS trade count. Neither touches the changed code. Both passed on re-run and in the two final runs.
