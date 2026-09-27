@@ -29,6 +29,8 @@ export interface AiConfig {
   /** USD per million tokens; used only for the cost metric. 0 when unset (cost shown as unknown). */
   prices: { input: number; output: number; cacheRead: number; cacheWrite: number };
   env: string;
+  /** IRTC R4-11: outside dev/test a secret pseudonym salt is required (the default is public). */
+  pseudonymSaltMissing: boolean;
 }
 
 function num(v: string | undefined, dflt: number, min = 0): number {
@@ -38,7 +40,8 @@ function num(v: string | undefined, dflt: number, min = 0): number {
 
 export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
   const env = e.KORA_ENV ?? 'dev';
-  const devOrTest = env === 'dev' || env === 'test';
+  // IRTC R4-12: either variable saying production makes this a production process.
+  const devOrTest = (env === 'dev' || env === 'test') && e.NODE_ENV !== 'production';
   const raw = (e.KORA_AI_PROVIDER ?? 'anthropic').trim();
   let provider: AiProviderKind = raw === 'scripted' || raw === 'replay' ? raw : 'anthropic';
   // Test doubles never serve real users: outside dev/test the provider is always the real one.
@@ -77,6 +80,7 @@ export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
       cacheWrite: num(e.KORA_AI_PRICE_CACHE_WRITE_USD_PER_MTOK, 0),
     },
     env,
+    pseudonymSaltMissing: !devOrTest && (e.KORA_AI_PSEUDONYM_SALT?.trim().length ?? 0) < 16,
   };
 }
 
@@ -85,6 +89,8 @@ export function unavailableReason(c: AiConfig): string | null {
   if (c.provider !== 'anthropic') return null;
   if (!c.model) return 'no model is configured (KORA_AI_MODEL is not set)';
   if (!c.apiKeyPresent) return 'no API key is configured';
+  if (c.pseudonymSaltMissing)
+    return 'KORA_AI_PSEUDONYM_SALT is not set (a secret of 16+ characters is required outside dev/test)';
   return null;
 }
 

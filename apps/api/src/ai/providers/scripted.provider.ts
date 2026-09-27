@@ -785,8 +785,14 @@ function referencePolicy(p: Parsed): Decision {
           text: 'No economic events are scheduled in the next 24 hours in the SIMULATED calendar.',
         };
       const clean = (s: unknown) => String(s ?? '').replace(/<\/?untrusted_data[^>]*>/g, '');
+      // Titles are untrusted text: figures inside them are not KORA data and are not repeated.
+      const title = (s: unknown) =>
+        clean(s)
+          .replace(/[-+]?\d[\d,.]*%?/g, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
       return {
-        text: `Upcoming events (SIMULATED calendar): ${ev.map((e) => `${clean(e.time ?? e.ts)} ${clean(e.title)} (${e.impact ?? 'n/a'} impact${e.currency ? `, ${e.currency}` : ''})`).join('; ')}.`,
+        text: `Upcoming events (SIMULATED calendar): ${ev.map((e) => `${clean(e.time ?? e.ts)} ${title(e.title)} (${e.impact ?? 'n/a'} impact${e.currency ? `, ${e.currency}` : ''})`).join('; ')}.`,
       };
     }
     return { tools: [{ name: 'get_calendar', input: { hoursAhead: 24 } }] };
