@@ -5,7 +5,7 @@ import { QueueEvents } from 'bullmq';
 import { Redis } from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { heartbeatKey, ROBOT_CONTROL_CHANNEL, ROBOT_EVENTS_CHANNEL } from './bots.js';
+import { heartbeatKey, robotControlChannel, robotEventsChannel } from './bots.js';
 import { loadConfig, loadEnv, type RunnerConfig } from './config.js';
 import { barJobId, handleJob, RejectedJobError } from './jobs.js';
 import { startRunner, type Runner } from './runner.js';
@@ -60,6 +60,7 @@ describe('config', () => {
       apiUrl: 'http://127.0.0.1:4000',
       quantUrl: 'http://127.0.0.1:8000',
       mdPrefix: 'kora:md:',
+      ctlPrefix: 'kora:',
       concurrency: 16,
       heartbeatMs: 5000,
     });
@@ -76,13 +77,25 @@ describe('config', () => {
 loadEnv();
 const redisUrl = process.env.REDIS_URL;
 
+/** A free loopback port (fixed ports collided with other runners on the same machine). */
+async function freePort(): Promise<number> {
+  const srv = createServer();
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+  const port = (srv.address() as AddressInfo).port;
+  await new Promise((r) => srv.close(r));
+  return port;
+}
+
 describe.skipIf(!redisUrl)('heartbeat-only runner (no service token)', () => {
   let runner: Runner;
   let events: QueueEvents;
+  let port: number;
   beforeAll(async () => {
+    port = await freePort();
     const cfg = {
       ...loadConfig({ REDIS_URL: redisUrl! }),
-      healthPort: 4199,
+      healthPort: port,
+      ctlPrefix: `kora:test:${process.pid}:hb-only:`,
       queueName: `kora-bots-test-${process.pid}`,
     };
     runner = await startRunner(cfg);
@@ -112,7 +125,7 @@ describe.skipIf(!redisUrl)('heartbeat-only runner (no service token)', () => {
 
   it('serves /health', async () => {
     // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- test double on loopback, reviewed goal 10
-    const res = await fetch('http://127.0.0.1:4199/health');
+    const res = await fetch(`http://127.0.0.1:${port}/health`);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       status: 'ok',
@@ -121,7 +134,7 @@ describe.skipIf(!redisUrl)('heartbeat-only runner (no service token)', () => {
       robots: { enabled: false },
     });
     // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- test double on loopback, reviewed goal 10
-    expect((await fetch('http://127.0.0.1:4199/nope')).status).toBe(404);
+    expect((await fetch(`http://127.0.0.1:${port}/nope`)).status).toBe(404);
   });
 });
 
@@ -138,6 +151,7 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
   let stub: Server;
   let redis: Redis;
   let cfg: RunnerConfig;
+  let healthPort: number;
   const seen: Array<{
     path: string;
     headers: Record<string, unknown>;
@@ -194,14 +208,18 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
     });
     await new Promise<void>((r) => stub.listen(0, '127.0.0.1', r));
     const url = `http://127.0.0.1:${(stub.address() as AddressInfo).port}`;
+    healthPort = await freePort();
     cfg = {
       ...loadConfig({ REDIS_URL: redisUrl! }),
-      healthPort: 4198,
+      healthPort,
       queueName: `kora-bots-robot-test-${process.pid}`,
       apiUrl: url,
       quantUrl: url,
       serviceToken: 'x'.repeat(40),
       mdPrefix: `kora:test:${process.pid}:runner:md:`,
+      // IRTC R6: its own control plane, so other runners or apis on the shared Redis (a global
+      // kill switch halts every account) cannot reach this runner, and it cannot reach them.
+      ctlPrefix: `kora:test:${process.pid}:${Date.now()}:`,
       heartbeatMs: 100,
       syncMs: 60_000,
       trackingCron: '',
@@ -223,7 +241,7 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
 
   it('heartbeats every running robot and syncs with the service token', async () => {
     await new Promise((r) => setTimeout(r, 250));
-    expect(Number(await redis.get(heartbeatKey(ROBOT)))).toBeGreaterThan(Date.now() - 1000);
+    expect(Number(await redis.get(heartbeatKey(ROBOT, cfg.ctlPrefix)))).toBeGreaterThan(Date.now() - 1000);
     const sync = seen.find((s) => s.path === '/internal/robots/running')!;
     expect(sync.headers['x-kora-service-token']).toBe('x'.repeat(40));
   });
@@ -278,7 +296,7 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
 
   it('halts the account’s robots within milliseconds of the kill-switch message and stops heartbeats', async () => {
     const listener = new Redis(redisUrl!, { maxRetriesPerRequest: null });
-    await listener.subscribe(ROBOT_EVENTS_CHANNEL);
+    await listener.subscribe(robotEventsChannel(cfg.ctlPrefix));
     const reported = new Promise<Record<string, unknown>>((r) =>
       listener.on('message', (_c, raw: string) => {
         const e = JSON.parse(raw) as Record<string, unknown>;
@@ -287,14 +305,14 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
     );
     const sent = Date.now();
     await redis.publish(
-      ROBOT_CONTROL_CHANNEL,
+      robotControlChannel(cfg.ctlPrefix),
       JSON.stringify({ action: 'halt', accountId: ACCOUNT, scope: 'robots', ts: sent }),
     );
     const e = await reported;
     expect(e.robotIds).toEqual([ROBOT]);
     expect(Number(e.reactedAt) - sent).toBeLessThan(1000);
     expect(runner.bots!.isActive(ROBOT)).toBe(false);
-    expect(await redis.get(heartbeatKey(ROBOT))).toBeNull();
+    expect(await redis.get(heartbeatKey(ROBOT, cfg.ctlPrefix))).toBeNull();
     // Closed candles for a halted robot are ignored.
     await redis.publish(
       `${cfg.mdPrefix}candles:BTCUSD:1m`,
@@ -305,7 +323,7 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
       await runner.queue.getJob(barJobId({ robotId: ROBOT, symbol: 'BTCUSD', barTs: 180_000 })),
     ).toBeUndefined();
     // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- test double on loopback, reviewed goal 10
-    const res = await fetch('http://127.0.0.1:4198/health');
+    const res = await fetch(`http://127.0.0.1:${healthPort}/health`);
     expect(await res.json()).toMatchObject({
       robots: { enabled: true, running: 1, haltedAccounts: 1 },
     });

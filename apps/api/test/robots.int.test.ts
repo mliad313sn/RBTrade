@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildOpenApi, createApp } from '../src/create-app';
 import { RecordingProxy, validateExchanges } from './contract-proxy';
 import { bearer, createUser, ownerQuery, type TestUser } from './helpers';
+import { robotHeartbeatKey } from '../src/robots/robot-channels';
 import { MarketFixture } from './market-fixture';
 import {
   clearCandles,
@@ -152,7 +153,7 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
     await request(http).post(`/robots/${robotId}/start`).set(bearer(u.token)).expect(200);
     const until = Date.now() + 10_000;
     while (Date.now() < until) {
-      if (await redis.get(`kora:robots:hb:${robotId}`)) return;
+      if (await redis.get(robotHeartbeatKey(robotId))) return;
       await new Promise((r) => setTimeout(r, 50));
     }
     throw new Error(

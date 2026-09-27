@@ -15,3 +15,6 @@ process.env.LIVE_TRADING_ENABLED = 'false';
 process.env.KORA_MD_FEED ??= 'off';
 process.env.KORA_MD_BACKFILL ??= 'false';
 process.env.KORA_MD_REDIS_PREFIX ??= `kora:test:${process.pid}:md:`;
+// IRTC R6: this worker's own robot control plane (kill-switch channel, runner events, heartbeats),
+// inherited by the bot runners and apis the tests spawn; other runs on the same Redis cannot interfere.
+process.env.KORA_ROBOT_CTL_PREFIX ??= `kora:test:${process.pid}:`;

@@ -7,11 +7,15 @@ import { withSpan } from './tracing.js';
 import type { RunnerConfig } from './config.js';
 import { barJobId, type BarCloseJob } from './jobs.js';
 
-/** Same channel the goal 03 kill switch publishes on (halt / resume) and the api's robot sync. */
-export const ROBOT_CONTROL_CHANNEL = 'kora:ctl:robots';
-/** Where the runner reports what it did (halts with latency, decisions) for monitoring and tests. */
-export const ROBOT_EVENTS_CHANNEL = 'kora:robots:events';
-export const heartbeatKey = (robotId: string): string => `kora:robots:hb:${robotId}`;
+/**
+ * Robot control plane on Redis, under `KORA_ROBOT_CTL_PREFIX` (default `kora:`), the same prefix the
+ * api uses (IRTC R6: a test or e2e run gets its own prefix, so other runners cannot interfere).
+ * - control: the goal 03 kill switch (halt / resume) and the api's robot sync;
+ * - events: what the runner did (halts with latency, decisions), for monitoring and tests.
+ */
+export const robotControlChannel = (prefix = 'kora:'): string => `${prefix}ctl:robots`;
+export const robotEventsChannel = (prefix = 'kora:'): string => `${prefix}robots:events`;
+export const heartbeatKey = (robotId: string, prefix = 'kora:'): string => `${prefix}robots:hb:${robotId}`;
 
 export interface RunningRobot {
   robotId: string;
@@ -99,10 +103,10 @@ export class Bots extends EventEmitter {
 
   async start(): Promise<void> {
     this.sub.on('message', (channel: string, raw: string) => {
-      if (channel === ROBOT_CONTROL_CHANNEL) void this.onControl(raw);
+      if (channel === robotControlChannel(this.cfg.ctlPrefix)) void this.onControl(raw);
       else void this.onCandle(channel, raw);
     });
-    await this.sub.subscribe(ROBOT_CONTROL_CHANNEL);
+    await this.sub.subscribe(robotControlChannel(this.cfg.ctlPrefix));
     await this.sync().catch((e: Error) => this.emit('error', e));
     this.timers.push(
       setInterval(
@@ -165,7 +169,7 @@ export class Bots extends EventEmitter {
       const robotIds = [...this.robots.values()]
         .filter((r) => r.accountId === msg.accountId)
         .map((r) => r.robotId);
-      if (robotIds.length) await this.pub.del(...robotIds.map(heartbeatKey)).catch(() => undefined);
+      if (robotIds.length) await this.pub.del(...robotIds.map((id) => heartbeatKey(id, this.cfg.ctlPrefix))).catch(() => undefined);
       const event = {
         type: 'halted',
         accountId: msg.accountId,
@@ -174,7 +178,7 @@ export class Bots extends EventEmitter {
         latencyMs: msg.ts ? reactedAt - msg.ts : null,
       };
       this.emit('halted', event);
-      await this.pub.publish(ROBOT_EVENTS_CHANNEL, JSON.stringify(event)).catch(() => undefined);
+      await this.pub.publish(robotEventsChannel(this.cfg.ctlPrefix), JSON.stringify(event)).catch(() => undefined);
       await this.dropQueued(new Set(robotIds));
       return;
     }
@@ -229,10 +233,10 @@ export class Bots extends EventEmitter {
     let n = 0;
     for (const r of this.robots.values()) {
       if (!this.isActive(r.robotId)) continue;
-      pipe.set(heartbeatKey(r.robotId), String(now), 'EX', 60);
+      pipe.set(heartbeatKey(r.robotId, this.cfg.ctlPrefix), String(now), 'EX', 60);
       n += 1;
     }
-    pipe.set('kora:robots:runner:hb', String(now), 'EX', 60);
+    pipe.set(`${this.cfg.ctlPrefix}robots:runner:hb`, String(now), 'EX', 60);
     await pipe.exec().catch(() => undefined);
     this.emit('beat', n);
   }
@@ -281,7 +285,7 @@ export class Bots extends EventEmitter {
       orderId: decision.orderId ?? null,
     };
     this.emit('decision', event);
-    await this.pub.publish(ROBOT_EVENTS_CHANNEL, JSON.stringify(event)).catch(() => undefined);
+    await this.pub.publish(robotEventsChannel(this.cfg.ctlPrefix), JSON.stringify(event)).catch(() => undefined);
     return event;
   }
 

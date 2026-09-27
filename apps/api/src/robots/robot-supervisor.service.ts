@@ -5,7 +5,7 @@ import type { Redis } from 'ioredis';
 import { OpsMetrics } from '../observability/ops-metrics.service';
 import { DbService } from '../db/db.service';
 import { AccountsService } from '../trading/accounts.service';
-import { ROBOT_CONTROL_CHANNEL } from '../trading/trading-events.service';
+import { robotControlChannel } from './robot-channels';
 import { RobotBookService } from './robot-book.service';
 import { RobotControlService, type RobotControlMessage } from './robot-control.service';
 import { heartbeatMs, isoWeekStart, RobotsService } from './robots.service';
@@ -53,7 +53,7 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
     if (process.env.KORA_ROBOT_SUPERVISOR_CONTROL !== 'off') {
       this.sub = this.control.subscriber();
       void this.sub
-        .subscribe(ROBOT_CONTROL_CHANNEL)
+        .subscribe(robotControlChannel())
         .catch((e: Error) => this.log.warn(`subscribe failed: ${e.message}`));
       this.sub.on('message', (_ch: string, raw: string) =>
         void this.onControl(raw).catch((e: Error) => this.log.warn(`control message failed: ${e.message}`)),

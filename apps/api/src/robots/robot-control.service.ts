@@ -2,10 +2,10 @@ import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common
 import { Redis } from 'ioredis';
 
 import { APP_CONFIG, type AppConfig } from '../config/config';
-import { ROBOT_CONTROL_CHANNEL } from '../trading/trading-events.service';
+import { robotControlChannel, robotHeartbeatKey } from './robot-channels';
 
 /** Redis key the bot runner refreshes every heartbeat for each robot it runs (value: epoch ms). */
-export const heartbeatKey = (robotId: string): string => `kora:robots:hb:${robotId}`;
+export const heartbeatKey = (robotId: string): string => robotHeartbeatKey(robotId);
 
 export interface RobotControlMessage {
   action: 'halt' | 'resume' | 'sync';
@@ -47,7 +47,7 @@ export class RobotControlService implements OnModuleDestroy {
   sync(accountId: string, robotId: string, status: string): void {
     const msg: RobotControlMessage = { action: 'sync', accountId, robotId, status, ts: Date.now() };
     this.redis()
-      .publish(ROBOT_CONTROL_CHANNEL, JSON.stringify(msg))
+      .publish(robotControlChannel(), JSON.stringify(msg))
       .catch(() => undefined);
   }
 

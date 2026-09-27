@@ -14,6 +14,8 @@ const WEB_PORT = process.env.E2E_WEB_PORT ?? '3010';
 const QUANT_PORT = process.env.E2E_QUANT_PORT ?? '8010';
 const BOT_RUNNER_PORT = process.env.E2E_BOT_RUNNER_PORT ?? '4110';
 const MD_PREFIX = process.env.E2E_MD_REDIS_PREFIX ?? 'kora:e2e:md:';
+// IRTC R6: the robot control plane (kill-switch channel, runner events, heartbeats) of this run only.
+const CTL_PREFIX = process.env.E2E_ROBOT_CTL_PREFIX ?? `kora:e2e:${API_PORT}:`;
 // Test-only shared secret between the api and the bot runner (goal 06, B-301).
 const SERVICE_TOKEN = process.env.E2E_SERVICE_TOKEN ?? 'e2e-only-service-token-0123456789abcdef';
 const e2eDb = process.env.DATABASE_URL_E2E;
@@ -23,7 +25,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 1 : 0,
+  // IRTC R6-10: no retries anywhere, CI included. A flaky test fails the job and gets fixed.
+  retries: 0,
   timeout: 45_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
@@ -70,6 +73,7 @@ export default defineConfig({
         KORA_TRADING_SESSION_OVERRIDE: 'EURUSD',
         KORA_ALERTS_EVAL_MS: '500',
         KORA_MD_REDIS_PREFIX: MD_PREFIX,
+        KORA_ROBOT_CTL_PREFIX: CTL_PREFIX,
         KORA_SERVICE_TOKEN: SERVICE_TOKEN,
         KORA_MD_WS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
         // Goal 07: deterministic scripted copilot (no API key in CI); refused outside dev/test.
@@ -93,6 +97,7 @@ export default defineConfig({
         QUANT_URL: `http://127.0.0.1:${QUANT_PORT}`,
         KORA_SERVICE_TOKEN: SERVICE_TOKEN,
         KORA_MD_REDIS_PREFIX: MD_PREFIX,
+        KORA_ROBOT_CTL_PREFIX: CTL_PREFIX,
         KORA_BOT_RUNNER_TRACKING_CRON: '',
       },
     },

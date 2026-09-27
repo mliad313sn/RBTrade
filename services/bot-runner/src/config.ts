@@ -12,6 +12,8 @@ export interface RunnerConfig {
   serviceToken: string | null;
   /** Goal 02 Redis bus prefix (candles channels). */
   mdPrefix: string;
+  /** Robot control plane prefix (`KORA_ROBOT_CTL_PREFIX`, default `kora:`), shared with the api. */
+  ctlPrefix: string;
   heartbeatMs: number;
   syncMs: number;
   /** BullMQ cron pattern for the daily tracking-error job (UTC); empty disables it. */
@@ -64,6 +66,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RunnerConfig {
     quantUrl: (env.QUANT_URL?.trim() || `http://127.0.0.1:${quantPort}`).replace(/\/$/, ''),
     serviceToken: token || null,
     mdPrefix: env.KORA_MD_REDIS_PREFIX?.trim() || 'kora:md:',
+    // IRTC R6: robot control plane (kill-switch channel, events, heartbeats); same variable as the api.
+    ctlPrefix: env.KORA_ROBOT_CTL_PREFIX?.trim() || 'kora:',
     heartbeatMs: int(env.KORA_ROBOT_HEARTBEAT_MS, 5000),
     syncMs: int(env.KORA_BOT_RUNNER_SYNC_MS, 5000),
     trackingCron: env.KORA_BOT_RUNNER_TRACKING_CRON ?? '5 0 * * *',

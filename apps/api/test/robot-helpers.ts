@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 import { Redis } from 'ioredis';
 
+import { robotEventsChannel } from '../src/robots/robot-channels';
 import { ownerQuery } from './helpers';
 
 const ROOT = resolve(__dirname, '../../..');
@@ -197,7 +198,7 @@ export function wave(
   return bars;
 }
 
-/** Collects `kora:robots:events` messages from the runner. */
+/** Collects the runner's robot events (on this worker's control-plane prefix). */
 export class RunnerEvents {
   readonly events: Array<Record<string, unknown> & { receivedAt: number }> = [];
   private readonly sub: Redis;
@@ -209,7 +210,7 @@ export class RunnerEvents {
   }
 
   async start(): Promise<void> {
-    await this.sub.subscribe('kora:robots:events');
+    await this.sub.subscribe(robotEventsChannel());
     this.sub.on('message', (_c: string, raw: string) =>
       this.events.push({ ...(JSON.parse(raw) as Record<string, unknown>), receivedAt: Date.now() }),
     );

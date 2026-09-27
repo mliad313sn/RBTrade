@@ -4,9 +4,7 @@ import { Redis } from 'ioredis';
 
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { busChannel, lastKey, MD_CONFIG, type MdConfig } from '../market-data/md-config';
-
-/** Redis control channel the bot runner (goal 06) listens to for halts and resumes. */
-export const ROBOT_CONTROL_CHANNEL = 'kora:ctl:robots';
+import { robotControlChannel } from '../robots/robot-channels';
 
 /**
  * Publishes trading events on the same Redis bus the WebSocket gateway fans out (goal 02), so
@@ -71,7 +69,7 @@ export class TradingEventsService implements OnModuleDestroy {
     auditEventId: string;
   }): void {
     this.client()
-      .publish(ROBOT_CONTROL_CHANNEL, JSON.stringify({ ...msg, ts: Date.now() }))
+      .publish(robotControlChannel(), JSON.stringify({ ...msg, ts: Date.now() }))
       .catch(() => undefined);
   }
 
