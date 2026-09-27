@@ -11,9 +11,8 @@ import { hashRecoveryCode, newRecoveryCode, RECOVERY_CODE_COUNT } from './recove
 import { base32Decode, generateTotpSecret, otpauthUrl, verifyTotp } from './totp';
 import type { Queryable } from '../db/db.service';
 import { UsersRepository, type UserRow } from './users.repository';
-
-const MAX_FAILURES = 10;
-const LOCK_MINUTES = 15;
+import { AUTH_POLICY, backoffKeys, backoffSeconds, ipHash, mfaLockMinutes } from './auth-policy';
+import { SessionsService } from './sessions.service';
 
 export type LoginOutcome =
   | { status: 'ok'; accessToken: string; user: PublicUser }
@@ -30,17 +29,23 @@ export class AuthError extends Error {
   constructor(
     readonly code:
       | 'invalid_credentials'
-      | 'locked'
+      | 'too_many_attempts'
+      | 'mfa_locked'
       | 'email_taken'
       | 'invalid_mfa_token'
       | 'invalid_code'
       | 'mfa_already_enrolled'
       | 'mfa_not_enrolled',
     message: string,
+    /** `too_many_attempts`: seconds until the back-off ends (sent as Retry-After). */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }
 }
+
+const TOO_MANY = 'Too many sign-in attempts. Wait a few minutes and try again.';
+const MFA_LOCKED = 'Too many wrong codes. Two-factor sign-in is paused for this account; try again later.';
 
 /** The built-in, OIDC-compatible dev identity provider (ADR 0101). */
 @Injectable()
@@ -54,6 +59,7 @@ export class DevIdpService {
     private readonly users: UsersRepository,
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
+    private readonly sessions: SessionsService,
   ) {
     if (config.auth.mfaEncKey) {
       this.box = new CryptoBox(config.auth.mfaEncKey);
@@ -100,23 +106,45 @@ export class DevIdpService {
     return generic;
   }
 
+  /**
+   * Password step (IRTC R1-04). No hard lock: progressive back-off per (e-mail, IP) and per e-mail,
+   * keyed on the e-mail string so an unknown e-mail answers exactly like an existing one. The owner's
+   * known IPs are exempt from the account-wide back-off. Refused attempts are not counted.
+   */
   async login(email: string, password: string, ip: string): Promise<LoginOutcome> {
+    const now = new Date();
+    const keys = backoffKeys(email, ip);
     const user = await this.users.findByEmail(email);
+    const blocked = await this.users.backoffState(keys);
+    const pairUntil = blocked.pair && blocked.pair > now ? blocked.pair : null;
+    let accountUntil = blocked.account && blocked.account > now ? blocked.account : null;
+    // Always one lookup, whether or not the account exists (keeps the timing uniform).
+    if (accountUntil && (await this.users.isKnownIp(user?.id ?? null, ipHash(ip), now, AUTH_POLICY.knownIpDays))) accountUntil = null;
+    const until = [pairUntil, accountUntil].filter((d): d is Date => d !== null).sort((x, y) => y.getTime() - x.getTime())[0];
+    if (until) {
+      await this.audit.record({ actorId: 'anonymous', actorType: 'user', action: 'auth.login_backoff', entity: 'user', entityId: null, payload: { scope: pairUntil ? 'pair' : 'account', ip } });
+      throw new AuthError('too_many_attempts', TOO_MANY, Math.max(1, Math.ceil((until.getTime() - now.getTime()) / 1000)));
+    }
+    const fail = async () => {
+      await this.users.recordBackoffFailure('pair', keys.pair, now, AUTH_POLICY.windowHours, (n) => backoffSeconds(n, AUTH_POLICY.pair));
+      await this.users.recordBackoffFailure('account', keys.account, now, AUTH_POLICY.windowHours, (n) => backoffSeconds(n, AUTH_POLICY.account));
+      if (Math.random() < 0.01) void this.users.pruneBackoff(now, AUTH_POLICY.windowHours).catch(() => undefined);
+    };
     if (!user || !user.password_hash || user.status !== 'active') {
       await verifyPassword(password, await dummyPasswordHash(this.config.auth.scryptN)); // equalise timing
+      await fail();
       await this.audit.record({ actorId: 'anonymous', actorType: 'user', action: 'auth.login_failed', entity: 'user', entityId: null, payload: { reason: 'unknown_or_disabled', ip } });
       throw new AuthError('invalid_credentials', 'Email or password is incorrect');
     }
-    if (user.locked_until && user.locked_until.getTime() > Date.now()) {
-      await this.audit.record({ actorId: user.id, actorType: 'user', action: 'auth.login_failed', entity: 'user', entityId: user.id, payload: { reason: 'locked', ip } });
-      throw new AuthError('locked', 'Too many failed attempts. Try again later.');
-    }
     if (!(await verifyPassword(password, user.password_hash))) {
-      await this.users.recordLoginFailure(user.id, MAX_FAILURES, LOCK_MINUTES);
+      await fail();
+      await this.users.recordPasswordFailure(user.id);
       await this.audit.record({ actorId: user.id, actorType: 'user', action: 'auth.login_failed', entity: 'user', entityId: user.id, payload: { reason: 'bad_password', ip } });
       throw new AuthError('invalid_credentials', 'Email or password is incorrect');
     }
-    await this.users.recordLoginSuccess(user.id);
+    // IRTC R1-01: a correct password clears the password back-off only, never the second-factor count.
+    await this.users.clearBackoff(keys);
+    await this.users.recordPasswordSuccess(user.id);
     const roles = await this.users.roles(user.id);
     const mfa = await this.users.mfa(user.id);
     const mfaEnabled = !!mfa?.enabled_at;
@@ -129,6 +157,7 @@ export class DevIdpService {
       };
     }
     const accessToken = await this.tokens.issueAccessToken({ sub: user.id, email: user.email, roles, amr: ['pwd'] });
+    await this.users.rememberIp(user.id, ipHash(ip), now);
     await this.audit.record({ actorId: user.id, actorType: 'user', action: 'auth.login', entity: 'user', entityId: user.id, payload: { amr: ['pwd'], ip } });
     return { status: 'ok', accessToken, user: this.publicUser(user, roles) };
   }
@@ -160,11 +189,41 @@ export class DevIdpService {
   async verifyStepUp(userId: string, code: string): Promise<boolean> {
     const mfa = await this.users.mfa(userId);
     if (!mfa?.enabled_at) return false;
+    const user = await this.users.findById(userId);
+    // IRTC R1-07: step-up codes share the second-factor lock; a locked second factor refuses them.
+    if (!user || this.mfaLocked(user)) {
+      await this.audit.record({ actorId: userId, actorType: 'user', action: 'auth.step_up_failed', entity: 'user', entityId: userId, payload: { reason: 'mfa_locked' } });
+      return false;
+    }
     const step = verifyTotp(base32Decode(this.box.open(mfa.totp_secret_enc, userId)), code);
     const ok = step !== null && (await this.db.tx((c) => this.users.consumeMfaStep(c, userId, step)));
-    if (!ok)
+    if (!ok) {
       await this.audit.record({ actorId: userId, actorType: 'user', action: 'auth.step_up_failed', entity: 'user', entityId: userId, payload: {} });
-    return ok;
+      // The session that produced the failures may be stolen: a lock ends every session of the user.
+      if (await this.mfaFailure(userId, 'step_up', null)) await this.sessions.invalidateAll(userId);
+      return false;
+    }
+    await this.users.recordMfaSuccess(userId);
+    return true;
+  }
+
+  private mfaLocked(user: UserRow): boolean {
+    return !!user.locked_until && user.locked_until.getTime() > Date.now();
+  }
+
+  /** Counts a failed second factor; returns true when this failure (re)locked it (audited). */
+  private async mfaFailure(userId: string, method: 'totp' | 'recovery_code' | 'step_up', ip: string | null): Promise<boolean> {
+    const until = await this.users.recordMfaFailure(userId, new Date(), AUTH_POLICY.mfa.maxFailures, mfaLockMinutes);
+    if (!until) return false;
+    await this.audit.record({
+      actorId: userId,
+      actorType: 'user',
+      action: 'auth.mfa_locked',
+      entity: 'user',
+      entityId: userId,
+      payload: { method, lockedUntil: until.toISOString(), ...(ip ? { ip } : {}) },
+    });
+    return true;
   }
 
   /**
@@ -199,8 +258,8 @@ export class DevIdpService {
   }
 
   /**
-   * B-902: second factor by a one-time recovery code (lost authenticator). Counts towards the login
-   * lockout like a wrong TOTP code. The session is MFA-level (`amr: pwd, mfa`). Replacing the
+   * B-902: second factor by a one-time recovery code (lost authenticator). A wrong code counts
+   * towards the second-factor lock like a wrong TOTP code (IRTC R1-01). The session is MFA-level (`amr: pwd, mfa`). Replacing the
    * authenticator itself stays the four-eyes `mfa_reset` for privileged roles (goal 09).
    */
   async recover(mfaToken: string, recoveryCode: string, ip: string): Promise<{ accessToken: string; user: PublicUser; remaining: number }> {
@@ -208,16 +267,18 @@ export class DevIdpService {
     const user = await this.users.findById(sub);
     const mfa = await this.users.mfa(sub);
     if (!user || !mfa?.enabled_at || stage !== 'verify') throw new AuthError('mfa_not_enrolled', 'Two-factor authentication is not set up for this account');
-    if (user.locked_until && user.locked_until.getTime() > Date.now()) throw new AuthError('locked', 'Too many failed attempts. Try again later.');
+    if (this.mfaLocked(user)) throw new AuthError('mfa_locked', MFA_LOCKED);
     const used = await this.db.query<{ id: string }>(
       `UPDATE mfa_recovery_codes SET used_at = now() WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL RETURNING id`,
       [sub, hashRecoveryCode(sub, recoveryCode)],
     );
     if (!used[0]) {
-      await this.users.recordLoginFailure(sub, MAX_FAILURES, LOCK_MINUTES);
       await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.mfa_failed', entity: 'user', entityId: sub, payload: { method: 'recovery_code', ip } });
+      if (await this.mfaFailure(sub, 'recovery_code', ip)) throw new AuthError('mfa_locked', MFA_LOCKED);
       throw new AuthError('invalid_code', 'That recovery code is not valid or was already used.');
     }
+    await this.users.recordMfaSuccess(sub);
+    await this.users.rememberIp(sub, ipHash(ip), new Date());
     const remaining = await this.recoveryCodesRemaining(sub);
     const roles = await this.users.roles(sub);
     const accessToken = await this.tokens.issueAccessToken({ sub, email: user.email, roles, amr: ['pwd', 'mfa'] });
@@ -235,17 +296,21 @@ export class DevIdpService {
     const user = await this.users.findById(sub);
     const mfa = await this.users.mfa(sub);
     if (!user || !mfa) throw new AuthError('mfa_not_enrolled', 'Set up an authenticator app first');
-    if (user.locked_until && user.locked_until.getTime() > Date.now()) {
-      throw new AuthError('locked', 'Too many failed attempts. Try again later.');
+    if (this.mfaLocked(user)) {
+      await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.mfa_failed', entity: 'user', entityId: sub, payload: { reason: 'mfa_locked', ip } });
+      throw new AuthError('mfa_locked', MFA_LOCKED);
     }
     const step = verifyTotp(base32Decode(this.box.open(mfa.totp_secret_enc, sub)), code);
     const wasEnabled = !!mfa.enabled_at;
     const ok = step !== null && (await this.db.tx((c) => this.users.consumeMfaStep(c, sub, step)));
     if (!ok) {
-      await this.users.recordLoginFailure(sub, MAX_FAILURES, LOCK_MINUTES);
       await this.audit.record({ actorId: sub, actorType: 'user', action: 'auth.mfa_failed', entity: 'user', entityId: sub, payload: { ip } });
+      if (await this.mfaFailure(sub, 'totp', ip)) throw new AuthError('mfa_locked', MFA_LOCKED);
       throw new AuthError('invalid_code', 'That code is not valid. Check your authenticator app and try again.');
     }
+    // IRTC R1-01: only a successful second factor clears the second-factor count and lock.
+    await this.users.recordMfaSuccess(sub);
+    await this.users.rememberIp(sub, ipHash(ip), new Date());
     const roles = await this.users.roles(sub);
     const accessToken = await this.tokens.issueAccessToken({ sub, email: user.email, roles, amr: ['pwd', 'otp'] });
     let recoveryCodes: string[] | undefined;

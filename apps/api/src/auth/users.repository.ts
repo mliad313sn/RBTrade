@@ -10,7 +10,10 @@ export interface UserRow {
   password_hash: string | null;
   status: 'active' | 'disabled';
   failed_logins: number;
+  /** Second factor locked until (IRTC R1-01). */
   locked_until: Date | null;
+  mfa_failed_count: number;
+  mfa_lock_count: number;
   created_at: Date;
 }
 
@@ -70,20 +73,116 @@ export class UsersRepository {
     }
   }
 
-  async recordLoginFailure(userId: string, maxFailures: number, lockMinutes: number): Promise<void> {
+  /** Informational wrong-password count (IRTC R1-04: the password step never hard-locks). */
+  async recordPasswordFailure(userId: string): Promise<void> {
+    await this.db.query('UPDATE users SET failed_logins = failed_logins + 1, updated_at = now() WHERE id = $1', [userId]);
+  }
+
+  /**
+   * A correct password. IRTC R1-01: this never touches the second-factor count or lock
+   * (`mfa_failed_count`, `locked_until`); only a successful second factor resets those.
+   */
+  async recordPasswordSuccess(userId: string): Promise<void> {
+    await this.db.query('UPDATE users SET failed_logins = 0, updated_at = now() WHERE id = $1 AND failed_logins <> 0', [userId]);
+  }
+
+  /**
+   * One failed second factor (TOTP, recovery code or step-up). At `maxFailures` consecutive failures
+   * the second factor locks for `lockMinutes(mfa_lock_count)`; while the count stays at or above the
+   * threshold, a failure after the lock expired renews it (doubled). Returns the lock end when this
+   * failure (re)locked it. Times use the application clock, the same one the checks use.
+   */
+  async recordMfaFailure(userId: string, now: Date, maxFailures: number, lockMinutes: (lockCount: number) => number): Promise<Date | null> {
+    return this.db.tx(async (c) => {
+      const { rows } = await c.query<{ mfa_failed_count: number; mfa_lock_count: number }>(
+        'SELECT mfa_failed_count, mfa_lock_count FROM users WHERE id = $1 FOR UPDATE',
+        [userId],
+      );
+      const row = rows[0];
+      if (!row) return null;
+      const failures = row.mfa_failed_count + 1;
+      const lock = failures >= maxFailures ? new Date(now.getTime() + lockMinutes(row.mfa_lock_count) * 60_000) : null;
+      await c.query(
+        `UPDATE users SET mfa_failed_count = $2, mfa_lock_count = mfa_lock_count + $3::int,
+           locked_until = COALESCE($4::timestamptz, locked_until), updated_at = now()
+         WHERE id = $1`,
+        [userId, failures, lock ? 1 : 0, lock],
+      );
+      return lock;
+    });
+  }
+
+  /** A successful second factor: the only event that clears the second-factor count and lock. */
+  async recordMfaSuccess(userId: string): Promise<void> {
     await this.db.query(
-      `UPDATE users SET failed_logins = failed_logins + 1,
-         locked_until = CASE WHEN failed_logins + 1 >= $2 THEN now() + make_interval(mins => $3) ELSE locked_until END,
-         updated_at = now()
-       WHERE id = $1`,
-      [userId, maxFailures, lockMinutes],
+      `UPDATE users SET mfa_failed_count = 0, mfa_lock_count = 0, locked_until = NULL, updated_at = now()
+       WHERE id = $1 AND (mfa_failed_count <> 0 OR mfa_lock_count <> 0 OR locked_until IS NOT NULL)`,
+      [userId],
     );
   }
 
-  async recordLoginSuccess(userId: string): Promise<void> {
-    await this.db.query('UPDATE users SET failed_logins = 0, locked_until = NULL, updated_at = now() WHERE id = $1', [
-      userId,
-    ]);
+  // ---- IRTC R1-04: password back-off, keyed on hashes (never on account existence) ----
+
+  async backoffState(keys: { pair: string; account: string }): Promise<{ pair: Date | null; account: Date | null }> {
+    const rows = await this.db.query<{ scope: 'pair' | 'account'; blocked_until: Date | null }>(
+      `SELECT scope, blocked_until FROM auth_login_backoff WHERE (scope = 'pair' AND key_hash = $1) OR (scope = 'account' AND key_hash = $2)`,
+      [keys.pair, keys.account],
+    );
+    return {
+      pair: rows.find((r) => r.scope === 'pair')?.blocked_until ?? null,
+      account: rows.find((r) => r.scope === 'account')?.blocked_until ?? null,
+    };
+  }
+
+  /**
+   * Counts one failure for a key (decaying after `windowHours` without failures) and sets the
+   * back-off computed from the new count. Returns the new count.
+   */
+  async recordBackoffFailure(scope: 'pair' | 'account', keyHash: string, now: Date, windowHours: number, backoff: (failures: number) => number): Promise<number> {
+    return this.db.tx(async (c) => {
+      const { rows } = await c.query<{ failures: number }>(
+        `INSERT INTO auth_login_backoff (scope, key_hash, failures, last_failure_at) VALUES ($1, $2, 0, $3)
+         ON CONFLICT (scope, key_hash) DO UPDATE SET
+           failures = CASE WHEN auth_login_backoff.last_failure_at < $3::timestamptz - make_interval(hours => $4) THEN 0 ELSE auth_login_backoff.failures END
+         RETURNING failures`,
+        [scope, keyHash, now, windowHours],
+      );
+      const failures = rows[0]!.failures + 1;
+      const secs = backoff(failures);
+      await c.query(
+        `UPDATE auth_login_backoff SET failures = $3, last_failure_at = $4, blocked_until = $5 WHERE scope = $1 AND key_hash = $2`,
+        [scope, keyHash, failures, now, secs > 0 ? new Date(now.getTime() + secs * 1000) : null],
+      );
+      return failures;
+    });
+  }
+
+  async clearBackoff(keys: { pair: string; account: string }): Promise<void> {
+    await this.db.query(
+      `DELETE FROM auth_login_backoff WHERE (scope = 'pair' AND key_hash = $1) OR (scope = 'account' AND key_hash = $2)`,
+      [keys.pair, keys.account],
+    );
+  }
+
+  /** Housekeeping: drops back-off rows idle for longer than the decay window. */
+  async pruneBackoff(now: Date, windowHours: number): Promise<void> {
+    await this.db.query(`DELETE FROM auth_login_backoff WHERE last_failure_at < $1::timestamptz - make_interval(hours => $2)`, [now, windowHours]);
+  }
+
+  async isKnownIp(userId: string | null, ipHash: string, now: Date, days: number): Promise<boolean> {
+    const rows = await this.db.query<{ ok: boolean }>(
+      `SELECT true AS ok FROM auth_known_ips WHERE user_id = $1::uuid AND ip_hash = $2 AND last_success_at > $3::timestamptz - make_interval(days => $4)`,
+      [userId, ipHash, now, days],
+    );
+    return rows.length > 0;
+  }
+
+  async rememberIp(userId: string, ipHash: string, now: Date): Promise<void> {
+    await this.db.query(
+      `INSERT INTO auth_known_ips (user_id, ip_hash, last_success_at) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, ip_hash) DO UPDATE SET last_success_at = EXCLUDED.last_success_at`,
+      [userId, ipHash, now],
+    );
   }
 
   async mfa(userId: string, c: Queryable = this.db.pool): Promise<MfaRow | null> {
