@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { INestApplication } from '@nestjs/common';
 import { TREND_X, type StrategyDefinition } from '@kora/domain';
 import request from 'supertest';
@@ -451,6 +453,14 @@ describe('AI copilot (goal 07)', () => {
     };
     expect(final.flags.executionClaim).toBe(true);
     expect(final.answer).not.toMatch(/placed your order/);
+    // IRTC R4-08: the audit proves both what was shown and that the guards changed the raw text.
+    const [row] = await ownerQuery<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM audit_events WHERE action = 'ai.request' AND actor_id = $1 ORDER BY id DESC LIMIT 1`,
+      [trader.id],
+    );
+    expect(row!.payload.answerHash).toBe(createHash('sha256').update(final.answer).digest('hex'));
+    expect(row!.payload.rawAnswerHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row!.payload.rawAnswerHash).not.toBe(row!.payload.answerHash);
   });
 
   it('Draft to ticket pre-fills a draft; only the user places the order (source ai-draft-accepted) and records the decision', async () => {
@@ -769,6 +779,13 @@ describe('AI copilot (goal 07)', () => {
       status: 'ok',
     });
     expect(String(rows[0]!.payload.promptHash)).toMatch(/^[0-9a-f]{64}$/);
+    // IRTC R4-08: what the user was shown is provable: SHA-256 and length of the answer text, on
+    // the fresh and the cached request alike.
+    const shown = createHash('sha256').update(String(a.body.answer)).digest('hex');
+    for (const r of rows) {
+      expect(r.payload.answerHash).toBe(shown);
+      expect(r.payload.answerLength).toBe(String(a.body.answer).length);
+    }
     const tools = await ownerQuery<{ payload: Record<string, unknown> }>(
       `SELECT payload FROM audit_events WHERE action = 'ai.tool_call' AND actor_id = $1 AND payload->>'promptHash' = $2`,
       [trader.id, a.body.promptHash],

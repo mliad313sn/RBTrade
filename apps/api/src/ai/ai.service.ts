@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { BudgetService, ResponseCacheService } from './budget.service';
 import { loadAiConfig, UNAVAILABLE_MESSAGE, type AiConfig } from './core/config';
 import { buildRequest, promptHashOf, runCopilot, type DraftRef } from './core/engine';
+import { sha256 } from './core/hash';
 import type { GuardFlags } from './core/guards';
 import type { ToolCallRecord } from './core/tools';
 import type { AiAsk, AiProvider, ProviderUsage } from './core/types';
@@ -46,6 +47,24 @@ interface CachedAnswer {
   flags: GuardFlags;
   toolCalls: Array<{ name: string; outcome: string }>;
   usage: ProviderUsage;
+}
+
+/**
+ * IRTC R4-08: what the user was shown, provable later. SHA-256 (hex, over the UTF-8 text exactly as
+ * returned) and length of the guarded answer; when the guards changed the model's text, the raw
+ * text's hash and length too. The text itself stays out of the audit log (retention/PII), but any
+ * copy (screenshot, export, support ticket) can be checked against the hash.
+ */
+function shownFields(answer: string, raw?: string): Record<string, string | number | null> {
+  const out: Record<string, string | number | null> = {
+    answerHash: sha256(answer),
+    answerLength: answer.length,
+  };
+  if (raw !== undefined) {
+    out.rawAnswerHash = raw === answer ? null : sha256(raw);
+    out.rawAnswerLength = raw.length;
+  }
+  return out;
 }
 
 /**
@@ -190,6 +209,7 @@ export class AiService {
         promptHash,
         inputTokens: 0,
         outputTokens: 0,
+        ...shownFields(hit.answer),
       });
       onEvent?.({ type: 'delta', text: hit.answer });
       return end(
@@ -249,6 +269,7 @@ export class AiService {
         noviceFallback: res.flags.fallback,
         readabilityGrade: res.flags.grade === null ? null : res.flags.grade.toFixed(1),
         stopReason: res.stopReason,
+        ...shownFields(res.text, res.rawText),
       });
       const toolCalls = res.toolCalls.map((t) => ({ name: t.name, outcome: t.outcome }));
       const clean =
