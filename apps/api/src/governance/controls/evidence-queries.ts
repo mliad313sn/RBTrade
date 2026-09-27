@@ -225,13 +225,24 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
   },
   'KC-13': async ({ anchors }, { from, to }) => {
     const list = await anchors.list(from, to);
+    // IRTC R4-07: signatures are checked against pinned keys; the head is witnessed by the latest
+    // trusted anchor (a deleted tail shows as truncated) and the WORM copy is read back.
+    const witness = await anchors.witness();
+    const worm = await anchors.wormCheck();
     return table(
-      ['id', 'anchoredAt', 'headId', 'headHash', 'eventCount', 'keyId', 'createdBy', 'signatureValid', 'matchesChain'],
+      ['id', 'anchoredAt', 'headId', 'headHash', 'eventCount', 'keyId', 'createdBy', 'signatureValid', 'trustedKey', 'matchesChain'],
       list as unknown as Row[],
       {
         anchors: list.length,
         invalid_signatures: list.filter((a) => !a.signatureValid).length,
+        untrusted_keys: list.filter((a) => !a.trustedKey).length,
         not_matching_chain: list.filter((a) => !a.matchesChain).length,
+        chain_truncated_after_last_anchor: witness?.truncated ?? false,
+        chain_mismatch_at_last_anchor: witness?.mismatch ?? false,
+        events_after_last_anchor: witness?.eventsAfterLastAnchor ?? null,
+        worm_configured: worm.configured,
+        worm_anchors: worm.fileAnchors,
+        worm_invalid_or_missing: worm.invalidSignatures + worm.missingInDatabase + worm.notMatchingChain + worm.unreadableLines,
       },
     );
   },

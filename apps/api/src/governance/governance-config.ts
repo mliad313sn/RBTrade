@@ -33,8 +33,13 @@ const Schema = z.object({
   KORA_AUDIT_ANCHOR_JWK: z.string().default(''),
   /** Directory the anchors are appended to (WORM stand-in). Empty = database only. */
   KORA_AUDIT_ANCHOR_DIR: z.string().default(''),
-  /** Interval of the in-process anchoring job (0 = off; daily in production). */
-  KORA_AUDIT_ANCHOR_INTERVAL_MS: z.coerce.number().int().min(0).max(7 * 86_400_000).default(0),
+  /**
+   * IRTC R4-07: public JWKs (JSON array) of earlier anchor keys still trusted after a rotation. The
+   * current key's public half is always trusted; a row's own `public_jwk` never is.
+   */
+  KORA_AUDIT_ANCHOR_TRUSTED_JWKS: z.string().default(''),
+  /** Interval of the in-process anchoring job (0 = off). Empty = daily, except in tests (off). */
+  KORA_AUDIT_ANCHOR_INTERVAL_MS: z.coerce.number().int().min(0).max(7 * 86_400_000).optional(),
   /** Deployment jurisdiction whose disclosures are served (placeholder until OQ-R2). */
   KORA_JURISDICTION: z
     .string()
@@ -52,7 +57,8 @@ export type GovernanceConfig = ReturnType<typeof loadGovernanceConfig>;
 
 export function loadGovernanceConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Schema.parse(env);
-  const devLike = e.KORA_ENV === 'dev' || e.KORA_ENV === 'test';
+  // IRTC R4-12: NODE_ENV=production alone also makes this a production process.
+  const devLike = (e.KORA_ENV === 'dev' || e.KORA_ENV === 'test') && env.NODE_ENV !== 'production';
   if (!devLike && !e.KORA_AUDIT_ANCHOR_JWK) {
     throw new Error('KORA_AUDIT_ANCHOR_JWK must be set outside dev/test (signed audit anchors, B-007)');
   }
@@ -65,7 +71,9 @@ export function loadGovernanceConfig(env: NodeJS.ProcessEnv = process.env) {
     nearLimitPct: e.KORA_RISK_NEAR_LIMIT_PCT,
     anchorJwk: e.KORA_AUDIT_ANCHOR_JWK,
     anchorDir: e.KORA_AUDIT_ANCHOR_DIR,
-    anchorIntervalMs: e.KORA_AUDIT_ANCHOR_INTERVAL_MS,
+    // IRTC R4-07: the anchoring job runs by default (daily) everywhere but in tests.
+    anchorIntervalMs: e.KORA_AUDIT_ANCHOR_INTERVAL_MS ?? (e.KORA_ENV === 'test' ? 0 : 86_400_000),
+    anchorTrustedJwks: e.KORA_AUDIT_ANCHOR_TRUSTED_JWKS,
     jurisdiction: e.KORA_JURISDICTION,
     buildSha: e.KORA_BUILD_SHA,
     releaseApprovalRef: e.KORA_RELEASE_APPROVAL_REF,

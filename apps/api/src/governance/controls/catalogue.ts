@@ -323,10 +323,14 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'daily',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'audit_anchors in the period with signature check and match against the current chain' },
+    evidence: {
+      kind: 'query',
+      source:
+        'audit_anchors in the period with the signature checked against the pinned anchor keys (never the key stored in the row), untrusted keys, match against the current chain, whether the chain was truncated or rewritten after the latest trusted anchor, and the WORM copy read back (KORA_AUDIT_ANCHOR_DIR)',
+    },
     testProcedure: [
-      'Export the evidence; confirm one anchor per day, every signature valid and every anchored hash present in the chain.',
-      'Compare two anchors with the copies in the WORM store (KORA_AUDIT_ANCHOR_DIR).',
+      'Export the evidence; confirm one anchor per day, every signature valid under a pinned key, untrusted keys 0, every anchored hash present in the chain, "truncated/mismatch after last anchor" false and WORM invalid-or-missing 0.',
+      'Re-perform: an anchor an insider signs with their own key is reported invalid (test/internal-audit.int.test.ts); a deleted tail makes /audit/verify return truncated_after_anchor (src/governance/anchors.unit.test.ts).',
     ],
     auditActions: ['internal_audit.anchor_created'],
   },
