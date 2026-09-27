@@ -5,7 +5,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bearer, createUser, ownerQuery, startApp, type TestUser } from './helpers';
-import { seedCandles, startQuant, wave, type Spawned } from './robot-helpers';
+import { clearCandles, seedCandles, startQuant, wave, type Spawned } from './robot-helpers';
 
 const H = 3_600_000;
 const T0 = Date.UTC(2025, 0, 6); // SIMULATED research window (fixed, deterministic)
@@ -41,6 +41,8 @@ describe('strategies, versions and research runs (goal 06)', () => {
     trader = await createUser(app, 'trader', [], { realClock: true });
     other = await createUser(app, 'trader', [], { realClock: true });
     novice = await createUser(app, 'novice', [], { realClock: true });
+    // Other files seed BTCUSD 1h candles too (the file order varies): start from this file's data only.
+    await clearCandles('BTCUSD', '1h');
     await seedCandles(
       'BTCUSD',
       '1h',
