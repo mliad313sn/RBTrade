@@ -496,6 +496,7 @@ describe('AI copilot (goal 07)', () => {
       .set(bearer(trader.token))
       .send({ decision: 'accepted' })
       .expect(400);
+    await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
     const pf = d.body.prefill as Record<string, string>;
     const placed = await request(http)
       .post('/orders')
@@ -568,6 +569,7 @@ describe('AI copilot (goal 07)', () => {
           .send({ symbol: 'BTCUSD', timeframe: '1h' })
           .expect(200)
       ).body as { draftId: string; prefill: Record<string, string> };
+    await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
     const d1 = await mk();
     const d2 = await mk();
     const accept = (draftId: string, orderId: string) =>
@@ -606,8 +608,10 @@ describe('AI copilot (goal 07)', () => {
     )[0]!.id;
     await accept(d2.draftId, rejectedId).expect(400);
     // The matching order is bound to d1 only: it cannot accept d2, and accepts d1 once.
+    // Fresh quote: earlier steps may take longer than the staleness window.
+    await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
     const good = await place({ side: d1.prefill.side, qty: d1.prefill.qty, aiDraftId: d1.draftId });
-    expect(good.status).toBe(201);
+    expect(good.status, JSON.stringify(good.body)).toBe(201);
     expect(good.body.order.source).toBe('ai-draft-accepted');
     await accept(d2.draftId, good.body.order.id).expect(400);
     await accept(d1.draftId, good.body.order.id).expect(200);
