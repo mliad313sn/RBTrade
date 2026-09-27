@@ -74,3 +74,64 @@ describe('hash chain', () => {
     expect(v.result()).toMatchObject({ valid: false, firstBrokenId: '1', count: 1 });
   });
 });
+
+// IRTC R6-01: pin the hash spec (ADR 0102) with a known-answer vector computed independently of this
+// implementation, and prove every hashed field is covered, so a refactor that drops a field or changes
+// the canonicalisation fails CI instead of silently breaking verification of historical chains.
+describe('audit hash spec (IRTC R6-01)', () => {
+  const KAT_EVENT = {
+    id: '1',
+    ts: '2026-09-26T12:00:00.000000Z',
+    actorId: 'u1',
+    actorType: 'user' as const,
+    action: 'test.event',
+    entity: 'test',
+    entityId: '1',
+    payload: { amount: '10.50' },
+  };
+  // The exact canonical body from ADR 0102 (sorted keys, no whitespace), written out by hand.
+  const KAT_BODY =
+    '{"action":"test.event","actor_id":"u1","actor_type":"user","entity":"test","entity_id":"1",' +
+    '"id":"1","payload":{"amount":"10.50"},"ts":"2026-09-26T12:00:00.000000Z"}';
+  // sha256(KAT_BODY + 64 zeros), computed outside this code base (Python hashlib).
+  const KAT_HASH = '8cd10597fd12fc73dedf4f0c8aa8520826084f849302bc9b36771df6d007618a';
+
+  it('matches the pinned known-answer vector for a fixed event and the genesis prev hash', () => {
+    expect(sha256Hex(KAT_BODY + GENESIS_HASH)).toBe(KAT_HASH);
+    expect(computeAuditHash(KAT_EVENT, GENESIS_HASH)).toBe(KAT_HASH);
+  });
+
+  const variants: [string, Partial<typeof KAT_EVENT> | { entityId: null }][] = [
+    ['id', { id: '2' }],
+    ['ts', { ts: '2026-09-26T12:00:00.000001Z' }],
+    ['actor_id', { actorId: 'u2' }],
+    ['actor_type', { actorType: 'system' as never }],
+    ['action', { action: 'test.forged' }],
+    ['entity', { entity: 'other' }],
+    ['entity_id', { entityId: '2' }],
+    ['entity_id (null)', { entityId: null }],
+    ['payload', { payload: { amount: '10.51' } }],
+  ];
+  for (const [field, patch] of variants) {
+    it(`changing ${field} changes the hash and breaks verification`, () => {
+      expect(computeAuditHash({ ...KAT_EVENT, ...patch } as typeof KAT_EVENT, GENESIS_HASH)).not.toBe(KAT_HASH);
+      const forged = { ...KAT_EVENT, ...patch, prevHash: GENESIS_HASH, hash: KAT_HASH } as AuditEvent;
+      expect(verifyAuditChain([forged])).toMatchObject({ valid: false, firstBrokenId: forged.id, reason: 'hash_mismatch' });
+    });
+  }
+
+  it('changing prev_hash changes the hash and breaks the link', () => {
+    expect(computeAuditHash(KAT_EVENT, 'f'.repeat(64))).not.toBe(KAT_HASH);
+    const c = chain(3);
+    const forgedPrev = 'a'.repeat(64);
+    c[1] = { ...c[1]!, prevHash: forgedPrev, hash: computeAuditHash(c[1]!, forgedPrev) };
+    expect(verifyAuditChain(c)).toMatchObject({ valid: false, firstBrokenId: '2', reason: 'prev_hash_mismatch' });
+  });
+
+  it('the untampered KAT event verifies', () => {
+    expect(verifyAuditChain([{ ...KAT_EVENT, prevHash: GENESIS_HASH, hash: KAT_HASH }])).toMatchObject({
+      valid: true,
+      headHash: KAT_HASH,
+    });
+  });
+});

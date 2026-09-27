@@ -47,3 +47,18 @@
   and checked (internal audit, KC-13). The anchoring job runs daily by default outside tests.
   Residual: events after the latest anchor are not yet witnessed; the daily cadence bounds that
   window, and real object-lock storage stays a deployment item.
+
+## Known-answer vector (IRTC R6-01, 2026-09-27)
+
+An auditor can re-implement the check against this vector. The event is
+`{id: "1", ts: "2026-09-26T12:00:00.000000Z", actor_id: "u1", actor_type: "user", action: "test.event",
+entity: "test", entity_id: "1", payload: {amount: "10.50"}}` with the genesis `prev_hash` (64 zeros).
+
+- Canonical body: `{"action":"test.event","actor_id":"u1","actor_type":"user","entity":"test","entity_id":"1","id":"1","payload":{"amount":"10.50"},"ts":"2026-09-26T12:00:00.000000Z"}`
+- `hash = sha256(body + prev_hash)` = `8cd10597fd12fc73dedf4f0c8aa8520826084f849302bc9b36771df6d007618a`
+
+The vector is pinned in `packages/domain/src/audit.test.ts`, together with tests showing that changing
+any hashed field (or `prev_hash`) changes the hash. `apps/api/test/audit.int.test.ts` tampers each
+column in the database and expects `/audit/verify` to break at that row. Changing the hash specification
+breaks the verification of every historical chain, so it needs a new ADR and a migration plan. Editing
+the pinned vector is not enough.

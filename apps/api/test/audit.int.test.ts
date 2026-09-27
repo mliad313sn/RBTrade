@@ -142,4 +142,33 @@ describe('audit log', () => {
     const ok = await request(http).get('/audit/verify').set(bearer(u.token)).expect(200);
     expect(ok.body.valid).toBe(true);
   });
+  // IRTC R6-01: every hashed column (and the link) is protected, not only the payload. Each tamper is
+  // made as the owner with the trigger disabled, must break /audit/verify at that row, and restoring
+  // the original value must make the chain verify again.
+  const TAMPERS: Array<[string, string]> = [
+    ['actor_id', "'forged-actor'"],
+    ['actor_type', "'ai'"],
+    ['ts', "ts + interval '1 hour'"],
+    ['action', "'test.r6_forged'"],
+    ['entity', "'forged'"],
+    ['entity_id', "'forged'"],
+    ['payload', `'{"a":"2"}'::jsonb`],
+    ['prev_hash', `'${'a'.repeat(64)}'`],
+  ];
+  for (const [col, forged] of TAMPERS) {
+    it(`tampering ${col} breaks the chain at that row (IRTC R6-01)`, async () => {
+      const e = await audit.record({ actorId: 'system', actorType: 'system', action: 'test.r6', entity: 'test', entityId: 'x', payload: { a: '1' } });
+      await audit.record({ actorId: 'system', actorType: 'system', action: 'test.r6_after', entity: 'test' });
+      const asOwner = (sql: string, params: unknown[] = []) =>
+        ownerQuery(`BEGIN; ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update_delete; ${sql}; ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_update_delete; COMMIT;`, params);
+      const orig = (await ownerQuery<{ v: string }>(`SELECT ${col}::text AS v FROM audit_events WHERE id = $1`, [e.id]))[0]!.v;
+      await asOwner(`UPDATE audit_events SET ${col} = ${forged} WHERE id = ${e.id}`);
+      const broken = await audit.verify();
+      // An untyped literal is coerced to the column type (timestamptz, jsonb, enum, text).
+      await asOwner(`UPDATE audit_events SET ${col} = '${orig.replace(/'/g, "''")}' WHERE id = ${e.id}`);
+      expect(broken).toMatchObject({ valid: false, firstBrokenId: e.id });
+      expect(broken.reason).toBe(col === 'prev_hash' ? 'prev_hash_mismatch' : 'hash_mismatch');
+      expect((await audit.verify()).valid).toBe(true);
+    });
+  }
 });
