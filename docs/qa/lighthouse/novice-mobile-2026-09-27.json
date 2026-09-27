@@ -1,0 +1,62 @@
+{
+  "/auto-invest": {
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": "simulate",
+    "scores": {
+      "performance": 0.97,
+      "accessibility": 1,
+      "best-practices": 0.96
+    },
+    "LCP": "2.5\u00a0s",
+    "TBT": "80\u00a0ms",
+    "CLS": "0",
+    "FCP": "1.5\u00a0s",
+    "fetchTime": "2026-09-27T00:29:57.584Z"
+  },
+  "/home": {
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": "simulate",
+    "scores": {
+      "performance": 0.95,
+      "accessibility": 1,
+      "best-practices": 0.96
+    },
+    "LCP": "2.7\u00a0s",
+    "TBT": "130\u00a0ms",
+    "CLS": "0",
+    "FCP": "1.5\u00a0s",
+    "fetchTime": "2026-09-27T00:29:24.566Z"
+  },
+  "/learn": {
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": "simulate",
+    "scores": {
+      "performance": 0.95,
+      "accessibility": 1,
+      "best-practices": 0.96
+    },
+    "LCP": "2.8\u00a0s",
+    "TBT": "110\u00a0ms",
+    "CLS": "0",
+    "FCP": "1.5\u00a0s",
+    "fetchTime": "2026-09-27T00:29:45.534Z"
+  },
+  "/practice": {
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": "simulate",
+    "scores": {
+      "performance": 0.93,
+      "accessibility": 1,
+      "best-practices": 0.96
+    },
+    "LCP": "2.9\u00a0s",
+    "TBT": "150\u00a0ms",
+    "CLS": "0",
+    "FCP": "1.5\u00a0s",
+    "fetchTime": "2026-09-27T00:30:17.281Z"
+  }
+}

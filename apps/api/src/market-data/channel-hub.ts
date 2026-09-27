@@ -74,7 +74,7 @@ export class ChannelHub implements OnModuleDestroy {
       if (channel !== STATUS_CHANNEL) await this.sub!.subscribe(busChannel(this.cfg, channel));
     }
     set.add(client);
-    let payload = this.last.get(channel) ?? (await this.cmd!.get(lastKey(this.cfg, channel)));
+    let payload = this.last.get(channel) ?? (await this.getLast([channel]))[0] ?? null;
     if (payload) {
       if (this.feedLost && channel.startsWith('quotes:')) payload = markStale(payload);
       this.sendTo(client, frame(channel, payload, true));
@@ -93,9 +93,21 @@ export class ChannelHub implements OnModuleDestroy {
   }
 
   /** Last-value cache (Redis) for REST reads. */
+  /**
+   * Goal 10 chaos finding: with Redis down the reads threw and REST answered 500 (accounts,
+   * positions, quotes, orders). The cache now answers "no value" instead: callers already treat a
+   * missing quote as no market data (orders refused with NO_MARKET_DATA, valuations unpriced).
+   */
   async getLast(channels: string[]): Promise<Array<string | null>> {
     await this.init();
-    return channels.length ? this.cmd!.mget(...channels.map((c) => lastKey(this.cfg, c))) : [];
+    if (!channels.length) return [];
+    if (this.cmd!.status !== 'ready') return channels.map(() => null);
+    try {
+      return await this.cmd!.mget(...channels.map((c) => lastKey(this.cfg, c)));
+    } catch (e) {
+      this.log.warn(`last-value cache unavailable: ${(e as Error).message}`);
+      return channels.map(() => null);
+    }
   }
 
   isSubscribed(channel: string): boolean {
