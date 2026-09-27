@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { AttemptSchema, type AttemptRequest } from '@kora/domain';
+import { AttemptSchema, rolesConflict, type AttemptRequest } from '@kora/domain';
 import type { Response } from 'express';
 
 import { AuditService } from '../audit/audit.service';
@@ -22,13 +22,22 @@ import { clearAccessCookie } from '../auth/cookies';
 import { CurrentPrincipal } from '../auth/decorators';
 import type { Principal } from '../auth/principal';
 import { UsersRepository } from '../auth/users.repository';
+import { appropriatenessIpLimitPerDay } from '../common/auth-throttle';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { QuestionnaireService } from './questionnaire.service';
 
 const ID = 'appropriateness';
-const attemptThrottle = () => ({ default: { limit: 20, ttl: 60_000 } });
+// Per client IP: 20 per minute, and (IRTC R1-11) a daily ceiling across all accounts.
+const attemptThrottle = () => ({ default: { limit: 20, ttl: 60_000 }, long: { limit: () => appropriatenessIpLimitPerDay(), ttl: 86_400_000 } });
+
+function sodBody(conflict: [string, string]) {
+  return {
+    error: 'segregation_of_duties',
+    message: `Segregation of duties: ${conflict[0]} cannot be combined with ${conflict[1]}, so Pro trading cannot be unlocked for this account.`,
+  };
+}
 
 /**
  * Appropriateness assessment (B-018, Sponsor decision OQ-S2). Everyone signs up as `novice`;
@@ -57,6 +66,22 @@ export class AppropriatenessController {
     return d;
   }
 
+  private async refuseIfConflict(userId: string, def: { id: string; version: number }): Promise<void> {
+    const roles = await this.users.roles(userId);
+    if (roles.includes('trader')) return; // answered as already_trader below
+    const conflict = rolesConflict([...roles, 'trader']);
+    if (!conflict) return;
+    await this.audit.record({
+      actorId: userId,
+      actorType: 'user',
+      action: 'appropriateness.refused',
+      entity: 'user',
+      entityId: userId,
+      payload: { questionnaireId: def.id, version: def.version, reason: 'segregation_of_duties', conflict: [conflict[0], conflict[1]] },
+    });
+    throw new ConflictException(sodBody(conflict));
+  }
+
   @Get('questionnaire')
   @ApiOperation({
     summary:
@@ -68,11 +93,13 @@ export class AppropriatenessController {
     const last = await this.q.lastAttempt(p.sub, ID);
     const cooldownUntil = this.q.cooldownUntil(def, last);
     const isTrader = roles.includes('trader');
+    // IRTC R1-09: a role that cannot hold `trader` (segregation of duties) is never eligible.
+    const conflict = isTrader ? null : rolesConflict([...roles, 'trader']);
     return {
       questionnaire: this.q.view(def),
       status: {
         hasTraderRole: isTrader,
-        eligible: !isTrader && !cooldownUntil,
+        eligible: !isTrader && !cooldownUntil && !conflict,
         cooldownUntil: cooldownUntil?.toISOString() ?? null,
         lastAttempt: last
           ? {
@@ -107,6 +134,9 @@ export class AppropriatenessController {
         current: { id: def.id, version: def.version },
       });
     }
+    // IRTC R1-09: refuse before grading when `trader` would break segregation of duties (the DB
+    // trigger from 0090 is the backstop; hitting it used to surface as an unaudited 500).
+    await this.refuseIfConflict(p.sub, def);
     const g = this.q.grade(def, body.answers);
     if (g.missing.length || g.unknown.length) {
       throw new BadRequestException({
@@ -126,6 +156,8 @@ export class AppropriatenessController {
           error: 'already_trader',
           message: 'Your account already has Pro trading access.',
         });
+      const conflict = rolesConflict([...roles, 'trader']);
+      if (conflict) throw new ConflictException(sodBody(conflict)); // a role granted meanwhile
       const until = this.q.cooldownUntil(def, await this.q.lastAttempt(p.sub, ID, c));
       if (until) {
         throw new HttpException(

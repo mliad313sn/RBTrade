@@ -9,7 +9,7 @@ import { AppropriatenessModule } from './appropriateness/appropriateness.module'
 import { AuditModule } from './audit/audit.module';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
-import { authLimit, ipAccountTracker, skipUnlessAccountThrottled } from './common/auth-throttle';
+import { authLimit, ipAccountTracker, skipUnlessAccountThrottled, skipUnlessLongThrottled } from './common/auth-throttle';
 import { ObservabilityModule } from './observability/observability.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ComplianceModule } from './compliance/compliance.module';
@@ -60,6 +60,8 @@ import { TradingModule } from './trading/trading.module';
       throttlers: [
         { name: 'default', ttl: 60_000, limit: () => Number(process.env.KORA_API_RATE_LIMIT ?? 600) || 600 },
         { name: 'account', ttl: 60_000, limit: () => authLimit(), getTracker: ipAccountTracker, skipIf: skipUnlessAccountThrottled },
+        // IRTC R1-11: opt-in per-IP limits over long windows (sign-up, appropriateness attempts).
+        { name: 'long', ttl: 3_600_000, limit: 1_000_000, skipIf: skipUnlessLongThrottled },
       ],
     }),
     DbModule,

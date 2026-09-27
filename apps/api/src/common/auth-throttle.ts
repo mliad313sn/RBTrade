@@ -52,6 +52,18 @@ export const ipAccountTracker: ThrottlerGetTrackerFunction = (req) => {
 export const skipUnlessAccountThrottled = (ctx: ExecutionContext): boolean =>
   Reflect.getMetadata('THROTTLER:LIMITaccount', ctx.getHandler()) === undefined;
 
+/** The `long` throttler (per IP, long windows) applies only to routes that opt in. */
+export const skipUnlessLongThrottled = (ctx: ExecutionContext): boolean =>
+  Reflect.getMetadata('THROTTLER:LIMITlong', ctx.getHandler()) === undefined;
+
+/**
+ * IRTC R1-11: new accounts per client IP per hour (default 10), and appropriateness attempts per
+ * client IP per day across all accounts (default 10), so a sybil cannot walk the answer key by
+ * opening many accounts (the cool-down applies per account).
+ */
+export const signupLimitPerHour = (): number => Number(process.env.KORA_SIGNUP_RATE_LIMIT_PER_HOUR ?? 10) || 10;
+export const appropriatenessIpLimitPerDay = (): number => Number(process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY ?? 10) || 10;
+
 /** Decorator options for sign-in routes (read per request; tests change the env at runtime). */
 export const authThrottle = () => ({
   default: { limit: () => authIpLimit(), ttl: 60_000 },

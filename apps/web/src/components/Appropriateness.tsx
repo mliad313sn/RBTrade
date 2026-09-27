@@ -94,6 +94,11 @@ export function Appropriateness() {
           Your last attempt did not pass. You can try again after {new Date(data.status.cooldownUntil).toUTCString()}.
         </Banner></div>
       ) : null}
+      {!result && !data.status.eligible && !data.status.cooldownUntil && !data.status.hasTraderRole ? (
+        <div data-testid="appropriateness-not-eligible"><Banner tone="info" title="Pro trading cannot be unlocked for this account.">
+          One of your roles cannot be combined with trading (segregation of duties). Ask an administrator if this is unexpected.
+        </Banner></div>
+      ) : null}
       {error ? (
         <Banner tone="critical" title="Couldn't submit.">
           <span data-testid="appropriateness-error">{error}</span>

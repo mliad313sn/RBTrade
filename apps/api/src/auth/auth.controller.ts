@@ -20,7 +20,7 @@ import type { Response } from 'express';
 import type { z } from 'zod';
 
 import { AuditService } from '../audit/audit.service';
-import { authThrottle } from '../common/auth-throttle';
+import { authThrottle, signupLimitPerHour } from '../common/auth-throttle';
 import { clientIp, type KoraRequest } from '../common/request';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
@@ -96,7 +96,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle(authThrottle())
+  @Throttle({ ...authThrottle(), long: { limit: () => signupLimitPerHour(), ttl: 3_600_000 } })
   @Post('signup')
   @ApiOperation({ summary: 'Create an account. Everyone starts as novice (PAPER); Pro trading needs the appropriateness assessment, then TOTP enrolment at the next login.' })
   @ApiBody({ schema: openApiSchema(SignupSchema) })

@@ -56,6 +56,9 @@ export default defineConfig({
         KORA_ENV: 'test',
         KORA_SCRYPT_N: '16384',
         KORA_AUTH_RATE_LIMIT: '10000',
+        // IRTC R1-11: the suite signs up many accounts from one address.
+        KORA_SIGNUP_RATE_LIMIT_PER_HOUR: '100000',
+        KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY: '100000',
         QUANT_URL: `http://127.0.0.1:${QUANT_PORT}`,
         LOG_LEVEL: 'warn',
         // Market data (goal 02): in-process SIMULATED feed for the prototype majors, own Redis namespace.

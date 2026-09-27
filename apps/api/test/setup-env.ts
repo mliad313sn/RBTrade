@@ -6,6 +6,9 @@ process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST ?? '';
 process.env.KORA_SCRYPT_N = '16384';
 process.env.KORA_AUTH_RATE_LIMIT = '10000';
+// IRTC R1-11 per-IP sign-up / assessment ceilings (their own tests run at the defaults).
+process.env.KORA_SIGNUP_RATE_LIMIT_PER_HOUR = '100000';
+process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY = '100000';
 process.env.LOG_LEVEL = 'silent';
 process.env.AUTH_PROVIDER = 'dev';
 process.env.LIVE_TRADING_ENABLED = 'false';
