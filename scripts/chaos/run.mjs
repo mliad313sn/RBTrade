@@ -40,6 +40,7 @@ const SERVICE_TOKEN = 'chaos-only-service-token-0123456789abcdef';
 const MD_PREFIX = 'kora:chaos:md:';
 const WEB = `http://127.0.0.1:${PORTS.web}`;
 const API = `${WEB}/api`; // everything goes through the web proxy, like a browser
+// nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_password -- test-only password for throwaway local accounts, reviewed goal 10
 const PASSWORD = 'correct-horse-battery-staple';
 const CSRF = { 'x-kora-csrf': '1', 'content-type': 'application/json' };
 

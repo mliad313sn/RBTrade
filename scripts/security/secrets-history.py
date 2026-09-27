@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWLIST = ROOT / "docs/security/secrets-allowlist.json"
 SKIP_SUFFIX = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".xlsx", ".pdf", ".webp")
-SKIP_NAMES = ("pnpm-lock.yaml",)  # integrity hashes, not secrets
+SKIP_NAMES = ("pnpm-lock.yaml", "secrets-allowlist.json")  # integrity hashes / fingerprints, not secrets
 
 REGEXES = {
     "private_key_pem": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"),

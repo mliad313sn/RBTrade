@@ -109,3 +109,22 @@ test('sign-up as novice lands in the simple view without MFA', async ({ page }) 
   await expect(page.getByTestId('novice-topbar')).toBeVisible();
   await expect(page.getByText('[XX]% of retail accounts lose money')).toBeVisible();
 });
+
+test('web security headers (goal 10): nonce CSP without unsafe-inline scripts, framing refused, no x-powered-by', async ({ request }) => {
+  for (const path of ['/login', '/terminal']) {
+    const res = await request.get(path, { maxRedirects: 0 });
+    const h = res.headers();
+    const csp = h['content-security-policy'] ?? '';
+    expect(csp, path).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
+    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+    expect(h['x-content-type-options']).toBe('nosniff');
+    expect(h['x-frame-options']).toBe('DENY');
+    expect(h['x-powered-by']).toBeUndefined();
+  }
+  // A fresh nonce per response.
+  const a = (await request.get('/login')).headers()['content-security-policy'];
+  const b = (await request.get('/login')).headers()['content-security-policy'];
+  expect(a).not.toBe(b);
+});
