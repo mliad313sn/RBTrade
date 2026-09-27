@@ -73,6 +73,14 @@ describe('trading config', () => {
     expect(() => loadTradingConfig({ KORA_ENV: 'test', KORA_TRADING_SESSION_OVERRIDE: 'eurusd' })).toThrow();
   });
 
+  it('IRTC R6-12: the session override needs KORA_ENV explicitly dev or test (unset or misspelt is refused)', () => {
+    expect(() => loadTradingConfig({ KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow(/refused/);
+    expect(() => loadTradingConfig({ KORA_ENV: ' ', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow();
+    expect([...loadTradingConfig({ KORA_ENV: 'dev', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' }).sessionOverride]).toEqual(['EURUSD']);
+    // Without the override an unset KORA_ENV still loads (nothing test-only is requested).
+    expect([...loadTradingConfig({}).sessionOverride]).toEqual([]);
+  });
+
   it('IRTC R2-13: NODE_ENV=production refuses the session override even when KORA_ENV is unset', () => {
     expect(() => loadTradingConfig({ NODE_ENV: 'production', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD,AAPL' })).toThrow(/refused/);
     expect(() => loadTradingConfig({ NODE_ENV: 'production', KORA_ENV: 'test', KORA_TRADING_SESSION_OVERRIDE: 'EURUSD' })).toThrow(/refused/);

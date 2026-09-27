@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isExplicitDevOrTest } from './env-mode';
+
 const bool = z
   .enum(['true', 'false', '1', '0', ''])
   .optional()
@@ -99,7 +101,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     redisUrl: e.REDIS_URL,
     logLevel: e.LOG_LEVEL,
     /** IRTC R1-11: Swagger UI and /openapi.json are served only in dev and test. */
-    apiDocs: (e.KORA_ENV === 'dev' || e.KORA_ENV === 'test') && !production,
+    // IRTC R6-12: only with KORA_ENV set explicitly to dev or test (unset is production).
+    apiDocs: isExplicitDevOrTest(env) && !production,
     auth: {
       provider: e.AUTH_PROVIDER,
       issuer: e.AUTH_PROVIDER === 'dev' ? e.KORA_JWT_ISSUER : keycloakIssuer,
@@ -109,7 +112,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       scryptN: e.KORA_SCRYPT_N,
       rateLimitPerMinute: e.KORA_AUTH_RATE_LIMIT,
       accessTokenTtlSeconds: e.KORA_ACCESS_TOKEN_TTL_SECONDS,
-      secureCookies: e.KORA_ENV !== 'dev' && e.KORA_ENV !== 'test',
+      secureCookies: !isExplicitDevOrTest(env),
       keycloak: {
         url: e.KEYCLOAK_URL,
         realm: e.KEYCLOAK_REALM,

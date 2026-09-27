@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isExplicitDevOrTest } from '../config/env-mode';
+
 const decimal = z.string().regex(/^\d+(\.\d+)?$/);
 const bool = (def: boolean) =>
   z
@@ -80,10 +82,11 @@ export function loadTradingConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Schema.parse(env);
   // IRTC R2-13: NODE_ENV=production counts as production even when KORA_ENV is unset (same
   // predicate as the main config), so the test aid can never be enabled in a production build.
-  const devOrTest = (e.KORA_ENV === 'dev' || e.KORA_ENV === 'test') && env.NODE_ENV !== 'production';
+  // IRTC R6-12: an unset KORA_ENV no longer counts as dev.
+  const devOrTest = isExplicitDevOrTest(env);
   if (e.KORA_TRADING_SESSION_OVERRIDE.length > 0 && !devOrTest) {
     throw new Error(
-      'KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused outside KORA_ENV=dev|test (and with NODE_ENV=production)',
+      'KORA_TRADING_SESSION_OVERRIDE is a test aid and is refused unless KORA_ENV is explicitly dev or test (and never with NODE_ENV=production)',
     );
   }
   if (Number(e.KORA_MARGIN_CLOSEOUT_LEVEL_PCT) >= Number(e.KORA_MARGIN_CALL_LEVEL_PCT))

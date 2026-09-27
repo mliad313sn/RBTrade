@@ -1,3 +1,5 @@
+import { isExplicitDevOrTest } from '../../config/env-mode';
+
 /**
  * AI copilot configuration, read from env only. There is deliberately **no default model id**:
  * with `KORA_AI_MODEL` unset the anthropic provider is unavailable and the copilot fails closed
@@ -43,7 +45,8 @@ function num(v: string | undefined, dflt: number, min = 0): number {
 export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
   const env = e.KORA_ENV ?? 'dev';
   // IRTC R4-12: either variable saying production makes this a production process.
-  const devOrTest = (env === 'dev' || env === 'test') && e.NODE_ENV !== 'production';
+  // IRTC R6-12: KORA_ENV must say dev or test explicitly (unset is production).
+  const devOrTest = isExplicitDevOrTest(e);
   const raw = (e.KORA_AI_PROVIDER ?? 'anthropic').trim();
   let provider: AiProviderKind = raw === 'scripted' || raw === 'replay' ? raw : 'anthropic';
   // Test doubles never serve real users: outside dev/test the provider is always the real one.

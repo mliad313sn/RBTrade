@@ -6,11 +6,17 @@ const base = { DATABASE_URL: 'postgres://x', REDIS_URL: 'redis://x' };
 
 describe('loadConfig', () => {
   it('defaults to PAPER, dev IdP and never enables LIVE', () => {
-    const c = loadConfig(base);
+    const c = loadConfig({ ...base, KORA_ENV: 'dev' });
     expect(c.tradingEnvironment).toBe('PAPER');
     expect(c.liveTradingEnabled).toBe(false);
     expect(c.auth.provider).toBe('dev');
     expect(c.auth.secureCookies).toBe(false);
+    expect(c.apiDocs).toBe(true);
+  });
+  it('IRTC R6-12: with KORA_ENV unset the dev leniencies are off (secure cookies, no API docs)', () => {
+    const c = loadConfig(base);
+    expect(c.auth.secureCookies).toBe(true);
+    expect(c.apiDocs).toBe(false);
   });
   it('refuses LIVE_TRADING_ENABLED=true', () => {
     expect(() => loadConfig({ ...base, LIVE_TRADING_ENABLED: 'true' })).toThrow(ConfigError);
@@ -51,7 +57,7 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...st, KORA_ALLOW_DEV_IDP: 'true', KORA_MFA_ENC_KEY: 'k', KORA_DEV_IDP_PRIVATE_JWK: '{}' }).auth.provider).toBe('dev');
   });
   it('IRTC R1-11: API docs only in dev and test', () => {
-    expect(loadConfig(base).apiDocs).toBe(true);
+    expect(loadConfig({ ...base, KORA_ENV: 'dev' }).apiDocs).toBe(true);
     expect(loadConfig({ ...base, KORA_ENV: 'test' }).apiDocs).toBe(true);
     expect(loadConfig({ ...base, AUTH_PROVIDER: 'keycloak', KORA_ENV: 'staging', REDIS_URL: 'redis://:p@x', KORA_ALLOW_INSECURE_TRANSPORT: 'true' }).apiDocs).toBe(false);
   });

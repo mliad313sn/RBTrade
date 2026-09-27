@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isExplicitDevOrTest } from '../config/env-mode';
+
 /** An optional number where an empty variable means "use the default" (not 0). */
 const optionalNumber = (n: z.ZodNumber) =>
   z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().pipe(n).optional());
@@ -62,7 +64,8 @@ export type GovernanceConfig = ReturnType<typeof loadGovernanceConfig>;
 export function loadGovernanceConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Schema.parse(env);
   // IRTC R4-12: NODE_ENV=production alone also makes this a production process.
-  const devLike = (e.KORA_ENV === 'dev' || e.KORA_ENV === 'test') && env.NODE_ENV !== 'production';
+  // IRTC R6-12: KORA_ENV must say dev or test explicitly (unset is production).
+  const devLike = isExplicitDevOrTest(env);
   if (!devLike && !e.KORA_AUDIT_ANCHOR_JWK) {
     throw new Error('KORA_AUDIT_ANCHOR_JWK must be set outside dev/test (signed audit anchors, B-007)');
   }

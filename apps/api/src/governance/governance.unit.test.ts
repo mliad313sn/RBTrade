@@ -127,11 +127,13 @@ describe('governance settings and helpers', () => {
   });
 
   it('defaults are conservative; the anchor key is required outside dev/test', () => {
-    const c = loadGovernanceConfig({});
+    const c = loadGovernanceConfig({ KORA_ENV: 'dev' });
     expect(c).toMatchObject({ resumePolicy: 'firm', nearPausePct: 70, nearLimitPct: 80, jurisdiction: 'GLOBAL', releaseRecord: true });
-    expect(loadGovernanceConfig({ KORA_FOUR_EYES_RESUME: 'all' }).resumePolicy).toBe('all');
+    expect(loadGovernanceConfig({ KORA_ENV: 'dev', KORA_FOUR_EYES_RESUME: 'all' }).resumePolicy).toBe('all');
     expect(() => loadGovernanceConfig({ KORA_ENV: 'production' })).toThrow(/KORA_AUDIT_ANCHOR_JWK/);
-    expect(() => loadGovernanceConfig({ KORA_JURISDICTION: 'france' })).toThrow();
+    expect(() => loadGovernanceConfig({ KORA_ENV: 'dev', KORA_JURISDICTION: 'france' })).toThrow();
+    // IRTC R6-12: an unset KORA_ENV is production (the unsigned-anchor leniency is refused).
+    expect(() => loadGovernanceConfig({})).toThrow(/KORA_AUDIT_ANCHOR_JWK/);
   });
 
   it('retention: periods are placeholders unless Compliance sets them; market-data ticks keep 7 days', () => {
