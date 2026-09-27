@@ -41,6 +41,8 @@ function Themed({ children, locale, disclosure, explainMode }: { children: React
     document.documentElement.dataset.colors = me.preferences.colourConvention;
     document.documentElement.dataset.mode = mode;
     document.documentElement.lang = lang;
+    // IRTC R5-26: remembered for the server render of the next page (not a secret; display only).
+    document.cookie = `kora_theme=${theme}; path=/; max-age=31536000; samesite=lax`;
   }, [theme, me.preferences.colourConvention, lang, mode]);
   return (
     <I18nProvider locale={lang} novice={mode === 'novice'}>

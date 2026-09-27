@@ -76,7 +76,10 @@ export function liveAccount(account: AccountView, marked: readonly MarkedPositio
   if (account.openPositions !== marked.length || marked.some((p) => p.unrealizedPnl === null)) return account;
   const ccy = account.baseCurrency;
   const unrealized = marked.reduce((a, p) => a.add(dec(p.unrealizedPnl!)), dec(0));
-  const margin = marked.reduce((a, p) => a.add(dec(p.marginUsed ?? '0')), dec(0));
+  // Margin per position is optional on the wire; without it for every position keep the engine's total.
+  const margin = marked.every((p) => p.marginUsed !== null)
+    ? marked.reduce((a, p) => a.add(dec(p.marginUsed!)), dec(0))
+    : dec(account.marginUsed);
   const equity = dec(account.cash).add(unrealized);
   const dayStart = dec(account.equity).sub(dec(account.dayPnl));
   const dayPnl = equity.sub(dayStart);

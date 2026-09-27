@@ -81,6 +81,12 @@ describe('live mark-to-market of the blotter and the account (IRTC R5-02)', () =
     expect(down.dailyLossUsedPct).toBe('8.28');
   });
 
+  it('keeps the engine margin total when a position has no margin figure', () => {
+    const marked = markPositions([pos({ marginUsed: null })], new Map([['BTCUSD', q('65274.3', '65280.3')]]), { now: 2_000, positionsAt: 1_500, currency: 'USD' });
+    const a = liveAccount(acct(), marked);
+    expect(a).toMatchObject({ marginUsed: '32607.15', equity: '100008.38', marginFree: '67401.23' });
+  });
+
   it('falls back to the engine account when the snapshots disagree or nothing is live', () => {
     const marked = markPositions([pos()], new Map([['BTCUSD', q('65274.3', '65280.3')]]), { now: 2_000, positionsAt: 1_500, currency: 'USD' });
     const a = acct({ openPositions: 2 });

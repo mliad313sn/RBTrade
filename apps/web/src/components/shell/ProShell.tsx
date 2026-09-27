@@ -23,7 +23,7 @@ export function ProShell({ children }: { children: ReactNode }) {
       </a>
       <div className="k-hazard" aria-hidden="true" />
       {/* IRTC R5-09: the bar wraps below ~460 px instead of widening the page (WCAG 1.4.10). */}
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1 min-h-[37px] border-b border-border bg-bg" data-testid="pro-topbar">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 min-h-[37px] border-b border-border bg-bg" data-testid="pro-topbar">
         <Link href="/terminal" className="flex items-center gap-2 no-underline font-semibold tracking-wide" aria-label="KORA Pro home">
           <TrendingUp size={18} className="text-accent" aria-hidden="true" />
           <span>KORA</span>
