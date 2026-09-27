@@ -4,6 +4,8 @@
  * the model produced. "Edge" is judged on results net of costs.
  */
 
+import { MIN_EDGE_CLUSTERS, type ClusteredEdge } from './edge-stat';
+
 export interface PredictionOutcome {
   predicted: number;
   outcome: boolean;
@@ -82,6 +84,8 @@ export interface CalibrationView {
   bins: CalibrationBin[];
   source: string | null;
   updatedAt: string | null;
+  /** Effective sample size of the edge test (time buckets, IRTC R3-03); null = pooled rows. */
+  edgeClusters?: number | null;
 }
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
@@ -99,6 +103,13 @@ export function calibrationView(
     minN: number;
     source?: string | null;
     updatedAt?: string | null;
+    /**
+     * IRTC R3-03: the dependence-aware edge statistic (time buckets + HAC). When given it replaces
+     * the pooled row-count t-test, and a positive edge needs MIN_EDGE_CLUSTERS buckets. `null`
+     * means the dependence is unknown (no statistic built from the rows): the pooled test may still
+     * say "none", but never "positive". Omitted = the pooled test alone (pure-maths callers).
+     */
+    edgeStat?: ClusteredEdge | null;
   },
 ): CalibrationView {
   const N = bins.reduce((a, b) => a + b.n, 0);
@@ -119,9 +130,16 @@ export function calibrationView(
       t = sd > 0 ? (mean / sd) * Math.sqrt(nR) : mean > 0 ? Infinity : 0;
     }
   }
+  const es = opts.edgeStat;
+  if (es) {
+    mean = es.mean;
+    t = es.tStat;
+  }
   let edge: Edge;
   if (N < opts.minN || mean === null) edge = 'insufficient_data';
-  else edge = mean > 0 && (t ?? 0) >= 2 ? 'positive' : 'none';
+  else if (!(mean > 0 && (t ?? 0) >= 2)) edge = 'none';
+  else if (es === null || (es && es.clusters < MIN_EDGE_CLUSTERS)) edge = 'insufficient_data';
+  else edge = 'positive';
   const edgeStatement =
     edge === 'none'
       ? 'No edge after costs.'
@@ -153,6 +171,7 @@ export function calibrationView(
     bins: [...bins],
     source: opts.source ?? null,
     updatedAt: opts.updatedAt ?? null,
+    edgeClusters: es ? es.clusters : null,
   };
 }
 

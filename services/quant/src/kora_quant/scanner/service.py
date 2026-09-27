@@ -126,17 +126,22 @@ def run_scan(req: ScanRequest) -> dict[str, Any]:
                         l2=req.forecast.l2,
                     ),
                 )
-                # Non-overlapping out-of-sample forecasts (every h-th) for the track record.
+                # Out-of-sample forecasts for the track record (IRTC R3-03): only those made at a
+                # bar close on the fixed calendar grid (a multiple of h × timeframe since the epoch)
+                # and at least h bars apart. Every later scan replays the same prediction times,
+                # so re-scans deduplicate on insert instead of adding a new overlapping phase.
                 oos: list[dict[str, Any]] = []
+                grid = hz.bars * panel.tf_ms
                 last_t = -(10**9)
                 for pt in res.oos:
-                    if pt.t - last_t < hz.bars:
+                    made = int(panel.t[i, pt.t]) + panel.tf_ms
+                    if made % grid != 0 or pt.t - last_t < hz.bars:
                         continue
                     last_t = pt.t
                     resolve = pt.t + hz.bars
                     oos.append(
                         {
-                            "ts": int(panel.t[i, pt.t]) + panel.tf_ms,
+                            "ts": made,
                             "resolvedTs": int(panel.t[i, resolve]) + panel.tf_ms,
                             "pUp": round(pt.p_up, 6),
                             "pDirection": round(max(pt.p_up, 1 - pt.p_up), 6),

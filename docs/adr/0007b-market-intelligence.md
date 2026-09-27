@@ -77,10 +77,14 @@ honestly (B-751).
 `model_key = trend:logit:<region>:<horizon>`) at the bar close, before its horizon ends; a resolver
 fills the outcome (moved in the forecast direction by more than the cost) from later candles.
 Walk-forward out-of-sample forecasts are stored as `history_replay` (non-overlapping). Bins are
-rebuilt with the goal 07 `CalibrationService`.
+rebuilt with the goal 07 `CalibrationService`. *Amended 2026-09-27 (IRTC R3-03):* replayed forecasts
+are only those made at a bar close on the fixed calendar grid (a multiple of horizon × timeframe),
+so every hourly re-scan replays the same prediction times and the idempotent insert deduplicates
+them (before, each scan added a new overlapping phase).
 
 **Display rule**: a probability is shown only if the model's calibration rows show an edge after
-costs (mean net > 0, t ≥ 2) **and** the current score's bin has n ≥ `KORA_AI_CALIBRATION_MIN_N`; the
+costs (mean net > 0, t ≥ 2 on the dependence-aware statistic below) **and** the current score's
+bin has n ≥ `KORA_AI_CALIBRATION_MIN_N`; the
 number is that bin's observed hit rate with "When we said 0.55, it happened 57% of the time (n=212)".
 Otherwise the card says **"No reliable signal"** with the reason (no edge, too few resolved
 forecasts, not enough history). On SIMULATED random-walk data this is the normal outcome; the quant

@@ -12,6 +12,7 @@ import {
   type CalibrationView,
   type PredictionOutcome,
 } from './core/calibration';
+import { clusteredEdge, type ClusteredEdge } from './core/edge-stat';
 import { AiReadPorts } from './read-ports';
 
 interface BinRow {
@@ -80,6 +81,35 @@ export class CalibrationService {
       throw new ForbiddenException({ error: 'forbidden', message: 'Unknown calibration model.' });
   }
 
+  /**
+   * IRTC R3-03: the dependence-aware edge statistic stored by `rebuild`, or null when there is none
+   * or the bins were written after it (seeded bins): then a positive edge cannot be confirmed.
+   */
+  async edge(modelKey: string, binsUpdatedAt: Date | null): Promise<ClusteredEdge | null> {
+    const r = (
+      await this.db.query<{
+        n: number;
+        clusters: number;
+        bucket_ms: string;
+        lag: number;
+        mean_net_return: number | null;
+        t_stat: number | null;
+        updated_at: Date;
+      }>('SELECT * FROM ai_calibration_edge WHERE model_key = $1', [modelKey])
+    )[0];
+    return r && (!binsUpdatedAt || r.updated_at >= binsUpdatedAt)
+      ? {
+          method: 'time_bucket_hac',
+          n: r.n,
+          clusters: r.clusters,
+          bucketMs: Number(r.bucket_ms),
+          lag: r.lag,
+          mean: r.mean_net_return,
+          tStat: r.t_stat,
+        }
+      : null;
+  }
+
   async view(
     modelKey: string,
     rawScore: number | null | undefined,
@@ -91,6 +121,7 @@ export class CalibrationService {
       minN,
       source,
       updatedAt: updatedAt?.toISOString() ?? null,
+      edgeStat: await this.edge(modelKey, updatedAt),
     });
   }
 
@@ -100,9 +131,18 @@ export class CalibrationService {
       predicted: string;
       outcome: boolean;
       net_return: number | null;
+      predicted_at: Date;
+      resolved_at: Date | null;
     }>(
-      'SELECT predicted, outcome, net_return FROM ai_predictions WHERE model_key = $1 AND outcome IS NOT NULL',
+      'SELECT predicted, outcome, net_return, predicted_at, resolved_at FROM ai_predictions WHERE model_key = $1 AND outcome IS NOT NULL',
       [modelKey],
+    );
+    const edge = clusteredEdge(
+      rows.map((r) => ({
+        netReturn: r.net_return,
+        predictedAt: r.predicted_at.getTime(),
+        resolvedAt: r.resolved_at?.getTime() ?? null,
+      })),
     );
     const bins = buildBins(
       rows.map(
@@ -133,6 +173,24 @@ export class CalibrationService {
           ],
         );
       }
+      await c.query(
+        `INSERT INTO ai_calibration_edge (model_key, method, n, clusters, bucket_ms, lag, mean_net_return, t_stat)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (model_key) DO UPDATE SET method = EXCLUDED.method, n = EXCLUDED.n,
+           clusters = EXCLUDED.clusters, bucket_ms = EXCLUDED.bucket_ms, lag = EXCLUDED.lag,
+           mean_net_return = EXCLUDED.mean_net_return, t_stat = EXCLUDED.t_stat,
+           updated_at = clock_timestamp()`,
+        [
+          modelKey,
+          edge.method,
+          edge.n,
+          edge.clusters,
+          edge.bucketMs,
+          edge.lag,
+          edge.mean,
+          edge.tStat !== null && Number.isFinite(edge.tStat) ? edge.tStat : null,
+        ],
+      );
     });
     return rows.length;
   }

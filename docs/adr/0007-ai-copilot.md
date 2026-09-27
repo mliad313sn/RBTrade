@@ -74,7 +74,15 @@ replayed over SIMULATED history, outcome = move in the bias direction beyond the
 bars). The confidence shown anywhere is the observed hit rate of the bin that contains the current
 raw score, only if that bin has `n ≥ KORA_AI_CALIBRATION_MIN_N` (30); the reliability line reads
 "When we said 0.6, it worked 57% of the time (n=212)". Edge = mean net result > 0 with t ≥ 2;
-otherwise the UI and the copilot say **"No edge after costs."** The model never produces a
+otherwise the UI and the copilot say **"No edge after costs."** *Amended 2026-09-27 (IRTC R3-03):*
+the t-statistic accounts for dependence. Rows are clustered in time buckets of one horizon (every
+forecast in a bucket, on any instrument, is one observation), and the variance of the bucket means
+is a HAC (truncated-kernel) long-run variance with a lag covering the longest horizon; the bucket
+count is the effective sample size and a positive edge needs ≥ 30 buckets
+(`apps/api/src/ai/core/edge-stat.ts`, table `ai_calibration_edge`, migration 0131). Bins without a
+statistic built from their rows (seeded demo tables) can say "none" but never "positive". In the
+no-skill simulation (8 correlated walks, a 24-bar forecast every bar, 120 seeds) the pooled row
+test called 45 seeds positive (t sd 6.0); the clustered test calls 3 (t sd 1.14; nominal ≈ 2.3 %). The model never produces a
 confidence; the system prompt forbids it and the numeric-fidelity guard removes invented figures.
 
 `ai_regime` (goal 06 condition) is **not** filled: there is no cheap calibrated regime model on
