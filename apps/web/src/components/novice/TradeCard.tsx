@@ -232,7 +232,7 @@ export function TradeCard({
           <div className="flex items-end justify-between gap-3 mt-2">
             <span className="text-muted">{t('trade.most')}</span>
             <span
-              className="font-display text-[28px] text-down leading-none"
+              className="font-display text-[28px] text-loss leading-none"
               data-testid="most-you-could-lose"
               aria-live="polite"
             >

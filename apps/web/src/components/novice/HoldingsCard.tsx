@@ -66,7 +66,7 @@ export function HoldingsCard({
                 data-testid={`holding-${h.symbol}`}
               >
                 <span
-                  className="grid place-items-center w-10 h-10 rounded-lg bg-up-surface text-accent text-xs font-bold shrink-0"
+                  className="grid place-items-center w-10 h-10 rounded-lg bg-accent-surface text-accent text-xs font-bold shrink-0"
                   aria-hidden="true"
                 >
                   {BADGE[h.assetClass] ?? h.symbol.slice(0, 3)}

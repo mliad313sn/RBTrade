@@ -36,6 +36,17 @@ export interface ThemeTokens {
   onPaperChip: string;
   upSurface: string;
   downSurface: string;
+  /**
+   * IRTC R5-15/R5-16: semantic colours that must NOT follow the up/down colour convention.
+   * accentSurface: selected / active highlight (nav, chosen option, chart area).
+   * loss: money you could lose (novice "Most you could lose"); risk: risk-level bars.
+   * ok: healthy status (connection dot). borderStrong: non-text outline >= 3:1 on panels (WCAG 1.4.11).
+   */
+  accentSurface: string;
+  loss: string;
+  risk: string;
+  ok: string;
+  borderStrong: string;
 }
 
 export const themes: Record<ThemeName, ThemeTokens> = {
@@ -65,6 +76,11 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     onPaperChip: '#0B0E13',
     upSurface: '#0F2238',
     downSurface: '#33220F',
+    accentSurface: '#0F2238',
+    loss: '#FF9F40',
+    risk: '#FF9F40',
+    ok: '#4DA3FF',
+    borderStrong: '#667085',
   },
   'novice-light': {
     bg: '#F7F5F0',
@@ -92,20 +108,36 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     onPaperChip: '#5C4300',
     upSurface: '#F0F6FD',
     downSurface: '#FDF5EF',
+    accentSurface: '#F0F6FD',
+    loss: '#B8520B',
+    risk: '#B8520B',
+    ok: '#1D6FD1',
+    borderStrong: '#857F73',
   },
 };
 
-/** Direction colours per convention (Settings). Blue/orange is the colour-blind-safe default. */
-export const conventions: Record<ThemeName, Record<ColourConvention, { up: string; down: string }>> = {
+/**
+ * Direction colours per convention (Settings). Blue/orange is the colour-blind-safe default.
+ * IRTC R5-15: the direction surfaces (depth bars, tick flash, selected buy/sell option) follow the
+ * convention too, so one widget never mixes two palettes.
+ */
+export interface ConventionColours {
+  up: string;
+  down: string;
+  upSurface: string;
+  downSurface: string;
+}
+
+export const conventions: Record<ThemeName, Record<ColourConvention, ConventionColours>> = {
   'pro-dark': {
-    blue_orange: { up: '#4DA3FF', down: '#FF9F40' },
-    green_red: { up: '#3FB950', down: '#FF6B6B' },
-    red_up_asia: { up: '#FF6B6B', down: '#3FB950' },
+    blue_orange: { up: '#4DA3FF', down: '#FF9F40', upSurface: '#0F2238', downSurface: '#33220F' },
+    green_red: { up: '#3FB950', down: '#FF6B6B', upSurface: '#0F2A17', downSurface: '#3A1616' },
+    red_up_asia: { up: '#FF6B6B', down: '#3FB950', upSurface: '#3A1616', downSurface: '#0F2A17' },
   },
   'novice-light': {
-    blue_orange: { up: '#1D6FD1', down: '#B8520B' },
-    green_red: { up: '#1A7F37', down: '#C62828' },
-    red_up_asia: { up: '#C62828', down: '#1A7F37' },
+    blue_orange: { up: '#1D6FD1', down: '#B8520B', upSurface: '#F0F6FD', downSurface: '#FDF5EF' },
+    green_red: { up: '#1A7F37', down: '#C62828', upSurface: '#EEF7F0', downSurface: '#FDEEEE' },
+    red_up_asia: { up: '#C62828', down: '#1A7F37', upSurface: '#FDEEEE', downSurface: '#EEF7F0' },
   },
 };
 
@@ -125,7 +157,7 @@ export const typography = {
 /** Text/surface pairs that must meet 4.5:1. [foreground, background, where it is used]. */
 export function contrastPairs(t: ThemeTokens): Array<[keyof ThemeTokens, keyof ThemeTokens, string]> {
   const surfaces: Array<keyof ThemeTokens> = ['bg', 'panel', 'raised'];
-  const texts: Array<keyof ThemeTokens> = ['text', 'textMuted', 'up', 'down', 'accent', 'ai', 'warn', 'kill'];
+  const texts: Array<keyof ThemeTokens> = ['text', 'textMuted', 'up', 'down', 'accent', 'ai', 'warn', 'kill', 'loss', 'ok'];
   const pairs: Array<[keyof ThemeTokens, keyof ThemeTokens, string]> = [];
   for (const fg of texts) for (const bg of surfaces) pairs.push([fg, bg, `${fg} text on ${bg}`]);
   void t;
@@ -141,8 +173,19 @@ export function contrastPairs(t: ThemeTokens): Array<[keyof ThemeTokens, keyof T
     ['up', 'upSurface', 'selected buy option'],
     ['down', 'downSurface', 'selected sell option'],
     ['text', 'upSurface', 'text on up surface'],
+    ['accent', 'accentSurface', 'active nav item'],
+    ['text', 'accentSurface', 'text on the selected option'],
   );
   return pairs;
+}
+
+/** Non-text pairs that must meet 3:1 (WCAG 1.4.11): [colour, surface, where it is used]. IRTC R5-16. */
+export function nonTextPairs(): Array<[keyof ThemeTokens, keyof ThemeTokens, string]> {
+  return [
+    ['borderStrong', 'panel', 'empty risk-level segment outline'],
+    ['risk', 'panel', 'filled risk-level segment'],
+    ['ok', 'bg', 'connection status dot'],
+  ];
 }
 
 export const radii = { sm: '4px', md: '8px', lg: '14px', pill: '999px' } as const;

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { tokensCss } from '../scripts/build-css';
 import { contrastRatio } from './lib/contrast';
-import { contrastPairs, conventions, themes } from './tokens';
+import { contrastPairs, conventions, nonTextPairs, themes } from './tokens';
 
 describe('design tokens', () => {
   it('match the committee palette exactly', () => {
@@ -23,6 +23,23 @@ describe('design tokens', () => {
         expect(contrastRatio(c.down, s)).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+  it('convention surfaces keep direction text readable; meaning graphics meet 3:1 (IRTC R5-15, R5-16)', () => {
+    for (const [name, convs] of Object.entries(conventions)) {
+      const t = themes[name as keyof typeof themes];
+      const surfaces = new Set<string>();
+      for (const c of Object.values(convs)) {
+        expect(contrastRatio(c.up, c.upSurface)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(c.down, c.downSurface)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(t.text, c.upSurface)).toBeGreaterThanOrEqual(4.5);
+        surfaces.add(c.upSurface);
+      }
+      // Each convention has its own surface (the depth bars follow the prices' palette).
+      expect(surfaces.size).toBe(3);
+      expect(convs.blue_orange.upSurface).toBe(t.upSurface);
+      for (const [fg, bg] of nonTextPairs()) expect(contrastRatio(t[fg], t[bg])).toBeGreaterThanOrEqual(3);
+    }
+    expect(tokensCss()).toContain("[data-theme='pro-dark'][data-colors='red_up_asia'], [data-theme='pro-dark'] [data-colors='red_up_asia'] {\n  --k-up: #FF6B6B;\n  --k-down: #3FB950;\n  --k-up-surface: #3A1616;");
   });
   it('contrast maths matches WCAG reference values', () => {
     expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 5);

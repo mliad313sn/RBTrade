@@ -73,6 +73,9 @@ function Card({
         </div>
         <details>
           <summary className="cursor-pointer font-semibold min-h-11 inline-flex items-center">
+            <span className="k-disclosure__icon" aria-hidden="true">
+              ▸
+            </span>
             {t('ai.riskWhy')}
           </summary>
           <ul className="m-0 pl-5 text-sm">

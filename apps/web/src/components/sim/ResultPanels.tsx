@@ -125,7 +125,7 @@ export function RealityChecks({ checks }: { checks: RealityCheck[] }) {
   if (checks.length === 0) {
     return (
       <p
-        className="m-0 p-3 rounded border border-border bg-up-surface text-sm"
+        className="m-0 p-3 rounded border border-border bg-accent-surface text-sm"
         data-testid="reality-ok"
       >
         Inputs look internally consistent. Run the stress test before trusting the median.
