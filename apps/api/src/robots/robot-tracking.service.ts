@@ -154,7 +154,8 @@ export class RobotTrackingService {
         data: usable,
         capital: Number(robot.allocation),
         split: { oosFraction: 0.5 },
-        guard: false,
+        // IRTC R3-18: the tracking error feeds the promotion checklist, so the replay is guarded.
+        guard: true,
         maxPoints: 50,
         aiRegime: loadIntelConfig().aiRegime,
       });
