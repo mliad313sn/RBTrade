@@ -1,0 +1,191 @@
+{
+  "startedAt": "2026-09-27T01:25:54.674Z",
+  "host": {
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "memGb": 17,
+    "node": "v22.22.2",
+    "note": "single shared cloud VM: generator, api, quant, runner, Postgres and Redis on the same host"
+  },
+  "scenarios": {
+    "A_terminal_users": {
+      "wsClients": 500,
+      "wsOpened": 500,
+      "wsErrors": 0,
+      "wsMessages": 869580,
+      "wsQuoteAgeMs": {
+        "p50": 73,
+        "p95": 117,
+        "p99": 133,
+        "n": 800000
+      },
+      "rest": {
+        "generator": "open loop (node:http)",
+        "requests": 15000,
+        "achievedRatePerS": 499.8,
+        "latencyMs": {
+          "p50": 242.1,
+          "p95": 1035.9,
+          "p99": 1992.7,
+          "max": 3943.1
+        },
+        "perPathMs": {
+          "/quotes": {
+            "p50": 295.6,
+            "p95": 647.7,
+            "p99": 1837.4,
+            "n": 2500
+          },
+          "/market-data/status": {
+            "p50": 35.9,
+            "p95": 319.2,
+            "p99": 638.5,
+            "n": 2500
+          },
+          "/candles": {
+            "p50": 272.4,
+            "p95": 650.4,
+            "p99": 2128.6,
+            "n": 2500
+          },
+          "/orders": {
+            "p50": 502.1,
+            "p95": 1081.7,
+            "p99": 2380.6,
+            "n": 2500
+          },
+          "/positions": {
+            "p50": 508.9,
+            "p95": 1227.4,
+            "p99": 2200.5,
+            "n": 2500
+          },
+          "/accounts/me": {
+            "p50": 507.7,
+            "p95": 1095.1,
+            "p99": 1595.4,
+            "n": 2500
+          }
+        },
+        "errorRate": 0,
+        "errors": 0,
+        "statusCodes": {
+          "200": 15000
+        }
+      }
+    },
+    "B_order_burst": {
+      "targetRatePerS": 100,
+      "http": {
+        "generator": "open loop (node:http)",
+        "requests": 3000,
+        "achievedRatePerS": 100,
+        "latencyMs": {
+          "p50": 16.8,
+          "p95": 24.2,
+          "p99": 29.8,
+          "max": 45.4
+        },
+        "errorRate": 0,
+        "errors": 0,
+        "statusCodes": {
+          "201": 3000
+        }
+      },
+      "spike": {
+        "orders": 300,
+        "simultaneous": 100,
+        "worstP50Ms": 558.5,
+        "worstP99Ms": 750,
+        "maxMs": 752.4,
+        "errors": 0,
+        "statusCodes": [
+          {
+            "201": 100
+          },
+          {
+            "201": 100
+          },
+          {
+            "201": 100
+          }
+        ]
+      },
+      "ordersByStatus": [
+        {
+          "status": "filled",
+          "reject_code": null,
+          "n": 3300
+        }
+      ],
+      "duplicates": 0,
+      "fills": 3300
+    },
+    "C_bots": {
+      "robots": 50,
+      "barsObserved": 4,
+      "decisionsPerBar": {
+        "2026-09-27T01:27:00.000Z": 50,
+        "2026-09-27T01:28:00.000Z": 50,
+        "2026-09-27T01:29:00.000Z": 50,
+        "2026-09-27T01:30:00.000Z": 50
+      },
+      "outcomes": {
+        "none": 200
+      },
+      "barCloseToDecisionMs": {
+        "p50": 1558.3,
+        "p95": 1803,
+        "p99": 1894,
+        "max": 1900.64,
+        "n": 200
+      }
+    }
+  },
+  "serverMetrics": {
+    "orderAck": {
+      "count": 3300,
+      "meanMs": 44,
+      "p50": "≤ 25 ms",
+      "p95": "≤ 500 ms",
+      "p99": "≤ 1000 ms",
+      "buckets": {
+        "1": 3300,
+        "0.005": 0,
+        "0.01": 68,
+        "0.025": 2958,
+        "0.05": 3000,
+        "0.1": 3007,
+        "0.25": 3090,
+        "0.5": 3259,
+        "2.5": 3300,
+        "+Inf": 3300
+      }
+    },
+    "http": {
+      "count": 19822,
+      "meanMs": 237,
+      "p50": "≤ 50 ms",
+      "p95": "≤ 1000 ms",
+      "p99": "≤ 2500 ms",
+      "buckets": {
+        "1": 19242,
+        "5": 19822,
+        "0.005": 2128,
+        "0.01": 3893,
+        "0.025": 8743,
+        "0.05": 10166,
+        "0.1": 11180,
+        "0.25": 12484,
+        "0.5": 15820,
+        "2.5": 19822,
+        "+Inf": 19822
+      }
+    }
+  },
+  "integrity": {
+    "duplicateClientOrderIds": 0,
+    "auditChain": "ok"
+  },
+  "finishedAt": "2026-09-27T01:31:21.631Z"
+}

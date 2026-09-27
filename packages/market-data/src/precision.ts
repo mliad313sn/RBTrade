@@ -41,7 +41,21 @@ export function roundPrice(value: Decimal | string, spec: PriceSpec, mode: Round
   return roundToTick(dec(value), spec.tickSize, ROUNDING[mode]);
 }
 
+const PLAIN = /^(0|[1-9]\d*)(?:\.(\d+))?$/;
+const unitTick = (p: number) => (p === 0 ? '1' : `0.${'0'.repeat(p - 1)}1`);
+
 export function formatPrice(value: Decimal | string, spec: PriceSpec, mode: RoundMode = 'nearest'): string {
+  // Fast path (goal 10 load finding: candle reads spent ~15 % of the api's CPU here). A plain
+  // non-negative decimal string with no more places than the precision already sits on a tick of
+  // 10^-precision, so rounding cannot change it; only zero padding is left.
+  if (typeof value === 'string' && spec.tickSize === unitTick(spec.pricePrecision)) {
+    const m = PLAIN.exec(value);
+    const places = m?.[2]?.length ?? 0;
+    if (m && places <= spec.pricePrecision) {
+      if (spec.pricePrecision === 0) return m[1]!;
+      return `${m[1]}.${(m[2] ?? '').padEnd(spec.pricePrecision, '0')}`;
+    }
+  }
   return roundPrice(value, spec, mode).toFixed(spec.pricePrecision);
 }
 

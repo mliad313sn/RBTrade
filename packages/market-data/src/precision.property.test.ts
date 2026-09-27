@@ -142,3 +142,23 @@ describe('registry-driven precision (fast-check)', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('formatPrice fast path (goal 10)', () => {
+  it('gives exactly the rounded answer for every tick/precision and decimal string', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...TICKS),
+        fc.bigInt({ min: 0n, max: 10n ** 12n }),
+        fc.integer({ min: 0, max: 8 }),
+        ([tickSize, pricePrecision], digits, scale) => {
+          const s = digits.toString().padStart(scale + 1, '0');
+          const value = scale ? `${s.slice(0, -scale)}.${s.slice(-scale)}` : s;
+          const spec = { tickSize, pricePrecision };
+          const slow = dec(value).toNearest(dec(tickSize), 6).toFixed(pricePrecision);
+          return formatPrice(value, spec) === slow;
+        },
+      ),
+      { numRuns: 3000 },
+    );
+  });
+});
