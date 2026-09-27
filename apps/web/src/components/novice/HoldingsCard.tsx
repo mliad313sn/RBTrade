@@ -8,6 +8,7 @@ import { refreshAccount } from '@/lib/account';
 import { api } from '@/lib/api-browser';
 import { useI18n } from '@/lib/i18n/react';
 import { assetName } from '@/lib/novice/view';
+import { displayDirection } from '@/lib/terminal/format';
 
 const BADGE: Record<string, string> = {
   fx: 'FX',
@@ -58,7 +59,8 @@ export function HoldingsCard({
           {holdings.map((h) => {
             const name = assetName(h.name, locale, h.displayName);
             const pnl = h.unrealizedPnl;
-            const up = pnl !== null && !pnl.startsWith('-');
+            // IRTC R5-19: no ▲ and no colour on $0.00 (direction from the rounded amount).
+            const dir = pnl !== null ? displayDirection(pnl, 2) : 'flat';
             return (
               <li
                 key={h.symbol}
@@ -82,8 +84,8 @@ export function HoldingsCard({
                     {h.value !== null ? money(h.value, ccy) : '—'}
                   </span>
                   {pnl !== null ? (
-                    <span className={`block text-sm k-num ${up ? 'text-up' : 'text-down'}`}>
-                      <span aria-hidden="true">{up ? '▲ ' : '▼ '}</span>
+                    <span className={`block text-sm k-num ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-muted'}`}>
+                      <span aria-hidden="true">{dir === 'up' ? '▲ ' : dir === 'down' ? '▼ ' : ''}</span>
                       {money(pnl, ccy, { signed: true })}
                     </span>
                   ) : (

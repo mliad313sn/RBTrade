@@ -7,12 +7,15 @@ const minus = '−';
 
 export function fmtNum(v: number | null | undefined, digits = 2): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—';
-  return v < 0 ? `${minus}${Math.abs(v).toFixed(digits)}` : v.toFixed(digits);
+  // IRTC R5-19: the sign follows the rounded value ("−0.0%" is shown as "0.0%").
+  const s = Math.abs(v).toFixed(digits);
+  return v < 0 && Number(s) !== 0 ? `${minus}${s}` : s;
 }
 
 export function fmtSigned(v: number | null | undefined, digits = 2, suffix = ''): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—';
   const s = Math.abs(v).toFixed(digits);
+  if (Number(s) === 0) return `${s}${suffix}`;
   return `${v > 0 ? '+' : v < 0 ? minus : ''}${s}${suffix}`;
 }
 

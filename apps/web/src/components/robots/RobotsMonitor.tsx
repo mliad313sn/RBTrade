@@ -30,6 +30,7 @@ import { EquityChart } from './EquityChart';
 import { Heatmap } from './Heatmap';
 import { KpiTable } from './KpiTable';
 import { AuditFeed, PromotionChecklist, RiskMeters } from './MonitorParts';
+import { displayDirection } from '@/lib/terminal/format';
 
 type Busy = null | 'backtest' | 'wf' | 'heatmap' | 'mc' | 'run' | 'pause' | 'switch';
 
@@ -341,11 +342,9 @@ export function RobotsMonitor() {
                       {r.symbols.join(', ')} · {r.timeframe} · PAPER
                       {r.pauseReason ? ` · ${pauseLabel(r.pauseReason)}` : ''}
                     </span>
-                    <span
-                      className="k-num block text-sm"
-                      style={{ color: Number(r.pnl) >= 0 ? 'var(--k-up)' : 'var(--k-down)' }}
-                    >
-                      {Number(r.pnl) >= 0 ? '▲ ' : '▼ '}
+                    {/* IRTC R5-19: no glyph and no direction colour on a zero P&L. */}
+                    <span className={`k-num block text-sm k-dir--${displayDirection(r.pnl, 2)}`}>
+                      {displayDirection(r.pnl, 2) === 'up' ? '▲ ' : displayDirection(r.pnl, 2) === 'down' ? '▼ ' : ''}
                       {fmtSigned(Number(r.pnl), 2)}
                     </span>
                   </Link>
