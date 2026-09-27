@@ -34,8 +34,21 @@ export class PreferencesRepository {
     return toPrefs(rows[0], defaults);
   }
 
+  /**
+   * Read-modify-write under a row lock, inside the caller's transaction. IRTC R6 (flake "density
+   * persist"): two quick saves (time display, then density) used to read the same old row and the
+   * second write dropped the first change. The row is created with the defaults when missing, then
+   * locked, so concurrent partial updates apply one after the other.
+   */
   async update(c: Queryable, userId: string, roles: Role[], patch: UpdatePreferences): Promise<{ before: UserPreferences; after: UserPreferences }> {
-    const before = await this.get(userId, roles);
+    const defaults = defaultPreferences(roles);
+    await c.query(
+      `INSERT INTO user_preferences (user_id, view_mode, theme, colour_convention, hotkeys, terminal, updated_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, now()) ON CONFLICT (user_id) DO NOTHING`,
+      [userId, defaults.viewMode, defaults.theme, defaults.colourConvention, JSON.stringify(defaults.hotkeys), JSON.stringify(defaults.terminal)],
+    );
+    const locked = await c.query<PrefRow>('SELECT * FROM user_preferences WHERE user_id = $1 FOR UPDATE', [userId]);
+    const before = toPrefs(locked.rows[0]!, defaults);
     const after: UserPreferences = {
       ...before,
       ...patch,

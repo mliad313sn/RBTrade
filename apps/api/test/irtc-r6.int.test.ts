@@ -61,6 +61,27 @@ describe('IRTC R6 regressions (risk wiring and fill safety)', () => {
   const settings = (u: TestUser, riskLimits: Record<string, unknown>) =>
     request(http).put('/accounts/me/settings').set(bearer(u.token)).send({ riskLimits }).expect(200);
 
+  it('flake "density persist": concurrent partial preference saves all land (row lock, no lost update)', async () => {
+    const u = await createUser(app, 'trader');
+    const patches = [
+      { terminal: { density: 'comfortable' } },
+      { terminal: { timeDisplay: 'local' } },
+      { terminal: { soundOnFills: true } },
+      { terminal: { perTradeRiskPct: '0.5' } },
+      { theme: 'pro-dark' },
+      { colourConvention: 'green_red' },
+      { hotkeys: { ticketSell: 'Alt+S' } },
+    ];
+    await Promise.all(patches.map((p) => request(http).put('/me/preferences').set(bearer(u.token)).send(p).expect(200)));
+    const prefs = (await request(http).get('/me/preferences').set(bearer(u.token)).expect(200)).body;
+    expect(prefs).toMatchObject({
+      theme: 'pro-dark',
+      colourConvention: 'green_red',
+      hotkeys: { ticketSell: 'Alt+S' },
+      terminal: { density: 'comfortable', timeDisplay: 'local', soundOnFills: true, perTradeRiskPct: '0.5' },
+    });
+  });
+
   it('R6-15: the scenario anchor is a Wednesday after the seeded legal content, and derived dates follow it', async () => {
     expect(MARKET_OPEN_UTC.getUTCDay()).toBe(3);
     expect(MARKET_OPEN_UTC.getTime()).toBeGreaterThan(SEED_EFFECTIVE_UTC.getTime());

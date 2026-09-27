@@ -3,7 +3,7 @@
 import { COLOUR_CONVENTIONS, DEFAULT_HOTKEYS, DEFAULT_TERMINAL_SETTINGS, HOTKEY_LABELS, THEMES, type UpdatePreferences } from '@kora/domain';
 import { Button, Kbd, Panel, Select, useToast } from '@kora/ui';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { isValidHotkey } from '@/lib/terminal/hotkeys';
 
@@ -28,9 +28,15 @@ export function SettingsForm() {
   const router = useRouter();
   const terminal = { ...DEFAULT_TERMINAL_SETTINGS, ...(me.preferences.terminal ?? {}) };
   const [riskPct, setRiskPct] = useState(terminal.perTradeRiskPct);
+  // IRTC R6 (flake "density persist"): two quick saves can answer out of order. The server applies
+  // each patch under a row lock, so the answer to the most recent save holds every change; an older
+  // answer that arrives later must not overwrite it.
+  const latest = useRef(0);
   const save = async (patch: UpdatePreferences) => {
+    const n = ++latest.current;
     try {
       const r = await api.updatePreferences(patch);
+      if (n !== latest.current) return;
       setMe({ ...me, preferences: r.preferences, capabilities: r.capabilities });
       toast.push('Saved', 'success', 3000);
       router.refresh();
