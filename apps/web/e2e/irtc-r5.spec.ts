@@ -1,6 +1,9 @@
+import { TREND_X } from '@kora/domain';
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiSignIn } from './helpers';
+
+const CSRF = { 'x-kora-csrf': '1' };
 
 /**
  * IRTC R5 regression suite (frontend, UX and accessibility review, docs/review/IRTC-R5-fixes.md).
@@ -18,6 +21,27 @@ async function marketTicket(page: Page, symbol: string, qty: string) {
   await ticket.getByTestId('ticket-qty').blur();
   await expect(page.getByTestId('preview-notional')).toContainText('USD');
   return ticket;
+}
+
+/** WCAG relative-luminance contrast of two CSS rgb() colours (test-side arithmetic). */
+function contrast(a: string, b: string): number {
+  const lum = (c: string) => {
+    const [r, g, bl] = (c.match(/\d+(\.\d+)?/g) ?? ['0', '0', '0'])
+      .slice(0, 3)
+      .map((x) => Number(x) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x! + 0.05) / (y! + 0.05);
+}
+
+async function setPrefs(page: Page, patch: Record<string, unknown>) {
+  expect((await page.request.put('/api/me/preferences', { headers: CSRF, data: patch })).status()).toBe(200);
+}
+
+async function setFrench(page: Page) {
+  await page.context().addCookies([{ name: 'kora_locale', value: 'fr', domain: '127.0.0.1', path: '/' }]);
 }
 
 async function hold(page: Page, testId: string, ms: number) {
@@ -111,5 +135,213 @@ test.describe('Pro terminal (trader)', () => {
     await ks.click();
     await expect(menu).toBeVisible();
     await page.keyboard.press('Escape');
+  });
+});
+
+test.describe('Pro views (trader), numbers and state', () => {
+  test.beforeEach(async ({ page }) => {
+    await apiSignIn(page, 'trader');
+  });
+
+  test('R5-02: blotter Mark and Unrealized P&L follow the live quotes and agree with the blotter summary', async ({ page }) => {
+    const buy = await page.request.post('/api/orders', { headers: CSRF, data: { clientOrderId: `e2e-r5-02-${Date.now()}`, symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '1' } });
+    expect(buy.status()).toBe(201);
+    await page.goto('/terminal?symbol=BTCUSD');
+    await page.getByRole('tab', { name: /Positions/ }).click();
+    const row = page.getByTestId('pos-BTCUSD');
+    await expect(row).toBeVisible();
+    const marks = new Set<string>();
+    for (let i = 0; i < 16; i++) {
+      // Read the row and the summary in the same frame.
+      const { cells, summary } = await page.evaluate(() => ({
+        cells: [...document.querySelectorAll('[data-testid=pos-BTCUSD] td')].map((td) => (td as HTMLElement).innerText),
+        summary: (document.querySelector('[data-testid=blotter-summary]') as HTMLElement).innerText.replace(/\s+/g, ' '),
+      }));
+      marks.add(cells[4]!.trim());
+      // One source of truth: the summary's unrealized equals the only position's P&L (same render).
+      const pnl = cells[7]!.replace(/Stale/g, '').trim();
+      expect(summary).toContain(`Unrealized ${pnl}`);
+      await page.waitForTimeout(500);
+    }
+    // The SIMULATED feed ticks several times in 8 s; a frozen mark shows one value until the 20 s reconcile.
+    expect(marks.size).toBeGreaterThan(1);
+  });
+
+  test('R5-06: the top bar marks the account figures as stale when the account endpoint fails', async ({ page }) => {
+    await page.goto('/simulator');
+    await expect(page.getByTestId('account-equity')).toContainText('USD');
+    await expect(page.getByTestId('account-stale')).toHaveCount(0);
+    await page.route('**/api/accounts/me', (r) => r.fulfill({ status: 503, body: '{}' }));
+    await expect(page.getByTestId('account-stale')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('account-stale')).toContainText(/as of \d\d:\d\d:\d\d/);
+    await page.unroute('**/api/accounts/me');
+    await expect(page.getByTestId('account-stale')).toHaveCount(0, { timeout: 15_000 });
+  });
+
+  test('R5-03: the status bar robots count comes from the robots API (running / paused)', async ({ page }) => {
+    await page.goto('/simulator');
+    await expect(page.getByTestId('status-robots')).toHaveText('Robots: none');
+    const s = await page.request.post('/api/strategies', { headers: CSRF, data: { definition: { ...TREND_X, name: 'R5-Trend' } } });
+    expect(s.status()).toBe(201);
+    const version = ((await s.json()) as { latest: { id: string } }).latest.id;
+    const ids: string[] = [];
+    for (const name of ['R5-A', 'R5-B']) {
+      const r = await page.request.post('/api/robots', { headers: CSRF, data: { name, versionId: version } });
+      expect(r.status()).toBe(201);
+      ids.push(((await r.json()) as { id: string }).id);
+    }
+    for (const id of ids) expect((await page.request.post(`/api/robots/${id}/start`, { headers: CSRF })).status()).toBe(200);
+    await page.reload();
+    await expect(page.getByTestId('status-robots')).toHaveText('Robots: 2 running', { timeout: 20_000 });
+    expect((await page.request.post(`/api/robots/${ids[1]}/pause`, { headers: CSRF, data: { reason: 'IRTC R5-03 check' } })).status()).toBe(200);
+    await expect(page.getByTestId('status-robots')).toHaveText('Robots: 1 running · 1 paused', { timeout: 20_000 });
+  });
+
+  test('R5-11: Portfolio shows the real positions, equity and fills (no placeholder)', async ({ page }) => {
+    const buy = await page.request.post('/api/orders', { headers: CSRF, data: { clientOrderId: `e2e-r5-11-${Date.now()}`, symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.01' } });
+    expect(buy.status()).toBe(201);
+    await page.goto('/portfolio');
+    await expect(page.locator('main')).not.toContainText('Arrives with');
+    await expect(page.getByTestId('portfolio-equity')).toContainText('USD');
+    await expect(page.getByTestId('portfolio-positions')).toContainText('BTC/USD');
+    await expect(page.getByTestId('portfolio-fills')).toContainText('BTCUSD');
+  });
+
+  test('R5-13: the light theme keeps the Pro density and tabular mono numbers', async ({ page }) => {
+    await setPrefs(page, { theme: 'novice-light' });
+    await page.goto('/terminal?symbol=BTCUSD');
+    const ks = page.getByTestId('kill-switch');
+    await expect(ks).toBeVisible();
+    expect((await ks.boundingBox())!.height).toBeLessThan(40);
+    const font = await page.getByTestId('account-equity').evaluate((e) => getComputedStyle(e).fontFamily);
+    expect(font).toMatch(/Plex Mono/);
+  });
+
+  test('R5-14: <summary> controls show the focus ring on the Pro dark theme', async ({ page }) => {
+    await page.goto('/terminal?symbol=BTCUSD');
+    const summary = page.locator('summary').first();
+    await expect(summary).toBeVisible();
+    await page.keyboard.press('Shift');
+    await summary.focus();
+    const ring = await summary.evaluate((e) => ({ style: getComputedStyle(e).outlineStyle, width: getComputedStyle(e).outlineWidth, color: getComputedStyle(e).outlineColor }));
+    expect(ring).toEqual({ style: 'solid', width: '2px', color: 'rgb(242, 201, 76)' });
+  });
+
+  test('R5-15: the colour convention also recolours depth and flash surfaces; status colours stay independent', async ({ page }) => {
+    await page.goto('/terminal?symbol=BTCUSD');
+    await expect(page.getByTestId('status-bar')).toContainText('Connected');
+    const read = () =>
+      page.evaluate(() => {
+        const root = document.querySelector('.k-root')!;
+        const cs = getComputedStyle(root);
+        const dot = document.querySelector('[data-testid=status-bar] [aria-hidden=true]')!;
+        return { upSurface: cs.getPropertyValue('--k-up-surface').trim(), downSurface: cs.getPropertyValue('--k-down-surface').trim(), dot: getComputedStyle(dot).color };
+      });
+    const blue = await read();
+    await setPrefs(page, { colourConvention: 'red_up_asia' });
+    await page.reload();
+    await expect(page.getByTestId('status-bar')).toContainText('Connected');
+    const asia = await read();
+    expect(asia.upSurface).not.toBe(blue.upSurface);
+    expect(asia.downSurface).not.toBe(blue.downSurface);
+    // "Connected" is a status, not a price direction: it must not turn red in the red-up convention.
+    expect(asia.dot).toBe(blue.dot);
+  });
+
+  test('R5-09: Pro non-terminal pages reflow at 320 px (no horizontal scroll)', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    for (const path of ['/settings', '/audit', '/portfolio']) {
+      await page.goto(path);
+      await expect(page.getByTestId('pro-topbar')).toBeVisible();
+      await page.waitForTimeout(300);
+      const w = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(w, path).toBeLessThanOrEqual(320);
+    }
+  });
+});
+
+test.describe('Novice view', () => {
+  test('R5-10: a novice-only user choosing Pro is sent to the assessment; Pro URLs in the simple view explain instead of rendering blank', async ({ page }) => {
+    await apiSignIn(page, 'novice');
+    await page.goto('/home');
+    await page.getByTestId('mode-toggle').getByRole('radio', { name: 'Pro' }).click();
+    await expect(page).toHaveURL(/\/appropriateness/);
+    await expect(page.getByTestId('pro-needs-assessment')).toBeVisible();
+    expect(((await (await page.request.get('/api/me')).json()) as { preferences: { viewMode: string } }).preferences.viewMode).toBe('novice');
+    await page.goto('/terminal');
+    await expect(page.getByTestId('pro-route-in-simple-view')).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('Order ticket');
+  });
+
+  test('R5-08: amounts accept thousands separators per language and refuse ambiguous input', async ({ page }) => {
+    await apiSignIn(page, 'novice');
+    await page.goto('/home');
+    const amount = page.getByTestId('trade-amount');
+    await amount.fill('2,500');
+    await amount.blur();
+    await expect(amount).toHaveValue(/^2,?500\.00$/);
+    await expect(page.getByTestId('amount-min')).toHaveCount(0);
+    await amount.fill('2,50');
+    await amount.blur();
+    await expect(page.getByText(/Use a comma only between thousands/)).toBeVisible();
+    await setFrench(page);
+    await page.reload();
+    await amount.fill('2 500,5');
+    await amount.blur();
+    await expect(amount).toHaveValue('2500,50');
+  });
+
+  test('R5-09: French novice pages reflow at 320 px', async ({ page }) => {
+    await apiSignIn(page, 'novice');
+    await setFrench(page);
+    await page.setViewportSize({ width: 320, height: 700 });
+    for (const path of ['/home', '/practice', '/settings']) {
+      await page.goto(path);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+      await page.waitForTimeout(500);
+      const w = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(w, path).toBeLessThanOrEqual(320);
+    }
+  });
+
+  test('R5-12: French novice: the assessment and page titles are in French; answer rows are 44 px targets', async ({ page }) => {
+    await apiSignIn(page, 'novice');
+    await setFrench(page);
+    await page.goto('/home');
+    await expect(page).toHaveTitle(/^Accueil/);
+    await page.goto('/appropriateness');
+    const form = page.getByTestId('appropriateness');
+    await expect(form.getByRole('heading', { level: 1 })).not.toHaveText('Pro trading appropriateness assessment');
+    await expect(form).toContainText('effet de levier');
+    await expect(form).not.toContainText('Submit answers');
+    const row = page.getByTestId('question-leverage').locator('label').first();
+    expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('R5-14/R5-16: the novice disclosure shows a marker; risk bars show the level in text with 3:1 segment contrast', async ({ page }) => {
+    await apiSignIn(page, 'novice');
+    await page.goto('/home');
+    const card = page.getByTestId('auto-invest-card');
+    await expect(card.getByText(/Risk level \d of 5/).first()).toBeVisible();
+    const seg = await card.locator('[role=img] > span').last().evaluate((e) => {
+      const cs = getComputedStyle(e);
+      const panel = getComputedStyle(e.closest('.k-panel')!).backgroundColor;
+      return { border: cs.borderTopColor, borderWidth: cs.borderTopWidth, bg: cs.backgroundColor, panel };
+    });
+    const edge = seg.borderWidth !== '0px' ? seg.border : seg.bg;
+    expect(contrast(edge, seg.panel)).toBeGreaterThanOrEqual(3);
+    await page.goto('/auto-invest');
+    await expect(page.locator('summary').first()).toContainText('▸');
+  });
+
+  test('R5-15: novice loss and risk colours do not follow the up/down convention (a loss never turns green)', async ({ page }) => {
+    await apiSignIn(page, 'novice');
+    await page.goto('/home');
+    const risk = () => page.getByTestId('auto-invest-card').locator('[role=img] > span').first().evaluate((e) => getComputedStyle(e).backgroundColor);
+    const blue = await risk();
+    await setPrefs(page, { colourConvention: 'red_up_asia' });
+    await page.reload();
+    expect(await risk()).toBe(blue);
+    expect(blue).not.toBe('rgb(26, 127, 55)');
   });
 });
