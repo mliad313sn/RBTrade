@@ -47,8 +47,19 @@ export class MarginService {
       `SELECT DISTINCT account_id FROM positions WHERE qty <> 0`,
     );
     let placed = 0;
+    const callLevel = dec(this.cfg.margin.callLevelPct);
     for (const { account_id } of rows) {
       try {
+        // Cheap unlocked pre-check; the account lock is taken only when the level is at or below
+        // the call level (the locked check re-values before acting).
+        const a = await this.accounts.byId(account_id);
+        if (!a) continue;
+        const v = await this.accounts.value(a, undefined, now);
+        const used = v.summary.marginUsed;
+        if (used.lte(0) || v.summary.equity.div(used).mul(100).gt(callLevel)) {
+          this.inCall.delete(account_id);
+          continue;
+        }
         placed += await this.checkAccount(account_id, now);
       } catch (e) {
         this.log.warn(`margin check ${account_id}: ${(e as Error).message}`);

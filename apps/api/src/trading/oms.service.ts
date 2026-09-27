@@ -207,7 +207,7 @@ export class OmsService {
     req: AnyOrderRequest,
     sub: Pick<Submitter, 'userId' | 'roles' | 'source'>,
     tx?: TradingTx,
-    opts: { excludeOrderId?: string; skipRegistryChecks?: boolean } = {},
+    opts: { excludeOrderId?: string; excludeOcoGroup?: string | null; skipRegistryChecks?: boolean } = {},
   ): Promise<EvaluatedOrder> {
     const t0 = performance.now();
     const inst = await this.registry.get(req.symbol);
@@ -304,7 +304,7 @@ export class OmsService {
     const pendingSameSide =
       req.reduceOnly || immediate
         ? new Decimal(0)
-        : await this.workingSameSide(account.id, req.symbol, side, opts.excludeOrderId, tx?.c);
+        : await this.workingSameSide(account.id, req.symbol, side, opts, tx?.c);
     const before = posQty.add(pendingSameSide.mul(sideSign(side)));
     const after = before.add(qty.mul(sideSign(side)));
     const posMark = pos?.mark ?? price;
@@ -398,14 +398,16 @@ export class OmsService {
     accountId: string,
     symbol: string,
     side: 'buy' | 'sell',
-    excludeOrderId: string | undefined,
+    exclude: { excludeOrderId?: string; excludeOcoGroup?: string | null },
     c?: Queryable,
   ): Promise<Decimal> {
+    // An amended OCO leg excludes its whole group: the legs are alternatives to each other.
     const r = await (c ?? this.db.pool).query<{ oco_group: string | null; rem: string }>(
       `SELECT oco_group, (qty - filled_qty)::text AS rem FROM orders
        WHERE account_id = $1 AND symbol = $2 AND side = $3 AND status = ANY($4) AND exec_type <> 'none'
-         AND NOT reduce_only AND ($5::uuid IS NULL OR id <> $5::uuid)`,
-      [accountId, symbol, side, OPEN_ORDER_STATUSES, excludeOrderId ?? null],
+         AND NOT reduce_only AND ($5::uuid IS NULL OR id <> $5::uuid)
+         AND ($6::uuid IS NULL OR oco_group IS NULL OR oco_group <> $6::uuid)`,
+      [accountId, symbol, side, OPEN_ORDER_STATUSES, exclude.excludeOrderId ?? null, exclude.excludeOcoGroup ?? null],
     );
     const groups = new Map<string, Decimal>();
     let total = new Decimal(0);
@@ -913,6 +915,7 @@ export class OmsService {
     const source = who.actor.type === 'robot' ? order.source : 'manual';
     const ev = await this.evaluate(tx.account, req, { userId: who.userId, roles: who.roles, source: source as OrderSource }, tx, {
       excludeOrderId: order.id,
+      excludeOcoGroup: order.oco_group,
       skipRegistryChecks: true,
     });
     return ev.violations.filter((v) => !AMEND_EXEMPT_CODES.has(v.code));
