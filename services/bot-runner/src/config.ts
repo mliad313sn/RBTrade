@@ -26,6 +26,14 @@ export function loadEnv(): void {
   if (existsSync(root)) process.loadEnvFile(root);
 }
 
+function hasPassword(url: string): boolean {
+  try {
+    return new URL(url).password.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 const int = (v: string | undefined, d: number) => {
   const n = Number(v ?? '');
   return Number.isInteger(n) && n > 0 ? n : d;
@@ -36,6 +44,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RunnerConfig {
     throw new Error('LIVE_TRADING_ENABLED=true is not supported: KORA runs in PAPER only.');
   }
   if (!env.REDIS_URL) throw new Error('REDIS_URL is required');
+  // IRTC R1-11: outside dev/test the robot job queue and the WS bus need an authenticated Redis.
+  const kEnv = env.KORA_ENV ?? 'dev';
+  if ((kEnv === 'staging' || kEnv === 'production' || env.NODE_ENV === 'production') && !hasPassword(env.REDIS_URL))
+    throw new Error('REDIS_URL must carry a password outside dev/test, e.g. rediss://:<password>@host:6380');
   const token = env.KORA_SERVICE_TOKEN?.trim() ?? '';
   if (token && token.length < 32)
     throw new Error('KORA_SERVICE_TOKEN must be at least 32 characters');

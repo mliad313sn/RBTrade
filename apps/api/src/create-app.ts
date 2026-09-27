@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
+import { APP_CONFIG, type AppConfig } from './config/config';
 import { openApiSchema } from './common/zod';
 import { CONTRACTS } from './contracts/registry';
 import { httpMetrics } from './observability/http-metrics';
@@ -53,8 +54,8 @@ export async function createApp(opts: { logger?: boolean } = {}): Promise<NestEx
   app.use(cookieParser());
   app.use(httpMetrics(app.get(OpsMetrics)));
   app.enableShutdownHooks();
-  const production = process.env.NODE_ENV === 'production' || process.env.KORA_ENV === 'production';
-  if (!production) {
+  // IRTC R1-11: API docs only in dev and test (they were also exposed in staging).
+  if (app.get<AppConfig>(APP_CONFIG).apiDocs) {
     SwaggerModule.setup('docs', app, buildOpenApi(app), { jsonDocumentUrl: 'openapi.json' });
   }
   return app;
