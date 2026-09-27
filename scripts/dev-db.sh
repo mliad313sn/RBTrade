@@ -30,7 +30,14 @@ as_pg() {
 }
 
 pg_running() { as_pg "$PG_BIN/pg_ctl" -D "$PGDATA" status >/dev/null 2>&1; }
-redis_running() { redis-cli -p "$REDIS_PORT" ping >/dev/null 2>&1; }
+# IRTC R1-11: Redis requires a password when KORA_REDIS_PASSWORD is set (the .env.example default);
+# clients take it from REDIS_URL (redis://:<password>@host:port). Unset keeps an open local Redis.
+REDIS_PASSWORD="${KORA_REDIS_PASSWORD:-}"
+rcli() {
+  if [ -n "$REDIS_PASSWORD" ]; then REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning -p "$REDIS_PORT" "$@"
+  else redis-cli -p "$REDIS_PORT" "$@"; fi
+}
+redis_running() { [ "$(rcli ping 2>/dev/null)" = "PONG" ]; }
 
 start_pg() {
   mkdir -p "$DATA" "$PGSOCK"
@@ -60,16 +67,19 @@ start_redis() {
   if redis_running; then
     echo "[dev-db] redis already running on $REDIS_PORT"
   else
-    redis-server --port "$REDIS_PORT" --bind 127.0.0.1 --dir "$REDIS_DIR" --daemonize yes \
+    # The password goes in a 0600 config file, not on the command line (visible in ps).
+    local conf="$REDIS_DIR/kora-auth.conf"
+    ( umask 077; : >"$conf"; if [ -n "$REDIS_PASSWORD" ]; then printf 'requirepass %s\n' "$REDIS_PASSWORD" >"$conf"; fi )
+    redis-server "$conf" --port "$REDIS_PORT" --bind 127.0.0.1 --dir "$REDIS_DIR" --daemonize yes \
       --pidfile "$REDIS_DIR/redis.pid" --logfile "$REDIS_DIR/redis.log" --save "" --appendonly no >/dev/null
     for _ in $(seq 1 50); do redis_running && break; sleep 0.1; done
-    echo "[dev-db] redis started on 127.0.0.1:$REDIS_PORT"
+    echo "[dev-db] redis started on 127.0.0.1:$REDIS_PORT$([ -n "$REDIS_PASSWORD" ] && echo ' (password required)')"
   fi
 }
 
 stop_all() {
   if pg_running; then as_pg "$PG_BIN/pg_ctl" -D "$PGDATA" -m fast -w stop >/dev/null && echo "[dev-db] postgres stopped"; fi
-  if redis_running; then redis-cli -p "$REDIS_PORT" shutdown nosave >/dev/null 2>&1 || true; echo "[dev-db] redis stopped"; fi
+  if redis_running; then rcli shutdown nosave >/dev/null 2>&1 || true; echo "[dev-db] redis stopped"; fi
 }
 
 case "${1:-start}" in

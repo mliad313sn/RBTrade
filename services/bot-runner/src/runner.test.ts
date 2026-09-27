@@ -38,6 +38,12 @@ describe('jobs', () => {
 });
 
 describe('config', () => {
+  it('IRTC R1-11: requires Redis authentication in staging and production', () => {
+    expect(() => loadConfig({ KORA_ENV: 'staging', REDIS_URL: 'rediss://redis:6380' })).toThrow(/password/);
+    expect(() => loadConfig({ KORA_ENV: 'production', REDIS_URL: 'redis://redis:6379' })).toThrow(/password/);
+    expect(loadConfig({ KORA_ENV: 'staging', REDIS_URL: 'rediss://:pw@redis:6380' }).redisUrl).toBe('rediss://:pw@redis:6380');
+    expect(loadConfig({ KORA_ENV: 'dev', REDIS_URL: 'redis://127.0.0.1:56379' }).redisUrl).toBe('redis://127.0.0.1:56379');
+  });
   it('refuses LIVE, requires redis and validates the service token', () => {
     expect(() => loadConfig({ LIVE_TRADING_ENABLED: 'true', REDIS_URL: 'redis://x' })).toThrow(
       /PAPER only/,

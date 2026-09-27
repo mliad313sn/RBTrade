@@ -1,5 +1,6 @@
 import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ACTOR_TYPES, AUDIT_READ_ROLES, hasAnyRole } from '@kora/domain';
 import { z } from 'zod';
 
@@ -26,6 +27,9 @@ const AuditQuerySchema = z
     limit: z.coerce.number().int().min(1).max(500).optional(),
   })
   .strict();
+
+/** IRTC R1-08: chain verification is O(N); its own low limit per client (read per request). */
+const verifyThrottle = () => ({ default: { limit: () => Number(process.env.KORA_AUDIT_VERIFY_RATE_LIMIT ?? 10) || 10, ttl: 60_000 } });
 
 @ApiTags('audit')
 @Controller('audit')
@@ -65,8 +69,14 @@ export class AuditController {
   }
 
   @Get('verify')
-  @ApiOperation({ summary: 'Recompute the hash chain. Returns valid:false with the first broken id on tamper.' })
-  verify() {
-    return this.audit.verify();
+  @Throttle(verifyThrottle())
+  @ApiOperation({
+    summary:
+      'Recompute the hash chain. Auditors, risk officers and admins verify the whole chain (scope "chain"); everyone else verifies their own events and their links (scope "own", no platform totals). Returns valid:false with the first broken id on tamper. IRTC R1-08: 10 per minute per client.',
+  })
+  async verify(@CurrentPrincipal() principal: Principal) {
+    if (hasAnyRole(principal.roles, AUDIT_READ_ROLES)) return { ...(await this.audit.verifyShared()), scope: 'chain' as const };
+    const accounts = await this.db.query<{ id: string }>('SELECT id FROM accounts WHERE user_id = $1', [principal.sub]);
+    return this.audit.verifyOwn({ userId: principal.sub, accountIds: accounts.map((a) => a.id) });
   }
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, Server } from 'node:http';
 import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
@@ -5,18 +6,20 @@ import type { Duplex } from 'node:stream';
 import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { AUDIT_READ_ALL_ROLES, hasAnyRole, isPrivateChannelKind, parseChannel, requiresMfa } from '@kora/domain';
+import { Redis } from 'ioredis';
 import { decodeJwt } from 'jose';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { z } from 'zod';
 
 import { ACCESS_COOKIE } from '../auth/cookies';
 import type { Principal } from '../auth/principal';
-import { SessionsService } from '../auth/sessions.service';
+import { SessionsService, type SessionRevocation } from '../auth/sessions.service';
+import { APP_CONFIG, type AppConfig } from '../config/config';
 import { TokenService } from '../auth/token.service';
 import { DbService } from '../db/db.service';
 import { ChannelHub, type HubClient } from './channel-hub';
 import { InstrumentsRepository } from './instruments.repository';
-import { MD_CONFIG, type MdConfig } from './md-config';
+import { busChannel, MD_CONFIG, type MdConfig } from './md-config';
 
 export const WS_PATH = '/ws';
 const AUTH_TIMEOUT_MS = 5000;
@@ -130,7 +133,17 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
   private readonly conns = new Set<Connection>();
   private nextId = 1;
   private pingTimer: NodeJS.Timeout | null = null;
+  private sweepTimer: NodeJS.Timeout | null = null;
+  private sweeping = false;
   private flusher: Flusher;
+  /** IRTC R1-03: cross-replica session revocations (Redis pub/sub). */
+  private revocationSub: Redis | null = null;
+  private revocationPub: Redis | null = null;
+  private readonly origin = randomUUID();
+  private readonly onLocalRevocation = (r: SessionRevocation): void => {
+    this.applyRevocation(r);
+    this.revocationPub?.publish(this.revocationChannel, JSON.stringify({ ...r, origin: this.origin })).catch(() => undefined);
+  };
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -140,8 +153,13 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     @Inject(MD_CONFIG) private readonly cfg: MdConfig,
     private readonly db: DbService,
     @Optional() private readonly sessions?: SessionsService,
+    @Optional() @Inject(APP_CONFIG) private readonly app?: AppConfig,
   ) {
     this.flusher = new Flusher(cfg.wsFlushMs);
+  }
+
+  private get revocationChannel(): string {
+    return busChannel(this.cfg, 'sessions:revoked');
   }
 
   async onApplicationBootstrap(): Promise<void> {
@@ -152,10 +170,69 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     this.server.on('upgrade', this.onUpgrade);
     this.pingTimer = setInterval(() => this.heartbeat(), PING_MS);
     this.pingTimer.unref();
+    // IRTC R1-03: sessions revoked while a socket is open end that socket.
+    if (this.sessions) {
+      this.sessions.events.on('revoked', this.onLocalRevocation);
+      this.sweepTimer = setInterval(() => void this.sweepSessions(), this.cfg.wsSessionSweepMs);
+      this.sweepTimer.unref();
+      if (this.app) {
+        this.revocationPub = new Redis(this.app.redisUrl, { maxRetriesPerRequest: 2 });
+        this.revocationSub = new Redis(this.app.redisUrl, { maxRetriesPerRequest: null });
+        for (const r of [this.revocationPub, this.revocationSub]) r.on('error', (e: Error) => this.log.warn(`redis (session revocations): ${e.message}`));
+        this.revocationSub.on('message', (_ch: string, payload: string) => this.onRemoteRevocation(payload));
+        await this.revocationSub.subscribe(this.revocationChannel).catch((e: Error) => this.log.warn(`session revocation channel: ${e.message}`));
+      }
+    }
+  }
+
+  private onRemoteRevocation(payload: string): void {
+    try {
+      const m = JSON.parse(payload) as SessionRevocation & { origin?: string };
+      if (m.origin === this.origin || typeof m.userId !== 'string') return;
+      this.sessions?.forget(m.userId);
+      this.applyRevocation({ userId: m.userId, tokenId: typeof m.tokenId === 'string' ? m.tokenId : undefined, validAfterSec: typeof m.validAfterSec === 'number' ? m.validAfterSec : undefined });
+    } catch {
+      // ignore malformed bus messages
+    }
+  }
+
+  /** Closes the user's sockets that the revocation covers; anything unclear is re-checked in the DB. */
+  private applyRevocation(r: SessionRevocation): void {
+    for (const c of this.conns) {
+      const p = c.principal;
+      if (!p || p.sub !== r.userId) continue;
+      if (r.tokenId && p.tokenId === r.tokenId) c.close(4401, 'session revoked');
+      else if (r.validAfterSec !== undefined && p.issuedAt !== undefined && p.issuedAt < r.validAfterSec) c.close(4401, 'session revoked');
+      else if (!r.tokenId && r.validAfterSec === undefined) void this.recheck(c);
+    }
+  }
+
+  private async recheck(c: Connection): Promise<void> {
+    if (!c.principal || !this.sessions) return;
+    if (!(await this.sessions.isActive(c.principal, { fresh: true }).catch(() => true))) c.close(4401, 'session revoked');
+  }
+
+  /** IRTC R1-03: periodic re-check of every authenticated socket (catches out-of-band changes). */
+  private async sweepSessions(): Promise<void> {
+    if (!this.sessions || this.sweeping) return;
+    this.sweeping = true;
+    try {
+      const open = [...this.conns].filter((c) => c.principal);
+      const dead = await this.sessions.inactive(open.map((c) => Object.assign({}, c.principal!, { conn: c })));
+      for (const d of dead) d.conn.close(4401, 'session revoked');
+    } catch (e) {
+      this.log.warn(`session sweep failed: ${(e as Error).message}`);
+    } finally {
+      this.sweeping = false;
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
     if (this.pingTimer) clearInterval(this.pingTimer);
+    if (this.sweepTimer) clearInterval(this.sweepTimer);
+    this.sessions?.events.off('revoked', this.onLocalRevocation);
+    this.revocationSub?.disconnect();
+    this.revocationPub?.disconnect();
     this.server?.off('upgrade', this.onUpgrade);
     for (const c of this.conns) c.ws.terminate();
     this.conns.clear();
@@ -235,6 +312,11 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       return;
     }
     if (op.op === 'ping') return conn.json({ type: 'pong', id: op.id, ts: now });
+    // IRTC R1-03: never grant a subscription on cached roles; the session must still be live.
+    if (op.op === 'subscribe' && this.sessions && !(await this.sessions.isActive(conn.principal, { fresh: true }))) {
+      conn.close(4401, 'session revoked');
+      return;
+    }
     if (op.op === 'unsubscribe') {
       for (const ch of op.channels) if (conn.channels.delete(ch)) this.hub.unsubscribe(conn, ch);
       return conn.json({ type: 'unsubscribed', channels: op.channels, id: op.id });

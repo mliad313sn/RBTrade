@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:-} --require ./peer-address.cjs\" next dev -p 3000",
     "build": "next build",
-    "start": "next start -p ${WEB_PORT:-3000}",
+    "start": "NODE_OPTIONS=\"${NODE_OPTIONS:-} --require ./peer-address.cjs\" next start -p ${WEB_PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run --coverage",

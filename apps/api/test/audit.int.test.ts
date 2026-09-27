@@ -28,9 +28,10 @@ describe('audit log', () => {
     );
     const ids = events.map((e) => BigInt(e.id)).sort((a, b) => (a < b ? -1 : 1));
     for (let i = 1; i < ids.length; i++) expect(ids[i]! - ids[i - 1]!).toBe(1n);
-    const u = await createUser(app, 'novice');
+    // IRTC R1-08: whole-chain verification is for auditors, risk officers and admins.
+    const u = await createUser(app, 'novice', ['auditor']);
     const v = await request(http).get('/audit/verify').set(bearer(u.token)).expect(200);
-    expect(v.body).toMatchObject({ valid: true, firstBrokenId: null });
+    expect(v.body).toMatchObject({ valid: true, firstBrokenId: null, scope: 'chain' });
     expect(v.body.count).toBeGreaterThanOrEqual(50);
   });
 

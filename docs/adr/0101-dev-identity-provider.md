@@ -39,9 +39,10 @@ The API accepts a JWT verified against a JWKS. The claims it uses are:
 - TOTP secrets are encrypted with AES-256-GCM under `KORA_MFA_ENC_KEY`. In dev an ephemeral key is generated with a warning.
 - Signing: ES256 key from `KORA_DEV_IDP_PRIVATE_JWK`, or ephemeral in dev. JWKS is served at `/auth/jwks.json` and discovery at `/auth/.well-known/openid-configuration`.
 - Access token: 30 min. It is set as an `HttpOnly; SameSite=Strict; Path=/` cookie `kora_at` (`Secure` outside dev) and also returned in the body for API clients.
-- Rate limit on `/auth/*` (throttler, `KORA_AUTH_RATE_LIMIT` per minute).
+- Rate limit on `/auth/*` (throttler, `KORA_AUTH_RATE_LIMIT` per minute; since IRTC R1-05 per client IP + account, with a per-IP ceiling `KORA_AUTH_IP_RATE_LIMIT`).
+- Brute force (amended by IRTC R1-01/R1-04/R1-07, policy OQ-SA1): the password step never hard-locks; it backs off per (e-mail, IP) and per e-mail with the same answer for unknown and existing accounts, and IPs with a completed sign-in are exempt from the account-wide back-off. Second-factor failures (TOTP, recovery code, step-up) have their own counter, reset only by a successful second factor; 5 failures lock the second factor (15 min, doubling to 24 h) and a lock reached through step-up ends every session.
 - Every auth event (signup, login ok/fail, mfa enrol/verify, role change) is written to the audit log. No passwords, secrets or codes are ever logged.
-- It refuses to boot when `NODE_ENV=production`.
+- It refuses to boot when `NODE_ENV=production`, and in staging unless `KORA_ALLOW_DEV_IDP=true` with persistent keys (IRTC R1-11).
 
 ### Keycloak (`AUTH_PROVIDER=keycloak`)
 

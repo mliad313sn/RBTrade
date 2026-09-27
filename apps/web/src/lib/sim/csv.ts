@@ -1,14 +1,22 @@
 import type { Scenario } from './types';
 
+const NUMERIC = /^-?\d+(\.\d+)?$/;
+
+/**
+ * IRTC R1-11: text that a spreadsheet would run as a formula (leading = + - @ tab or CR) is
+ * prefixed with an apostrophe, as in the governance CSV export (`csvCell`). Numbers, and numeric
+ * strings such as "-12.50", stay numeric.
+ */
 function cell(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return '';
-  const s =
+  let s =
     typeof v === 'number'
       ? Number.isInteger(v)
         ? String(v)
         : v.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')
       : v;
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s) && !NUMERIC.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 const row = (...cells: (string | number | null | undefined)[]) => cells.map(cell).join(',');

@@ -5,6 +5,8 @@ import {
   ForbiddenException,
   Get,
   HttpCode,
+  HttpException,
+  HttpStatus,
   Inject,
   NotFoundException,
   Post,
@@ -18,6 +20,7 @@ import type { Response } from 'express';
 import type { z } from 'zod';
 
 import { AuditService } from '../audit/audit.service';
+import { authThrottle, signupLimitPerHour } from '../common/auth-throttle';
 import { clientIp, type KoraRequest } from '../common/request';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
@@ -28,14 +31,19 @@ import { AuthError, DevIdpService } from './dev-idp.service';
 import { SessionsService } from './sessions.service';
 import { TokenService } from './token.service';
 
-function mapAuthError(e: unknown): never {
+function mapAuthError(e: unknown, res?: Response): never {
   if (e instanceof AuthError) {
     const body = { error: e.code, message: e.message };
     switch (e.code) {
       case 'email_taken':
       case 'mfa_already_enrolled':
         throw new ConflictException(body);
-      case 'locked':
+      case 'too_many_attempts':
+        // IRTC R1-04: back-off is keyed on the e-mail string, so this answer is the same for an
+        // unknown and an existing account (no enumeration). The body carries no timing detail.
+        if (res && e.retryAfterSeconds) res.setHeader('Retry-After', String(e.retryAfterSeconds));
+        throw new HttpException({ statusCode: 429, ...body }, HttpStatus.TOO_MANY_REQUESTS);
+      case 'mfa_locked':
         throw new ForbiddenException(body);
       default:
         throw new UnauthorizedException(body);
@@ -44,8 +52,6 @@ function mapAuthError(e: unknown): never {
   throw e;
 }
 
-// Read per request (goal 10 tests change it at runtime).
-const authThrottle = () => ({ default: { limit: () => Number(process.env.KORA_AUTH_RATE_LIMIT ?? 20) || 20, ttl: 60_000 } });
 
 @ApiTags('auth')
 @Controller('auth')
@@ -90,7 +96,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle(authThrottle())
+  @Throttle({ ...authThrottle(), long: { limit: () => signupLimitPerHour(), ttl: 3_600_000 } })
   @Post('signup')
   @ApiOperation({ summary: 'Create an account. Everyone starts as novice (PAPER); Pro trading needs the appropriateness assessment, then TOTP enrolment at the next login.' })
   @ApiBody({ schema: openApiSchema(SignupSchema) })
@@ -111,7 +117,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     this.assertDevIdp();
-    const out = await this.idp.login(body.email, body.password, clientIp(req)).catch(mapAuthError);
+    const out = await this.idp.login(body.email, body.password, clientIp(req)).catch((e: unknown) => mapAuthError(e, res));
     if (out.status === 'ok') setAccessCookie(res, out.accessToken, this.config);
     return out;
   }

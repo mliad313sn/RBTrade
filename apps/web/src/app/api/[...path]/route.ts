@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { forwardedClient, trustedProxyHops } from '@/lib/forwarded';
+import { clientAddress, peerStampActive, trustedProxyHops } from '@/lib/forwarded';
 
 /**
  * Same-origin proxy to the API (read at runtime from API_INTERNAL_URL), so the session cookie stays
@@ -26,6 +26,16 @@ const FORWARD_RESPONSE = [
   'x-kora-next-before-id',
 ];
 
+// Staging/production must run with the peer-address preload (Dockerfile) or a configured ingress hop
+// count; otherwise every user would share one rate-limit bucket (IRTC R1-05).
+const STRICT_ENV = ['staging', 'production'].includes(process.env.KORA_ENV ?? '');
+let warned = false;
+function warnOnce(): void {
+  if (warned) return;
+  warned = true;
+  console.warn('[kora-web] peer-address.cjs is not preloaded and KORA_TRUSTED_PROXY_HOPS=0: every client is reported as 127.0.0.1 (IRTC R1-05).');
+}
+
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {
   const { path } = await ctx.params;
   const base = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
@@ -36,9 +46,20 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     const v = req.headers.get(h);
     if (v) headers.set(h, v);
   }
-  // B-015 (goal 10): only addresses appended by our own proxies are trusted (KORA_TRUSTED_PROXY_HOPS);
-  // a client-supplied X-Forwarded-For never reaches the API (rate limits and audit IPs key on it).
-  headers.set('x-forwarded-for', forwardedClient(req.headers.get('x-forwarded-for'), trustedProxyHops()));
+  // B-015 (goal 10) + IRTC R1-05: a client-supplied X-Forwarded-For never reaches the API (rate
+  // limits and audit IPs key on it). Behind a trusted ingress (KORA_TRUSTED_PROXY_HOPS >= 1) the
+  // address it appended is used; with none, the real TCP peer stamped by peer-address.cjs.
+  const hops = trustedProxyHops();
+  if (hops === 0 && !peerStampActive()) {
+    if (STRICT_ENV) {
+      return Response.json(
+        { statusCode: 503, error: 'proxy_misconfigured', message: 'The KORA web proxy cannot attribute client addresses (see the deployment checklist).' },
+        { status: 503 },
+      );
+    }
+    warnOnce();
+  }
+  headers.set('x-forwarded-for', clientAddress(req.headers, hops));
   const hasBody = !['GET', 'HEAD'].includes(req.method);
   let upstream: Response;
   try {

@@ -11,9 +11,14 @@ import { DbService } from '../db/db.service';
 const SECTIONS: Array<{ id: string; sql: string; note?: string }> = [
   {
     id: 'profile',
-    sql: `SELECT id, email, display_name, identity_provider, status, failed_logins, locked_until, created_at, updated_at FROM users WHERE id = $1`,
+    sql: `SELECT id, email, display_name, identity_provider, status, failed_logins, locked_until, mfa_failed_count, mfa_lock_count, created_at, updated_at FROM users WHERE id = $1`,
   },
   { id: 'roles', sql: `SELECT role, granted_by, granted_at FROM user_roles WHERE user_id = $1 ORDER BY role` },
+  {
+    id: 'known_sign_in_addresses',
+    sql: `SELECT ip_hash, last_success_at FROM auth_known_ips WHERE user_id = $1 ORDER BY last_success_at`,
+    note: 'SHA-256 of the addresses a full sign-in succeeded from; used to exempt your devices from sign-in back-off (IRTC R1-04).',
+  },
   {
     id: 'mfa',
     sql: `SELECT (enabled_at IS NOT NULL) AS enrolled, enabled_at, created_at FROM user_mfa WHERE user_id = $1`,

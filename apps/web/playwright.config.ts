@@ -56,6 +56,9 @@ export default defineConfig({
         KORA_ENV: 'test',
         KORA_SCRYPT_N: '16384',
         KORA_AUTH_RATE_LIMIT: '10000',
+        // IRTC R1-11: the suite signs up many accounts from one address.
+        KORA_SIGNUP_RATE_LIMIT_PER_HOUR: '100000',
+        KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY: '100000',
         QUANT_URL: `http://127.0.0.1:${QUANT_PORT}`,
         LOG_LEVEL: 'warn',
         // Market data (goal 02): in-process SIMULATED feed for the prototype majors, own Redis namespace.
@@ -99,7 +102,8 @@ export default defineConfig({
       url: `http://127.0.0.1:${WEB_PORT}/login`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { ...(process.env as Record<string, string>), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on', KORA_EXPLAIN_THIS: process.env.E2E_EXPLAIN_THIS ?? 'on' },
+      // IRTC R1-05: the same peer-address preload as `pnpm start` and the Docker image.
+      env: { ...(process.env as Record<string, string>), NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${resolve(__dirname, 'peer-address.cjs')}`.trim(), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on', KORA_EXPLAIN_THIS: process.env.E2E_EXPLAIN_THIS ?? 'on' },
     },
   ],
 });

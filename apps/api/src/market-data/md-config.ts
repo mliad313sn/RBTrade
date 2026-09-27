@@ -33,6 +33,8 @@ const Schema = z.object({
   KORA_MD_CONFLATE_BURST: z.coerce.number().int().min(1).max(20).default(2),
   /** Per-client write coalescing window (ms); 0 = flush at the end of the event-loop turn. */
   KORA_MD_WS_FLUSH_MS: z.coerce.number().int().min(0).max(50).default(0),
+  /** IRTC R1-03: how often open sockets are re-checked against server-side session state (ms). */
+  KORA_WS_SESSION_SWEEP_MS: z.coerce.number().int().min(200).max(300_000).default(15_000),
   /** Redis namespace (tests use their own so they never cross-talk with a dev api). */
   KORA_MD_REDIS_PREFIX: z.string().regex(/^[a-z0-9:_-]{1,64}:$/).default('kora:md:'),
 });
@@ -65,6 +67,7 @@ export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = '
     wsFlushMs: e.KORA_MD_WS_FLUSH_MS,
     wsMaxConnPerUser: e.KORA_MD_WS_MAX_CONN_PER_USER,
     wsMaxConnPerIp: e.KORA_MD_WS_MAX_CONN_PER_IP,
+    wsSessionSweepMs: e.KORA_WS_SESSION_SWEEP_MS,
   };
 }
 

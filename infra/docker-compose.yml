@@ -31,11 +31,15 @@ services:
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    # IRTC R1-11: authentication required; clients use REDIS_URL=redis://:<password>@host:6379.
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$KORA_REDIS_PASSWORD\""]
+    environment:
+      KORA_REDIS_PASSWORD: ${KORA_REDIS_PASSWORD:?set KORA_REDIS_PASSWORD (see .env.example)}
+      REDISCLI_AUTH: ${KORA_REDIS_PASSWORD:?set KORA_REDIS_PASSWORD (see .env.example)}
     ports: ["127.0.0.1:6379:6379"]
     volumes: [redisdata:/data]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
