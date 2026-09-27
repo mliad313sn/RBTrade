@@ -1,7 +1,8 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, Optional, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { dec } from '@kora/domain';
 import type { Redis } from 'ioredis';
 
+import { OpsMetrics } from '../observability/ops-metrics.service';
 import { DbService } from '../db/db.service';
 import { AccountsService } from '../trading/accounts.service';
 import { ROBOT_CONTROL_CHANNEL } from '../trading/trading-events.service';
@@ -37,6 +38,7 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
     private readonly book: RobotBookService,
     private readonly accounts: AccountsService,
     private readonly control: RobotControlService,
+    @Optional() private readonly metrics?: OpsMetrics,
   ) {}
 
   onModuleInit(): void {
@@ -95,9 +97,17 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
       const running = await this.db.query<RobotRow>(
         `SELECT * FROM robots WHERE status = 'running'`,
       );
-      if (!running.length) return;
+      this.metrics?.robotsRunning.set(running.length);
+      if (!running.length) {
+        this.metrics?.robotHeartbeatMaxAge.set(0);
+        return;
+      }
       const beats = await this.control.heartbeats(running.map((r) => r.id));
       const hb = heartbeatMs();
+      // Goal 10: oldest heartbeat among running robots (alert: runner lost).
+      this.metrics?.robotHeartbeatMaxAge.set(
+        Math.max(...running.map((r) => (now - (beats.get(r.id) ?? r.started_at?.getTime() ?? now)) / 1000), 0),
+      );
       for (const r of running) {
         try {
           await this.checkHeartbeat(r, beats.get(r.id), hb, now);
@@ -121,6 +131,7 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
     const since = r.started_at?.getTime() ?? now;
     const lastSeen = last ?? since;
     if (now - since <= grace || now - lastSeen <= grace) return;
+    this.metrics?.robotAutoPauses.inc({ reason: 'heartbeat_lost' });
     await this.robots.pauseRobot(
       r.id,
       'heartbeat_lost',

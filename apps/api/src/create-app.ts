@@ -11,6 +11,8 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { openApiSchema } from './common/zod';
 import { CONTRACTS } from './contracts/registry';
+import { httpMetrics } from './observability/http-metrics';
+import { OpsMetrics } from './observability/ops-metrics.service';
 
 export function buildOpenApi(app: INestApplication): OpenAPIObject {
   const doc = new DocumentBuilder()
@@ -49,6 +51,7 @@ export async function createApp(opts: { logger?: boolean } = {}): Promise<NestEx
     }),
   );
   app.use(cookieParser());
+  app.use(httpMetrics(app.get(OpsMetrics)));
   app.enableShutdownHooks();
   const production = process.env.NODE_ENV === 'production' || process.env.KORA_ENV === 'production';
   if (!production) {

@@ -1,12 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional, UnprocessableEntityException } from '@nestjs/common';
 import {
   availableSize,
   canonicalJson,
@@ -32,6 +26,8 @@ import {
   type RiskViolation,
 } from '@kora/domain';
 
+import { OpsMetrics } from '../observability/ops-metrics.service';
+import { currentTraceparent, withSpan } from '../observability/spans';
 import { AuditService } from '../audit/audit.service';
 import { DbService, type Queryable } from '../db/db.service';
 import { DisclosureAcknowledgements } from '../disclosures/acknowledgements.service';
@@ -87,6 +83,7 @@ export class OmsService {
     private readonly engine: PaperEngineService,
     private readonly publisher: TradingPublisher,
     private readonly disclosures: DisclosureAcknowledgements,
+    @Optional() private readonly metrics?: OpsMetrics,
   ) {}
 
   /** Guardrails apply to novice-only accounts and to anyone using the Novice view (goal 08). */
@@ -351,7 +348,38 @@ export class OmsService {
    * Places an order. Returns `{order, idempotentReplay}`; a risk rejection is persisted (so the
    * same client order id replays the same answer) and thrown as HTTP 422.
    */
+  /** Goal 10: the submit runs in an `oms.submit` span; its trace context is stored on the order. */
   async submit(
+    sub: Submitter,
+    req: PlaceOrderRequest,
+  ): Promise<{
+    order: ReturnType<typeof toOrderDto>;
+    idempotentReplay: boolean;
+    legs?: ReturnType<typeof toOrderDto>[];
+  }> {
+    const t0 = performance.now();
+    const source = sub.source.startsWith('robot:') ? 'robot' : sub.source;
+    try {
+      const out = await withSpan(
+        'oms.submit',
+        { 'kora.symbol': req.symbol, 'kora.side': req.side, 'kora.order_type': req.type, 'kora.source': sub.source, 'kora.client_order_id': req.clientOrderId },
+        () => this.submitInSpan(sub, req),
+      );
+      const outcome = out.idempotentReplay ? 'replay' : out.order.status === 'rejected' ? 'rejected' : 'accepted';
+      this.metrics?.orderSubmit.observe({ outcome, source }, (performance.now() - t0) / 1000);
+      if (outcome === 'rejected') this.metrics?.orderRejections.inc({ code: out.order.rejectCode ?? 'unknown' });
+      return out;
+    } catch (e) {
+      // A pre-trade risk rejection is answered as 422 (the order row is stored as rejected).
+      const body = e instanceof UnprocessableEntityException ? (e.getResponse() as { error?: string; code?: string }) : null;
+      const outcome = body?.error === 'risk_rejected' ? 'rejected' : 'error';
+      this.metrics?.orderSubmit.observe({ outcome, source }, (performance.now() - t0) / 1000);
+      if (outcome === 'rejected') this.metrics?.orderRejections.inc({ code: body?.code ?? 'unknown' });
+      throw e;
+    }
+  }
+
+  private async submitInSpan(
     sub: Submitter,
     req: PlaceOrderRequest,
   ): Promise<{
@@ -387,7 +415,7 @@ export class OmsService {
         }
         return { order: o, replay: true, legs: [] as OrderRow[] };
       }
-      const ev = await this.evaluate(tx.account, req, sub, tx);
+      const ev = await withSpan('risk.evaluate', { 'kora.symbol': req.symbol }, () => this.evaluate(tx.account, req, sub, tx));
       const execType = execTypeFor(req);
       const expireAt =
         req.tif === 'gtd'
@@ -397,9 +425,9 @@ export class OmsService {
             : null;
       const ins = await tx.c.query<OrderRow>(
         `INSERT INTO orders (account_id, client_order_id, request_hash, role, symbol, side, type, exec_type, qty, limit_price, stop_price,
-           trail_amount, stop_loss_price, take_profit_price, tif, expire_at, reduce_only, post_only, source, status, created_by)
+           trail_amount, stop_loss_price, take_profit_price, tif, expire_at, reduce_only, post_only, source, status, created_by, trace_parent)
          VALUES ($1, $2, $3, 'primary', $4, $5, $6, $7, $8::numeric, $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13::numeric,
-           $14, $15, $16, $17, $18, 'new', $19)
+           $14, $15, $16, $17, $18, 'new', $19, $20)
          ON CONFLICT (account_id, client_order_id) DO NOTHING RETURNING *`,
         [
           account.id,
@@ -421,6 +449,7 @@ export class OmsService {
           req.postOnly,
           sub.source,
           sub.userId,
+          currentTraceparent(),
         ],
       );
       let order = ins.rows[0]!;
@@ -491,8 +520,8 @@ export class OmsService {
         for (const leg of req.legs!) {
           const r = await tx.c.query<OrderRow>(
             `INSERT INTO orders (account_id, parent_order_id, oco_group, role, symbol, side, type, exec_type, qty, limit_price, stop_price,
-               tif, expire_at, reduce_only, source, status, created_by)
-             VALUES ($1, $2, $2, 'oco_leg', $3, $4, 'oco', $5, $6::numeric, $7::numeric, $8::numeric, $9, $10, $11, $12, 'new', $13) RETURNING *`,
+               tif, expire_at, reduce_only, source, status, created_by, trace_parent)
+             VALUES ($1, $2, $2, 'oco_leg', $3, $4, 'oco', $5, $6::numeric, $7::numeric, $8::numeric, $9, $10, $11, $12, 'new', $13, $14) RETURNING *`,
             [
               account.id,
               order.id,
@@ -507,6 +536,7 @@ export class OmsService {
               req.reduceOnly,
               sub.source,
               sub.userId,
+              order.trace_parent ?? null,
             ],
           );
           let l = r.rows[0]!;

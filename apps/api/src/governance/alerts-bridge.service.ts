@@ -1,8 +1,9 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
 import { RISK_ALERTS_CHANNEL } from '@kora/domain';
 import { Redis } from 'ioredis';
 import { Client } from 'pg';
 
+import { OpsMetrics } from '../observability/ops-metrics.service';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { busChannel, MD_CONFIG, type MdConfig } from '../market-data/md-config';
@@ -31,6 +32,7 @@ export class AlertsBridgeService implements OnApplicationBootstrap, OnModuleDest
     @Inject(MD_CONFIG) private readonly md: MdConfig,
     @Inject(GOVERNANCE_CONFIG) private readonly cfg: GovernanceConfig,
     private readonly db: DbService,
+    @Optional() private readonly metrics?: OpsMetrics,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -79,6 +81,7 @@ export class AlertsBridgeService implements OnApplicationBootstrap, OnModuleDest
     const first = await this.redis!.set(`${this.md.prefix}risk-alert:${id}`, '1', 'EX', 300, 'NX');
     if (first !== 'OK') {
       this.stats.duplicates += 1;
+      this.metrics?.alertRelay.inc({ result: 'duplicate' });
       return;
     }
     const rows = await this.db.query<AlertRow>('SELECT * FROM alerts WHERE id = $1', [id]);
@@ -88,6 +91,7 @@ export class AlertsBridgeService implements OnApplicationBootstrap, OnModuleDest
       JSON.stringify({ type: 'risk_alert', alert: alertView(rows[0]), ts: Date.now() }),
     );
     this.stats.published += 1;
+    this.metrics?.alertRelay.inc({ result: 'published' });
   }
 
   async onModuleDestroy(): Promise<void> {

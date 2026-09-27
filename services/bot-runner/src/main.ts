@@ -1,7 +1,9 @@
 import { loadConfig, loadEnv } from './config.js';
 import { startRunner } from './runner.js';
+import { startTracing } from './tracing.js';
 
 loadEnv();
+startTracing();
 const cfg = loadConfig();
 const runner = await startRunner(cfg);
 console.warn(

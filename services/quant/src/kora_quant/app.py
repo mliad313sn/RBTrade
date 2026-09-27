@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import FastAPI
+from opentelemetry.sdk.trace import TracerProvider
 from pydantic import BaseModel
 
 from . import __version__
@@ -18,6 +19,7 @@ from .scanner.kernels import warm_up as warm_up_scanner
 from .scanner.routes import router as scanner_router
 from .sim.engine import warm_up
 from .sim.routes import router as sim_router
+from .tracing import build_provider, instrument
 
 
 class Health(BaseModel):
@@ -36,9 +38,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, tracer_provider: TracerProvider | None = None
+) -> FastAPI:
     cfg = settings or load_settings()
     app = FastAPI(title="KORA quant", version=__version__, docs_url="/docs", lifespan=lifespan)
+    instrument(app, tracer_provider or build_provider())
 
     @app.get("/health", response_model=Health)
     def health() -> Health:

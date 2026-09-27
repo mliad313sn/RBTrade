@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   applyFill,
   assertTransition,
@@ -21,6 +21,8 @@ import {
   type OrderStatus,
 } from '@kora/domain';
 
+import { OpsMetrics } from '../observability/ops-metrics.service';
+import { contextFrom, withSpan } from '../observability/spans';
 import { FxService } from './fx.service';
 import { LedgerService } from './ledger.service';
 import { MarketViewService, type MarketSnapshot } from './market-view.service';
@@ -67,6 +69,7 @@ export class PaperEngineService {
     private readonly market: MarketViewService,
     private readonly fx: FxService,
     private readonly ledger: LedgerService,
+    @Optional() private readonly metrics?: OpsMetrics,
   ) {}
 
   // ---- order row helpers ---------------------------------------------------------------------
@@ -330,7 +333,26 @@ export class PaperEngineService {
     return r.rows[0] ?? null;
   }
 
+  /** Goal 10: each fill is an `engine.fill` span in the trace of the request that created the order. */
   private async bookFill(
+    tx: TradingTx,
+    order: OrderRow,
+    inst: TradableInstrument,
+    snap: MarketSnapshot,
+    piece: FillPiece,
+    reference: Decimal,
+    liquidity: 'taker' | 'maker',
+    rate: Decimal,
+  ): Promise<OrderRow> {
+    return withSpan(
+      'engine.fill',
+      { 'kora.order_id': order.id, 'kora.symbol': order.symbol, 'kora.side': order.side, 'kora.qty': piece.qty.toString(), 'kora.liquidity': liquidity },
+      () => this.bookFillInSpan(tx, order, inst, snap, piece, reference, liquidity, rate),
+      contextFrom(order.trace_parent),
+    );
+  }
+
+  private async bookFillInSpan(
     tx: TradingTx,
     order: OrderRow,
     inst: TradableInstrument,
@@ -364,6 +386,9 @@ export class PaperEngineService {
           .cost;
     const spread = spreadCost(piece.qty, snap.bid!, snap.ask!, inst.multiplier).mul(rate);
     const slippage = piece.price.sub(reference).mul(sideSign(order.side));
+    // Goal 10: fills and slippage (bps of the reference) for the order-quality dashboard.
+    this.metrics?.fills.inc({ liquidity });
+    if (!reference.isZero()) this.metrics?.observeSlippageBps(order.symbol, slippage.div(reference).mul(10_000).toFixed(4));
     const q = snap.quote!;
     const quoteAtDecision = {
       bid: q.bid,
@@ -522,8 +547,8 @@ export class PaperEngineService {
     const stop = role === 'stop_loss';
     const r = await tx.c.query<OrderRow>(
       `INSERT INTO orders (account_id, parent_order_id, oco_group, role, symbol, side, type, exec_type, qty, limit_price, stop_price,
-         tif, reduce_only, source, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8::numeric, $9::numeric, $10::numeric, 'gtc', true, $11, 'new', $12) RETURNING *`,
+         tif, reduce_only, source, status, created_by, trace_parent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8::numeric, $9::numeric, $10::numeric, 'gtc', true, $11, 'new', $12, $13) RETURNING *`,
       [
         tx.account.id,
         parent.id,
@@ -537,6 +562,7 @@ export class PaperEngineService {
         stop ? parent.stop_loss_price : null,
         parent.source,
         parent.created_by,
+        parent.trace_parent ?? null,
       ],
     );
     let child = r.rows[0]!;

@@ -3,8 +3,10 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { timingSafeEqual } from 'node:crypto';
 import type { Response } from 'express';
+import { Registry } from 'prom-client';
 
 import { Public } from '../auth/decorators';
+import { MetricsRegistry } from '../observability/ops-metrics.service';
 import { MetricsService } from './metrics.service';
 
 function sameToken(a: string, b: string): boolean {
@@ -20,7 +22,10 @@ function sameToken(a: string, b: string): boolean {
 @ApiExcludeController()
 @Controller('metrics')
 export class MetricsController {
-  constructor(private readonly metrics: MetricsService) {}
+  constructor(
+    private readonly metrics: MetricsService,
+    private readonly ops: MetricsRegistry,
+  ) {}
 
   @Get()
   @Public()
@@ -36,7 +41,9 @@ export class MetricsController {
         error: 'unauthorized',
         message: 'Metrics token required.',
       });
-    res.setHeader('content-type', this.metrics.registry.contentType);
-    res.send(await this.metrics.registry.metrics());
+    // Copilot metrics (goal 07) and operational metrics (goal 10) in one scrape.
+    const merged = Registry.merge([this.metrics.registry, this.ops.registry]);
+    res.setHeader('content-type', merged.contentType);
+    res.send(await merged.metrics());
   }
 }

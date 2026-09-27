@@ -1,12 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import {
   AUDIT_READ_ALL_ROLES,
   dec,
@@ -18,6 +12,7 @@ import {
   type Role,
 } from '@kora/domain';
 
+import { OpsMetrics } from '../observability/ops-metrics.service';
 import { DbService } from '../db/db.service';
 import { FourEyesStore, toFourEyesView } from '../governance/four-eyes.store';
 import { GOVERNANCE_CONFIG, type GovernanceConfig } from '../governance/governance-config';
@@ -67,6 +62,7 @@ export class KillSwitchService {
     private readonly events: TradingEventsService,
     private readonly fourEyes: FourEyesStore,
     @Inject(GOVERNANCE_CONFIG) private readonly gov: GovernanceConfig,
+    @Optional() private readonly metrics?: OpsMetrics,
   ) {}
 
   async trigger(userId: string, req: KillSwitchRequestWithReason): Promise<KillSwitchResult> {
@@ -179,6 +175,8 @@ export class KillSwitchService {
       `SELECT id::text AS id FROM audit_events WHERE action = 'kill_switch.requested' AND payload->>'killSwitchId' = $1 ORDER BY id LIMIT 1`,
       [killSwitchId],
     );
+    this.metrics?.killSwitch.inc({ scope: req.scope, kind: extra.globalKillSwitchId ? 'firm' : 'account' });
+    this.metrics?.killSwitchDuration.observe({ scope: req.scope }, (performance.now() - t0) / 1000);
     this.events.robotControl({
       action: 'halt',
       accountId: account.id,

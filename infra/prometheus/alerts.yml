@@ -1,0 +1,149 @@
+# KORA alert rules (goal 10, B-012/B-916). Every alert names its SLO and links to a goal 09 runbook;
+# apps/api/test/observability.int.test.ts fails when a rule has no runbook, the runbook file is
+# missing, or an expression uses a metric the api does not export.
+groups:
+  - name: kora-availability
+    rules:
+      - alert: KoraApiDown
+        expr: up{job="kora-api"} == 0
+        for: 2m
+        labels: { severity: critical, slo: SLO-1 }
+        annotations:
+          summary: The KORA api does not answer Prometheus scrapes.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/incident-workflow.md
+      - alert: KoraHighErrorRate
+        expr: sum(rate(kora_http_requests_total{status="5xx"}[5m])) / clamp_min(sum(rate(kora_http_requests_total[5m])), 1e-9) > 0.02
+        for: 5m
+        labels: { severity: warning, slo: SLO-1 }
+        annotations:
+          summary: More than 2 % of api requests fail with a server error.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/incident-workflow.md
+      - alert: KoraErrorBudgetFastBurn
+        # multi-window burn rate for a 99.9 % objective: 14.4x over 1 h and 5 m spends 2 % of the 30-day budget per hour
+        expr: >-
+          (sum(rate(kora_http_requests_total{status="5xx"}[1h])) / clamp_min(sum(rate(kora_http_requests_total[1h])), 1e-9) > 14.4 * 0.001)
+          and
+          (sum(rate(kora_http_requests_total{status="5xx"}[5m])) / clamp_min(sum(rate(kora_http_requests_total[5m])), 1e-9) > 14.4 * 0.001)
+        labels: { severity: critical, slo: SLO-1 }
+        annotations:
+          summary: The availability error budget is burning 14x faster than sustainable.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/incident-workflow.md
+  - name: kora-trading
+    rules:
+      - alert: KoraOrderAckSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(kora_order_submit_seconds_bucket[5m]))) > 0.25
+        for: 5m
+        labels: { severity: warning, slo: SLO-2 }
+        annotations:
+          summary: Order acknowledgement p99 is above 250 ms.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/engine-stall.md
+      - alert: KoraOrderErrors
+        expr: sum(rate(kora_order_submit_seconds_count{outcome="error"}[5m])) > 0.1
+        for: 5m
+        labels: { severity: warning, slo: SLO-2 }
+        annotations:
+          summary: Order submissions are failing with errors (not risk rejections).
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/engine-stall.md
+      - alert: KoraKillSwitchFired
+        expr: sum by (scope, kind) (increase(kora_kill_switch_activations_total[5m])) > 0
+        labels: { severity: warning, slo: SLO-3 }
+        annotations:
+          summary: A kill switch fired ({{ $labels.kind }}, {{ $labels.scope }}).
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/kill-switch-fired.md
+      - alert: KoraKillSwitchSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(kora_kill_switch_duration_seconds_bucket[15m]))) > 2
+        labels: { severity: critical, slo: SLO-3 }
+        annotations:
+          summary: A kill switch took longer than 2 s to complete.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/kill-switch-fired.md
+      - alert: KoraRobotRunnerSilent
+        expr: kora_robots_running > 0 and kora_robot_heartbeat_max_age_seconds > 30
+        for: 1m
+        labels: { severity: critical, slo: SLO-2 }
+        annotations:
+          summary: Running robots have no bot-runner heartbeat for more than 30 s (the supervisor pauses them).
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/engine-stall.md
+      - alert: KoraReconciliationBreak
+        expr: kora_governance{metric="reconciliation_breaks_open"} > 0
+        labels: { severity: critical, slo: SLO-6 }
+        annotations:
+          summary: The books and the ledger disagree (open reconciliation break).
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/reconciliation-break.md
+      - alert: KoraReconciliationStalled
+        expr: time() - kora_governance{metric="reconciliation_last_run_ts"} > 300
+        labels: { severity: warning, slo: SLO-6 }
+        annotations:
+          summary: No reconciliation run for more than 5 minutes.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/reconciliation-break.md
+  - name: kora-market-data
+    rules:
+      - alert: KoraFeedDown
+        expr: kora_feed_up == 0
+        for: 1m
+        labels: { severity: critical, slo: SLO-4 }
+        annotations:
+          summary: The market data feed {{ $labels.source }} is down; the engine refuses fills on stale data.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/feed-outage.md
+      - alert: KoraFeedHeartbeatLost
+        expr: kora_feed_status_age_seconds > 30
+        for: 1m
+        labels: { severity: critical, slo: SLO-4 }
+        annotations:
+          summary: No feed status heartbeat for more than 30 s.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/feed-outage.md
+      - alert: KoraStaleSymbols
+        expr: kora_feed_stale_symbols > 0
+        for: 5m
+        labels: { severity: warning, slo: SLO-4 }
+        annotations:
+          summary: "{{ $value }} symbols have been stale for 5 minutes."
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/feed-outage.md
+  - name: kora-ai
+    rules:
+      - alert: KoraAiProviderErrors
+        expr: sum(rate(kora_ai_requests_total{status=~"error|unavailable"}[10m])) / clamp_min(sum(rate(kora_ai_requests_total[10m])), 1e-9) > 0.1
+        for: 10m
+        labels: { severity: warning, slo: SLO-9 }
+        annotations:
+          summary: More than 10 % of copilot requests fail; trading is unaffected.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/ai-provider-outage.md
+      - alert: KoraAiBudgetNearlySpent
+        expr: max by (org) (kora_ai_org_tokens_used / clamp_min(kora_ai_org_token_budget, 1)) > 0.8
+        labels: { severity: warning, slo: SLO-9 }
+        annotations:
+          summary: The organisation has used more than 80 % of today's AI token budget.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/ai-provider-outage.md
+  - name: kora-governance
+    rules:
+      - alert: KoraCriticalAlertUnacknowledged
+        expr: kora_governance{metric="alerts_open_critical"} > 0
+        for: 1h
+        labels: { severity: warning, slo: SLO-8 }
+        annotations:
+          summary: A critical alert has not been acknowledged by the 2nd line within an hour.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/incident-workflow.md
+      - alert: KoraMajorIncidentOpen
+        expr: kora_governance{metric="incidents_open_p1p2"} > 0
+        labels: { severity: critical }
+        annotations:
+          summary: A P1/P2 incident is open.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/incident-workflow.md
+      - alert: KoraAuditAnchorMissed
+        expr: time() - kora_governance{metric="anchor_last_success_ts"} > 90000
+        labels: { severity: warning, slo: SLO-12 }
+        annotations:
+          summary: No signed audit anchor for more than 25 hours.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/database-restore.md
+      - alert: KoraRestoreTestStale
+        expr: time() - kora_governance{metric="backup_last_success_ts"} > 90000
+        labels: { severity: warning, slo: SLO-10 }
+        annotations:
+          summary: No successful backup + restore test for more than 25 hours.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/database-restore.md
+      - alert: KoraFourEyesBacklog
+        expr: kora_governance{metric="four_eyes_pending"} > 10
+        for: 4h
+        labels: { severity: info }
+        annotations:
+          summary: More than 10 four-eyes requests are waiting for a decision.
+          runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/incident-workflow.md

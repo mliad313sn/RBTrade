@@ -9,6 +9,7 @@ import { AppropriatenessModule } from './appropriateness/appropriateness.module'
 import { AuditModule } from './audit/audit.module';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ComplianceModule } from './compliance/compliance.module';
 import { ConfigModule } from './config/config.module';
@@ -44,6 +45,8 @@ import { TradingModule } from './trading/trading.module';
             '*.secret',
             '*.mfaToken',
             '*.accessToken',
+            '*.recoveryCode',
+            '*.recoveryCodes',
           ],
           censor: '[redacted]',
         },
@@ -52,6 +55,8 @@ import { TradingModule } from './trading/trading.module';
     }),
     ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 600 }] }),
     DbModule,
+    // Goal 10: shared Prometheus registry and operational metrics (global).
+    ObservabilityModule,
     AuditModule,
     // Goal 09: governance settings and the four-eyes store (global; used by the trading core).
     GovernanceCoreModule,

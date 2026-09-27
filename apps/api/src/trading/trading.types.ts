@@ -35,6 +35,8 @@ export interface AccountRow {
 
 export interface OrderRow {
   id: string;
+  /** Goal 10: W3C traceparent of the creating request (engine fills join that trace). */
+  trace_parent?: string | null;
   account_id: string;
   client_order_id: string | null;
   request_hash: string | null;

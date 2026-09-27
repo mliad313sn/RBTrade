@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import type { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 
+import { withSpan } from './tracing.js';
 import type { RunnerConfig } from './config.js';
 import { barJobId, type BarCloseJob } from './jobs.js';
 
@@ -238,6 +239,13 @@ export class Bots extends EventEmitter {
 
   /** Evaluates one closed bar: context (api) → decision (quant) → act (api → OMS). */
   async processBar(job: BarCloseJob): Promise<Record<string, unknown>> {
+    // Goal 10: one trace per bar close, runner → api → quant → api → OMS.
+    return withSpan('runner.bar_close', { 'kora.robot_id': job.robotId, 'kora.symbol': job.symbol, 'kora.bar_ts': job.barTs }, () =>
+      this.processBarInSpan(job),
+    );
+  }
+
+  private async processBarInSpan(job: BarCloseJob): Promise<Record<string, unknown>> {
     if (!this.isActive(job.robotId)) return { skipped: 'robot_not_active' };
     const ctx = await this.http.call<{ versionId: string; signalRequest: unknown }>(
       'api',
