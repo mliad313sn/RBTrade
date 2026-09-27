@@ -330,11 +330,15 @@ async function signUp(kind) {
     const answers = Object.fromEntries(
       q.questions.map((x) => [x.id, [...x.options].sort((a, b) => b.points - a.points)[0].id]),
     );
-    await s.req('POST', '/appropriateness/attempts', {
+    // IRTC R4-09: passing confirms the risk warning in force (the drill predates that gate).
+    const rw = (await s.req('GET', '/disclosures/risk-warning?locale=en')).json.document;
+    const attempt = await s.req('POST', '/appropriateness/attempts', {
       questionnaireId: q.id,
       version: q.version,
       answers,
+      riskWarning: { version: rw.version, contentHash: rw.contentHash, locale: 'en' },
     });
+    if (!attempt.json?.passed) throw new Error(`appropriateness not passed: ${attempt.text}`);
     const l = await s.req('POST', '/auth/login', { email, password: PASSWORD });
     const enr = await s.req('POST', '/auth/mfa/enroll', { mfaToken: l.json.mfaToken });
     const v = await s.req('POST', '/auth/mfa/verify', {

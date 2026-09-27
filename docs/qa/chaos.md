@@ -33,7 +33,12 @@ listening socket. After each fault the component is restarted and recovery is ch
 | No orders on stale data | **Pass.** Market orders during the feed outage → 422 `MARKET_DATA_STALE`; during the Redis outage → 422 `NO_MARKET_DATA`; zero fills for any order sent during an outage; no robot decision or order while quant was down. |
 | Recovery without duplicated orders | **Pass.** After each restart a new order fills exactly once, the client retry of the same `clientOrderId` replays (200, `idempotentReplay`), the retry of a refused order stays refused; no duplicated client order id and no over-filled order in the whole database; audit chain valid; reconciliation clean. |
 
-Overall: **40/40 checks passed** in 143 s (re-run of 2026-09-27 after the stale-marker fix; see `run.json` for the exact timings; the per-step table below is from the first run).
+Overall: **41/41 checks passed** in 142 s (re-run of 2026-09-27 for IRTC R6-09; see `run.json` for the
+exact timings; the per-step table below is from the first run). Since R6-09 the checks can fail: the
+stale badge must be visible on its own (a stale API quote is a separate step), and reconciliation runs
+over every account as a risk officer and passes only on HTTP 200 with an empty `mismatches` array
+(2 accounts checked, 0 mismatches). The drill also confirms the risk warning when its trader passes
+the assessment (IRTC R4-09 gate).
 
 ## Findings fixed by the drill
 

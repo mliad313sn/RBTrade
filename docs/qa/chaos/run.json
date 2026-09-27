@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-09-27T02:15:58.968Z",
+  "startedAt": "2026-09-27T23:23:01.151Z",
   "environment": "PAPER, SIMULATED data, native stack",
   "scenarios": [
     {
@@ -7,95 +7,100 @@
       "fault": "none",
       "steps": [
         {
-          "t": 5982,
+          "t": 6482,
           "what": "feed status ok",
           "pass": true,
-          "ms": 15
+          "ms": 17
         },
         {
-          "t": 6045,
+          "t": 6542,
           "what": "market order accepted",
           "pass": true,
           "status": 201,
           "orderStatus": "filled"
         },
         {
-          "t": 6061,
+          "t": 6555,
           "what": "baseline order filled by the engine",
           "pass": true,
           "fills": 1
         },
         {
-          "t": 6142,
+          "t": 6632,
           "what": "probe robot running (PAPER)",
           "pass": true,
           "status": 200
         }
       ],
-      "startedAt": 5967
+      "startedAt": 6464
     },
     {
       "name": "market-data adapter killed",
       "fault": "SIGKILL of the standalone feed process (md:feed)",
       "steps": [
         {
-          "t": 9053,
+          "t": 9773,
           "what": "api detects the lost feed heartbeat (status not ok / feedLost)",
           "pass": true,
-          "ms": 2075,
+          "ms": 2561,
           "status": "down",
           "feedLost": true
         },
         {
-          "t": 11807,
+          "t": 12439,
+          "what": "api quote flagged stale",
+          "pass": true,
+          "quoteStale": true
+        },
+        {
+          "t": 12530,
           "what": "stale badge on the watchlist",
           "pass": true,
-          "quoteStale": true,
           "badgeVisible": true,
           "screenshot": "docs/qa/chaos/screenshots/01-feed-down-stale-badges.png"
         },
         {
-          "t": 11816,
+          "t": 12537,
           "what": "ticket and order book mark the price stale",
           "pass": true,
           "ticketStale": true,
           "bookStale": true
         },
         {
-          "t": 11848,
+          "t": 12566,
           "what": "no order on stale data: market order refused with a data code",
           "pass": true,
           "status": 422,
           "code": "MARKET_DATA_STALE"
         },
         {
-          "t": 13376,
+          "t": 14092,
           "what": "no fill while the feed is down",
           "pass": true,
           "fillsBefore": 1,
           "fillsAfter": 1
         },
         {
-          "t": 13400,
+          "t": 14120,
           "what": "kill switch works via REST while the feed is down",
           "pass": true,
           "status": 202,
-          "durationMs": 10
+          "durationMs": 8
         },
         {
-          "t": 13652,
+          "t": 14387,
           "what": "resume after the halt",
           "pass": true,
           "status": 200
         },
         {
-          "t": 14697,
+          "t": 15427,
           "what": "feed recovers (status ok) after restart",
           "pass": true,
-          "ms": 1040
+          "ms": 1036
         },
         {
-          "t": 14794,
+          "t": 15535,
           "what": "recovery without duplicates: retried order replays, refused order stays refused",
           "pass": true,
           "first": 201,
@@ -104,39 +109,39 @@
           "refusedRetry": 422,
           "rows": [
             {
-              "client_order_id": "chaos-recover-1790475358968-3",
+              "client_order_id": "chaos-recover-1790551381151-3",
               "n": 1
             },
             {
-              "client_order_id": "chaos-stale-1790475358968-2",
+              "client_order_id": "chaos-stale-1790551381151-2",
               "n": 1
             }
           ]
         },
         {
-          "t": 14815,
+          "t": 15547,
           "what": "exactly one new fill after recovery",
           "pass": true,
           "fills": 2,
           "expected": 2
         }
       ],
-      "startedAt": 6965
+      "startedAt": 7197
     },
     {
       "name": "Redis killed",
       "fault": "SIGKILL of redis-server (quotes cache, bus, BullMQ, WebSocket fan-out)",
       "steps": [
         {
-          "t": 16998,
+          "t": 17777,
           "what": "health degrades with redis down (api stays up)",
           "pass": true,
           "status": "degraded",
           "redis": "down",
-          "ms": 6
+          "ms": 58
         },
         {
-          "t": 20171,
+          "t": 20988,
           "what": "reads degrade instead of failing: account and quotes answer 200 (unpriced / no quote)",
           "pass": true,
           "account": 200,
@@ -144,52 +149,52 @@
           "quote": null
         },
         {
-          "t": 20197,
+          "t": 21017,
           "what": "no order without market data (quotes cache unreachable): refused with NO_MARKET_DATA",
           "pass": true,
           "status": 422,
           "code": "NO_MARKET_DATA"
         },
         {
-          "t": 20218,
+          "t": 21036,
           "what": "kill switch works via REST while Redis is down",
           "pass": true,
           "status": 202,
           "halted": true
         },
         {
-          "t": 20241,
+          "t": 21057,
           "what": "no fill while Redis is down",
           "pass": true,
           "fills": 2,
           "before": 2
         },
         {
-          "t": 20756,
+          "t": 22076,
           "what": "health back to ok after Redis restarts",
           "pass": true,
-          "ms": 511
+          "ms": 1014
         },
         {
-          "t": 20766,
+          "t": 22086,
           "what": "feed republishes into the fresh Redis",
           "pass": true,
           "ms": 10
         },
         {
-          "t": 20783,
+          "t": 22109,
           "what": "resume",
           "pass": true,
           "status": 200
         },
         {
-          "t": 20803,
+          "t": 22128,
           "what": "probe robot restarted by its owner after the halt",
           "pass": true,
           "status": 200
         },
         {
-          "t": 20867,
+          "t": 22196,
           "what": "recovery without duplicates after Redis restart",
           "pass": true,
           "first": 201,
@@ -198,41 +203,41 @@
           "expected": 3
         },
         {
-          "t": 20870,
+          "t": 22199,
           "what": "bot runner reconnects (health ok)",
           "pass": true,
           "runner": "ok",
           "ms": 3
         }
       ],
-      "startedAt": 16978
+      "startedAt": 17709
     },
     {
       "name": "quant service killed",
       "fault": "SIGKILL of the quant service (uvicorn)",
       "steps": [
         {
-          "t": 21929,
+          "t": 23252,
           "what": "simulator answers 502/503 \"Nothing was simulated\"",
           "pass": true,
           "status": 503,
           "message": "The simulation service is not reachable right now. Nothing was simulated."
         },
         {
-          "t": 24256,
+          "t": 25611,
           "what": "manual trading unaffected by the quant outage",
           "pass": true,
           "status": 201,
           "fills": 4
         },
         {
-          "t": 63776,
+          "t": 61128,
           "what": "runner evaluates closed 1-minute bars (quant up)",
           "pass": true,
           "signals": 1
         },
         {
-          "t": 131063,
+          "t": 128877,
           "what": "runner skips the bar (no decision, no robot order) while quant is down",
           "pass": true,
           "signalsBefore": 1,
@@ -240,33 +245,33 @@
           "robotOrders": 0
         },
         {
-          "t": 132362,
+          "t": 130152,
           "what": "simulator recovers",
           "pass": true,
           "status": 200
         },
         {
-          "t": 138418,
+          "t": 138218,
           "what": "runner evaluates the next bar again after recovery",
           "pass": true,
           "signals": 2
         }
       ],
-      "startedAt": 20870
+      "startedAt": 22199
     },
     {
       "name": "AI provider down",
       "fault": "the (fake) AI provider endpoint stops accepting connections",
       "steps": [
         {
-          "t": 138471,
+          "t": 138286,
           "what": "baseline: copilot answers through the provider",
           "pass": true,
           "status": 200,
           "answer": "ok"
         },
         {
-          "t": 139963,
+          "t": 139742,
           "what": "copilot degrades to a friendly message (no error page)",
           "pass": true,
           "status": 200,
@@ -274,59 +279,60 @@
           "message": "The AI service is not reachable right now. Please try again shortly."
         },
         {
-          "t": 142377,
+          "t": 142073,
           "what": "trading unaffected by the AI outage",
           "pass": true,
           "status": 201,
           "fills": 5
         },
         {
-          "t": 142414,
+          "t": 142100,
           "what": "copilot recovers when the provider is back",
           "pass": true,
           "answer": "ok"
         }
       ],
-      "startedAt": 138418
+      "startedAt": 138218
     },
     {
       "name": "integrity after the drill",
       "fault": "none",
       "steps": [
         {
-          "t": 142448,
+          "t": 142129,
           "what": "no duplicated client order ids anywhere",
           "pass": true,
           "duplicates": 0
         },
         {
-          "t": 142468,
+          "t": 142142,
           "what": "no order filled beyond its quantity",
           "pass": true,
           "overfilled": 0
         },
         {
-          "t": 142486,
+          "t": 142155,
           "what": "no fill for any order sent during an outage",
           "pass": true,
           "fills": 0
         },
         {
-          "t": 142502,
+          "t": 142170,
           "what": "audit chain still valid",
           "pass": true,
           "status": 200,
           "valid": true
         },
         {
-          "t": 142523,
-          "what": "reconciliation clean after the drill",
+          "t": 142314,
+          "what": "reconciliation clean after the drill (all accounts)",
           "pass": true,
           "status": 200,
+          "accountsChecked": 2,
           "mismatches": 0
         }
       ],
-      "startedAt": 142433
+      "startedAt": 142112
     }
   ],
   "checks": [
@@ -349,7 +355,7 @@
       "aiDownScreenshot": "docs/qa/chaos/screenshots/06-ai-down-explain-friendly.png"
     }
   ],
-  "finishedAt": "2026-09-27T02:18:21.539Z",
-  "durationS": 143,
+  "finishedAt": "2026-09-27T23:25:23.526Z",
+  "durationS": 142,
   "passed": true
 }
