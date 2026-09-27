@@ -8,7 +8,7 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { BatchSpanProcessor, SimpleSpanProcessor, type SpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { BatchSpanProcessor, type SpanProcessor } from '@opentelemetry/sdk-trace-base';
 
 import { FileSpanExporter } from './observability/file-span-exporter';
 
@@ -19,7 +19,8 @@ export function startTracing(serviceName = 'kora-api'): NodeSDK | null {
   process.env.OTEL_SERVICE_NAME ??= serviceName;
   const spanProcessors: SpanProcessor[] = [];
   if (endpoint) spanProcessors.push(new BatchSpanProcessor(new OTLPTraceExporter()));
-  if (file) spanProcessors.push(new SimpleSpanProcessor(new FileSpanExporter(file)));
+  // Batched: a synchronous write per span would itself slow the request path it measures.
+  if (file) spanProcessors.push(new BatchSpanProcessor(new FileSpanExporter(file), { scheduledDelayMillis: 500, maxQueueSize: 100_000, maxExportBatchSize: 5_000 }));
   const sdk = new NodeSDK({
     spanProcessors,
     instrumentations: [

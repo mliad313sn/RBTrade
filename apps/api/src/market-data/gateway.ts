@@ -2,7 +2,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
-import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { AUDIT_READ_ALL_ROLES, hasAnyRole, isPrivateChannelKind, parseChannel, requiresMfa } from '@kora/domain';
 import { decodeJwt } from 'jose';
@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { ACCESS_COOKIE } from '../auth/cookies';
 import type { Principal } from '../auth/principal';
+import { SessionsService } from '../auth/sessions.service';
 import { TokenService } from '../auth/token.service';
 import { DbService } from '../db/db.service';
 import { ChannelHub, type HubClient } from './channel-hub';
@@ -138,6 +139,7 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     private readonly repo: InstrumentsRepository,
     @Inject(MD_CONFIG) private readonly cfg: MdConfig,
     private readonly db: DbService,
+    @Optional() private readonly sessions?: SessionsService,
   ) {
     this.flusher = new Flusher(cfg.wsFlushMs);
   }
@@ -279,6 +281,11 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     const refresh = conn.principal !== null;
     try {
       const p = await this.tokens.verifyAccessToken(token);
+      // Goal 10 (S9 finding): a logged-out, role-changed or disabled session must not open a socket.
+      if (this.sessions && !(await this.sessions.isActive(p))) {
+        conn.close(4401, 'session revoked');
+        return;
+      }
       if (requiresMfa(p.roles) && !p.mfa) {
         conn.close(4403, 'mfa required');
         return;

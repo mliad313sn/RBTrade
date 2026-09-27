@@ -1,0 +1,140 @@
+{
+  "startedAt": "2026-09-27T00:51:39.651Z",
+  "host": {
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "memGb": 17,
+    "node": "v22.22.2",
+    "note": "single shared cloud VM: generator, api, quant, runner, Postgres and Redis on the same host"
+  },
+  "scenarios": {
+    "A_terminal_users": {
+      "wsClients": 500,
+      "wsOpened": 500,
+      "wsErrors": 0,
+      "wsMessages": 787231,
+      "wsQuoteAgeMs": {
+        "p50": 74,
+        "p95": 243,
+        "p99": 335,
+        "n": 785731
+      },
+      "rest": {
+        "requests": 14689,
+        "rps": 490,
+        "latencyMs": {
+          "p50": 382,
+          "p90": 855,
+          "p97_5": 1498,
+          "p99": 2061,
+          "max": 2949
+        },
+        "non2xx": 0,
+        "errors": 0,
+        "timeouts": 0,
+        "statusCodes": {
+          "200": {
+            "count": 14689
+          }
+        }
+      }
+    },
+    "B_order_burst": {
+      "targetRatePerS": 100,
+      "http": {
+        "requests": 3000,
+        "rps": 100,
+        "latencyMs": {
+          "p50": 137,
+          "p90": 274,
+          "p97_5": 331,
+          "p99": 363,
+          "max": 559
+        },
+        "non2xx": 0,
+        "errors": 0,
+        "timeouts": 0,
+        "statusCodes": {
+          "201": {
+            "count": 3000
+          }
+        }
+      },
+      "ordersByStatus": [
+        {
+          "status": "filled",
+          "reject_code": null,
+          "n": 3050
+        }
+      ],
+      "duplicates": 0,
+      "fills": 3050
+    },
+    "C_bots": {
+      "robots": 50,
+      "barsObserved": 4,
+      "decisionsPerBar": {
+        "2026-09-27T00:53:00.000Z": 50,
+        "2026-09-27T00:55:00.000Z": 50,
+        "2026-09-27T00:54:00.000Z": 50,
+        "2026-09-27T00:56:00.000Z": 50
+      },
+      "outcomes": {
+        "none": 200
+      },
+      "barCloseToDecisionMs": {
+        "p50": 7871.3,
+        "p95": 13537.3,
+        "p99": 13828.6,
+        "max": 13991.022,
+        "n": 200
+      }
+    }
+  },
+  "serverMetrics": {
+    "orderAck": {
+      "count": 3053,
+      "meanMs": 226.9,
+      "p50": "≤ 250 ms",
+      "p95": "≤ 500 ms",
+      "p99": "≤ 500 ms",
+      "buckets": {
+        "1": 3052,
+        "0.005": 0,
+        "0.01": 0,
+        "0.025": 0,
+        "0.05": 2,
+        "0.1": 255,
+        "0.25": 1611,
+        "0.5": 3051,
+        "2.5": 3053,
+        "+Inf": 3053
+      }
+    },
+    "http": {
+      "count": 19354,
+      "meanMs": 509.2,
+      "p50": "≤ 1000 ms",
+      "p95": "≤ 2500 ms",
+      "p99": "≤ 2500 ms",
+      "buckets": {
+        "1": 17965,
+        "5": 19354,
+        "0.005": 348,
+        "0.01": 667,
+        "0.025": 1008,
+        "0.05": 1403,
+        "0.1": 2337,
+        "0.25": 4566,
+        "0.5": 9639,
+        "2.5": 19327,
+        "+Inf": 19354
+      }
+    }
+  },
+  "integrity": {
+    "duplicateClientOrderIds": 0,
+    "auditChain": "ok"
+  },
+  "finishedAt": "2026-09-27T00:57:21.820Z"
+}

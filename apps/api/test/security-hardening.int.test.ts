@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { base32Decode, totp } from '../src/auth/totp';
 import { CSRF, PASSWORD, bearer, createUser, nextTotpWindow, ownerQuery, startApp } from './helpers';
+import { listen, TestWs } from './ws-helpers';
 
 describe('security hardening (goal 10)', () => {
   let app: INestApplication;
@@ -27,6 +28,17 @@ describe('security hardening (goal 10)', () => {
       expect(after.body.error).toBe('session_revoked');
       const audit = await ownerQuery<{ n: number }>(`SELECT count(*)::int AS n FROM revoked_tokens WHERE user_id = $1 AND reason = 'logout'`, [u.id]);
       expect(audit[0]!.n).toBe(1);
+    });
+
+    it('a revoked session cannot open a WebSocket either', async () => {
+      const urls = await listen(app);
+      const u = await createUser(app, 'novice');
+      const ok = await TestWs.authed(urls.ws, u.token);
+      ok.ws.close();
+      await request(http).post('/auth/logout').set(bearer(u.token)).expect(200);
+      const s = await TestWs.open(urls.ws);
+      s.send({ op: 'auth', token: u.token });
+      expect(await s.waitClose()).toMatchObject({ code: 4401, reason: 'session revoked' });
     });
 
     it('an admin role change ends the target user’s older sessions', async () => {

@@ -20,4 +20,8 @@ ignoredBuiltDependencies:
 # may not come from git/tarball URLs.
 minimumReleaseAge: 10080
 trustPolicy: no-downgrade
+# Reviewed exceptions: old releases published before provenance existed, pulled in by the build
+# toolchain (not a takeover signal). Add an entry only after checking the package on npm.
+trustPolicyExclude:
+  - semver@6.3.1
 blockExoticSubdeps: true

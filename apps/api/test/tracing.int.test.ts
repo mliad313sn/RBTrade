@@ -173,7 +173,11 @@ describe('distributed traces (goal 10)', () => {
       (s) => s.length > 0,
     );
     expect(q.map((s) => s.name)).toContain('POST /mc/project');
-    const apiSpans = readSpans(files.api).filter((s) => s.traceId === tp.traceId);
+    // The api batches span exports (every 500 ms), so wait for its client span to be written.
+    const apiSpans = await until(
+      () => readSpans(files.api).filter((s) => s.traceId === tp.traceId),
+      (s) => s.some((x) => x.spanId === q[0]!.parentSpanId),
+    );
     // quant's server span is a child of the api's outgoing (undici) client span
     expect(apiSpans.map((s) => s.spanId)).toContain(q[0]!.parentSpanId);
   });

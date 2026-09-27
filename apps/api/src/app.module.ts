@@ -53,7 +53,8 @@ import { TradingModule } from './trading/trading.module';
         customProps: () => ({ service: 'kora-api', env: 'PAPER' }),
       },
     }),
-    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 600 }] }),
+    // Per-client default for every route (KORA_API_RATE_LIMIT per minute, read per request; goal 10 load runs raise it).
+    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: () => Number(process.env.KORA_API_RATE_LIMIT ?? 600) || 600 }] }),
     DbModule,
     // Goal 10: shared Prometheus registry and operational metrics (global).
     ObservabilityModule,

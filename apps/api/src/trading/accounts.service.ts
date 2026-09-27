@@ -351,8 +351,8 @@ export class AccountsService {
   }
 
   /** Wire view of the account for GET /accounts/me and the `account:{id}` channel. */
-  async view(a: AccountRow, c?: Queryable) {
-    const v = await this.value(a, c);
+  async view(a: AccountRow, c?: Queryable, valued?: Awaited<ReturnType<AccountsService['value']>>) {
+    const v = valued ?? (await this.value(a, c));
     const ccy = a.base_currency;
     const m = (d: Decimal) => formatAmount(d, ccy);
     const now = Date.now();
@@ -400,8 +400,8 @@ export class AccountsService {
   }
 
   /** Positions with marks and base-currency P&L for GET /positions and `positions:{id}`. */
-  async positionsView(a: AccountRow, c?: Queryable): Promise<PositionDto[]> {
-    const v = await this.value(a, c);
+  async positionsView(a: AccountRow, c?: Queryable, valued?: Awaited<ReturnType<AccountsService['value']>>): Promise<PositionDto[]> {
+    const v = valued ?? (await this.value(a, c));
     const ccy = a.base_currency;
     return v.positions.map((p) => {
       const fx = p.fxRate;

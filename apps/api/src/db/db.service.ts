@@ -12,7 +12,10 @@ export class DbService implements OnModuleDestroy {
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
     this.pool = new Pool({
       connectionString: config.databaseUrl,
-      max: 10,
+      // Goal 10 load finding: 10 connections queued the order path at 100 orders/s (pool waits of
+      // 100–200 ms). Size per replica with KORA_DB_POOL_MAX (keep replicas × max under Postgres
+      // max_connections or put PgBouncer in front).
+      max: Math.max(2, Math.min(200, Number(process.env.KORA_DB_POOL_MAX ?? 20) || 20)),
       application_name: 'kora-api',
       statement_timeout: 10_000,
     });
