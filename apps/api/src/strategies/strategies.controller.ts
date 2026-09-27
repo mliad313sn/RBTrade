@@ -157,7 +157,7 @@ export class BacktestsController {
   @Throttle(researchThrottle())
   @ApiOperation({
     summary:
-      'Grid or random search with a hard cap (KORA_BT_MAX_COMBOS), ranked by out-of-sample Sharpe.',
+      'Grid or random search with a hard cap (KORA_BT_MAX_COMBOS), ranked by validation Sharpe (inside the in-sample window); the out-of-sample holdout is scored once, for the selected combination.',
   })
   @ApiBody({ schema: openApiSchema(OptimiseRequestSchema) })
   optimise(
@@ -169,7 +169,10 @@ export class BacktestsController {
 
   @Post('sensitivity')
   @Throttle(researchThrottle())
-  @ApiOperation({ summary: 'Sensitivity heatmap: out-of-sample Sharpe over two parameters.' })
+  @ApiOperation({
+    summary:
+      'Sensitivity heatmap: validation Sharpe over two parameters (the out-of-sample holdout is not used).',
+  })
   @ApiBody({ schema: openApiSchema(SensitivityRequestSchema) })
   sensitivity(
     @CurrentPrincipal() p: Principal,

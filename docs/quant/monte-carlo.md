@@ -68,7 +68,7 @@ The acceptance test compares this with the Monte Carlo ruin rate at 50k paths on
 
 ## 5. Block bootstrap (`POST /mc/from-trades`)
 
-- **Input:** a trade list either as R multiples (sized fixed-fractional at `riskPct`, with an optional extra cost in R) or as per-trade **percentage returns** (the paper account: net P&L ÷ equity at entry, applied multiplicatively as traded).
+- **Input:** a trade list either as R multiples (sized fixed-fractional at `riskPct`, with an optional extra cost in R) or as per-trade **percentage returns** (the paper account: net P&L ÷ equity at entry, applied multiplicatively as traded). An extra cost in R cannot apply to % returns, so that combination is refused (422/400) rather than ignored, and `effective.costPerTradeR` always echoes the cost actually applied (IRTC R3-07).
 - **Method:** circular moving-block bootstrap. Each path joins `⌈N/b⌉` blocks of `b` consecutive trades. Each block starts at a uniformly random index and wraps around the end of the list.
 - **Automatic block size:** `b = ⌈n^{1/3}⌉` (Hall, Horowitz and Jing 1995 rate). The user can set `b` (1 ≤ `b` ≤ n).
 - Blocks keep streaks and regime clustering that an i.i.d. resample destroys. `test_block_bootstrap_keeps_streaks_that_iid_breaks` shows this.

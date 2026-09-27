@@ -1,4 +1,4 @@
-"""IS/OOS split, warnings, walk-forward, optimisation (cap, OOS ranking), sensitivity, live
+"""IS/OOS split, warnings, walk-forward, optimisation (cap, validation ranking), sensitivity, live
 signal."""
 
 from __future__ import annotations
@@ -153,7 +153,7 @@ def test_walk_forward_with_per_fold_reoptimisation() -> None:
     assert fixed["reoptimised"] is False and len(fixed["trialStats"]) == 1
 
 
-def test_optimisation_is_capped_and_ranked_by_oos(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_optimisation_is_capped_and_ranked_by_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KORA_BT_MAX_COMBOS", "4")
     with pytest.raises(ResearchError, match="9 parameter combinations requested; the limit is 4"):
         optimise(
@@ -167,10 +167,11 @@ def test_optimisation_is_capped_and_ranked_by_oos(monkeypatch: pytest.MonkeyPatc
             {**syn_request(900), "grid": {"fast": [5, 10, 15], "slow": [30, 40, 50]}}
         )
     )
-    assert out["evaluated"] == 9 and out["rankedBy"] == "out_of_sample_sharpe"
-    oos = [r["oosSharpe"] for r in out["results"] if r["oosSharpe"] is not None]
-    assert oos == sorted(oos, reverse=True)
-    assert out["best"] == out["results"][0]
+    assert out["evaluated"] == 9 and out["rankedBy"] == "validation_sharpe"
+    val = [r["validationSharpe"] for r in out["results"] if r["validationSharpe"] is not None]
+    assert val == sorted(val, reverse=True)
+    assert {k: v for k, v in out["best"].items() if k != "holdout"} == out["results"][0]
+    assert set(out["best"]["holdout"]) == {"sharpe", "trades", "cagr", "maxDrawdown"}
     rnd = optimise(
         OptimiseRequest.model_validate(
             {

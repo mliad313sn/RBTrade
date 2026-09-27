@@ -88,6 +88,11 @@ export const OptimiseRequestSchema = BacktestRequestSchema.extend({
     .max(2 ** 31 - 1)
     .default(1),
   maxCombos: z.number().int().min(1).max(1000).optional(),
+  /**
+   * Share of the pre-holdout bars that ranks the combinations (IRTC R3-01). The out-of-sample
+   * holdout is never read while ranking; it is scored once, for the selected combination.
+   */
+  validationFraction: z.number().min(0.1).max(0.5).default(0.3),
 });
 export type OptimiseRequest = z.infer<typeof OptimiseRequestSchema>;
 
@@ -100,6 +105,8 @@ export const SensitivityRequestSchema = BacktestRequestSchema.extend({
     param: z.string().regex(PARAM_NAME),
     values: z.array(z.number().finite()).min(2).max(12),
   }),
+  /** Cells are scored on the validation segment, never on the out-of-sample holdout (R3-01). */
+  validationFraction: z.number().min(0.1).max(0.5).default(0.3),
 });
 export type SensitivityRequest = z.infer<typeof SensitivityRequestSchema>;
 
@@ -148,7 +155,7 @@ export const TIMEFRAMES_FOR_ROBOTS = STRATEGY_TIMEFRAMES;
 
 /** Promotion checklist item (goal 06 §9). */
 export interface ChecklistItem {
-  id: 'oos_sharpe' | 'oos_trades' | 'paper_tracking' | 'risk_signoff';
+  id: 'oos_sharpe' | 'oos_trades' | 'oos_length' | 'holdout_dsr' | 'paper_tracking' | 'risk_signoff';
   label: string;
   pass: boolean;
   evidence: Record<string, string | number | boolean | null>;

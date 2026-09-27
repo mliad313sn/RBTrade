@@ -155,7 +155,8 @@ describe('Market intelligence (goal 07B)', () => {
   it('a scan stores features, trends and forecasts, audited, with the look-ahead guard passed', async () => {
     const res = await request(http).post('/intel/scan').set(bearer(admin.token)).expect(200);
     expect(res.body).toMatchObject({ instruments: UNIVERSE.length, guard: { passed: true } });
-    expect(res.body.guard.checkpoints).toBeGreaterThanOrEqual(2);
+    expect(res.body.guard.checkpoints).toBeGreaterThanOrEqual(8); // IRTC R3-05
+    expect(res.body.guard.compared).toBeGreaterThan(0);
     expect(res.body.forecasts).toBe(UNIVERSE.length * 2);
     const feats = await ownerQuery<{ symbol: string; features: Record<string, number | null> }>(
       "SELECT symbol, features FROM intel_features WHERE timeframe = '1h'",
@@ -414,6 +415,19 @@ describe('Market intelligence (goal 07B)', () => {
           b >= 5 ? (b + 0.5) / 10 : null,
         ],
       );
+    // IRTC R3-03: seeded bins alone cannot claim an edge (dependence unknown).
+    const unconfirmed = await request(http)
+      .get('/intel/trends/7203.XTKS?horizon=1d')
+      .set(bearer(trader.token))
+      .expect(200);
+    expect(unconfirmed.body.probability.status).toBe('no_reliable_signal');
+    // With a dependence-aware statistic (time buckets + HAC) that shows the edge, it is displayed.
+    await ownerQuery(
+      `INSERT INTO ai_calibration_edge (model_key, method, n, clusters, bucket_ms, lag, mean_net_return, t_stat)
+       VALUES ('trend:logit:asia:1d', 'time_bucket_hac', 1060, 60, 86400000, 1, 0.002, 3.1)
+       ON CONFLICT (model_key) DO UPDATE SET clusters = 60, t_stat = 3.1, mean_net_return = 0.002,
+         updated_at = clock_timestamp()`,
+    );
     const seeded = await request(http)
       .get('/intel/trends/7203.XTKS?horizon=1d')
       .set(bearer(trader.token))
@@ -579,10 +593,14 @@ describe('Market intelligence (goal 07B)', () => {
     expect(res.body.disclaimer).toBe('Not investment advice.');
   });
   it('contract (goal 10): every api → quant exchange matches the quant OpenAPI', async () => {
-    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<
+      typeof validateExchanges
+    >[0];
     const traffic = proxy.exchanges.filter((x) => x.path !== '/health');
     expect(traffic.length).toBeGreaterThan(0);
-    expect([...new Set(traffic.map((x) => x.path))]).toEqual(expect.arrayContaining(['/scanner/run']));
+    expect([...new Set(traffic.map((x) => x.path))]).toEqual(
+      expect.arrayContaining(['/scanner/run']),
+    );
     expect(validateExchanges(doc, 'quant', traffic)).toEqual([]);
   });
 });

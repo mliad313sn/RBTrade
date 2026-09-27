@@ -196,6 +196,13 @@ describe('gain simulator proxy (/sim)', () => {
       .set(bearer(trader.token))
       .send({ trades: [1, -1], blockSize: 3 })
       .expect(400);
+    // IRTC R3-07: a cost in R cannot apply to % returns: refused, never silently ignored.
+    const pct = await request(http())
+      .post('/sim/from-trades')
+      .set(bearer(trader.token))
+      .send({ trades: [1.5, -0.8, 0.4], tradeUnit: 'pct_return', extraCostPerTradeR: 2 })
+      .expect(400);
+    expect(JSON.stringify(pct.body.issues)).toContain('cannot be applied to % returns');
   });
 
   it('paper analytics and "project from my paper results" use the labelled SIMULATED fixture for an account with no fills', async () => {

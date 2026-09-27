@@ -1130,7 +1130,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Grid or random search with a hard cap (KORA_BT_MAX_COMBOS), ranked by out-of-sample Sharpe. */
+    /** Grid or random search with a hard cap (KORA_BT_MAX_COMBOS), ranked by validation Sharpe (inside the in-sample window); the out-of-sample holdout is scored once, for the selected combination. */
     post: operations['BacktestsController_optimise'];
     delete?: never;
     options?: never;
@@ -1147,7 +1147,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Sensitivity heatmap: out-of-sample Sharpe over two parameters. */
+    /** Sensitivity heatmap: validation Sharpe over two parameters (the out-of-sample holdout is not used). */
     post: operations['BacktestsController_sensitivity'];
     delete?: never;
     options?: never;
@@ -7332,6 +7332,8 @@ export interface operations {
           /** @default 1 */
           seed?: number;
           maxCombos?: number;
+          /** @default 0.3 */
+          validationFraction?: number;
         };
       };
     };
@@ -7384,6 +7386,8 @@ export interface operations {
             param: string;
             values: number[];
           };
+          /** @default 0.3 */
+          validationFraction?: number;
         };
       };
     };

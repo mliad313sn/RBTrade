@@ -1,5 +1,8 @@
 import type { ExecutionContext } from '@nestjs/common';
 import { DEFAULT_ROBOT_LIMITS } from '@kora/domain';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { maxBars } from '../strategies/research-data.service';
@@ -27,7 +30,15 @@ describe('robots config and guards', () => {
     expect(supervisorMs({ KORA_ROBOT_SUPERVISOR_MS: '0' })).toBe(0);
     expect(maxBars({})).toBe(20_000);
     expect(maxBars({ KORA_BT_MAX_BARS: '999999' })).toBe(60_000);
-    expect(promotionThresholds({})).toEqual({ minOosSharpe: 0.8, minOosTrades: 100, minPaperDays: 30, maxTrackingErrorPct: 1 });
+    // IRTC R3-02 (OQ-R8a): holdout length and deflated Sharpe decided by the Product Owner.
+    expect(promotionThresholds({})).toEqual({
+      minOosSharpe: 0.8,
+      minOosTrades: 100,
+      minOosDays: 90,
+      minHoldoutDsr: 0.95,
+      minPaperDays: 30,
+      maxTrackingErrorPct: 1,
+    });
     expect(promotionThresholds({ KORA_PROMOTE_MIN_OOS_SHARPE: '1.2' }).minOosSharpe).toBe(1.2);
   });
 
@@ -47,5 +58,18 @@ describe('robots config and guards', () => {
       if (prev === undefined) delete process.env.KORA_SERVICE_TOKEN;
       else process.env.KORA_SERVICE_TOKEN = prev;
     }
+  });
+});
+
+describe('look-ahead guard on every api → quant research call (IRTC R3-18)', () => {
+  it('no service sends guard: false (tracking replays feed the promotion checklist)', () => {
+    const root = join(__dirname, '..');
+    const files = ['robots', 'strategies', 'intel', 'ai'].flatMap((d) =>
+      readdirSync(join(root, d))
+        .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+        .map((f) => join(root, d, f)),
+    );
+    const offenders = files.filter((f) => /guard:\s*false/.test(readFileSync(f, 'utf8')));
+    expect(offenders).toEqual([]);
   });
 });

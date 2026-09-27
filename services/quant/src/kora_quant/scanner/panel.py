@@ -1,10 +1,12 @@
 """The scan panel: every instrument's own last T bars, right-aligned (column T-1 is each
 instrument's latest closed bar), left-padded with NaN when an instrument has fewer bars.
 
-Instrument time, not wall-clock time: a venue that is closed simply has no bars, so an equity's
-20-bar window is 20 trading hours while a crypto pair's is 20 calendar hours. Cross-sectional
-detectors (relative strength, correlation breaks) compare instruments at the same bar position,
-which is documented in docs/adr/0007b-market-intelligence.md.
+Instrument time for per-instrument windows: a venue that is closed simply has no bars, so an
+equity's 20-bar window is 20 trading hours while a crypto pair's is 20 calendar hours. Columns are
+therefore NOT a common clock: cross-sectional detectors (relative strength, correlation breaks)
+match peers on the bar start time `t`, never on the column position (IRTC R3-04; see
+`detectors.group_mean_excl` and docs/adr/0007b-market-intelligence.md). The look-ahead guard
+truncates by wall-clock time for the same reason.
 """
 
 from __future__ import annotations

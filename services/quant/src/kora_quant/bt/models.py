@@ -54,6 +54,9 @@ class SymbolData(Wire):
     session_open: list[bool] | None = None
     events: Annotated[list[int] | None, Field(max_length=10_000)] = None
     costs: CostModel
+    # IRTC R3-06: bars a year from the venue session calendar (trading days x session bars), sent
+    # by the api per instrument. None = continuous 24/7 trading (365 x 86,400 / timeframe).
+    bars_per_year: Annotated[float | None, Field(gt=0, le=31_622_400)] = None
 
     @model_validator(mode="after")
     def _session(self) -> SymbolData:
@@ -104,6 +107,8 @@ class OptimiseRequest(ResearchBase):
     samples: Annotated[int, Field(ge=1, le=HARD_MAX_COMBOS)] = 50
     seed: Annotated[int, Field(ge=0, le=2**31 - 1)] = 1
     max_combos: Annotated[int | None, Field(ge=1, le=HARD_MAX_COMBOS)] = None
+    # Share of the pre-holdout bars used to rank configurations (IRTC R3-01).
+    validation_fraction: Annotated[float, Field(ge=0.1, le=0.5)] = 0.3
 
 
 class Axis(Wire):
@@ -114,6 +119,7 @@ class Axis(Wire):
 class SensitivityRequest(ResearchBase):
     x: Axis
     y: Axis
+    validation_fraction: Annotated[float, Field(ge=0.1, le=0.5)] = 0.3
 
 
 class PositionWire(Wire):

@@ -30,9 +30,12 @@ the seeded calendars cover XNYS, XLON, XTKS, XHKG, XJSE, BVMF and XASX.
 ### 2. Scanner (`services/quant/src/kora_quant/scanner`, `POST /scanner/run`)
 
 - **Panel in instrument time**: each instrument's own last T bars, right-aligned. A closed venue has
-  no bars, so windows count trading bars. Cross-sectional detectors (relative strength, correlation
-  breaks) compare instruments at the same bar position; this is simpler and causal, at the cost of
-  mixing wall-clock times across venues (documented limitation).
+  no bars, so windows count trading bars. *Amended 2026-09-27 (IRTC R3-04):* comparing instruments
+  at the same bar position was **not** causal: when an instrument is stale, halted or on another
+  calendar, its column t holds an earlier time than its peers' column t, so its relative strength
+  used peers' later bars (the IRTC reproduction: 8/8 fake "skill" for a 4-bar-stale instrument).
+  Cross-sectional detectors now match peers on the bar start time (a peer with no bar at that exact
+  time is left out), so no information after the instrument's own bar close can enter.
 - **Detectors output numbers only** (20 features): ADX/ATR, slope t-stat, regime probabilities,
   breakout and channel position, band-width percentile and ATR ratio (compression), momentum and
   mean-reversion z, relative strength vs sector and region, correlation break, volume and return
@@ -47,6 +50,13 @@ the seeded calendars cover XNYS, XLON, XTKS, XHKG, XJSE, BVMF and XASX.
 - **Look-ahead guard**: every feature at bar t must equal the value computed on bars 0..t
   (prefix recomputation at checkpoints, same idea as goal 06). A leaky detector or injected future
   data raises `LookAheadError`, which the route maps to 422; the api path runs it on every scan.
+  *Amended 2026-09-27 (IRTC R3-05):* the api default of 2 checkpoints compared only column 0 (warm-up,
+  all NaN) and the last column (prefix = full), so it checked nothing while reporting "passed". Now:
+  at least 8 checkpoints (`KORA_INTEL_GUARD_CHECKPOINTS` ≥ 8), taken after the warm-up and before
+  the last bar, half spread and half random (seeded from the data); the prefix is cut by
+  **wall-clock time** (every instrument keeps its bars that started at or before T), and every bar up
+  to T is compared, not only the bar at T. The response reports `compared` (finite values checked)
+  and `passed` is false when nothing was compared.
 
 ### 3. Regime model and the goal 06 `ai_regime` hook
 
@@ -69,7 +79,7 @@ embargo = horizon: a training label must end before the test fold starts). Each 
 with isotonic regression (PAV) on the earlier folds' out-of-sample scores (Platt with fewer than 200,
 identity with fewer than 30). Skill after costs: Brier skill vs the training base rate and the net
 return of following the forecast direction minus a SIMULATED round-trip cost, t-statistic on
-non-overlapping forecasts. Drivers are exact linear SHAP values (log-odds). Gradient boosting was not
+non-overlapping forecasts. Drivers are exact linear SHAP values (log-odds). Calibrated probabilities are bounded to [0.01, 0.99] and isotonic blocks are Laplace-smoothed, so a forecast is never shown as certain (IRTC R3-09). Gradient boosting was not
 added: no ML dependency is installed, and logistic regression is enough to exercise the pipeline
 honestly (B-751).
 
@@ -77,10 +87,14 @@ honestly (B-751).
 `model_key = trend:logit:<region>:<horizon>`) at the bar close, before its horizon ends; a resolver
 fills the outcome (moved in the forecast direction by more than the cost) from later candles.
 Walk-forward out-of-sample forecasts are stored as `history_replay` (non-overlapping). Bins are
-rebuilt with the goal 07 `CalibrationService`.
+rebuilt with the goal 07 `CalibrationService`. *Amended 2026-09-27 (IRTC R3-03):* replayed forecasts
+are only those made at a bar close on the fixed calendar grid (a multiple of horizon × timeframe),
+so every hourly re-scan replays the same prediction times and the idempotent insert deduplicates
+them (before, each scan added a new overlapping phase).
 
 **Display rule**: a probability is shown only if the model's calibration rows show an edge after
-costs (mean net > 0, t ≥ 2) **and** the current score's bin has n ≥ `KORA_AI_CALIBRATION_MIN_N`; the
+costs (mean net > 0, t ≥ 2 on the dependence-aware statistic below) **and** the current score's
+bin has n ≥ `KORA_AI_CALIBRATION_MIN_N`; the
 number is that bin's observed hit rate with "When we said 0.55, it happened 57% of the time (n=212)".
 Otherwise the card says **"No reliable signal"** with the reason (no edge, too few resolved
 forecasts, not enough history). On SIMULATED random-walk data this is the normal outcome; the quant

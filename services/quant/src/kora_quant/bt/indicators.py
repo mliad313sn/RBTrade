@@ -86,7 +86,9 @@ def rsi(c: F, n: int) -> F:
         if i > n:
             ag = (ag * (n - 1) + gain[i - 1]) / n
             al = (al * (n - 1) + loss[i - 1]) / n
-        out[i] = 100.0 if al == 0 else 100.0 - 100.0 / (1.0 + ag / al)
+        # A flat window (no gains, no losses) is 50, as in the chart and alert library
+        # (packages/domain/src/indicators.ts; IRTC R3-13).
+        out[i] = (50.0 if ag == 0 else 100.0) if al == 0 else 100.0 - 100.0 / (1.0 + ag / al)
     return out
 
 

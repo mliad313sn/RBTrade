@@ -69,6 +69,7 @@ def to_input(sd: SymbolData, end_ts: int | None = None) -> SymbolInput:
         if sd.session_open is None
         else np.asarray(sd.session_open[:n], dtype=bool),
         events=None if sd.events is None else np.asarray(sorted(sd.events), dtype=np.int64),
+        bars_per_year=sd.bars_per_year,
     )
 
 
@@ -177,6 +178,27 @@ def _overfitting(is_m: dict[str, Any], trials: int, sharpes: list[float]) -> dic
     }
 
 
+def _holdout_overfitting(
+    oos_m: dict[str, Any], trials: int, sharpes: list[float]
+) -> dict[str, Any]:
+    """DSR of the out-of-sample holdout, deflated by every trial recorded for the strategy
+    (IRTC R3-02: the promotion gate reads this basis, recomputed by the api at check time)."""
+    var = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+    sr = oos_m.get("periodSharpe")
+    base = {"trials": trials, "trialSharpeVariance": var, "basis": "out_of_sample_holdout"}
+    if sr is None or oos_m.get("skew") is None or oos_m.get("kurtosis") is None:
+        return {**base, "dsr": None, "sr0": None, "observations": oos_m.get("observations")}
+    dsr, sr0 = deflated_sharpe(
+        sr, int(oos_m["observations"]), float(oos_m["skew"]), float(oos_m["kurtosis"]), trials, var
+    )
+    return {
+        **base,
+        "dsr": None if dsr is None else round(dsr, 4),
+        "sr0": round(sr0, 6),
+        "observations": oos_m.get("observations"),
+    }
+
+
 def _trial_stat(
     values: dict[str, float], is_m: dict[str, Any], oos_m: dict[str, Any]
 ) -> dict[str, Any]:
@@ -222,7 +244,10 @@ def backtest(req: BacktestRunRequest) -> dict[str, Any]:
         "oosStart": split,
         "metrics": {"inSample": is_m, "outOfSample": oos_m, "all": all_m},
         "warnings": _warnings(is_m, oos_m, res),
-        "overfitting": _overfitting(is_m, trials, sharpes),
+        "overfitting": {
+            **_overfitting(is_m, trials, sharpes),
+            "holdout": _holdout_overfitting(oos_m, trials, sharpes),
+        },
         "equity": _downsample(res, req.max_points),
         "trades": [_trade_wire(t, split) for t in res.trades],
         "blocked": res.blocked,
@@ -252,16 +277,54 @@ def _cap(n: int, requested: int | None) -> int:
     return cap
 
 
+def validation_start(req: ResearchBase, split: int, fraction: float) -> int:
+    """Start of the inner validation segment: the last `fraction` of the bars before the holdout.
+
+    Selection (optimisation, heatmap) is scored on [validation_start, split); the holdout
+    [split, end) is never read while choosing (IRTC R3-01)."""
+    pre = [t for t in timeline(req.data) if t < split]
+    if len(pre) < 20:
+        raise ResearchError(
+            f"Only {len(pre)} bars before the out-of-sample holdout: selection needs at least 20 "
+            "(in-sample plus validation). Use more data or a smaller out-of-sample share."
+        )
+    return pre[min(len(pre) - 1, max(1, int(len(pre) * (1.0 - fraction))))]
+
+
 def _score(
-    req: ResearchBase, over: dict[str, float], split: int
+    req: ResearchBase, over: dict[str, float], split: int, vsplit: int
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    """In-sample and validation metrics on data truncated at the holdout start: the engine never
+    receives a holdout bar while a configuration is being scored."""
+    res = _run(req, over, end_ts=split, guard=True)
+    return segment_metrics(res, None, vsplit), segment_metrics(res, vsplit, None)
+
+
+def _holdout(req: ResearchBase, over: dict[str, float], split: int) -> dict[str, Any]:
+    """The single out-of-sample evaluation of the selected configuration."""
     res = _run(req, over, guard=True)
-    return segment_metrics(res, None, split), segment_metrics(res, split, None)
+    return segment_metrics(res, split, None)
+
+
+def _selection_stat(
+    values: dict[str, float], is_m: dict[str, Any], val_m: dict[str, Any]
+) -> dict[str, Any]:
+    stat = _trial_stat(values, is_m, {"periodSharpe": None, "sharpe": None, "trades": 0})
+    stat["validationPeriodSharpe"] = val_m.get("periodSharpe")
+    stat["validationSharpe"] = val_m.get("sharpe")
+    return stat
+
+
+SELECTION_NOTE = (
+    "Ranked on the validation segment (the end of the in-sample window). The out-of-sample "
+    "holdout was not read while ranking; it is reported once, for the selected configuration."
+)
 
 
 def optimise(req: OptimiseRequest) -> dict[str, Any]:
     t0 = time.perf_counter()
     split = oos_start(req)
+    vsplit = validation_start(req, split, req.validation_fraction)
     d = parse_definition(req.definition)
     for name in req.grid:
         if name not in d.params:
@@ -281,38 +344,58 @@ def optimise(req: OptimiseRequest) -> dict[str, Any]:
     stats: list[dict[str, Any]] = []
     base = Params(d.params, req.param_overrides).values
     for over in combos:
-        is_m, oos_m = _score(req, over, split)
+        is_m, val_m = _score(req, over, split, vsplit)
         values = {**base, **over}
-        stats.append(_trial_stat(values, is_m, oos_m))
+        stats.append(_selection_stat(values, is_m, val_m))
         rows.append(
             {
                 "params": over,
                 "isSharpe": is_m.get("sharpe"),
-                "oosSharpe": oos_m.get("sharpe"),
+                "validationSharpe": val_m.get("sharpe"),
                 "isTrades": is_m["trades"],
-                "oosTrades": oos_m["trades"],
-                "oosCagr": oos_m.get("cagr"),
-                "oosMaxDrawdown": oos_m.get("maxDrawdown"),
+                "validationTrades": val_m["trades"],
+                "validationCagr": val_m.get("cagr"),
+                "validationMaxDrawdown": val_m.get("maxDrawdown"),
                 "overfitWarning": bool(
                     is_m.get("sharpe") is not None
                     and is_m["sharpe"] > 0
-                    and (oos_m.get("sharpe") is None or oos_m["sharpe"] < 0.5 * is_m["sharpe"])
+                    and (val_m.get("sharpe") is None or val_m["sharpe"] < 0.5 * is_m["sharpe"])
                 ),
             }
         )
-    rows.sort(key=lambda r: (r["oosSharpe"] is None, -(r["oosSharpe"] or 0.0)))
+    order = sorted(
+        range(len(rows)),
+        key=lambda i: (rows[i]["validationSharpe"] is None, -(rows[i]["validationSharpe"] or 0.0)),
+    )
+    rows = [rows[i] for i in order]
+    stats = [stats[i] for i in order]
     for i, r in enumerate(rows):
         r["rank"] = i + 1
+    best: dict[str, Any] | None = None
+    if rows:
+        h = _holdout(req, rows[0]["params"], split)
+        holdout = {
+            "sharpe": h.get("sharpe"),
+            "trades": h["trades"],
+            "cagr": h.get("cagr"),
+            "maxDrawdown": h.get("maxDrawdown"),
+        }
+        best = {**rows[0], "holdout": holdout}
+        stats[0]["oosPeriodSharpe"] = h.get("periodSharpe")
+        stats[0]["oosSharpe"] = h.get("sharpe")
+        stats[0]["oosTrades"] = h["trades"]
     return {
         "simulated": True,
         "disclaimer": DISCLAIMER,
-        "rankedBy": "out_of_sample_sharpe",
+        "rankedBy": "validation_sharpe",
+        "selectionNote": SELECTION_NOTE,
         "method": req.method,
         "evaluated": len(combos),
         "cap": min(max_combos(), req.max_combos or max_combos()),
+        "validationStart": vsplit,
         "oosStart": split,
         "results": rows[:100],
-        "best": rows[0] if rows else None,
+        "best": best,
         "trialStats": stats,
         "elapsedMs": round((time.perf_counter() - t0) * 1000, 1),
     }
@@ -321,6 +404,7 @@ def optimise(req: OptimiseRequest) -> dict[str, Any]:
 def sensitivity(req: SensitivityRequest) -> dict[str, Any]:
     t0 = time.perf_counter()
     split = oos_start(req)
+    vsplit = validation_start(req, split, req.validation_fraction)
     d = parse_definition(req.definition)
     for ax in (req.x, req.y):
         if ax.param not in d.params:
@@ -336,18 +420,18 @@ def sensitivity(req: SensitivityRequest) -> dict[str, Any]:
         for xv in req.x.values:
             over = {req.x.param: xv, req.y.param: yv}
             try:
-                is_m, oos_m = _score(req, over, split)
+                is_m, val_m = _score(req, over, split, vsplit)
             except ResearchError as exc:
                 row.append({"x": xv, "y": yv, "error": str(exc)})
                 continue
-            stats.append(_trial_stat({**base, **over}, is_m, oos_m))
+            stats.append(_selection_stat({**base, **over}, is_m, val_m))
             row.append(
                 {
                     "x": xv,
                     "y": yv,
-                    "oosSharpe": oos_m.get("sharpe"),
+                    "validationSharpe": val_m.get("sharpe"),
                     "isSharpe": is_m.get("sharpe"),
-                    "oosTrades": oos_m["trades"],
+                    "validationTrades": val_m["trades"],
                 }
             )
         cells.append(row)
@@ -355,11 +439,13 @@ def sensitivity(req: SensitivityRequest) -> dict[str, Any]:
         "simulated": True,
         "x": {"param": req.x.param, "values": req.x.values, "current": base[req.x.param]},
         "y": {"param": req.y.param, "values": req.y.values, "current": base[req.y.param]},
-        "metric": "out_of_sample_sharpe",
+        "metric": "validation_sharpe",
         "cells": cells,
-        "note": "A flat plateau around the chosen cell suggests robustness; "
-        "a lone bright cell is a lucky spike.",
+        "note": "Validation Sharpe (the end of the in-sample window; the out-of-sample holdout is "
+        "not used). A flat plateau around the chosen cell suggests robustness; a lone bright cell "
+        "is a lucky spike.",
         "trialStats": stats,
+        "validationStart": vsplit,
         "oosStart": split,
         "elapsedMs": round((time.perf_counter() - t0) * 1000, 1),
     }
@@ -498,10 +584,10 @@ def signal(req: SignalRequest) -> dict[str, Any]:
         if len(sym.bars) == 0:
             raise ResearchError("No bars to evaluate.")
         tf_s = TIMEFRAME_SECONDS[d.universe.timeframe]
-        bpy = bars_per_year(tf_s)
+        bpy = sym.bars_per_year or bars_per_year(tf_s)
         keys = feature_keys(d, p, req.ai_regime == "model")
         feats = compute_features(sym.bars, keys, bpy)
-        verify_point_in_time(sym.bars, keys, bpy, feats, checkpoints=3)
+        verify_point_in_time(sym.bars, keys, bpy, feats)
         ctx = EvalContext(d, p, sym, feats, tf_s)
         t = len(sym.bars) - 1
         pos = None

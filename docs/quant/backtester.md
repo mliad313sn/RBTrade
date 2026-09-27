@@ -21,7 +21,16 @@ calendar data, AI regime before goal 07). An unavailable condition never opens a
 `ai_regime` condition set to `whenUnavailable: "ignore"`, which is skipped and recorded.
 
 Indicators (causal, NaN in warm-up): close/open/high/low/volume, EMA (SMA-seeded), SMA, RSI, ATR and
-ADX (Wilder), ROC %, highest high / lowest low of the **previous** n bars, realised volatility %.
+ADX (Wilder), ROC %, highest high / lowest low of the **previous** n bars, realised volatility %. RSI
+of a flat window is 50, as in the chart and alert library (IRTC R3-13).
+
+Realised volatility (and volatility-target sizing) is annualised with **bars a year from the venue
+session calendar** (IRTC R3-06): the api sends `barsPerYear` per instrument = trading days × session
+bars over the last 365 venue-local dates (`sessionBarsPerYear`, e.g. ≈ 252 for daily equity bars, 7 a
+day for a 09:30–16:00 venue on 1h bars), when at least 95 % of the bars fall in trading time. A 24/7
+calendar, or a SIMULATED feed that runs outside the sessions, uses 365 × 86,400 / timeframe. Before,
+every instrument used the 24/7 figure: 23.9 % instead of 20 % for daily weekday bars, × 2.2 for
+7-hour equity sessions on 1h bars.
 
 ## Timing and fills (conservative)
 
@@ -52,7 +61,10 @@ of the parity tolerance.
 ## Look-ahead guard
 
 Indicators are computed vectorised on the whole series, then the engine recomputes every feature on
-`bars[:t+1]` at 8 checkpoints (plus the last bar) and requires row *t* to be identical. Any difference
+`bars[:t+1]` at 12 checkpoints (IRTC R3-05: half spread evenly, half random and seeded from the data,
+never the trivial last bar) and requires **every row 0…t** to be identical, not only row *t*. A
+sparse leak (a centred pivot flag) passed the old 8-point, single-row check in 17 of 40 random
+series; it now fails in every one (`tests/test_bt_guard.py`). Any difference
 raises `LookAheadError` and the run fails with HTTP 422 ("used future data"). Tests inject a
 future-peeking indicator (must fail) and perturb future bars (past decisions must not change).
 
@@ -72,11 +84,11 @@ Daily (UTC) equity returns; annualisation factor = observed days per year (≈ 3
 
 | Metric | Definition |
 |---|---|
-| CAGR | (E_end / E_start)^(365.25 / days) − 1 |
+| CAGR | (E_end / E_start)^(365.25 / days) − 1; not reported (and no Calmar) for segments under 30 days (IRTC R3-15) |
 | Sharpe | mean / stdev (ddof 1) × √A |
 | Sortino | mean / √mean(min(r, 0)²) × √A |
 | Calmar | CAGR / \|max DD\| |
-| Max DD, duration | on bar-close equity; longest peak-to-recovery time in days |
+| Max DD, duration | on bar-close equity; longest peak-to-recovery time in days (0 when the curve only makes new highs) |
 | Win rate, profit factor | net P&L per trade; gross wins / gross losses |
 | Expectancy | mean R multiple (net P&L / initial risk) and mean currency P&L |
 | Exposure | share of bars with an open position |
@@ -87,14 +99,35 @@ Daily (UTC) equity returns; annualisation factor = observed days per year (≈ 3
 
 - **Trials** are counted by the api, not the client: every distinct configuration evaluated for a
   strategy (backtest, optimisation, heatmap, walk-forward grid) is a row in `strategy_trials`, keyed by
-  the hash of the definition with its parameter values applied.
+  the hash of the definition with its parameter values applied **and its data context** (IRTC R3-02):
+  symbols, data window (UTC days), split (or walk-forward design) and cost override. Re-running the
+  same parameters with another split, window, symbol set or spread is a new trial.
+- **Promotion evidence** (IRTC R3-02, OQ-R8a) is only a *gate-eligible* backtest: the version's own
+  parameters and universe, all available history, the default 30 % holdout and the registry costs (no
+  `spreadTicks` override). Every run stores `gate_eligible` and the reasons when it is not. The
+  checklist deflates that run's holdout Sharpe with **every trial recorded at the time of the check**
+  (`holdout_dsr` ≥ 0.95) and needs ≥ 90 daily holdout observations (`oos_length`), next to the raw
+  OOS Sharpe and trade-count items. The backtest reports the same basis as `overfitting.holdout`.
 - **Deflated Sharpe** (Bailey & López de Prado, 2014) on the in-sample per-period Sharpe with
   N = trials and V[SR] = variance of the recorded trials' in-sample per-period Sharpes; with one trial
   it is the PSR against zero. Reproduces the paper's example (SR₀ = 0.1132, DSR = 0.9004).
-- **Sensitivity heatmap** over two parameters (≤ 12 × 12), OOS Sharpe per cell, current cell outlined.
+- **Sensitivity heatmap** over two parameters (≤ 12 × 12), validation Sharpe per cell (see below),
+  current cell outlined.
 - **Warnings**: fewer than 100 OOS trades; OOS Sharpe below half the IS Sharpe; no trades.
 - **Optimisation**: grid or seeded random search, hard cap `KORA_BT_MAX_COMBOS` (default 200, ceiling
-  1,000; larger grids are refused, not truncated), ranked by OOS Sharpe.
+  1,000; larger grids are refused, not truncated), **ranked by validation Sharpe** (IRTC R3-01).
+
+### Selection never reads the out-of-sample holdout (IRTC R3-01)
+
+The data splits three ways: in-sample, validation (the last `validationFraction`, default 30 %, of
+the bars before the holdout) and the out-of-sample **holdout** (default: the last 30 % of the bars).
+Optimisation and the heatmap run the engine on data **truncated at the holdout start**, so no
+holdout bar reaches the engine while combinations are scored; they rank on the validation segment.
+The holdout is scored **once**, for the selected combination only (`best.holdout`). Walk-forward
+chooses each fold's parameters on that fold's training window only (data truncated at the training
+end). Regression tests (`tests/test_bt_selection.py`): replacing the holdout bars leaves the ranking
+unchanged, and on driftless noise the selected combination is not the holdout maximum (before the
+fix it was, in 6 of 6 seeds, with a mean reported "OOS" Sharpe of about 5).
 
 ## Live signal and explainability
 

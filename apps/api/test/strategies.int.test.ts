@@ -220,7 +220,43 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .expect(404);
   });
 
-  it('optimisation is capped and ranked by OOS; every combination is a trial', async () => {
+  it('IRTC R3-02: split, window, symbols and spread are part of a trial; tuned runs are never promotion evidence', async () => {
+    const run = (body: Record<string, unknown>) =>
+      request(http)
+        .post('/backtests')
+        .set(bearer(trader.token))
+        .send({ versionId: v1.id, ...body })
+        .expect(201);
+    const base = await run({});
+    expect(base.body.trialsAdded).toBe(0);
+    expect(base.body.gateEligible).toBe(true);
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ split: { oosFraction: 0.2 } }, 'custom_split'],
+      [{ spreadTicks: 0 }, 'cost_override'],
+      [{ from: T0 + 200 * H }, 'custom_window'],
+    ];
+    for (const [body, reason] of cases) {
+      const r = await run(body);
+      // Same parameters on another split, cost or window: a new trial, and not evidence.
+      expect(r.body.trialsAdded).toBe(1);
+      expect(r.body.gateEligible).toBe(false);
+      expect(r.body.gateIneligibleReasons).toContain(reason);
+      expect(r.body.overfitting.trials).toBe(r.body.trialsTotal);
+    }
+    const rows = await ownerQuery<{ gate_eligible: boolean; reasons: string[] }>(
+      `SELECT gate_eligible, evidence->'reasons' AS reasons FROM backtest_runs
+       WHERE version_id = $1 AND kind = 'backtest' ORDER BY created_at DESC LIMIT 4`,
+      [v1.id],
+    );
+    expect(rows.map((r) => r.gate_eligible)).toEqual([false, false, false, true]);
+    const ctx = await ownerQuery<{ context: { spreadTicks: number | null } }>(
+      `SELECT context FROM strategy_trials WHERE strategy_id = $1 AND context->>'spreadTicks' = '0'`,
+      [strategyId],
+    );
+    expect(ctx).toHaveLength(1);
+  });
+
+  it('optimisation is capped and ranked by validation (holdout scored once); every combination is a trial', async () => {
     const big = await request(http)
       .post('/backtests/optimise')
       .set(bearer(trader.token))
@@ -236,12 +272,16 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .set(bearer(trader.token))
       .send({ versionId: v1.id, grid: { fast: [5, 10], slow: [30, 50] } })
       .expect(201);
-    expect(opt.body.rankedBy).toBe('out_of_sample_sharpe');
+    // IRTC R3-01: ranked on the validation segment; only the selected combination sees the holdout.
+    expect(opt.body.rankedBy).toBe('validation_sharpe');
     expect(opt.body.evaluated).toBe(4);
-    const oos = opt.body.results
-      .map((r: { oosSharpe: number | null }) => r.oosSharpe)
+    const val = opt.body.results
+      .map((r: { validationSharpe: number | null }) => r.validationSharpe)
       .filter((x: number | null) => x !== null);
-    expect(oos).toEqual([...oos].sort((a: number, b: number) => b - a));
+    expect(val).toEqual([...val].sort((a: number, b: number) => b - a));
+    expect(opt.body.results.some((r: Record<string, unknown>) => 'oosSharpe' in r)).toBe(false);
+    expect(opt.body.best.holdout).toHaveProperty('sharpe');
+    expect(opt.body.validationStart).toBeLessThan(opt.body.oosStart);
     const s = await request(http)
       .get(`/strategies/${strategyId}`)
       .set(bearer(trader.token))
@@ -261,6 +301,7 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .expect(201);
     expect(heat.body.cells).toHaveLength(2);
     expect(heat.body.cells[0]).toHaveLength(3);
+    expect(heat.body.metric).toBe('validation_sharpe');
     expect(heat.body.x.current).toBe(10);
     const wf = await request(http)
       .post('/backtests/walk-forward')
@@ -276,6 +317,40 @@ describe('strategies, versions and research runs (goal 06)', () => {
     expect(list.body.runs.map((r: { kind: string }) => r.kind)).toEqual(
       expect.arrayContaining(['backtest', 'optimise', 'sensitivity', 'walk_forward']),
     );
+  });
+
+  it('IRTC R3-06: session-gated data is annualised from the venue calendar, a 24/7 feed from 365 days', async () => {
+    // Weekday-only daily AAPL bars (XNAS calendar) vs the 24/7 BTC hourly series seeded above.
+    const DAY = 86_400_000;
+    const weekdays = wave(420, T0, DAY, { base: 180, amp: 8, period: 40, tick: 0.01 }).filter(
+      (b) => ![0, 6].includes(new Date(b.t).getUTCDay()),
+    );
+    await seedCandles('AAPL', '1D', weekdays, 2);
+    const eq = await request(http)
+      .post('/strategies')
+      .set(bearer(trader.token))
+      .send({
+        definition: {
+          ...BTC_TREND,
+          name: 'Trend-X AAPL daily',
+          universe: { symbols: ['AAPL'], timeframe: '1D' },
+        },
+      })
+      .expect(201);
+    await request(http)
+      .post('/backtests')
+      .set(bearer(trader.token))
+      .send({ versionId: eq.body.latest.id })
+      .expect(201);
+    const runs = proxy.exchanges.filter((x) => x.path === '/bt/run');
+    const sent = (x: (typeof runs)[number]) =>
+      (x.requestBody as { data: Array<{ symbol: string; barsPerYear?: number }> }).data[0]!;
+    const aapl = sent(runs[runs.length - 1]!);
+    expect(aapl.symbol).toBe('AAPL');
+    expect(aapl.barsPerYear).toBeGreaterThanOrEqual(245);
+    expect(aapl.barsPerYear).toBeLessThanOrEqual(262);
+    const btc = sent(runs.find((x) => sent(x).symbol === 'BTCUSD')!);
+    expect(btc.barsPerYear).toBeUndefined();
   });
 
   it('sends the OOS trade list to Monte Carlo through /sim/from-trades (B-502)', async () => {
@@ -302,10 +377,14 @@ describe('strategies, versions and research runs (goal 06)', () => {
     await request(http).get(`/backtests/${runId}`).set(bearer(other.token)).expect(404);
   });
   it('contract (goal 10): every api → quant exchange matches the quant OpenAPI', async () => {
-    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<
+      typeof validateExchanges
+    >[0];
     const traffic = proxy.exchanges.filter((x) => x.path !== '/health');
     expect(traffic.length).toBeGreaterThan(0);
-    expect([...new Set(traffic.map((x) => x.path))]).toEqual(expect.arrayContaining(['/bt/optimise', '/bt/run', '/bt/sensitivity', '/bt/walk-forward']));
+    expect([...new Set(traffic.map((x) => x.path))]).toEqual(
+      expect.arrayContaining(['/bt/optimise', '/bt/run', '/bt/sensitivity', '/bt/walk-forward']),
+    );
     expect(validateExchanges(doc, 'quant', traffic)).toEqual([]);
   });
 });

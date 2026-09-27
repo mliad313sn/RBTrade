@@ -3,7 +3,7 @@
 import { fmtNum } from '@/lib/robots/format';
 import type { SensitivityResult } from '@/lib/robots/types';
 
-/** Blue scale on OOS Sharpe; the number is always printed, so colour is not the only cue. */
+/** Blue scale on validation Sharpe; the number is always printed, so colour is not the only cue. */
 function shade(v: number | null | undefined, lo: number, hi: number): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return 'var(--k-raised)';
   const r = hi === lo ? 0.5 : (v - lo) / (hi - lo);
@@ -11,11 +11,15 @@ function shade(v: number | null | undefined, lo: number, hi: number): string {
   return `color-mix(in srgb, var(--k-up) ${pct}%, var(--k-panel))`;
 }
 
-/** Sensitivity heatmap (goal 06 §5): out-of-sample Sharpe over two parameters; current cell outlined. */
+/**
+ * Sensitivity heatmap (goal 06 §5): validation Sharpe over two parameters; current cell outlined.
+ * IRTC R3-01: the validation segment is the end of the in-sample window, so choosing a cell never
+ * reads the out-of-sample holdout.
+ */
 export function Heatmap({ data }: { data: SensitivityResult }) {
   const vals = data.cells
     .flat()
-    .map((c) => c.oosSharpe)
+    .map((c) => c.validationSharpe)
     .filter((v): v is number => typeof v === 'number');
   const lo = vals.length ? Math.min(...vals) : 0;
   const hi = vals.length ? Math.max(...vals) : 1;
@@ -23,7 +27,7 @@ export function Heatmap({ data }: { data: SensitivityResult }) {
     <figure className="m-0" data-testid="heatmap">
       <table className="w-full border-separate text-xs" style={{ borderSpacing: 2 }}>
         <caption className="mb-1 text-left text-xs text-muted">
-          Sharpe (out-of-sample) · {data.y.param} ↓ × {data.x.param} →
+          Sharpe (validation, holdout unused) · {data.y.param} ↓ × {data.x.param} →
         </caption>
         <thead>
           <tr>
@@ -52,19 +56,21 @@ export function Heatmap({ data }: { data: SensitivityResult }) {
                     key={`${c.x}-${c.y}`}
                     className="k-num px-1 py-1 text-center"
                     style={{
-                      background: shade(c.oosSharpe, lo, hi),
+                      background: shade(c.validationSharpe, lo, hi),
                       outline: current ? '2px solid var(--k-focus)' : undefined,
                       color: 'var(--k-text)',
                     }}
                     title={
                       c.error ??
-                      `${data.x.param} ${c.x}, ${data.y.param} ${c.y}: OOS Sharpe ${fmtNum(c.oosSharpe)}, ${c.oosTrades ?? 0} OOS trades`
+                      `${data.x.param} ${c.x}, ${data.y.param} ${c.y}: validation Sharpe ${fmtNum(c.validationSharpe)}, ${c.validationTrades ?? 0} validation trades`
                     }
                     aria-label={
-                      current ? `current cell, OOS Sharpe ${fmtNum(c.oosSharpe)}` : undefined
+                      current
+                        ? `current cell, validation Sharpe ${fmtNum(c.validationSharpe)}`
+                        : undefined
                     }
                   >
-                    {c.error ? '×' : fmtNum(c.oosSharpe)}
+                    {c.error ? '×' : fmtNum(c.validationSharpe)}
                   </td>
                 );
               })}

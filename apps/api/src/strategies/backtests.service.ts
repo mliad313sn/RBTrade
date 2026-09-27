@@ -1,6 +1,10 @@
+import { createHash } from 'node:crypto';
+
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AUDIT_READ_ALL_ROLES,
+  canonicalStrategyJson,
+  evidenceEligibility,
   hasAnyRole,
   shortHash,
   withParams,
@@ -36,6 +40,49 @@ interface QuantResult {
   [key: string]: unknown;
 }
 
+/**
+ * What a trial was evaluated on (IRTC R3-02): the same parameters on another symbol set, data
+ * window (UTC days), split or walk-forward design, or cost override are a different trial.
+ */
+export interface TrialContext {
+  symbols: string[];
+  window: [string, string] | null;
+  design: Record<string, number | string | null>;
+  spreadTicks: number | null;
+}
+
+const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+export function trialContext(
+  kind: Kind,
+  req: BacktestRequest & Partial<Pick<WalkForwardRequest, 'mode' | 'folds' | 'trainFraction'>>,
+  data: ReadonlyArray<Pick<SymbolDataWire, 'symbol' | 'bars'>>,
+): TrialContext {
+  const withBars = data.filter((d) => d.bars.t.length > 0);
+  const first = withBars.map((d) => d.bars.t[0]!);
+  const last = withBars.map((d) => d.bars.t[d.bars.t.length - 1]!);
+  return {
+    symbols: data.map((d) => d.symbol).sort(),
+    window: withBars.length ? [utcDay(Math.min(...first)), utcDay(Math.max(...last))] : null,
+    design:
+      kind === 'walk_forward'
+        ? {
+            walkForward: req.mode ?? 'anchored',
+            folds: req.folds ?? null,
+            trainFraction: req.trainFraction ?? null,
+          }
+        : { oosStart: req.split.oosStart ?? null, oosFraction: req.split.oosFraction },
+    spreadTicks: req.spreadTicks ?? null,
+  };
+}
+
+/** Trial identity: the configuration hash and its data context, hashed together. */
+export function trialKey(configHash: string, context: TrialContext): string {
+  return createHash('sha256')
+    .update(canonicalStrategyJson({ config: configHash, context }))
+    .digest('hex');
+}
+
 interface RunRow {
   id: string;
   strategy_id: string;
@@ -46,6 +93,7 @@ interface RunRow {
   summary: Record<string, unknown>;
   result: Record<string, unknown>;
   trials_added: number;
+  gate_eligible?: boolean;
   created_at: Date;
 }
 
@@ -64,6 +112,7 @@ function runDto(r: RunRow, full: boolean) {
     kind: r.kind,
     summary: r.summary,
     trialsAdded: r.trials_added,
+    gateEligible: r.gate_eligible ?? false,
     createdAt: r.created_at.toISOString(),
     ...(full ? { request: r.request, result: r.result } : {}),
   };
@@ -85,7 +134,7 @@ export class BacktestsService {
     private readonly accounts: AccountsService,
   ) {}
 
-  private async prepare(userId: string, roles: Role[], req: BacktestRequest) {
+  private async prepare(userId: string, roles: Role[], kind: Kind, req: BacktestRequest) {
     const { version, strategy } = await this.strategies.version(userId, roles, req.versionId);
     if (strategy.owner_id !== userId)
       throw new NotFoundException({ error: 'not_found', message: 'Strategy version not found.' });
@@ -110,12 +159,15 @@ export class BacktestsService {
       'SELECT config_hash, is_period_sharpe FROM strategy_trials WHERE strategy_id = $1',
       [strategy.id],
     );
+    const kept = data.filter((d) => d.bars.t.length > 0);
     return {
       version,
       strategy,
       def,
-      data: data.filter((d) => d.bars.t.length > 0),
+      data: kept,
       trials,
+      context: trialContext(kind, req, kept),
+      evidence: evidenceEligibility(kind, req, def.universe.symbols),
       baseCurrency: account.base_currency,
     };
   }
@@ -125,7 +177,10 @@ export class BacktestsService {
     prep: Awaited<ReturnType<BacktestsService['prepare']>>,
     extra: Record<string, unknown>,
   ) {
-    const current = strategyContentHash(withParams(prep.def, req.paramOverrides));
+    const current = trialKey(
+      strategyContentHash(withParams(prep.def, req.paramOverrides)),
+      prep.context,
+    );
     const others = prep.trials.filter((t) => t.config_hash !== current);
     return {
       definition: prep.def,
@@ -150,12 +205,14 @@ export class BacktestsService {
     req: Record<string, unknown>,
     result: QuantResult,
     summary: Record<string, unknown>,
+    context: TrialContext,
+    evidence: { eligible: boolean; reasons: string[] },
   ) {
     return this.db.tx(async (c) => {
       const run = (
         await c.query<RunRow>(
-          `INSERT INTO backtest_runs (strategy_id, version_id, user_id, kind, request, summary, result, trials_added)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 0) RETURNING *`,
+          `INSERT INTO backtest_runs (strategy_id, version_id, user_id, kind, request, summary, result, trials_added, gate_eligible, evidence)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9) RETURNING *`,
           [
             version.strategy_id,
             version.id,
@@ -164,15 +221,20 @@ export class BacktestsService {
             JSON.stringify(req),
             JSON.stringify(summary),
             JSON.stringify(result),
+            evidence.eligible,
+            JSON.stringify({ reasons: evidence.reasons, trialContext: context }),
           ],
         )
       ).rows[0]!;
       let added = 0;
       for (const t of result.trialStats) {
-        const hash = strategyContentHash(withParams(version.definition, t.params));
+        const hash = trialKey(
+          strategyContentHash(withParams(version.definition, t.params)),
+          context,
+        );
         const ins = await c.query(
-          `INSERT INTO strategy_trials (strategy_id, config_hash, params, version_id, run_id, is_period_sharpe, oos_period_sharpe, is_sharpe, oos_sharpe, observations)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (strategy_id, config_hash) DO NOTHING`,
+          `INSERT INTO strategy_trials (strategy_id, config_hash, params, version_id, run_id, is_period_sharpe, oos_period_sharpe, is_sharpe, oos_sharpe, observations, context)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (strategy_id, config_hash) DO NOTHING`,
           [
             version.strategy_id,
             hash,
@@ -184,6 +246,7 @@ export class BacktestsService {
             t.isSharpe,
             t.oosSharpe,
             t.observations,
+            JSON.stringify(context),
           ],
         );
         added += ins.rowCount ?? 0;
@@ -211,6 +274,7 @@ export class BacktestsService {
             contentHash: version.content_hash,
             trialsAdded: added,
             trialsTotal: total,
+            gateEligible: evidence.eligible,
             simulated: true,
             ...(Object.fromEntries(
               Object.entries(summary).filter(
@@ -235,7 +299,7 @@ export class BacktestsService {
     req: BacktestRequest,
     extra: Record<string, unknown>,
   ) {
-    const prep = await this.prepare(userId, roles, req);
+    const prep = await this.prepare(userId, roles, kind, req);
     const body = this.body(req, prep, extra);
     const result = await this.quant.post<QuantResult>(PATHS[kind], body);
     const summary = summarise(kind, result, prep);
@@ -246,6 +310,8 @@ export class BacktestsService {
       req as unknown as Record<string, unknown>,
       result,
       summary,
+      prep.context,
+      prep.evidence,
     );
     return {
       runId: run.id,
@@ -257,6 +323,8 @@ export class BacktestsService {
       shortHash: shortHash(prep.version.content_hash),
       trialsAdded: added,
       trialsTotal: total,
+      gateEligible: prep.evidence.eligible,
+      gateIneligibleReasons: prep.evidence.reasons,
       auditEventId,
       baseCurrency: prep.baseCurrency,
       ...result,
@@ -282,12 +350,17 @@ export class BacktestsService {
       grid: req.grid,
       samples: req.samples,
       seed: req.seed,
+      validationFraction: req.validationFraction,
       ...(req.maxCombos ? { maxCombos: req.maxCombos } : {}),
     });
   }
 
   sensitivity(userId: string, roles: Role[], req: SensitivityRequest) {
-    return this.execute(userId, roles, 'sensitivity', req, { x: req.x, y: req.y });
+    return this.execute(userId, roles, 'sensitivity', req, {
+      x: req.x,
+      y: req.y,
+      validationFraction: req.validationFraction,
+    });
   }
 
   async list(
@@ -338,7 +411,32 @@ export class BacktestsService {
     };
   }
 
-  /** Latest standard backtest of a version (promotion evidence). */
+  /**
+   * Promotion evidence (IRTC R3-02): the latest *gate-eligible* backtest of a version, i.e. its own
+   * parameters and universe, all available history, the default holdout and registry costs.
+   */
+  async latestEvidenceBacktest(versionId: string): Promise<RunRow | null> {
+    const r = await this.db.query<RunRow>(
+      `SELECT * FROM backtest_runs WHERE version_id = $1 AND kind = 'backtest' AND gate_eligible
+       ORDER BY created_at DESC LIMIT 1`,
+      [versionId],
+    );
+    return r[0] ?? null;
+  }
+
+  /** Every trial recorded for a strategy (count and in-sample per-period Sharpes, for the DSR). */
+  async trialStats(strategyId: string): Promise<{ count: number; periodSharpes: number[] }> {
+    const rows = await this.db.query<{ is_period_sharpe: number | null }>(
+      'SELECT is_period_sharpe FROM strategy_trials WHERE strategy_id = $1',
+      [strategyId],
+    );
+    return {
+      count: rows.length,
+      periodSharpes: rows.map((r) => r.is_period_sharpe).filter((x): x is number => x !== null),
+    };
+  }
+
+  /** Latest standard backtest of a version (copilot and calibration context, not promotion). */
   async latestBacktest(versionId: string): Promise<RunRow | null> {
     const r = await this.db.query<RunRow>(
       `SELECT * FROM backtest_runs WHERE version_id = $1 AND kind = 'backtest' ORDER BY created_at DESC LIMIT 1`,
@@ -372,6 +470,13 @@ function summarise(
       oosSharpe: m?.outOfSample?.sharpe ?? null,
       isSharpe: m?.inSample?.sharpe ?? null,
       dsr: (r.overfitting as { dsr?: number | null } | undefined)?.dsr ?? null,
+      // Holdout moments: the promotion checklist deflates them with the trial count at check time.
+      oosPeriodSharpe: m?.outOfSample?.periodSharpe ?? null,
+      oosObservations: (m?.outOfSample?.observations as number) ?? 0,
+      oosSkew: m?.outOfSample?.skew ?? null,
+      oosKurtosis: m?.outOfSample?.kurtosis ?? null,
+      holdoutDsr:
+        (r.overfitting as { holdout?: { dsr?: number | null } } | undefined)?.holdout?.dsr ?? null,
       warnings: ((r.warnings as Array<{ code: string }>) ?? []).map((w) => w.code).join(','),
     };
   if (kind === 'walk_forward')
@@ -381,11 +486,19 @@ function summarise(
       wfTrades: (m?.trades as number) ?? 0,
       wfSharpe: m?.sharpe ?? null,
     };
-  if (kind === 'optimise')
+  if (kind === 'optimise') {
+    // IRTC R3-01: ranked on validation; the holdout was scored once, for the selected combination.
+    const best = r.best as {
+      validationSharpe?: number | null;
+      holdout?: { sharpe?: number | null };
+    } | null;
     return {
       ...base,
       evaluated: r.evaluated as number,
-      bestOosSharpe: (r.best as { oosSharpe?: number } | null)?.oosSharpe ?? null,
+      rankedBy: (r.rankedBy as string) ?? 'validation_sharpe',
+      bestValidationSharpe: best?.validationSharpe ?? null,
+      bestHoldoutSharpe: best?.holdout?.sharpe ?? null,
     };
+  }
   return { ...base, cells: (r.cells as unknown[][]).flat().length };
 }

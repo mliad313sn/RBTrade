@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from bt_helpers import bars_wire, syn_request, synthetic_series, toy_request
 from kora_quant.app import create_app
 from kora_quant.bt import indicators as ind
-from kora_quant.bt.evaluate import LookAheadError
+from kora_quant.bt.evaluate import LookAheadError, compute_features, verify_point_in_time
 from kora_quant.bt.models import BacktestRunRequest
 from kora_quant.bt.research import backtest
 from kora_quant.config import Settings
@@ -70,3 +70,45 @@ def test_perturbing_future_bars_never_changes_past_decisions() -> None:
     before_b = [t for t in other["trades"] if t["exitTs"] < t_cut]
     assert before_a, "the series must trade before the cut"
     assert before_a == before_b
+
+
+def _pivot_flag(b: ind.Bars, _n: int, _y: float) -> ind.F:
+    """IRTC R3-05: a classic sparse leak (a centred 21-bar pivot-high flag, as in zigzag/fractal
+    indicators): 1 only on bars that are the highest of the 10 bars on each side."""
+    hh, k = b.h, 10
+    out = np.zeros(len(hh))
+    for i in range(len(hh)):
+        lo, hi = max(0, i - k), min(len(hh), i + k + 1)
+        out[i] = 1.0 if hh[i] == hh[lo:hi].max() and i + k < len(hh) else 0.0
+    return out
+
+
+def test_guard_catches_a_sparse_leak_in_almost_every_series() -> None:
+    """Before the fix the guard compared one row at 8 evenly spaced checkpoints and passed this
+    leak in 17 of 40 random series."""
+    original = ind.REGISTRY["volume"]
+    ind.REGISTRY["volume"] = _pivot_flag
+    passed = 0
+    try:
+        for s in range(40):
+            r = np.random.default_rng(100 + s)
+            n = 2000
+            c = 100 * np.exp(np.cumsum(r.normal(0, 0.01, n)))
+            o = np.r_[100, c[:-1]]
+            bars = ind.Bars(
+                np.arange(n, dtype=np.int64) * 3_600_000,
+                o,
+                np.maximum(o, c) * 1.001,
+                np.minimum(o, c) * 0.999,
+                c,
+                np.ones(n),
+            )
+            feats = compute_features(bars, ["volume"], 8760.0)
+            try:
+                verify_point_in_time(bars, ["volume"], 8760.0, feats)
+                passed += 1
+            except LookAheadError:
+                pass
+    finally:
+        ind.REGISTRY["volume"] = original
+    assert passed <= 1, passed

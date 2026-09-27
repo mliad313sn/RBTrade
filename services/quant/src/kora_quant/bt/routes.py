@@ -64,7 +64,8 @@ async def bt_walk_forward(req: WalkForwardRequest) -> dict[str, Any]:
 
 @router.post("/optimise")
 async def bt_optimise(req: OptimiseRequest) -> dict[str, Any]:
-    """Grid or random search with a hard cap, ranked by out-of-sample Sharpe."""
+    """Grid or random search with a hard cap, ranked on the validation segment (the
+    out-of-sample holdout is scored once, for the selected configuration)."""
     return await _call("optimise", research.optimise, req)
 
 

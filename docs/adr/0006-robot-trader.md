@@ -48,7 +48,9 @@ policy, intrabar stop-first rule and funding are documented in `docs/quant/backt
 A mandatory prefix-invariance guard recomputes features on `bars[:t+1]` at checkpoints and fails the
 run on any difference. Trials are counted server-side per strategy (distinct configuration hashes),
 not supplied by the client; the DSR uses them (Bailey & López de Prado 2014, reproducing the paper's
-example). Optimisation has a hard cap (refuse, never truncate) and ranks by OOS Sharpe.
+example). Optimisation has a hard cap (refuse, never truncate). *Amended 2026-09-27 (IRTC R3-01):*
+it ranks on an inner validation segment and never reads the out-of-sample holdout, which is scored
+once for the selected combination (see `docs/quant/backtester.md`).
 
 ### 6. Bot runner ↔ OMS: internal authenticated api endpoint (B-301)
 
@@ -96,6 +98,10 @@ checklist. A realised basis keeps both sides comparable without re-marking histo
 
 ### 9. Promotion stays a record, never a switch
 
+*Amended 2026-09-27 (IRTC R3-02, OQ-R8a):* the evidence is the latest **gate-eligible** backtest
+(own parameters and universe, all history, default holdout, registry costs), which must also show a
+holdout deflated Sharpe ≥ 0.95 with every recorded trial counted and ≥ 90 daily holdout observations;
+trials are keyed by configuration and data context (symbols, window, split, cost override).
 Checklist evidence: latest backtest OOS Sharpe ≥ `KORA_PROMOTE_MIN_OOS_SHARPE` and ≥ 100 OOS trades,
 ≥ 30 days paper with 30-day TE < 1 %, risk limits signed by a `risk_officer` who is neither the owner
 nor the requester, bound to the current limits hash (a limits change invalidates it; a database

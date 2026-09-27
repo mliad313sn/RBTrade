@@ -147,6 +147,15 @@ export const FromTradesRequestSchema = z
         message: 'Block size cannot exceed the number of imported trades',
       });
     }
+    // IRTC R3-07: a cost in R cannot be applied to % returns, so it is refused, never ignored.
+    if (v.tradeUnit === 'pct_return' && v.extraCostPerTradeR > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['extraCostPerTradeR'],
+        message:
+          'Extra costs in R cannot be applied to % returns: import R multiples, or include the costs in the returns',
+      });
+    }
   });
 export type FromTradesRequest = z.infer<typeof FromTradesRequestSchema>;
 

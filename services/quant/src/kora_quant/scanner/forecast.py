@@ -7,7 +7,8 @@ For one instrument and one horizon of h bars:
 - anchored walk-forward: K contiguous test folds after `min_train` rows; each fold's model is
   trained only on rows whose label window ended before the fold starts (embargo = h bars), so no
   training label overlaps the test period;
-- calibration of fold k: isotonic (or Platt) fitted on the out-of-sample scores of folds < k;
+- calibration of fold k: isotonic (or Platt) fitted on the out-of-sample scores of folds < k whose
+  label window ended before fold k starts (the same h-bar embargo, IRTC R3-12);
 - out-of-sample skill after costs: Brier skill vs the training base rate, and the net return of
   following the forecast direction minus the round-trip cost, t-statistic on non-overlapping
   forecasts (every h-th). `has_skill` needs n ≥ 30, Brier skill > 0, mean net > 0 and t ≥ 2;
@@ -135,7 +136,13 @@ def forecast(x_all: F2, close: F1, names: list[str], cfg: ForecastConfig) -> For
         mu, sd = _standardise(x, train)
         w = fit_logistic((x[train] - mu) / sd, y_all[train], cfg.l2)
         raw_b = sigmoid(w[0] + ((x[block] - mu) / sd) @ w[1:])
-        cal: Calibrator = fit_calibrator(np.asarray(oos_raw), y_all[np.asarray(oos_t, dtype=int)])
+        # Embargo for the calibrator too: earlier out-of-sample rows whose label window reaches
+        # into this fold would leak its outcomes into the calibration (IRTC R3-12).
+        prior_t = np.asarray(oos_t, dtype=np.int64)
+        ok = prior_t + h < int(block[0])
+        cal: Calibrator = fit_calibrator(
+            np.asarray(oos_raw, dtype=np.float64)[ok], y_all[prior_t[ok]]
+        )
         p = cal.predict(raw_b)
         oos_t.extend(int(t) for t in block)
         oos_raw.extend(float(v) for v in raw_b)

@@ -22,7 +22,8 @@ def panel() -> Panel:
 
 def test_guard_passes_on_the_real_detectors(panel: Panel) -> None:
     full = detectors.compute(panel, ScanConfig())
-    assert verify_scan_point_in_time(panel, ScanConfig(), full, checkpoints=8) >= 8
+    res = verify_scan_point_in_time(panel, ScanConfig(), full, checkpoints=8)
+    assert res.checkpoints >= 8 and res.compared > 0
 
 
 def test_future_bars_do_not_change_past_features(panel: Panel) -> None:
@@ -146,7 +147,8 @@ def test_route_returns_features_trends_and_forecasts() -> None:
     assert res.status_code == 200, res.text
     out = res.json()
     assert out["simulated"] is True
-    assert out["guard"] == {"enabled": True, "checkpoints": 4, "passed": True}
+    assert out["guard"]["enabled"] is True and out["guard"]["passed"] is True
+    assert out["guard"]["checkpoints"] == 8 and out["guard"]["compared"] > 0
     first = out["instruments"][0]
     assert set(first["features"]) == set(detectors.FEATURES)
     assert all(isinstance(v, float) or v is None for v in first["features"].values())
