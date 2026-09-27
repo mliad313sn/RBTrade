@@ -9,7 +9,7 @@
     "start": "next start -p ${WEB_PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "test:e2e": "playwright test",
     "i18n:check": "vitest run src/lib/i18n/i18n.test.ts",
     "readability": "KORA_WRITE_READABILITY=1 vitest run src/lib/i18n/readability.test.ts",

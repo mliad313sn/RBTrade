@@ -140,3 +140,34 @@ test('colour convention: blue/orange by default, the setting switches the tokens
     expect(await down()).toBe(d);
   }
 });
+
+test('screen-reader spot checks: landmarks, names and live regions on the terminal and the novice home', async ({ page, browser }) => {
+  // What a screen reader announces comes from the accessibility tree: check it, not pixels.
+  await apiSignIn(page, 'trader');
+  await page.goto('/terminal');
+  await expect(page.getByTestId('status-bar')).toContainText('Connected');
+  await expect(page.getByRole('main')).toHaveCount(1);
+  await expect(page.getByRole('banner').first()).toBeVisible();
+  // the kill switch is a named button, never an icon-only control
+  await expect(page.getByTestId('kill-switch')).toHaveAccessibleName(/kill switch/i);
+  // connection state is announced politely; the ticket preview updates in a live region
+  await expect(page.getByTestId('status-bar').locator('[role="status"][aria-live="polite"]')).toHaveCount(1);
+  await expect(page.getByTestId('ticket-preview')).toHaveAttribute('aria-live', 'polite');
+  // every button in the top bar has an accessible name
+  const unnamed = await page.getByTestId('pro-topbar').getByRole('button').evaluateAll((els) =>
+    els.filter((e) => !(e.getAttribute('aria-label') || e.textContent?.trim() || e.getAttribute('aria-labelledby'))).length,
+  );
+  expect(unnamed).toBe(0);
+
+  const ctx = await browser.newContext();
+  const novice = await ctx.newPage();
+  await apiSignIn(novice, 'novice');
+  await novice.goto('/home');
+  await expect(novice.getByRole('main')).toHaveCount(1);
+  await expect(novice.getByRole('navigation').first()).toBeVisible();
+  // the practice-money chip is announced as a status, not only shown as colour
+  await expect(novice.getByTestId('env-chip')).toHaveAttribute('role', 'status');
+  const h1 = await novice.getByRole('heading', { level: 1 }).count();
+  expect(h1).toBeGreaterThanOrEqual(1);
+  await ctx.close();
+});
