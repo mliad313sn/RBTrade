@@ -11,7 +11,12 @@ import itertools
 from typing import Any
 
 import numpy as np
+import pytest
 
+from kora_quant.bt.evaluate import LookAheadError
+from kora_quant.scanner import detectors
+from kora_quant.scanner.guard import verify_scan_point_in_time
+from kora_quant.scanner.panel import Panel, ScanConfig, build_panel
 from kora_quant.scanner.service import ScanRequest, run_scan
 
 H = 3_600_000
@@ -80,3 +85,151 @@ def test_replayed_forecasts_sit_on_a_fixed_grid_so_rescans_deduplicate() -> None
         a, b = set(seen[0][sym]), set(seen[1][sym])
         inner = {p for p in b if min(a) <= p <= max(a)}
         assert inner <= a, sorted(inner - a)[:3]
+
+
+# --- R3-04: cross-sectional features align peers by wall-clock time -----------------------------
+
+
+def _stale_pair(seed: int, lag: int, n: int = 3000) -> tuple[dict[str, Any], dict[str, Any]]:
+    """A and B share a common factor on one hourly grid; B's history ends `lag` bars before A's
+    (venue closed, halted or stale feed at scan time)."""
+    rng = np.random.default_rng(seed)
+    m = n + lag
+    f = rng.standard_normal(m) * 0.006
+    ca = 100 * np.exp(np.cumsum(f + rng.standard_normal(m) * 0.0018))
+    cb = 100 * np.exp(np.cumsum(f + rng.standard_normal(m) * 0.0018))
+    ts = T0 + np.arange(m, dtype=np.int64) * H
+    return _wire(ts[-n:], ca[-n:]), _wire(ts[:n], cb[:n])
+
+
+def _pair_panel(a: dict[str, Any], b: dict[str, Any]) -> Panel:
+    return build_panel(
+        ["A", "B"],
+        [(x["t"], x["o"], x["h"], x["l"], x["c"], x["v"]) for x in (a, b)],
+        H,
+        ["x", "x"],
+        ["R", "R"],
+    )
+
+
+def _pair_scan(a: dict[str, Any], b: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    return run_scan(
+        ScanRequest.model_validate(
+            {
+                "timeframe": "1h",
+                "tfSeconds": 3600,
+                "width": len(a["t"]),
+                "instruments": [
+                    {"symbol": "A", "sector": "x", "region": "R", "bars": a},
+                    {"symbol": "B", "sector": "x", "region": "R", "bars": b, "costFraction": 5e-4},
+                ],
+                **extra,
+            }
+        )
+    )
+
+
+def test_stale_instrument_never_sees_peers_later_bars() -> None:
+    """B's relative strength at its last bar may only use A's bar at the same wall-clock time."""
+    a, b = _stale_pair(1, lag=4, n=400)
+    cfg = ScanConfig()
+    p = _pair_panel(a, b)
+    f = detectors.compute(p, cfg)
+    logc = np.log(p.c)
+    mom = logc - np.roll(logc, cfg.fast, axis=1)
+    col_a = int(np.nonzero(p.t[0] == p.t[1, -1])[0][0])  # A's column at B's last wall-clock time
+    assert col_a == p.width - 1 - 4
+    expected = mom[1, -1] - mom[0, col_a]
+    assert f["rs_index"][1, -1] == pytest.approx(expected, rel=1e-9)
+
+
+def test_stale_instrument_shows_no_fake_forecast_skill() -> None:
+    """The IRTC R3-04 reproduction: with right-aligned columns, B's 8-bar forecast showed skill in
+    8/8 seeds (hit rate 0.60, t 4.1) because its features held A's future bars."""
+    skilled = 0
+    for seed in range(4):
+        a, b = _stale_pair(seed, lag=4)
+        out = _pair_scan(
+            a,
+            b,
+            guard=False,
+            forecast={"horizons": [{"label": "8h", "bars": 8}], "minTrain": 300, "symbols": ["B"]},
+        )
+        sk = next(i for i in out["instruments"] if i["symbol"] == "B")["forecasts"][0]["skill"]
+        skilled += bool(sk["hasSkill"])
+    assert skilled == 0
+
+
+# --- R3-05: the look-ahead guard is never vacuous and checks prefixes by wall-clock time ---------
+
+
+def _panel(n: int = 5, w: int = 600, seed: int = 3) -> Panel:
+    rng = np.random.default_rng(seed)
+    series = []
+    for _ in range(n):
+        c = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, w)))
+        o = np.r_[100, c[:-1]]
+        series.append(
+            (
+                [T0 + k * H for k in range(w)],
+                list(o),
+                list(np.maximum(o, c) * 1.002),
+                list(np.minimum(o, c) * 0.998),
+                list(c),
+                [1.0] * w,
+            )
+        )
+    return build_panel([f"S{i}" for i in range(n)], series, H, ["a"] * n, ["r"] * n)
+
+
+def _next_bar_leak(pp: Panel, cfg: ScanConfig) -> detectors.Features:
+    """Next bar's return, NaN during the warm-up like every real detector (IRTC e_guard)."""
+    f = detectors.compute(pp, cfg)
+    r = detectors.log_returns(pp.c)
+    fut = np.full(r.shape, np.nan)
+    fut[:, :-1] = r[:, 1:]
+    fut[:, :101] = np.nan
+    f["mom_z"] = fut
+    return f
+
+
+def test_scanner_guard_catches_a_warmup_respecting_leak_with_the_old_default() -> None:
+    p, cfg = _panel(), ScanConfig()
+    full = _next_bar_leak(p, cfg)
+    for requested in (1, 2):  # the api default was 2: columns {0, w-1} compared nothing
+        with pytest.raises(LookAheadError, match="mom_z"):
+            verify_scan_point_in_time(p, cfg, full, requested, fn=_next_bar_leak)
+
+
+def test_scanner_guard_catches_the_right_aligned_cross_section_leak() -> None:
+    """The pre-fix cross-sectional mean (by column, not by time) leaks a stale instrument's peers'
+    later bars. A wall-clock prefix guard sees it; a column-prefix guard could not."""
+    p = _pair_panel(*_stale_pair(2, lag=4, n=500))
+
+    def by_column(pp: Panel, cfg: ScanConfig) -> detectors.Features:
+        f = detectors.compute(pp, cfg)
+        logc = np.log(pp.c)
+        mom = logc - np.roll(logc, cfg.fast, axis=1)
+        mom[:, : cfg.fast] = np.nan
+        f["rs_index"] = mom - mom[::-1]  # the peer at the same column, whatever its time
+        return f
+
+    cfg = ScanConfig()
+    with pytest.raises(LookAheadError, match="rs_index"):
+        verify_scan_point_in_time(p, cfg, by_column(p, cfg), 8, fn=by_column)
+
+
+def test_scanner_guard_reports_how_much_it_compared(monkeypatch: pytest.MonkeyPatch) -> None:
+    out = _pair_scan(*_stale_pair(5, lag=0, n=400), guardCheckpoints=2)
+    g = out["guard"]
+    assert g["checkpoints"] >= 8 and g["compared"] > 0 and g["passed"] is True
+
+    real = detectors.compute
+
+    def warming_up(pp: Panel, cfg: ScanConfig) -> detectors.Features:
+        return {k: np.full_like(v, np.nan) for k, v in real(pp, cfg).items()}
+
+    # Every value still warming up: nothing was compared, so the scan is not reported as verified.
+    monkeypatch.setattr(detectors, "compute", warming_up)
+    blank = _pair_scan(*_stale_pair(5, lag=0, n=400))
+    assert blank["guard"]["compared"] == 0 and blank["guard"]["passed"] is False

@@ -52,7 +52,10 @@ of the parity tolerance.
 ## Look-ahead guard
 
 Indicators are computed vectorised on the whole series, then the engine recomputes every feature on
-`bars[:t+1]` at 8 checkpoints (plus the last bar) and requires row *t* to be identical. Any difference
+`bars[:t+1]` at 12 checkpoints (IRTC R3-05: half spread evenly, half random and seeded from the data,
+never the trivial last bar) and requires **every row 0…t** to be identical, not only row *t*. A
+sparse leak (a centred pivot flag) passed the old 8-point, single-row check in 17 of 40 random
+series; it now fails in every one (`tests/test_bt_guard.py`). Any difference
 raises `LookAheadError` and the run fails with HTTP 422 ("used future data"). Tests inject a
 future-peeking indicator (must fail) and perturb future bars (past decisions must not change).
 

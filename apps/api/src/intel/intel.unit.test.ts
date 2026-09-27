@@ -106,6 +106,10 @@ describe('taxonomy', () => {
     expect(
       loadIntelConfig({ KORA_ENV: 'dev', KORA_AI_REGIME: 'off', KORA_INTEL_TIMEFRAME: '1s' }),
     ).toMatchObject({ scan: true, aiRegime: 'off', timeframe: '1h' });
+    // IRTC R3-05: the look-ahead guard never runs with fewer than 8 checkpoints.
+    expect(c.guardCheckpoints).toBe(8);
+    expect(loadIntelConfig({ KORA_INTEL_GUARD_CHECKPOINTS: '2' }).guardCheckpoints).toBe(8);
+    expect(loadIntelConfig({ KORA_INTEL_GUARD_CHECKPOINTS: '12' }).guardCheckpoints).toBe(12);
   });
 });
 

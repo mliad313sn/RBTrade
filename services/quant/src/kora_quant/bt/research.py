@@ -586,7 +586,7 @@ def signal(req: SignalRequest) -> dict[str, Any]:
         bpy = bars_per_year(tf_s)
         keys = feature_keys(d, p, req.ai_regime == "model")
         feats = compute_features(sym.bars, keys, bpy)
-        verify_point_in_time(sym.bars, keys, bpy, feats, checkpoints=3)
+        verify_point_in_time(sym.bars, keys, bpy, feats)
         ctx = EvalContext(d, p, sym, feats, tf_s)
         t = len(sym.bars) - 1
         pos = None

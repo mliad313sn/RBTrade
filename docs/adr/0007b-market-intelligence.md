@@ -30,9 +30,12 @@ the seeded calendars cover XNYS, XLON, XTKS, XHKG, XJSE, BVMF and XASX.
 ### 2. Scanner (`services/quant/src/kora_quant/scanner`, `POST /scanner/run`)
 
 - **Panel in instrument time**: each instrument's own last T bars, right-aligned. A closed venue has
-  no bars, so windows count trading bars. Cross-sectional detectors (relative strength, correlation
-  breaks) compare instruments at the same bar position; this is simpler and causal, at the cost of
-  mixing wall-clock times across venues (documented limitation).
+  no bars, so windows count trading bars. *Amended 2026-09-27 (IRTC R3-04):* comparing instruments
+  at the same bar position was **not** causal: when an instrument is stale, halted or on another
+  calendar, its column t holds an earlier time than its peers' column t, so its relative strength
+  used peers' later bars (the IRTC reproduction: 8/8 fake "skill" for a 4-bar-stale instrument).
+  Cross-sectional detectors now match peers on the bar start time (a peer with no bar at that exact
+  time is left out), so no information after the instrument's own bar close can enter.
 - **Detectors output numbers only** (20 features): ADX/ATR, slope t-stat, regime probabilities,
   breakout and channel position, band-width percentile and ATR ratio (compression), momentum and
   mean-reversion z, relative strength vs sector and region, correlation break, volume and return
@@ -47,6 +50,13 @@ the seeded calendars cover XNYS, XLON, XTKS, XHKG, XJSE, BVMF and XASX.
 - **Look-ahead guard**: every feature at bar t must equal the value computed on bars 0..t
   (prefix recomputation at checkpoints, same idea as goal 06). A leaky detector or injected future
   data raises `LookAheadError`, which the route maps to 422; the api path runs it on every scan.
+  *Amended 2026-09-27 (IRTC R3-05):* the api default of 2 checkpoints compared only column 0 (warm-up,
+  all NaN) and the last column (prefix = full), so it checked nothing while reporting "passed". Now:
+  at least 8 checkpoints (`KORA_INTEL_GUARD_CHECKPOINTS` ≥ 8), taken after the warm-up and before
+  the last bar, half spread and half random (seeded from the data); the prefix is cut by
+  **wall-clock time** (every instrument keeps its bars that started at or before T), and every bar up
+  to T is compared, not only the bar at T. The response reports `compared` (finite values checked)
+  and `passed` is false when nothing was compared.
 
 ### 3. Regime model and the goal 06 `ai_regime` hook
 

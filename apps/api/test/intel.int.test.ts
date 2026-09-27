@@ -155,7 +155,8 @@ describe('Market intelligence (goal 07B)', () => {
   it('a scan stores features, trends and forecasts, audited, with the look-ahead guard passed', async () => {
     const res = await request(http).post('/intel/scan').set(bearer(admin.token)).expect(200);
     expect(res.body).toMatchObject({ instruments: UNIVERSE.length, guard: { passed: true } });
-    expect(res.body.guard.checkpoints).toBeGreaterThanOrEqual(2);
+    expect(res.body.guard.checkpoints).toBeGreaterThanOrEqual(8); // IRTC R3-05
+    expect(res.body.guard.compared).toBeGreaterThan(0);
     expect(res.body.forecasts).toBe(UNIVERSE.length * 2);
     const feats = await ownerQuery<{ symbol: string; features: Record<string, number | null> }>(
       "SELECT symbol, features FROM intel_features WHERE timeframe = '1h'",

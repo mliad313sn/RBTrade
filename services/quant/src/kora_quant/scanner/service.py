@@ -14,7 +14,7 @@ from ..bt.models import BarsWire
 from ..sim.models import Wire
 from . import detectors
 from .forecast import FORECAST_FEATURES, ForecastConfig, forecast
-from .guard import verify_scan_point_in_time
+from .guard import MIN_CHECKPOINTS, GuardResult, verify_scan_point_in_time
 from .panel import ScanConfig, build_panel
 
 MAX_INSTRUMENTS = 2_000
@@ -64,7 +64,8 @@ class ScanRequest(Wire):
     config: ConfigWire = ConfigWire()
     width: Annotated[int, Field(ge=10, le=MAX_WIDTH)] = 1_000
     guard: bool = True
-    guard_checkpoints: Annotated[int, Field(ge=1, le=20)] = 4
+    # At least MIN_CHECKPOINTS are always used (IRTC R3-05); a smaller request is raised to it.
+    guard_checkpoints: Annotated[int, Field(ge=1, le=20)] = MIN_CHECKPOINTS
     forecast: ForecastSpec | None = None
 
 
@@ -92,8 +93,10 @@ def run_scan(req: ScanRequest) -> dict[str, Any]:
         width=min(req.width, max(len(i.bars.t) for i in ins)),
     )
     feats = detectors.compute(panel, cfg)
-    checkpoints = (
-        verify_scan_point_in_time(panel, cfg, feats, req.guard_checkpoints) if req.guard else 0
+    guard = (
+        verify_scan_point_in_time(panel, cfg, feats, req.guard_checkpoints)
+        if req.guard
+        else GuardResult(0, 0)
     )
     scan_ms = (time.perf_counter() - started) * 1000
     last = detectors.last_column(feats)
@@ -171,7 +174,13 @@ def run_scan(req: ScanRequest) -> dict[str, Any]:
         "timeframe": req.timeframe,
         "instruments": out,
         "featureNames": list(detectors.FEATURES),
-        "guard": {"enabled": req.guard, "checkpoints": checkpoints, "passed": True},
+        "guard": {
+            "enabled": req.guard,
+            "checkpoints": guard.checkpoints,
+            "compared": guard.compared,
+            # Passed = no look-ahead found AND something was actually compared (IRTC R3-05).
+            "passed": req.guard and guard.verified,
+        },
         "scanMs": round(scan_ms, 1),
         "elapsedMs": round((time.perf_counter() - started) * 1000, 1),
     }

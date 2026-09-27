@@ -58,7 +58,8 @@ def test_toy_strategy_matches_hand_computed_trades_exactly() -> None:
         assert t["barsHeld"] == held
         assert t["entrySignal"]["conditions"][0]["result"] is True
     assert out["equity"]["equity"][-1] == 99_987.91
-    assert out["guard"] == {"checkpoints": 8, "passed": True, "enabled": True}
+    # 14 bars: every row but the first and the last is a checkpoint (IRTC R3-05: at least 8).
+    assert out["guard"] == {"checkpoints": 12, "passed": True, "enabled": True}
 
 
 def test_entry_signal_records_features_and_contributions() -> None:

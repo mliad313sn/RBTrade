@@ -33,7 +33,8 @@ export function loadIntelConfig(e: NodeJS.ProcessEnv = process.env): IntelConfig
     bars: int(e.KORA_INTEL_BARS, 1000, 50, 5000),
     horizons: parseHorizons(e.KORA_INTEL_HORIZONS),
     minTrain: int(e.KORA_INTEL_MIN_TRAIN, 200, 50, 10_000),
-    guardCheckpoints: int(e.KORA_INTEL_GUARD_CHECKPOINTS, 2, 1, 20),
+    // IRTC R3-05: at least 8 (fewer compared nothing: warm-up and the full panel only).
+    guardCheckpoints: int(e.KORA_INTEL_GUARD_CHECKPOINTS, 8, 8, 20),
     news: (e.KORA_INTEL_NEWS?.trim() || (env === 'test' ? 'off' : 'on')) === 'on',
     newsIntervalMs: int(e.KORA_INTEL_NEWS_INTERVAL_MS, 900_000, 10_000, 86_400_000),
     aiRegime: e.KORA_AI_REGIME === 'off' ? 'off' : 'model',

@@ -140,34 +140,56 @@ def compute_features(bars: ind.Bars, keys: list[str], bars_per_year: float) -> d
     return out
 
 
+GUARD_CHECKPOINTS = 12
+
+
+def guard_points(n: int, checkpoints: int, seed: int) -> list[int]:
+    """Checkpoint rows for the guard (IRTC R3-05): half spread evenly, half drawn at random (seeded
+    from the data, so a run is reproducible), never the last row (prefix == full there)."""
+    if n < 2:
+        return []
+    pool = np.arange(1, n - 1) if n > 2 else np.arange(0, 1)
+    k = min(len(pool), max(checkpoints, 8))
+    spread = {int(pool[int(i)]) for i in np.linspace(0, len(pool) - 1, num=(k + 1) // 2)}
+    rest = np.setdiff1d(pool, np.fromiter(spread, dtype=np.int64))
+    drawn = np.random.default_rng(seed).choice(
+        rest, size=min(len(rest), k - len(spread)), replace=False
+    )
+    return sorted(spread | {int(x) for x in drawn})
+
+
 def verify_point_in_time(
     bars: ind.Bars,
     keys: list[str],
     bars_per_year: float,
     full: dict[str, ind.F],
-    checkpoints: int = 8,
+    checkpoints: int = GUARD_CHECKPOINTS,
 ) -> int:
-    """Recomputes features on prefixes bars[:t+1] and compares them with row t of the full run.
+    """Recomputes features on prefixes bars[:t+1] and compares them with rows 0..t of the full run.
 
-    Raises LookAheadError on any difference. Returns the number of checkpoints verified.
+    Every row of each prefix is compared, not only row t (IRTC R3-05): a leak that looks a few bars
+    ahead changes the tail of the prefix, so it is caught whenever such a bar falls near any
+    checkpoint. Raises LookAheadError on any difference. Returns the number of checkpoints verified.
     """
     n = len(bars)
     if n == 0:
         return 0
-    points = sorted({int(x) for x in np.linspace(0, n - 1, num=min(checkpoints, n))} | {n - 1})
+    seed = (n * 1_000_003 + int(bars.t[-1] // 1000)) % (2**32)
+    points = guard_points(n, checkpoints, seed)
     for t in points:
         part = compute_features(bars.prefix(t + 1), keys, bars_per_year)
         for k in keys:
-            a, b = full[k][t], part[k][t]
-            same = (math.isnan(a) and math.isnan(b)) or (
-                not math.isnan(a)
-                and not math.isnan(b)
-                and math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-12)
+            a, b = (
+                np.asarray(full[k][: t + 1], dtype=np.float64),
+                np.asarray(part[k], dtype=np.float64),
             )
-            if not same:
+            same = (np.isnan(a) & np.isnan(b)) | np.isclose(a, b, rtol=1e-9, atol=1e-12)
+            bad = np.nonzero(~same)[0]
+            if len(bad):
+                j = int(bad[-1])
                 raise LookAheadError(
-                    f"Look-ahead detected: feature {k} at bar {t} is {a} with the full series "
-                    f"but {b} "
+                    f"Look-ahead detected: feature {k} at bar {j} is {float(a[j])} with the full "
+                    f"series but {float(b[j])} "
                     "with only the bars up to it. The run used future data and was stopped."
                 )
     return len(points)
