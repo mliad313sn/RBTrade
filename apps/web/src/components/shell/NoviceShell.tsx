@@ -11,12 +11,13 @@ import { LanguageSwitch } from '@/components/novice/LanguageSwitch';
 import { PricesPausedBanner, PwaRegister } from '@/components/novice/Pwa';
 import type { MessageKey } from '@/lib/i18n';
 import { useI18n } from '@/lib/i18n/react';
-import { NOVICE_NAV } from '@/lib/modes';
+import { isProRoute, NOVICE_NAV } from '@/lib/modes';
 import { NoviceExplainThis } from '@/lib/novice/explain-copilot';
 import { registerExplainThis } from '@/lib/novice/explain-slot';
 
 import { KillSwitch } from './KillSwitch';
 import { ModeToggle } from './ModeToggle';
+import { ProRouteNotice } from './ProRouteNotice';
 import { TradingHaltBanner } from './TradingHaltBanner';
 import { UserMenu } from './UserMenu';
 import { WhatChangedNote } from './WhatChangedNote';
@@ -44,6 +45,7 @@ function useActive() {
  */
 export function NoviceShell({ children, disclosure }: { children: ReactNode; disclosure: DisclosureDocument | null }) {
   const active = useActive();
+  const pathname = usePathname();
   const { t } = useI18n();
   return (
     <div className="min-h-screen flex flex-col pb-24 md:pb-0">
@@ -68,7 +70,7 @@ export function NoviceShell({ children, disclosure }: { children: ReactNode; dis
                 <Link
                   href={n.href}
                   aria-current={active(n.href) ? 'page' : undefined}
-                  className={`inline-flex items-center h-11 px-4 rounded-full no-underline text-[15px] ${active(n.href) ? 'bg-up-surface text-accent font-semibold' : 'text-text hover:bg-raised'}`}
+                  className={`inline-flex items-center h-11 px-4 rounded-full no-underline text-[15px] ${active(n.href) ? 'bg-accent-surface text-accent font-semibold' : 'text-text hover:bg-raised'}`}
                 >
                   {t(LABELS[n.href] ?? 'nav.home')}
                 </Link>
@@ -107,7 +109,7 @@ export function NoviceShell({ children, disclosure }: { children: ReactNode; dis
       <WhatChangedNote className="px-4 md:px-10 pt-3" />
       <TradingHaltBanner className="px-4 md:px-10 pt-3" />
       <main id="main" className="flex-1 px-4 md:px-10 py-4 md:py-5">
-        {children}
+        {isProRoute(pathname) ? <ProRouteNotice /> : children}
       </main>
       <nav
         aria-label={t('shell.nav.mobile')}

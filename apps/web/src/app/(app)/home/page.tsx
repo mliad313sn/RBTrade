@@ -4,8 +4,12 @@ import { redirect } from 'next/navigation';
 import { NoviceHome } from '@/components/novice/NoviceHome';
 import { requireMe, serverClient } from '@/lib/api-server';
 import { DEFAULT_SYMBOL } from '@/lib/modes';
+import { localisedTitle } from '@/lib/i18n/metadata';
 
-export const metadata = { title: 'Home' };
+/** Localised page title (IRTC R5-12). */
+export function generateMetadata() {
+  return localisedTitle('nav.home');
+}
 
 /**
  * Novice home (goal 08). Data is fetched on the server so the balance is in the first paint

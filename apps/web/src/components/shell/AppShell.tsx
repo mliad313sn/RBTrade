@@ -6,8 +6,11 @@ import { ToastProvider } from '@kora/ui';
 import dynamic from 'next/dynamic';
 import { useEffect, type ReactNode } from 'react';
 
+import { usePathname } from 'next/navigation';
+
 import type { Locale } from '@/lib/i18n';
 import { I18nProvider } from '@/lib/i18n/react';
+import { isGovernanceRoute } from '@/lib/modes';
 import { ExplainModeProvider, type ExplainMode } from '@/lib/novice/explain-slot';
 
 import { NoviceShell } from './NoviceShell';
@@ -25,15 +28,20 @@ interface ShellExtras {
 
 function Themed({ children, locale, disclosure, explainMode }: { children: ReactNode } & ShellExtras) {
   const { me } = useShell();
-  const theme = resolveTheme(me.preferences);
-  const mode = me.preferences.viewMode;
+  const pathname = usePathname();
+  // IRTC R5-25: second- and third-line screens (risk console, internal audit, administration) belong to
+  // the Pro shell whatever the viewer's preferred view, so a risk officer never sees them under the
+  // retail banner and novice navigation.
+  const mode = isGovernanceRoute(pathname) ? 'pro' : me.preferences.viewMode;
+  const theme = resolveTheme({ ...me.preferences, viewMode: mode });
   // Goal 08: the Novice view speaks the viewer's language; Pro screens stay in English.
   const lang: Locale = mode === 'novice' ? locale : 'en';
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.colors = me.preferences.colourConvention;
+    document.documentElement.dataset.mode = mode;
     document.documentElement.lang = lang;
-  }, [theme, me.preferences.colourConvention, lang]);
+  }, [theme, me.preferences.colourConvention, lang, mode]);
   return (
     <I18nProvider locale={lang} novice={mode === 'novice'}>
       <div data-theme={theme} data-colors={me.preferences.colourConvention} data-mode={mode} className="k-root min-h-screen">

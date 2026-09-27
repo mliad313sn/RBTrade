@@ -1,6 +1,6 @@
 'use client';
 
-import type { ViewMode } from '@kora/domain';
+import { isNoviceOnly, type ViewMode } from '@kora/domain';
 import { SegmentedControl, useToast } from '@kora/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
@@ -24,6 +24,12 @@ export function ModeToggle() {
 
   const change = (target: ViewMode) => {
     if (target === mode || pending) return;
+    // IRTC R5-10: Pro needs the trader role (appropriateness, B-018). A novice-only account goes to the
+    // assessment and stays in the simple view, instead of a Pro view whose promises it cannot use.
+    if (target === 'pro' && isNoviceOnly(me.roles)) {
+      router.push('/appropriateness?from=pro');
+      return;
+    }
     start(async () => {
       try {
         const r = await api.updatePreferences({ viewMode: target });

@@ -67,6 +67,13 @@ export function isProRoute(pathname: string): boolean {
   return PRO_NAV.some((n) => pathname === n.href || pathname.startsWith(`${n.href}/`));
 }
 
+/** Second- and third-line screens: always in the Pro shell (IRTC R5-25). */
+export const GOVERNANCE_ROUTES = ['/risk', '/internal-audit', '/admin'];
+
+export function isGovernanceRoute(pathname: string): boolean {
+  return GOVERNANCE_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
+
 export const WHAT_CHANGED: Record<ViewMode, string> = {
   novice:
     'Simple view: same account and instrument. Advanced order types, market depth and the robot builder are hidden; every trade shows the most you could lose first.',

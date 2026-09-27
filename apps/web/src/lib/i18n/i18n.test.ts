@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { KILL_SWITCH_SCOPES, noviceTemplates, RISK_CODES, type RiskFactor } from '@kora/domain';
 import { describe, expect, it } from 'vitest';
 
+import appropriateness from '../../../../api/src/appropriateness/questionnaires/appropriateness.v1.json';
 import knowledgeCheck from '../../../../api/src/appropriateness/questionnaires/knowledge-check.v1.json';
 import { GLOSSARY, lessonKeys, LESSONS } from '../novice/learn';
 import { en } from './en';
@@ -149,6 +150,24 @@ describe('i18n catalogue (EN source of truth, FR complete)', () => {
       for (const o of q.options)
         expect(en[`kc.q.${q.id}.${o.id}` as keyof typeof en]).toBe(o.label);
       expect(hasKey(`kc.topic.${q.topic}`)).toBe(true);
+    }
+  });
+
+  it('the appropriateness copy matches the graded data (EN) and is translated (FR) (IRTC R5-12)', () => {
+    const e = en as Record<string, string>;
+    const f = fr as Record<string, string>;
+    expect(e['appr.q.title']).toBe(appropriateness.title);
+    expect(e['appr.q.intro']).toBe(appropriateness.intro);
+    expect(f['appr.q.title']).not.toBe(appropriateness.title);
+    for (const q of appropriateness.questions) {
+      expect(e[`appr.q.${q.id}.prompt`]).toBe(q.prompt);
+      expect(f[`appr.q.${q.id}.prompt`]).not.toBe(q.prompt);
+      expect(e[`appr.topic.${q.id}`]).toBe(q.topic);
+      expect(f[`appr.topic.${q.id}`]).toBeTruthy();
+      for (const o of q.options) {
+        expect(e[`appr.q.${q.id}.${o.id}`]).toBe(o.label);
+        expect(f[`appr.q.${q.id}.${o.id}`]).toBeTruthy();
+      }
     }
   });
 

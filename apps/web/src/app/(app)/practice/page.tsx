@@ -1,8 +1,12 @@
 import { Practice } from '@/components/sim/Practice';
 import { serverClient } from '@/lib/api-server';
 import { getT } from '@/lib/i18n/server';
+import { localisedTitle } from '@/lib/i18n/metadata';
 
-export const metadata = { title: 'Practice' };
+/** Localised page title (IRTC R5-12). */
+export function generateMetadata() {
+  return localisedTitle('nav.practice');
+}
 
 export default async function Page() {
   const [client, { locale, t }] = await Promise.all([serverClient(), getT()]);
