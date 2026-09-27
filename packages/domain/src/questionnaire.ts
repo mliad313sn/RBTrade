@@ -133,6 +133,19 @@ export const AttemptSchema = z
     questionnaireId: id,
     version: z.number().int().min(1),
     answers: z.record(id, id),
+    /**
+     * IRTC R4-09: the risk warning the user read and confirmed on the assessment page (version and
+     * content hash of the text in force). Required by the appropriateness assessment, whose pass
+     * records it as the user's acknowledgement; other questionnaires ignore it.
+     */
+    riskWarning: z
+      .object({
+        version: z.string().min(1).max(64),
+        contentHash: z.string().regex(/^[0-9a-f]{64}$/),
+        locale: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type AttemptRequest = z.infer<typeof AttemptSchema>;

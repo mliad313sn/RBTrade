@@ -252,7 +252,8 @@ export function TicketPanel() {
     }
     if (reduceOnly) b.reduceOnly = true;
     if (postOnly) b.postOnly = true;
-    if (origin === 'ai') b.source = 'ai-draft-accepted';
+    // IRTC R4-06: send the draft id; the server decides the source (ai-draft-accepted only if the order matches the draft).
+    if (origin === 'ai' && aiDraftId) b.aiDraftId = aiDraftId;
     if (type === 'oco') {
       const out = legs.map((l) => ({ type: l.type, ...(l.type !== 'stop' ? { limitPrice: l.limitPrice } : {}), ...(l.type !== 'limit' ? { stopPrice: l.stopPrice } : {}) }));
       if (out.some((l) => ('limitPrice' in l && !l.limitPrice) || ('stopPrice' in l && !l.stopPrice))) return null;
@@ -278,7 +279,7 @@ export function TicketPanel() {
     if (slPrice && !reduceOnly) b.stopLossPrice = slPrice.toFixed();
     if (tpPrice && !reduceOnly) b.takeProfitPrice = tpPrice.toFixed();
     return b;
-  }, [inst, units, symbol, side, type, tif, expireAt, reduceOnly, postOnly, origin, legs, needsLimit, needsStop, limitPrice, stopPrice, trailAmount, entryType, slPrice, tpPrice]);
+  }, [inst, units, symbol, side, type, tif, expireAt, reduceOnly, postOnly, origin, aiDraftId, legs, needsLimit, needsStop, limitPrice, stopPrice, trailAmount, entryType, slPrice, tpPrice]);
 
   const bodyKey = body ? JSON.stringify(body) : null;
   useEffect(() => {
@@ -336,7 +337,7 @@ export function TicketPanel() {
       toast.push(text, 'success', 4000);
       setConfirm(false);
       // Goal 07: the user placed the order from an AI draft; record the human decision (audited).
-      if (origin === 'ai' && aiDraftId) void recordAiDecision(aiDraftId, { decision: 'accepted', orderId: o.id });
+      if (origin === 'ai' && aiDraftId && o.source === 'ai-draft-accepted') void recordAiDecision(aiDraftId, { decision: 'accepted', orderId: o.id });
       setOrigin('manual');
       setNote(null);
       setAiDraftId(null);

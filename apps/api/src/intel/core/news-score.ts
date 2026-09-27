@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
+import { hasExecutionClaim, hasTradeSuggestion } from '../../ai/core/guards';
 import { hashOf } from '../../ai/core/hash';
+import { matchVariants } from '../../ai/core/normalise';
 import { modelSchema } from '../../ai/core/tools';
 import type { AiProvider, ProviderRequest, ProviderUsage } from '../../ai/core/types';
 import { neutralise, wrapUntrusted } from '../../ai/core/untrusted';
@@ -13,6 +15,21 @@ import { neutralise, wrapUntrusted } from '../../ai/core/untrusted';
  * candidate list — is rejected and never stored as a score. The article is wrapped as untrusted
  * data and no tools are offered, so an injected instruction has nothing to call.
  */
+
+const INJECTION_MARKERS =
+  /\b(?:ignore|disregard|forget)\s+(?:all\s+|any\s+)?(?:previous|prior|above|earlier|your)\s+(?:instructions?|rules?|prompts?)|\bsystem\s+(?:prompt|override|message)\b|\b(?:call|use|invoke)\s+(?:the\s+)?(?:tool|function)\b|\b(?:submit|place)_order\b|<\s*\/?\s*[a-z_]+\s*>/i;
+
+/**
+ * IRTC R4-05: model-written text derived from untrusted news (translated titles and summaries) is
+ * checked before it is stored or shown to a novice. Returns why it is unsafe, or null.
+ */
+export function unsafeDisplayText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  if (hasTradeSuggestion(text)) return 'trade suggestion';
+  if (hasExecutionClaim(text)) return 'execution claim';
+  if (matchVariants(text).some((v) => INJECTION_MARKERS.test(v))) return 'injection marker';
+  return null;
+}
 
 export const EVENT_TYPES = [
   'earnings',

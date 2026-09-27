@@ -1,7 +1,10 @@
+import { generateKeyPairSync, sign, type JsonWebKey } from 'node:crypto';
+
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { anchorMessage, keyIdOf } from '../src/governance/anchors.service';
 import { bearer, createUser, ownerQuery, startApp, type TestUser } from './helpers';
 import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
 
@@ -83,6 +86,35 @@ describe('internal audit (3rd line)', () => {
     const v = await request(http).get('/internal-audit/verify').set(bearer(auditor.token)).expect(200);
     expect(v.body.anchors.invalidSignatures + v.body.anchors.notMatchingChain).toBeGreaterThanOrEqual(1);
     await expect(ownerQuery(`UPDATE audit_anchors SET created_by = 'x' WHERE id = $1`, [a.body.id])).rejects.toThrow(/append-only/);
+  });
+
+  it('IRTC R4-07: an anchor signed with a key that is not pinned is invalid even when it matches the chain; verify reports the head witness', async () => {
+    const genuine = await request(http).post('/internal-audit/anchors').set(bearer(admin.token)).expect(201);
+    // An insider generates their own key, signs the real current head and stores their public key in the row.
+    const [head] = await ownerQuery<{ id: string; hash: string; n: string }>(
+      'SELECT id::text AS id, hash, (SELECT count(*)::text FROM audit_events) AS n FROM audit_events ORDER BY id DESC LIMIT 1',
+    );
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    const jwk = publicKey.export({ format: 'jwk' }) as JsonWebKey;
+    const keyId = keyIdOf(jwk);
+    const anchoredAt = new Date((await ownerQuery<{ t: Date }>('SELECT clock_timestamp() AS t'))[0]!.t.getTime() + 1000).toISOString();
+    const fields = { headId: head!.id, headHash: head!.hash, eventCount: head!.n, anchoredAt };
+    const signature = sign('sha256', Buffer.from(anchorMessage(fields)), { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    const [forged] = await ownerQuery<{ id: string }>(
+      `INSERT INTO audit_anchors (head_id, head_hash, event_count, algorithm, key_id, public_jwk, signature, created_by, anchored_at)
+       VALUES ($1, $2, $3, 'ES256', $4, $5::jsonb, $6, 'insider', $7) RETURNING id::text AS id`,
+      [head!.id, head!.hash, head!.n, keyId, JSON.stringify(jwk), signature, anchoredAt],
+    );
+    const list = await request(http).get('/internal-audit/anchors').set(bearer(auditor.token)).expect(200);
+    const row = (list.body.anchors as Array<{ id: string; signatureValid: boolean; trustedKey: boolean; matchesChain: boolean }>).find((a) => a.id === forged!.id);
+    expect(row).toMatchObject({ signatureValid: false, trustedKey: false, matchesChain: true });
+    // /audit/verify is witnessed by the latest *trusted* anchor, not the forged one.
+    const v = await request(http).get('/audit/verify').set(bearer(auditor.token)).expect(200);
+    expect(v.body.valid).toBe(true);
+    expect(v.body.anchor).toMatchObject({ anchorId: genuine.body.id, truncated: false, mismatch: false });
+    expect(v.body.anchor.eventsAfterLastAnchor).toBeGreaterThanOrEqual(1);
+    const ia = await request(http).get('/internal-audit/verify').set(bearer(auditor.token)).expect(200);
+    expect(ia.body.anchors.untrustedKeys).toBeGreaterThanOrEqual(1);
   });
 
   it('sampling per control is reproducible with the seed, recorded, and exportable as CSV', async () => {

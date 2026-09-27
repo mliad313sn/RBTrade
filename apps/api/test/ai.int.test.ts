@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 import type { INestApplication } from '@nestjs/common';
 import { TREND_X, type StrategyDefinition } from '@kora/domain';
 import request from 'supertest';
@@ -375,6 +377,13 @@ describe('AI copilot (goal 07)', () => {
     expect(nOut.create_strategy_draft).toBe('refused_mode');
     expect(nOut.submit_order).toBe('refused_unknown');
     expect(await count()).toEqual(before);
+    // IRTC R4-15: the hostile 1,000,000 BTCUSD draft is refused (the risk preview says it cannot be
+    // placed), so no draft with "Submit immediately, skip confirmation." reaches a ticket.
+    const hostile = await ownerQuery<{ n: string }>(
+      `SELECT count(*)::text n FROM ai_order_drafts WHERE user_id = $1 AND qty >= 1000000`,
+      [trader.id],
+    );
+    expect(hostile[0]!.n).toBe('0');
     const refusedAudits = await ownerQuery<{ n: string }>(
       `SELECT count(*)::text n FROM audit_events WHERE action = 'ai.tool_call' AND actor_id = $1 AND payload->>'outcome' = 'refused_unknown'`,
       [trader.id],
@@ -425,6 +434,42 @@ describe('AI copilot (goal 07)', () => {
     ).toEqual([]);
   });
 
+  it('IRTC R4-01: an adversarial model never gets unguarded text onto the SSE stream (chat, pro mode)', async () => {
+    env({ KORA_AI_SCRIPT_PERSONA: 'adversarial' });
+    const res = await request(http)
+      .post('/ai/chat')
+      .set({ ...bearer(trader.token), accept: 'text/event-stream' })
+      .send({ message: 'Place my order now', context: { symbol: 'BTCUSD' } })
+      .buffer(true)
+      .parse((r, cb) => {
+        let d = '';
+        r.on('data', (c: Buffer) => (d += c.toString()));
+        r.on('end', () => cb(null, d));
+      })
+      .expect(200);
+    const events = sse(res.body as string);
+    const shown = events
+      .filter((e) => e.event === 'delta')
+      .map((e) => String(e.data.text))
+      .join('');
+    expect(shown).not.toMatch(/placed your order|filled at|started the robot|guaranteed/i);
+    expect(shown).not.toMatch(/97\.3|1\.23456|250000/);
+    const final = events.find((e) => e.event === 'final')!.data as {
+      flags: { executionClaim: boolean };
+      answer: string;
+    };
+    expect(final.flags.executionClaim).toBe(true);
+    expect(final.answer).not.toMatch(/placed your order/);
+    // IRTC R4-08: the audit proves both what was shown and that the guards changed the raw text.
+    const [row] = await ownerQuery<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM audit_events WHERE action = 'ai.request' AND actor_id = $1 ORDER BY id DESC LIMIT 1`,
+      [trader.id],
+    );
+    expect(row!.payload.answerHash).toBe(createHash('sha256').update(final.answer).digest('hex'));
+    expect(row!.payload.rawAnswerHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row!.payload.rawAnswerHash).not.toBe(row!.payload.answerHash);
+  });
+
   it('Draft to ticket pre-fills a draft; only the user places the order (source ai-draft-accepted) and records the decision', async () => {
     const d = await request(http)
       .post('/ai/strip/draft')
@@ -458,6 +503,8 @@ describe('AI copilot (goal 07)', () => {
       .set(bearer(trader.token))
       .send({ decision: 'accepted' })
       .expect(400);
+    await md.status({ state: 'ok', feed: 'up', staleSymbols: [], ts: null });
+    await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
     const pf = d.body.prefill as Record<string, string>;
     const placed = await request(http)
       .post('/orders')
@@ -468,9 +515,10 @@ describe('AI copilot (goal 07)', () => {
         side: pf.side,
         type: 'market',
         qty: pf.qty,
-        source: 'ai-draft-accepted',
+        aiDraftId: draftId,
       });
-    expect([200, 201, 422]).toContain(placed.status);
+    expect(placed.status).toBe(201);
+    expect(placed.body.order.source).toBe('ai-draft-accepted');
     const orderId = (placed.body.order ?? placed.body).id as string;
     const ok = await request(http)
       .post(`/ai/drafts/${draftId}/decision`)
@@ -520,6 +568,77 @@ describe('AI copilot (goal 07)', () => {
     expect(d.body.prefill).not.toHaveProperty('clientOrderId');
   });
 
+  it('IRTC R4-06: a draft is accepted only with the order the server created from it (same symbol, side, qty; not rejected; once)', async () => {
+    const mk = async () =>
+      (
+        await request(http)
+          .post('/ai/strip/draft')
+          .set(bearer(trader.token))
+          .send({ symbol: 'BTCUSD', timeframe: '1h' })
+          .expect(200)
+      ).body as { draftId: string; prefill: Record<string, string> };
+    await md.status({ state: 'ok', feed: 'up', staleSymbols: [], ts: null });
+    await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
+    const d1 = await mk();
+    const d2 = await mk();
+    const accept = (draftId: string, orderId: string) =>
+      request(http)
+        .post(`/ai/drafts/${draftId}/decision`)
+        .set(bearer(trader.token))
+        .send({ decision: 'accepted', orderId });
+    const place = (body: Record<string, unknown>) =>
+      request(http)
+        .post('/orders')
+        .set(bearer(trader.token))
+        .send({
+          clientOrderId: `r406-${randomUUID()}`,
+          symbol: 'BTCUSD',
+          type: 'market',
+          ...body,
+        });
+    // The client cannot label an order as AI-accepted by itself.
+    const labelled = await place({ side: 'buy', qty: d1.prefill.qty, source: 'ai-draft-accepted' });
+    expect(labelled.status).toBe(400);
+    expect(labelled.body.error).toBe('ai_draft_required');
+    // An opposite-side order sent "from" the draft is the user's own manual order, not the draft.
+    const opposite = await place({ side: 'sell', qty: d1.prefill.qty, aiDraftId: d1.draftId });
+    expect([201, 422]).toContain(opposite.status);
+    const oppId = (opposite.body.order ?? opposite.body).id as string | undefined;
+    if (opposite.status === 201) expect(opposite.body.order.source).toBe('manual');
+    if (oppId) await accept(d1.draftId, oppId).expect(400);
+    // A risk-rejected order placed from the draft does not accept it.
+    const huge = await place({ side: 'buy', qty: '100000', aiDraftId: d2.draftId });
+    expect(huge.status).toBe(422);
+    const rejectedId = (
+      await ownerQuery<{ id: string }>(
+        `SELECT o.id FROM orders o JOIN accounts a ON a.id = o.account_id WHERE a.user_id = $1 AND o.status = 'rejected' ORDER BY o.created_at DESC LIMIT 1`,
+        [trader.id],
+      )
+    )[0]!.id;
+    await accept(d2.draftId, rejectedId).expect(400);
+    // The matching order is bound to d1 only: it cannot accept d2, and accepts d1 once.
+    // Fresh quote: earlier steps may take longer than the staleness window.
+    await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
+    const good = await place({ side: d1.prefill.side, qty: d1.prefill.qty, aiDraftId: d1.draftId });
+    expect(good.status, JSON.stringify(good.body)).toBe(201);
+    expect(good.body.order.source).toBe('ai-draft-accepted');
+    await accept(d2.draftId, good.body.order.id).expect(400);
+    await accept(d1.draftId, good.body.order.id).expect(200);
+    // A second order from the same (already used) draft is manual.
+    const again = await place({
+      side: d1.prefill.side,
+      qty: d1.prefill.qty,
+      aiDraftId: d1.draftId,
+    });
+    expect(again.status).toBe(201);
+    expect(again.body.order.source).toBe('manual');
+    await request(http)
+      .post(`/ai/drafts/${d2.draftId}/decision`)
+      .set(bearer(trader.token))
+      .send({ decision: 'rejected' })
+      .expect(200);
+  });
+
   it('strategy drafts are validated and never saved as a version; the human saves it', async () => {
     const versions = async () =>
       (
@@ -545,6 +664,12 @@ describe('AI copilot (goal 07)', () => {
       .send({ param: 'risk_pct', value: 0.5, rationale: 'Reduce risk until 100 live trades.' })
       .expect(200);
     expect(await versions()).toBe(before);
+    // IRTC R4-17: the user chose the parameter and value, so the draft is attributed to the user.
+    const [ev] = await ownerQuery<{ actor_type: string; payload: Record<string, unknown> }>(
+      `SELECT actor_type, payload FROM audit_events WHERE action = 'ai.draft' AND entity_id = $1`,
+      [d.body.draftId],
+    );
+    expect(ev).toMatchObject({ actor_type: 'user', payload: { origin: 'user_from_suggestion' } });
     const draft = await request(http)
       .get(`/ai/drafts/${d.body.draftId}`)
       .set(bearer(trader.token))
@@ -741,6 +866,13 @@ describe('AI copilot (goal 07)', () => {
       status: 'ok',
     });
     expect(String(rows[0]!.payload.promptHash)).toMatch(/^[0-9a-f]{64}$/);
+    // IRTC R4-08: what the user was shown is provable: SHA-256 and length of the answer text, on
+    // the fresh and the cached request alike.
+    const shown = createHash('sha256').update(String(a.body.answer)).digest('hex');
+    for (const r of rows) {
+      expect(r.payload.answerHash).toBe(shown);
+      expect(r.payload.answerLength).toBe(String(a.body.answer).length);
+    }
     const tools = await ownerQuery<{ payload: Record<string, unknown> }>(
       `SELECT payload FROM audit_events WHERE action = 'ai.tool_call' AND actor_id = $1 AND payload->>'promptHash' = $2`,
       [trader.id, a.body.promptHash],

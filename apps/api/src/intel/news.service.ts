@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 
 import { AiService } from '../ai/ai.service';
 import { BudgetService } from '../ai/budget.service';
+import { hashOf } from '../ai/core/hash';
 import type { ProviderUsage } from '../ai/core/types';
 import { MetricsService } from '../ai/metrics.service';
 import { AuditService } from '../audit/audit.service';
@@ -17,7 +18,7 @@ import {
   type EntityTerm,
   type NewsAdapter,
 } from './core/news-pipeline';
-import { scoreArticle, translateArticle } from './core/news-score';
+import { scoreArticle, translateArticle, unsafeDisplayText } from './core/news-score';
 import { loadIntelConfig } from './intel-config';
 import { IntelReadService } from './intel-read.service';
 import { NEWS_STUBS, NewsProviderNotConfiguredError, SimulatedNewsAdapter } from './news-adapters';
@@ -250,12 +251,13 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       return 'unavailable';
     }
     const provider = sel.provider;
-    const usage = await this.budget.usage(SYSTEM_USER, cfg).catch(() => null);
-    if (usage && usage.orgUsed >= cfg.orgDailyTokens) {
+    // IRTC R4-20: the pipeline has its own daily budget; a news burst cannot starve the copilot.
+    const usage = await this.budget.pipelineUsage(cfg).catch(() => null);
+    if (usage && usage.used >= usage.budget) {
       await store({
         status: 'budget_exceeded',
         modelId: provider.modelId,
-        errors: ['organisation token budget reached'],
+        errors: ['news pipeline token budget reached'],
       });
       return 'budget_exceeded';
     }
@@ -271,6 +273,12 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
     let tTitle: string | null = null;
     let tSummary: string | null = null;
     let promptHash: string | null = null;
+    let translation: {
+      status: string;
+      promptHash: string;
+      usage: ProviderUsage;
+      guard: string | null;
+    } | null = null;
     let status: 'ok' | 'invalid' | 'error' = 'error';
     let scores: {
       sentiment: number;
@@ -282,10 +290,20 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       if (language !== 'en') {
         const t = await translateArticle(provider, { id: articleId, title, body });
         add(t.usage);
-        if (t.status === 'ok') {
+        // IRTC R4-05: the translation is model text derived from untrusted news; it is checked
+        // before it is stored (and so before any novice sees it).
+        const guard =
+          t.status === 'ok'
+            ? (unsafeDisplayText(t.value.title) ?? unsafeDisplayText(t.value.summary))
+            : null;
+        translation = { status: t.status, promptHash: t.promptHash, usage: t.usage, guard };
+        if (t.status === 'ok' && !guard) {
           lang = t.value.language;
           tTitle = t.value.title;
           tSummary = t.value.summary;
+        } else if (t.status === 'ok') {
+          lang = t.value.language;
+          errors.push(`translation: rejected by the ${guard} check`);
         } else errors.push(...t.errors.map((e) => `translation: ${e}`));
       }
       const recent = candidates.length
@@ -318,9 +336,31 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       errors.push(String((err as Error).message).slice(0, 200));
     }
     const tokens = total.inputTokens + total.outputTokens + total.cacheWriteTokens;
-    await this.budget.add(SYSTEM_USER, cfg, tokens).catch(() => undefined);
+    await this.budget.addPipeline(cfg, tokens).catch(() => undefined);
     this.metrics.recordUsage(provider.modelId, 'news', total, cfg);
     this.metrics.requests.inc({ surface: 'news', mode: 'pro', status });
+    // IRTC R4-08: the translation is its own audited AI request, with its prompt hash and a hash of
+    // the stored (shown) text.
+    if (translation)
+      await this.audit.record({
+        actorId: SYSTEM_USER,
+        actorType: 'ai',
+        action: 'ai.request',
+        entity: 'news_article',
+        entityId: articleId,
+        payload: {
+          surface: 'news',
+          task: 'news_translate',
+          status: translation.status,
+          modelId: provider.modelId,
+          promptHash: translation.promptHash,
+          inputTokens: translation.usage.inputTokens,
+          outputTokens: translation.usage.outputTokens,
+          guard: translation.guard,
+          stored: tTitle !== null,
+          shownHash: tTitle === null ? null : hashOf({ title: tTitle, summary: tSummary }),
+        },
+      });
     const ev = await this.audit.record({
       actorId: SYSTEM_USER,
       actorType: 'ai',
@@ -330,6 +370,7 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       payload: {
         surface: 'news',
         task: 'news_score',
+        translationPromptHash: translation?.promptHash ?? null,
         status,
         modelId: provider.modelId,
         promptHash,

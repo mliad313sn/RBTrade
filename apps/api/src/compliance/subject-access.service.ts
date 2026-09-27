@@ -13,7 +13,7 @@ const SECTIONS: Array<{ id: string; sql: string; note?: string }> = [
     id: 'profile',
     sql: `SELECT id, email, display_name, identity_provider, status, failed_logins, locked_until, mfa_failed_count, mfa_lock_count, created_at, updated_at FROM users WHERE id = $1`,
   },
-  { id: 'roles', sql: `SELECT role, granted_by, granted_at FROM user_roles WHERE user_id = $1 ORDER BY role` },
+  { id: 'roles', sql: `SELECT role, granted_by, approved_by, four_eyes_request_id, granted_at FROM user_roles WHERE user_id = $1 ORDER BY role` },
   {
     id: 'known_sign_in_addresses',
     sql: `SELECT ip_hash, last_success_at FROM auth_known_ips WHERE user_id = $1 ORDER BY last_success_at`,
@@ -38,6 +38,27 @@ const SECTIONS: Array<{ id: string; sql: string; note?: string }> = [
   },
   { id: 'novice_profile', sql: `SELECT * FROM novice_profiles WHERE user_id = $1` },
   { id: 'strategies', sql: `SELECT id, name, created_at FROM strategies WHERE owner_id = $1 ORDER BY created_at` },
+  // IRTC R4-13: the rest of what KORA holds about the subject.
+  {
+    id: 'strategy_versions',
+    sql: `SELECT v.id, v.strategy_id, v.version, v.content_hash, v.definition, v.author_id, v.reason, v.created_at FROM strategy_versions v
+          JOIN strategies s ON s.id = v.strategy_id WHERE s.owner_id = $1 OR v.author_id = $1 ORDER BY v.created_at`,
+  },
+  { id: 'backtest_runs', sql: `SELECT id, strategy_id, version_id, kind, request, summary, trials_added, data_simulated, created_at FROM backtest_runs WHERE user_id = $1 ORDER BY created_at` },
+  {
+    id: 'robot_signals',
+    sql: `SELECT g.id, g.robot_id, g.symbol, g.bar_ts, g.action, g.reason, g.outcome, g.order_id, g.created_at FROM robot_signals g
+          JOIN robots r ON r.id = g.robot_id WHERE r.owner_id = $1 ORDER BY g.created_at DESC LIMIT 5000`,
+    note: 'Latest 5,000 robot decisions (stored features are included in the in-app "why" view).',
+  },
+  { id: 'robot_promotions', sql: `SELECT p.* FROM robot_promotions p JOIN robots r ON r.id = p.robot_id WHERE r.owner_id = $1 ORDER BY p.created_at` },
+  { id: 'intel_alert_events', sql: `SELECT * FROM intel_alert_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5000` },
+  { id: 'revoked_tokens', sql: `SELECT reason, revoked_at, expires_at FROM revoked_tokens WHERE user_id = $1 ORDER BY revoked_at`, note: 'Token ids are not exported.' },
+  {
+    id: 'equity_snapshots',
+    sql: `SELECT s.account_id, s.period, s.period_start, s.equity, s.created_at FROM account_equity_snapshots s
+          JOIN accounts a ON a.id = s.account_id WHERE a.user_id = $1 ORDER BY s.period_start`,
+  },
   { id: 'robots', sql: `SELECT id, name, mode, status, allocation, limits, created_at FROM robots WHERE owner_id = $1 ORDER BY created_at` },
   { id: 'ai_order_drafts', sql: `SELECT * FROM ai_order_drafts WHERE user_id = $1 ORDER BY created_at` },
   { id: 'ai_strategy_drafts', sql: `SELECT id, status, created_at FROM ai_strategy_drafts WHERE user_id = $1 ORDER BY created_at` },
@@ -55,6 +76,14 @@ const SECTIONS: Array<{ id: string; sql: string; note?: string }> = [
     id: 'audit_events',
     sql: `SELECT e.id::text AS id, e.ts, e.actor_type, e.action, e.entity, e.entity_id, e.payload FROM audit_events e WHERE e.actor_id = $1::text ORDER BY e.id DESC LIMIT 5000`,
     note: 'Your own actions (latest 5,000). The hash-chained log itself stays immutable.',
+  },
+  {
+    id: 'audit_events_about_you',
+    sql: `SELECT e.id::text AS id, e.ts, e.actor_id, e.actor_type, e.action, e.entity, e.entity_id, e.payload FROM audit_events e
+          WHERE e.actor_id <> $1::text AND (e.entity_id = $1::text OR e.entity_id IN (SELECT id::text FROM accounts WHERE user_id = $1::uuid)
+                OR e.payload->>'userId' = $1::text OR e.payload->>'accountId' IN (SELECT id::text FROM accounts WHERE user_id = $1::uuid))
+          ORDER BY e.id DESC LIMIT 5000`,
+    note: 'Events other people or the system recorded about you or your accounts (role changes, MFA resets, kill-switch actions; latest 5,000).',
   },
 ];
 

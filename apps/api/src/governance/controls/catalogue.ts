@@ -89,8 +89,9 @@ export const CONTROLS: ControlDefinition[] = [
   {
     id: 'KC-02',
     area: 'access_mfa',
-    title: 'Privileged role changes recorded and reviewed',
-    objective: 'Every grant or removal of a role is attributable and reviewed each quarter.',
+    title: 'Privileged role changes recorded, four-eyes approved and reviewed',
+    objective:
+      'Every grant or removal of a role is attributable and reviewed each quarter; granting admin, risk officer, auditor or trader needs a second admin and a reason, and nobody grants themselves a role.',
     cobit: ['DSS05.04', 'DSS06.03'],
     risk: 'Unreviewed privilege creep gives users capabilities outside their duties.',
     ownerLine: 1,
@@ -98,10 +99,15 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'quarterly',
     nature: 'detective',
     automation: 'semi-automated',
-    evidence: { kind: 'log', source: 'admin.roles_changed audit events in the period + current roster of privileged roles' },
+    evidence: {
+      kind: 'log',
+      source:
+        'admin.roles_changed audit events in the period with the four-eyes request, requester and approver; privileged grants without four-eyes (must be 0); self-granted roles now (must be 0); current roster of privileged roles',
+    },
     testProcedure: [
-      'Export the evidence for the quarter; trace every role change to a ticket or approval.',
+      'Export the evidence for the quarter; confirm "privileged grants without four-eyes" and "self-granted roles now" are 0, and trace every role change to a ticket or approval.',
       'Compare the roster with the HR joiner/mover/leaver list; any unmatched privileged user is an exception.',
+      'Re-perform: an admin granting risk_officer gets 202 and a pending role_grant request; they cannot approve it, a risk officer cannot approve it, a second admin can; an admin adding a role to themselves gets 403 self_grant (test/role-grants.int.test.ts).',
     ],
     auditActions: ['admin.roles_changed', 'appropriateness.passed'],
   },
@@ -205,8 +211,9 @@ export const CONTROLS: ControlDefinition[] = [
   {
     id: 'KC-08',
     area: 'segregation_of_duties',
-    title: 'Four-eyes on MFA resets and disclosure publications',
-    objective: 'Resetting a user’s second factor and publishing regulatory text or figures need two people.',
+    title: 'Four-eyes on MFA resets, disclosure publications and privileged role grants, with independent approvers',
+    objective:
+      'Resetting a user’s second factor, publishing regulatory text or figures and granting a privileged role need two people, and the approver’s own approval role was not granted or approved by the requester.',
     cobit: ['DSS05.04', 'MEA03.02'],
     risk: 'Social-engineered MFA reset; unreviewed disclosure text or figures shown to customers.',
     ownerLine: 2,
@@ -214,12 +221,17 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'four_eyes_requests (mfa_reset, disclosure_publish) in the period with requester, approver and outcome' },
+    evidence: {
+      kind: 'query',
+      source:
+        'four_eyes_requests (mfa_reset, disclosure_publish, role_grant) in the period with requester, approver and outcome; decisions whose approver role was granted or approved by the requester (must be 0)',
+    },
     testProcedure: [
-      'Export the evidence; confirm each approved request has a distinct approver.',
+      'Export the evidence; confirm each approved request has a distinct approver and "approver role granted by requester" is 0.',
       'Confirm each published disclosure version has approved_by ≠ drafted_by (disclosure_documents).',
+      'Re-perform: a user whose risk_officer role the requester granted cannot approve that requester (403 approver_not_independent, test/role-grants.int.test.ts).',
     ],
-    auditActions: ['auth.mfa_reset', 'disclosure.published', 'disclosure.value_set'],
+    auditActions: ['auth.mfa_reset', 'disclosure.published', 'disclosure.value_set', 'admin.roles_changed'],
   },
   // ---------------------------------------------------------------- Change management
   {
@@ -311,10 +323,14 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'daily',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'audit_anchors in the period with signature check and match against the current chain' },
+    evidence: {
+      kind: 'query',
+      source:
+        'audit_anchors in the period with the signature checked against the pinned anchor keys (never the key stored in the row), untrusted keys, match against the current chain, whether the chain was truncated or rewritten after the latest trusted anchor, and the WORM copy read back (KORA_AUDIT_ANCHOR_DIR)',
+    },
     testProcedure: [
-      'Export the evidence; confirm one anchor per day, every signature valid and every anchored hash present in the chain.',
-      'Compare two anchors with the copies in the WORM store (KORA_AUDIT_ANCHOR_DIR).',
+      'Export the evidence; confirm one anchor per day, every signature valid under a pinned key, untrusted keys 0, every anchored hash present in the chain, "truncated/mismatch after last anchor" false and WORM invalid-or-missing 0.',
+      'Re-perform: an anchor an insider signs with their own key is reported invalid (test/internal-audit.int.test.ts); a deleted tail makes /audit/verify return truncated_after_anchor (src/governance/anchors.unit.test.ts).',
     ],
     auditActions: ['internal_audit.anchor_created'],
   },
@@ -602,9 +618,10 @@ export const CONTROLS: ControlDefinition[] = [
     automation: 'automated',
     evidence: { kind: 'query', source: 'users holding trader without a passed appropriateness attempt (must be 0) + attempts in the period' },
     testProcedure: [
-      'Export the evidence; each exception must be an admin-granted role with a documented reason.',
+      'Export the evidence; each exception must be a four-eyes role_grant flagged appropriatenessOverride, with a documented reason (KC-02 evidence).',
+      'Re-perform: an admin granting trader without a reason gets 400; with a reason it becomes a pending role_grant approved by a second admin; a Keycloak token carrying trader without a passed attempt is stripped of it.',
     ],
-    auditActions: ['appropriateness.passed', 'appropriateness.failed'],
+    auditActions: ['appropriateness.passed', 'appropriateness.failed', 'admin.roles_changed'],
   },
   {
     id: 'KC-29',

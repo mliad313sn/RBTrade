@@ -2,7 +2,8 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 import { applyGuards, type GuardFlags } from './guards';
 import { hashOf } from './hash';
-import { systemPrompt, userTurn } from './prompts';
+import { groundingForModel, systemPrompt, userTurn } from './prompts';
+import { GuardedTextStream } from './stream-guard';
 import {
   dispatchTool,
   toolsFor,
@@ -27,7 +28,12 @@ export interface DraftRef {
 }
 
 export interface EngineHooks {
-  onText?: (delta: string) => void;
+  /**
+   * Guarded text for live display (IRTC R4-01): complete sentences that already passed the output
+   * guards. Raw provider deltas are never exposed. The final answer (`EngineResult.text`) replaces
+   * whatever was shown.
+   */
+  onGuardedText?: (text: string) => void;
   onToolCall?: (record: ToolCallRecord) => void | Promise<void>;
 }
 
@@ -112,13 +118,28 @@ export async function runCopilot(ask: AiAsk, opts: EngineOptions): Promise<Engin
     cacheWriteTokens: 0,
   };
   const toolCalls: ToolCallRecord[] = [];
+  // Sources the guards check figures against (the grounding exactly as the model saw it).
+  const sources = (): unknown[] => [
+    ask.grounding ? groundingForModel(ask.grounding) : {},
+    ask.context,
+    ask.message,
+    ...toolCalls.filter((t) => t.outcome === 'ok').map((t) => t.output),
+  ];
+  const onGuardedText = opts.hooks?.onGuardedText;
+  const stream = onGuardedText
+    ? new GuardedTextStream({ mode: ask.mode, sources, emit: onGuardedText })
+    : null;
   let rawText = '';
   let stopReason: string | null = null;
   let rounds = 0;
 
   for (;;) {
     rounds += 1;
-    const turn = await opts.provider.complete({ ...first, messages }, opts.hooks?.onText);
+    const turn = await opts.provider.complete(
+      { ...first, messages },
+      stream ? (delta) => stream.push(delta) : undefined,
+    );
+    stream?.endTurn();
     usage.inputTokens += turn.usage.inputTokens;
     usage.outputTokens += turn.usage.outputTokens;
     usage.cacheReadTokens += turn.usage.cacheReadTokens;
@@ -153,13 +174,7 @@ export async function runCopilot(ask: AiAsk, opts: EngineOptions): Promise<Engin
     messages.push({ role: 'user', content: results.map((r) => r.block) });
   }
 
-  const sources: unknown[] = [
-    ask.grounding ?? {},
-    ask.context,
-    ask.message,
-    ...toolCalls.filter((t) => t.outcome === 'ok').map((t) => t.output),
-  ];
-  const guarded = applyGuards({ text: rawText, mode: ask.mode, sources });
+  const guarded = applyGuards({ text: rawText, mode: ask.mode, sources: sources() });
   return {
     text: guarded.text,
     rawText,

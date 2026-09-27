@@ -60,7 +60,7 @@ export interface AcknowledgementRecord {
   jurisdiction?: string;
 }
 
-export const ACK_CONTEXTS = ['onboarding', 'banner', 'settings', 'reconfirm'] as const;
+export const ACK_CONTEXTS = ['onboarding', 'banner', 'settings', 'reconfirm', 'appropriateness'] as const;
 export type AcknowledgementContext = (typeof ACK_CONTEXTS)[number];
 
 export const DISCLOSURE_REGISTRY = Symbol('DISCLOSURE_REGISTRY');

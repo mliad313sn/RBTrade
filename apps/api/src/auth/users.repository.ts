@@ -63,12 +63,22 @@ export class UsersRepository {
     return user;
   }
 
-  async setRoles(c: Queryable, userId: string, roles: Role[], grantedBy: string | null): Promise<void> {
+  /**
+   * Replaces a user's roles. New rows record who granted them and, for a four-eyes role grant
+   * (IRTC R4-02), who approved it and the request id; existing rows keep their history.
+   */
+  async setRoles(
+    c: Queryable,
+    userId: string,
+    roles: Role[],
+    grantedBy: string | null,
+    approval: { approvedBy: string; requestId: string } | null = null,
+  ): Promise<void> {
     await c.query('DELETE FROM user_roles WHERE user_id = $1 AND NOT (role = ANY($2::text[]))', [userId, roles]);
     for (const role of roles) {
       await c.query(
-        'INSERT INTO user_roles (user_id, role, granted_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-        [userId, role, grantedBy],
+        'INSERT INTO user_roles (user_id, role, granted_by, approved_by, four_eyes_request_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
+        [userId, role, grantedBy, approval?.approvedBy ?? null, approval?.requestId ?? null],
       );
     }
   }

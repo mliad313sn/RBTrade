@@ -48,6 +48,8 @@ function table(columns: string[], rows: Row[], summary: Record<string, Cell> = {
 }
 
 const PRIVILEGED = `('trader','quant','risk_officer','admin','auditor')`;
+/** Roles whose grant needs four eyes (IRTC R4-02, PRIVILEGED_GRANT_ROLES). */
+const GRANT_PRIVILEGED = `('trader','risk_officer','admin','auditor')`;
 const LIMIT_CODES = `('MAX_ORDER_NOTIONAL','FAT_FINGER','MAX_POSITION','MAX_LEVERAGE','INSUFFICIENT_MARGIN','DAILY_LOSS_LIMIT','WEEKLY_LOSS_LIMIT','MONTHLY_LOSS_LIMIT','ORDER_RATE_LIMIT')`;
 
 /**
@@ -75,15 +77,25 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
     });
   },
   'KC-02': async ({ db }, { from, to }) => {
+    // IRTC R4-02: a change that adds admin, risk_officer, auditor or trader must carry a four-eyes
+    // request (requester ≠ approver); `added_privileged` lists what it granted.
     const rows = await db.query<Row>(
-      `SELECT id::text AS audit_id, ts, actor_id AS changed_by, entity_id AS user_id, payload->'before' AS before, payload->'after' AS after
-       FROM audit_events WHERE action = 'admin.roles_changed' AND ts >= $1 AND ts < $2 ORDER BY id`,
+      `SELECT e.id::text AS audit_id, e.ts, e.actor_id AS changed_by, e.entity_id AS user_id, e.payload->'before' AS before, e.payload->'after' AS after,
+              e.payload->>'requestId' AS four_eyes_request, e.payload->>'requestedBy' AS requested_by, e.payload->>'approvedBy' AS approved_by,
+              (SELECT string_agg(r, ' ' ORDER BY r) FROM jsonb_array_elements_text(e.payload->'after') r
+                WHERE r IN ${GRANT_PRIVILEGED} AND NOT (e.payload->'before') ? r) AS added_privileged
+       FROM audit_events e WHERE e.action = 'admin.roles_changed' AND e.ts >= $1 AND e.ts < $2 ORDER BY e.id`,
       [from, to],
     );
     const roster = await db.query<{ n: string }>(`SELECT count(DISTINCT user_id)::text AS n FROM user_roles WHERE role IN ${PRIVILEGED}`);
-    return table(['audit_id', 'ts', 'changed_by', 'user_id', 'before', 'after'], rows, {
+    const privileged = rows.filter((x) => x.added_privileged);
+    const selfGrants = await db.query<{ n: string }>(`SELECT count(*)::text AS n FROM user_roles WHERE granted_by = user_id OR approved_by = user_id`);
+    return table(['audit_id', 'ts', 'changed_by', 'user_id', 'before', 'after', 'added_privileged', 'four_eyes_request', 'requested_by', 'approved_by'], rows, {
       role_changes: rows.length,
       privileged_roster_now: Number(roster[0]?.n ?? 0),
+      privileged_grants_with_four_eyes: privileged.filter((x) => x.four_eyes_request && x.requested_by !== x.approved_by).length,
+      privileged_grants_without_four_eyes: privileged.filter((x) => !x.four_eyes_request || x.requested_by === x.approved_by).length,
+      self_granted_roles_now: Number(selfGrants[0]?.n ?? 0),
     });
   },
   'KC-03': async ({ db }, { from, to }) => {
@@ -151,7 +163,7 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
       },
     );
   },
-  'KC-08': async ({ db }, r) => fourEyes(db, r, ['mfa_reset', 'disclosure_publish']),
+  'KC-08': async ({ db }, r) => fourEyes(db, r, ['mfa_reset', 'disclosure_publish', 'role_grant']),
   'KC-09': async ({ db }, { from, to }) => {
     const rows = await db.query<Row>(
       `SELECT v.id, v.strategy_id, v.version, v.author_id, v.reason, v.content_hash, v.created_at
@@ -213,13 +225,24 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
   },
   'KC-13': async ({ anchors }, { from, to }) => {
     const list = await anchors.list(from, to);
+    // IRTC R4-07: signatures are checked against pinned keys; the head is witnessed by the latest
+    // trusted anchor (a deleted tail shows as truncated) and the WORM copy is read back.
+    const witness = await anchors.witness();
+    const worm = await anchors.wormCheck();
     return table(
-      ['id', 'anchoredAt', 'headId', 'headHash', 'eventCount', 'keyId', 'createdBy', 'signatureValid', 'matchesChain'],
+      ['id', 'anchoredAt', 'headId', 'headHash', 'eventCount', 'keyId', 'createdBy', 'signatureValid', 'trustedKey', 'matchesChain'],
       list as unknown as Row[],
       {
         anchors: list.length,
         invalid_signatures: list.filter((a) => !a.signatureValid).length,
+        untrusted_keys: list.filter((a) => !a.trustedKey).length,
         not_matching_chain: list.filter((a) => !a.matchesChain).length,
+        chain_truncated_after_last_anchor: witness?.truncated ?? false,
+        chain_mismatch_at_last_anchor: witness?.mismatch ?? false,
+        events_after_last_anchor: witness?.eventsAfterLastAnchor ?? null,
+        worm_configured: worm.configured,
+        worm_anchors: worm.fileAnchors,
+        worm_invalid_or_missing: worm.invalidSignatures + worm.missingInDatabase + worm.notMatchingChain + worm.unreadableLines,
       },
     );
   },
@@ -359,6 +382,13 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
        FROM orders WHERE source = 'ai-draft-accepted' AND created_at >= $1 AND created_at < $2`,
       [from, to],
     );
+    // IRTC R4-06: an accepted draft must name the order the server bound to it when it was placed.
+    const unbound = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM ai_order_drafts
+        WHERE status = 'accepted' AND decided_at >= $1 AND decided_at < $2
+          AND (order_id IS NULL OR placed_order_id IS NULL OR order_id <> placed_order_id)`,
+      [from, to],
+    );
     const count = (a: string) => rows.filter((x) => x.action === a).reduce((s, x) => s + Number(x.events), 0);
     const drafts = count('ai.draft');
     const accepted = count('ai.draft_accepted');
@@ -370,6 +400,7 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
       acceptance_rate_pct: accepted + rejected > 0 ? Math.round((accepted / (accepted + rejected)) * 100) : null,
       ai_draft_orders: Number(orders[0]?.n ?? 0),
       ai_draft_orders_not_placed_by_a_user: Number(orders[0]?.bad ?? 0),
+      accepted_drafts_not_bound_to_their_order: Number(unbound[0]?.n ?? 0),
     });
   },
   'KC-22': async ({ db }, { from, to }) => {
@@ -504,18 +535,26 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
 };
 
 async function fourEyes(db: DbService, { from, to }: Range, kinds: string[]): Promise<EvidenceTable> {
+  // IRTC R4-02: `approver_granted_by_requester` is true when every approval role the decider holds
+  // (admin for role grants, risk_officer/admin otherwise) was granted or approved by the requester.
   const rows = await db.query<Row>(
-    `SELECT id, kind, subject_type, subject_id, requested_by, requested_at, status, decided_by, decided_at, reason, decision_note
-     FROM four_eyes_requests WHERE kind = ANY($3::text[]) AND requested_at >= $1 AND requested_at < $2 ORDER BY requested_at`,
+    `SELECT f.id, f.kind, f.subject_type, f.subject_id, f.requested_by, f.requested_at, f.status, f.decided_by, f.decided_at, f.reason, f.decision_note,
+            (f.decided_by IS NOT NULL AND f.status IN ('approved', 'rejected') AND NOT EXISTS (
+               SELECT 1 FROM user_roles ur
+                WHERE ur.user_id = f.decided_by
+                  AND ur.role = ANY(CASE WHEN f.kind = 'role_grant' THEN ARRAY['admin'] ELSE ARRAY['risk_officer', 'admin'] END)
+                  AND ur.granted_by IS DISTINCT FROM f.requested_by AND ur.approved_by IS DISTINCT FROM f.requested_by)) AS approver_granted_by_requester
+     FROM four_eyes_requests f WHERE f.kind = ANY($3::text[]) AND f.requested_at >= $1 AND f.requested_at < $2 ORDER BY f.requested_at`,
     [from, to, kinds],
   );
   return table(
-    ['id', 'kind', 'subject_type', 'subject_id', 'requested_by', 'requested_at', 'status', 'decided_by', 'decided_at', 'reason', 'decision_note'],
+    ['id', 'kind', 'subject_type', 'subject_id', 'requested_by', 'requested_at', 'status', 'decided_by', 'decided_at', 'reason', 'decision_note', 'approver_granted_by_requester'],
     rows,
     {
       requests: rows.length,
       approved: rows.filter((x) => x.status === 'approved').length,
       requester_equals_approver: rows.filter((x) => (x.status === 'approved' || x.status === 'rejected') && x.decided_by === x.requested_by).length,
+      approver_role_granted_by_requester: rows.filter((x) => x.approver_granted_by_requester === true).length,
     },
   );
 }

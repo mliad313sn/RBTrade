@@ -3,6 +3,7 @@ import {
   canonicalJson,
   GENESIS_HASH,
   type ActorType,
+  type AnchorWitness,
   type AuditEvent,
   type ChainVerification,
   type JsonValue,
@@ -88,6 +89,17 @@ function toEvent(r: AuditRow): AuditEvent {
 @Injectable()
 export class AuditService {
   constructor(private readonly db: DbService) {}
+
+  /**
+   * IRTC R4-07: an external witness of the head (the latest trusted signed anchor), registered by
+   * the governance anchors service. A consistent rewrite or a deleted tail passes the internal
+   * recomputation; the witness does not.
+   */
+  private headWitness: (() => Promise<AnchorWitness | null>) | null = null;
+
+  registerHeadWitness(fn: () => Promise<AnchorWitness | null>): void {
+    this.headWitness = fn;
+  }
 
   /**
    * Appends one event. Pass `client` to commit atomically with a business change; the caller's
@@ -304,6 +316,17 @@ export class AuditService {
       after = rows[rows.length - 1]!.id;
       if (rows.length < pageSize) break;
     }
-    return verifier.result();
+    const result: ChainVerification = verifier.result();
+    if (!this.headWitness) return result;
+    const anchor = await this.headWitness();
+    if (anchor && (anchor.truncated || anchor.mismatch))
+      return {
+        ...result,
+        valid: false,
+        firstBrokenId: anchor.anchoredHeadId,
+        reason: anchor.truncated ? 'truncated_after_anchor' : 'anchor_mismatch',
+        anchor,
+      };
+    return { ...result, anchor };
   }
 }

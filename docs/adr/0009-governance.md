@@ -40,7 +40,7 @@ order and lands on `/internal-audit`.
 
 ### 4. One four-eyes engine
 
-`four_eyes_requests` (kinds `limit_override`, `kill_switch_resume`, `mfa_reset`, `disclosure_publish`)
+`four_eyes_requests` (kinds `limit_override`, `kill_switch_resume`, `mfa_reset`, `disclosure_publish`, `role_grant` — §4a)
 with a single invariant — **the approver is never the requester** — enforced by `FourEyesStore` (403
 `four_eyes`) and by the database (`four_eyes_guard` trigger, `four_eyes_distinct_approver` check);
 decided rows are immutable, nothing is deleted, one pending request per subject, lazy expiry
@@ -48,6 +48,33 @@ decided rows are immutable, nothing is deleted, one pending request per subject,
 approved action with both names audited. The goal 06 promotion sign-off keeps its own tables and
 trigger and is shown in the same console queue. The store lives in a global `GovernanceCoreModule` so
 the trading core can open a request (kill-switch resume) without a module cycle.
+
+### 4a. Privileged role grants are four-eyes, and approvers must be independent (IRTC R4-02, R4-10)
+
+Segregation of duties is only as strong as role assignment. Rules (2026-09-27, IRTC R4):
+
+- **Role grants.** `PUT /admin/users/:id/roles` that *adds* `admin`, `risk_officer`, `auditor` or
+  `trader` (`PRIVILEGED_GRANT_ROLES`) does not apply the change: it needs a `reason` and opens a
+  `role_grant` four-eyes request (202). Only an **admin** other than the requester and other than the
+  user concerned approves it; the approval applies the exact before→after change (refused if the roles
+  moved since) and records `granted_by` (requester), `approved_by` and `four_eyes_request_id` on the
+  new `user_roles` rows. Removals and `novice`/`quant` still apply directly.
+- **No self-grants.** Nobody adds a role to themselves (403 `self_grant`; `user_roles_no_self_grant`
+  and `user_roles_distinct_approver` constraints, migration 0121).
+- **Approver independence (every kind).** A decision (approve *or* reject) is made through an approval
+  role (`risk_officer`/`admin`; `admin` for role grants) that the requester neither granted nor
+  approved, and that is older than `KORA_APPROVER_COOLING_HOURS` (default 24 h outside dev/test, 0 in
+  dev/test). Otherwise 403 `approver_not_independent`. The check reads `user_roles`, not the token.
+- **Trader outside the assessment.** Passing the appropriateness assessment stays the normal path. An
+  admin grant of `trader` is a `role_grant` with a reason; the request records
+  `appropriatenessPassed` and, without a passed attempt, `appropriatenessOverride: true` (KC-28
+  exceptions). With Keycloak, a token carrying `trader` without a local passed attempt is stripped of
+  it for the request and in the local roles.
+- **Bootstrap.** The first admins are created by the deployment runbook (database seed), not the API.
+  With Keycloak, realm-role assignment for admin/risk_officer/auditor is governed in the IdP, whose own
+  process must mirror this rule (open item for Security, see `docs/review/IRTC-R4-fixes.md`).
+- **Evidence.** KC-02 reports privileged grants with and without four-eyes and self-granted rows; KC-08
+  covers `role_grant` and counts decisions whose approver role the requester granted or approved.
 
 ### 5. Limit loosening = platform override with four eyes
 

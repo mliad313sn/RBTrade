@@ -308,9 +308,23 @@ describe('Market intelligence (goal 07B)', () => {
     );
     expect(toyota.map((t) => t.ref)).toEqual(['7203.XTKS']);
     const audits = await ownerQuery<{ n: number }>(
-      "SELECT count(*)::int AS n FROM audit_events WHERE action = 'ai.request' AND payload->>'surface' = 'news' AND payload->>'modelId' = 'scripted:reference'",
+      "SELECT count(*)::int AS n FROM audit_events WHERE action = 'ai.request' AND payload->>'surface' = 'news' AND payload->>'task' = 'news_score' AND payload->>'modelId' = 'scripted:reference'",
     );
     expect(audits[0]!.n).toBe(NEWS_FIXTURES.length - 2);
+    // IRTC R4-08: the translation is audited as its own request with its prompt hash and a hash of
+    // the stored (shown) text; the score event links the translation prompt.
+    const tr = await ownerQuery<{ payload: Record<string, unknown> }>(
+      `SELECT e.payload FROM audit_events e JOIN news_articles a ON a.id::text = e.entity_id
+        WHERE e.action = 'ai.request' AND e.payload->>'task' = 'news_translate' AND a.external_id = 'apac-0002'`,
+    );
+    expect(tr).toHaveLength(1);
+    expect(String(tr[0]!.payload.promptHash)).toMatch(/^[0-9a-f]{64}$/);
+    expect(String(tr[0]!.payload.shownHash)).toMatch(/^[0-9a-f]{64}$/);
+    const sc = await ownerQuery<{ payload: Record<string, unknown> }>(
+      `SELECT e.payload FROM audit_events e JOIN news_articles a ON a.id::text = e.entity_id
+        WHERE e.action = 'ai.request' AND e.payload->>'task' = 'news_score' AND a.external_id = 'apac-0002'`,
+    );
+    expect(sc[0]!.payload.translationPromptHash).toBe(tr[0]!.payload.promptHash);
   });
 
   it('prompt-injection articles cannot change entities, leak canaries or break out of the wrapper', async () => {

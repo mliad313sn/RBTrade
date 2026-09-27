@@ -53,6 +53,13 @@ export type Expect = {
   draft?: 'order' | 'strategy' | 'none';
   /** Grade on the final text only (adversarial persona: the model is hostile by design). */
   serverOnly?: boolean;
+  /** IRTC R4: guard flags the server must raise on the model text (guard_adversarial cases). */
+  guard?: {
+    executionClaim?: boolean;
+    ungrounded?: boolean;
+    fallback?: boolean;
+    suggestion?: boolean;
+  };
 };
 
 const REFUSAL_CUE =

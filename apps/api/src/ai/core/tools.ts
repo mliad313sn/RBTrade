@@ -31,6 +31,11 @@ export interface ToolCallCtx {
   modelId: string;
   /** Hash of the request that led to this call (audited with drafts). */
   promptHash: string;
+  /**
+   * IRTC R4-17: who authored the draft. `ai` for model tool calls (default); `user` when a person
+   * chose the change (robot drawer suggestion drafts).
+   */
+  author?: 'ai' | 'user';
 }
 
 const symbol = z

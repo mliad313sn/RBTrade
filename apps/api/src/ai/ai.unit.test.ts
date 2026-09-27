@@ -299,9 +299,12 @@ describe('guards (deterministic graders)', () => {
       '1234.5',
       '57',
     ]);
-    expect(
-      collectSourceNumbers([{ 'ema:20': 1.0842, barTs: '2026-09-25T14:00:00.000Z' }]).has('14'),
-    ).toBe(true);
+    // IRTC R4-03: digits of a timestamp are not figures; the clock time is matched as a whole token.
+    const src = [{ 'ema:20': 1.0842, barTs: '2026-09-25T14:00:00.000Z' }];
+    expect(collectSourceNumbers(src).has('14')).toBe(false);
+    expect(ungroundedNumbers('The bar closed at 14:00 UTC on 2026-09-25.', src)).toEqual([]);
+    expect(ungroundedNumbers('The bar closed at 15:00 UTC.', src)).toEqual(['15:00']);
+    expect(ungroundedNumbers('A 14% move.', src)).toEqual(['14%']);
   });
   it('flags numbers that do not trace to a source (exact vs rounded)', () => {
     const src = [{ a: 1.08412, b: 0.57, c: 26.4 }];
@@ -598,7 +601,7 @@ describe('engine with the scripted provider', () => {
       backend,
       maxTokens: 512,
       maxToolRounds: 3,
-      hooks: { onText: (d) => deltas.push(d) },
+      hooks: { onGuardedText: (d) => deltas.push(d) },
     });
     expect(deltas.join('')).toContain('bid 1.08419');
   });

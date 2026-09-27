@@ -18,6 +18,7 @@ const KIND_LABEL: Record<FourEyesView['kind'], string> = {
   kill_switch_resume: 'Resume after firm halt',
   mfa_reset: 'MFA reset',
   disclosure_publish: 'Publish disclosure',
+  role_grant: 'Grant privileged role',
 };
 
 const exposureCols: Column<ExposureRow>[] = [

@@ -94,9 +94,16 @@ export async function apiSignIn(
     if (opts.onboarded !== false) await apiOnboard(req);
     return { email };
   }
+  // IRTC R4-09: the attempt confirms the risk warning in force.
+  const warning = (await (await req.get('/api/disclosures/risk-warning?locale=en')).json()).document as { version: string; contentHash: string };
   const attempt = await req.post('/api/appropriateness/attempts', {
     headers: CSRF,
-    data: { questionnaireId: QUESTIONNAIRE.id, version: QUESTIONNAIRE.version, answers: answerKey() },
+    data: {
+      questionnaireId: QUESTIONNAIRE.id,
+      version: QUESTIONNAIRE.version,
+      answers: answerKey(),
+      riskWarning: { version: warning.version, contentHash: warning.contentHash, locale: 'en' },
+    },
   });
   expect(attempt.status()).toBe(200);
   expect((await attempt.json()).passed).toBe(true);

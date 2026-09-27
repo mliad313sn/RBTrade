@@ -52,13 +52,19 @@ export class InternalAuditService {
   async verify(actor: string) {
     const chain = await this.audit.verify();
     const anchors = await this.anchors.list();
+    // IRTC R4-07: the chain head against the latest trusted anchor, and the WORM copy read back.
+    const worm = await this.anchors.wormCheck();
     const out = {
       chain,
       anchors: {
         count: anchors.length,
         invalidSignatures: anchors.filter((a) => !a.signatureValid).length,
+        untrustedKeys: anchors.filter((a) => !a.trustedKey).length,
         notMatchingChain: anchors.filter((a) => !a.matchesChain).length,
         latest: anchors[0] ?? null,
+        headWitness: chain.anchor ?? null,
+        eventsAfterLastAnchor: chain.anchor?.eventsAfterLastAnchor ?? null,
+        worm,
       },
       verifiedAt: new Date().toISOString(),
     };
@@ -75,6 +81,9 @@ export class InternalAuditService {
         headHash: chain.headHash,
         anchors: anchors.length,
         anchorsInvalid: out.anchors.invalidSignatures + out.anchors.notMatchingChain,
+        reason: chain.reason,
+        eventsAfterLastAnchor: out.anchors.eventsAfterLastAnchor,
+        wormInvalid: worm.invalidSignatures + worm.missingInDatabase + worm.notMatchingChain,
       },
     });
     return out;

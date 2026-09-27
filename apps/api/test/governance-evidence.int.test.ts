@@ -118,7 +118,7 @@ describe('control evidence export', () => {
     expect(kc06.body.evidence.summary.approved).toBeGreaterThanOrEqual(1);
     const kc06csv = await evidence(auditor, 'KC-06', { ...inRange, format: 'csv' }).expect(200);
     expect(kc06csv.headers['content-type']).toMatch(/text\/csv/);
-    expect(kc06csv.text.split('\r\n')[0]).toBe('id,kind,subject_type,subject_id,requested_by,requested_at,status,decided_by,decided_at,reason,decision_note');
+    expect(kc06csv.text.split('\r\n')[0]).toBe('id,kind,subject_type,subject_id,requested_by,requested_at,status,decided_by,decided_at,reason,decision_note,approver_granted_by_requester');
     expect(kc06csv.text).toContain(risk.id);
     expect(kc06csv.text).toContain(risk2.id);
     const kc06old = await evidence(auditor, 'KC-06', { ...before, format: 'csv' }).expect(200);

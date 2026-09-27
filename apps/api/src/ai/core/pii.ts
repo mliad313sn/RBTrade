@@ -23,7 +23,7 @@ export function redactPii(text: string, opts: { keepUuids?: boolean } = {}): str
 
 export function pseudonym(
   userId: string,
-  salt = process.env.KORA_AI_PSEUDONYM_SALT ?? 'kora-ai',
+  salt = process.env.KORA_AI_PSEUDONYM_SALT || 'kora-ai',
 ): string {
   return `u_${createHash('sha256').update(`${salt}:${userId}`).digest('hex').slice(0, 10)}`;
 }

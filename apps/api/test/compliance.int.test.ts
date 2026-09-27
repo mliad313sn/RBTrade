@@ -199,8 +199,15 @@ describe('compliance hooks', () => {
     expect(text).not.toContain('password_hash');
     expect(text).not.toContain('totp_secret');
     expect(text).not.toMatch(/scrypt\$/);
+    // IRTC R4-13: every table about the subject, and audit events other actors recorded about them.
+    for (const section of ['strategy_versions', 'backtest_runs', 'robot_signals', 'robot_promotions', 'intel_alert_events', 'revoked_tokens', 'equity_snapshots', 'audit_events_about_you'])
+      expect(mine.body.data, section).toHaveProperty(section);
     const onBehalf = await request(http).get(`/compliance/subject-access/${trader.id}`).set(bearer(riskA.token)).expect(200);
     expect(onBehalf.body.mode).toBe('on_behalf');
+    // The risk officer's earlier export is an event about the trader recorded by someone else.
+    const again = await request(http).get('/me/data-export').set(bearer(trader.token)).expect(200);
+    const about = again.body.data.audit_events_about_you as Array<{ action: string; actor_id: string }>;
+    expect(about.some((e) => e.action === 'privacy.subject_access_exported' && e.actor_id === riskA.id)).toBe(true);
     await request(http).get(`/compliance/subject-access/${trader.id}`).set(bearer(auditor.token)).expect(403);
     const audit = await ownerQuery<{ actor_id: string; payload: { mode: string } }>(
       `SELECT actor_id, payload FROM audit_events WHERE action = 'privacy.subject_access_exported' AND entity_id = $1 ORDER BY id`,
@@ -209,6 +216,7 @@ describe('compliance hooks', () => {
     expect(audit.map((a) => [a.actor_id, a.payload.mode])).toEqual([
       [trader.id, 'self_service'],
       [riskA.id, 'on_behalf'],
+      [trader.id, 'self_service'],
     ]);
   });
 });

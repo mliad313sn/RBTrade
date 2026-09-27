@@ -39,3 +39,11 @@
 
 - One global chain means writes are serialised. That is fine for goal 01–03 volumes. If contention appears under goal 03 load (1,000 orders in a kill switch), we will move to per-partition chains anchored in a periodic global checkpoint (BACKLOG B-006).
 - Hash anchoring outside the DB (for example daily head hash to WORM storage) is in goal 09 (BACKLOG B-007).
+- IRTC R4-07 (2026-09-27): anchors are verified only against pinned public keys (the configured signing
+  key plus `KORA_AUDIT_ANCHOR_TRUSTED_JWKS` for rotated keys), never the key stored in the anchor row.
+  `/audit/verify` compares the chain with the latest trusted anchor and fails with
+  `truncated_after_anchor` (events the anchor covers are missing) or `anchor_mismatch` (hash at the
+  anchored id differs), and reports `eventsAfterLastAnchor`. The JSON-lines WORM copy is read back
+  and checked (internal audit, KC-13). The anchoring job runs daily by default outside tests.
+  Residual: events after the latest anchor are not yet witnessed; the daily cadence bounds that
+  window, and real object-lock storage stays a deployment item.

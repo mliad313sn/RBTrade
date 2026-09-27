@@ -21,6 +21,8 @@ export interface AiConfig {
   maxToolRounds: number;
   userDailyTokens: number;
   orgDailyTokens: number;
+  /** IRTC R4-20: daily token budget of the news pipeline, separate from the copilot budgets. */
+  pipelineDailyTokens: number;
   ratePerMin: number;
   cacheTtlSeconds: number;
   orgId: string;
@@ -29,6 +31,8 @@ export interface AiConfig {
   /** USD per million tokens; used only for the cost metric. 0 when unset (cost shown as unknown). */
   prices: { input: number; output: number; cacheRead: number; cacheWrite: number };
   env: string;
+  /** IRTC R4-11: outside dev/test a secret pseudonym salt is required (the default is public). */
+  pseudonymSaltMissing: boolean;
 }
 
 function num(v: string | undefined, dflt: number, min = 0): number {
@@ -38,7 +42,8 @@ function num(v: string | undefined, dflt: number, min = 0): number {
 
 export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
   const env = e.KORA_ENV ?? 'dev';
-  const devOrTest = env === 'dev' || env === 'test';
+  // IRTC R4-12: either variable saying production makes this a production process.
+  const devOrTest = (env === 'dev' || env === 'test') && e.NODE_ENV !== 'production';
   const raw = (e.KORA_AI_PROVIDER ?? 'anthropic').trim();
   let provider: AiProviderKind = raw === 'scripted' || raw === 'replay' ? raw : 'anthropic';
   // Test doubles never serve real users: outside dev/test the provider is always the real one.
@@ -65,6 +70,7 @@ export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
     maxToolRounds: Math.floor(num(e.KORA_AI_MAX_TOOL_ROUNDS, 6, 1)),
     userDailyTokens: Math.floor(num(e.KORA_AI_USER_DAILY_TOKENS, 200_000, 0)),
     orgDailyTokens: Math.floor(num(e.KORA_AI_ORG_DAILY_TOKENS, 5_000_000, 0)),
+    pipelineDailyTokens: Math.floor(num(e.KORA_AI_PIPELINE_DAILY_TOKENS, 1_000_000, 0)),
     ratePerMin: Math.floor(num(e.KORA_AI_RATE_PER_MIN, 20, 1)),
     cacheTtlSeconds: Math.floor(num(e.KORA_AI_CACHE_TTL_S, 300, 0)),
     orgId: e.KORA_AI_ORG_ID?.trim() || 'default',
@@ -77,6 +83,7 @@ export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
       cacheWrite: num(e.KORA_AI_PRICE_CACHE_WRITE_USD_PER_MTOK, 0),
     },
     env,
+    pseudonymSaltMissing: !devOrTest && (e.KORA_AI_PSEUDONYM_SALT?.trim().length ?? 0) < 16,
   };
 }
 
@@ -85,6 +92,8 @@ export function unavailableReason(c: AiConfig): string | null {
   if (c.provider !== 'anthropic') return null;
   if (!c.model) return 'no model is configured (KORA_AI_MODEL is not set)';
   if (!c.apiKeyPresent) return 'no API key is configured';
+  if (c.pseudonymSaltMissing)
+    return 'KORA_AI_PSEUDONYM_SALT is not set (a secret of 16+ characters is required outside dev/test)';
   return null;
 }
 

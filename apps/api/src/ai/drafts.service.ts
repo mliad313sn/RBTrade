@@ -15,8 +15,19 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { DbService } from '../db/db.service';
 import { TradingRegistryService } from '../trading/trading-registry.service';
+import { sha256 } from './core/hash';
 import type { ToolCallCtx, ToolInput } from './core/tools';
+import { neutralise } from './core/untrusted';
 import { AiReadPorts } from './read-ports';
+
+/** Pre-trade risk codes that mean "too big to place" (IRTC R4-15). */
+const DRAFT_SIZE_CODES = [
+  'MAX_ORDER_NOTIONAL',
+  'FAT_FINGER',
+  'MAX_POSITION',
+  'MAX_LEVERAGE',
+  'INSUFFICIENT_MARGIN',
+];
 
 /**
  * Drafts are the copilot's only "write": an order draft pre-fills the goal 04 ticket (the user still
@@ -86,6 +97,17 @@ export class DraftsService {
       };
     }
 
+    // IRTC R4-15: a draft the risk preview says cannot be placed for its size (notional, fat finger,
+    // position, leverage, margin) is not created: the model cannot park an oversized order in a ticket.
+    const sizeCodes = String(preview.violations ?? '')
+      .split(',')
+      .filter((c) => DRAFT_SIZE_CODES.includes(c));
+    if (sizeCodes.length)
+      throw new BadRequestException({
+        error: 'draft_too_large',
+        message: `The draft is refused: the order preview rejects it for size (${sizeCodes.join(', ')}). Ask for a smaller size.`,
+      });
+
     const id = await this.db.tx(async (c) => {
       const r = await c.query<{ id: string }>(
         `INSERT INTO ai_order_drafts (user_id, surface, symbol, side, type, qty, limit_price, stop_loss_price, take_profit_price, rationale, preview, model_id)
@@ -124,13 +146,16 @@ export class DraftsService {
             qty: qty.toFixed(),
             environment: 'PAPER',
             canSubmit: false,
+            // IRTC R4-08: the model-written rationale shown in the ticket is provable.
+            rationaleHash: sha256(input.rationale),
           },
         },
         c,
       );
       return draftId;
     });
-    const note = `AI draft ${id.slice(0, 8)}: ${input.rationale.slice(0, 80)}`;
+    // IRTC R4-15: the rationale is model text; the ticket note says so and it is neutralised.
+    const note = `AI draft ${id.slice(0, 8)} · copilot's words, not advice: ${neutralise(input.rationale).slice(0, 80)}`;
     return {
       draftId: id,
       status: 'draft',
@@ -204,12 +229,13 @@ export class DraftsService {
       await this.audit.record(
         {
           actorId: ctx.user.id,
-          actorType: 'ai',
+          actorType: ctx.author === 'user' ? 'user' : 'ai',
           action: 'ai.draft',
           entity: 'ai_strategy_draft',
           entityId: draftId,
           payload: {
             kind: 'strategy',
+            origin: ctx.author === 'user' ? 'user_from_suggestion' : 'model',
             surface: ctx.surface,
             modelId: ctx.modelId,
             promptHash: ctx.promptHash,
@@ -253,8 +279,8 @@ export class DraftsService {
   }
 
   /**
-   * The human decision. Accepting an order draft links the order the user placed from the ticket
-   * (it must be theirs and carry `source: ai-draft-accepted`); accepting a strategy draft links the
+   * The human decision. Accepting an order draft links the order the server bound to it when the
+   * user placed it from the ticket (IRTC R4-06); accepting a strategy draft links the
    * version the user saved (authored by them, on that strategy). Rejecting just records it.
    */
   async decide(
@@ -279,15 +305,16 @@ export class DraftsService {
               error: 'order_required',
               message: 'Accepting an order draft needs the order you placed.',
             });
-          const o = await c.query<{ id: string; source: string; symbol: string }>(
-            `SELECT o.id, o.source, o.symbol FROM orders o JOIN accounts a ON a.id = o.account_id WHERE o.id = $1 AND a.user_id = $2`,
-            [body.orderId, userId],
+          // IRTC R4-06: only the order the server bound to this draft when it was placed (same
+          // symbol, side, type and qty, accepted by risk), and not one that was rejected since.
+          const o = await c.query<{ id: string; status: string }>(
+            `SELECT o.id, o.status FROM orders o
+               JOIN accounts a ON a.id = o.account_id
+               JOIN ai_order_drafts d ON d.placed_order_id = o.id
+              WHERE o.id = $1 AND a.user_id = $2 AND d.id = $3 AND d.user_id = $2`,
+            [body.orderId, userId, id],
           );
-          if (
-            !o.rows[0] ||
-            o.rows[0].source !== 'ai-draft-accepted' ||
-            o.rows[0].symbol !== draft.symbol
-          ) {
+          if (!o.rows[0] || o.rows[0].status === 'rejected') {
             throw new BadRequestException({
               error: 'order_mismatch',
               message: 'That order was not placed from this draft.',

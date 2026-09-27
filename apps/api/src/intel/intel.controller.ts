@@ -159,6 +159,7 @@ export class IntelController {
     res.flushHeaders();
     let closed = false;
     req.on('close', () => (closed = true));
+    // `delta` events carry only guarded sentences (IRTC R4-01); novice answers are not streamed.
     const send = (e: StreamEvent) => {
       if (closed || (e.type === 'delta' && mode === 'novice')) return;
       res.write(`event: ${e.type}\ndata: ${JSON.stringify(e.type === 'final' ? e.answer : e)}\n\n`);

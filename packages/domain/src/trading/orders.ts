@@ -119,6 +119,11 @@ export const PlaceOrderBaseSchema = z
     reduceOnly: z.boolean().default(false),
     postOnly: z.boolean().default(false),
     source: z.enum(REST_ORDER_SOURCES).default('manual'),
+    /**
+     * IRTC R4-06: the AI draft this order was placed from (ticket prefill). The server decides the
+     * source: `ai-draft-accepted` only when the order matches that draft; the client cannot set it.
+     */
+    aiDraftId: z.uuid().optional(),
   })
   .strict();
 

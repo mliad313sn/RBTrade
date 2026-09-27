@@ -149,3 +149,28 @@ processing terms are a Sponsor item (OQ-A1).
   cases; 08 places `ExplainThis`.
 - Every new tool must be added to the catalogue with a role set and a novice flag; anything that
   mutates state other than a draft is out of scope by design (ADR change required).
+
+## Amendment — IRTC R4 (2026-09-27)
+
+Independent review findings R4-01, R4-03/04/05, R4-08, R4-15/16/20 changed the gateway as follows
+(details and evidence in `docs/review/IRTC-R4-fixes.md`):
+
+- **Guarded streaming.** The engine no longer exposes provider text deltas. `GuardedTextStream`
+  holds text back to sentence boundaries and emits a sentence only after the execution-claim and
+  numeric-fidelity guards pass against the sources known so far; the first failing sentence stops
+  the stream and the guarded `final` answer replaces the preview. Novice answers are not streamed.
+- **Numeric fidelity from values.** Source figures come from numeric leaves, decimal strings and
+  KORA labels, never keys, identifiers, timestamps, links or untrusted text; UUIDs, dates and clock
+  times in answers are matched as whole tokens. A confidence/probability/hit-rate percentage must be
+  a calibrated figure with its `n` in the same sentence. Text is NFKC-normalised, invisible
+  characters removed and Unicode digits mapped before any guard; keyword guards also see
+  confusable-folded variants.
+- **Untrusted by default.** Free-text keys (names, descriptions, titles, translations, summaries,
+  sources, links, rationales) and any long string are wrapped in tool outputs and grounding alike;
+  translated news is checked before it is stored or shown to a novice.
+- **Audit of what was shown.** `ai.request` carries the SHA-256 and length of the returned answer
+  (and of the raw text when the guards changed it); translation is its own audited request.
+- **Budgets.** The check reserves one answer's worth of tokens; the news pipeline has its own budget
+  (`KORA_AI_PIPELINE_DAILY_TOKENS`).
+- **Drafts.** A draft the risk preview rejects for size is refused; the ticket labels the rationale
+  as the copilot's words; acceptance binds to the order the server created from the draft.

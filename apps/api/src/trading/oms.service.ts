@@ -31,6 +31,7 @@ import {
 
 import { OpsMetrics } from '../observability/ops-metrics.service';
 import { currentTraceparent, withSpan } from '../observability/spans';
+import { bindDraftToOrder } from '../ai/draft-binding';
 import { AuditService } from '../audit/audit.service';
 import { DbService, type Queryable } from '../db/db.service';
 import { DisclosureAcknowledgements } from '../disclosures/acknowledgements.service';
@@ -49,6 +50,8 @@ export interface Submitter {
   roles: Role[];
   actor: Actor;
   source: OrderSource;
+  /** IRTC R4-06: bind the new order to this AI draft (set by the server, see ai/draft-binding.ts). */
+  aiDraftId?: string;
 }
 
 export interface EvaluatedOrder {
@@ -218,10 +221,14 @@ export class OmsService {
     const novice = await this.isNovice(sub.userId, sub.roles, tx?.c);
     // Goal 08: cooling-off and the borrowing cap only matter for guarded accounts.
     const guard = novice ? await this.accounts.guardState(account, valuation, now, tx?.c) : null;
-    // Goal 09 (B-801): a novice-only user needs the risk warning in force acknowledged first.
-    const disclosureRequired =
-      isNoviceOnly(sub.roles) &&
-      !(await this.disclosures.isCurrent(sub.userId, RISK_WARNING_DISCLOSURE_ID, tx?.c));
+    // Goal 09 (B-801), IRTC R4-09: every account needs the risk warning in force acknowledged
+    // before an order that adds exposure (reducing orders pass; traders acknowledge when they pass
+    // the appropriateness assessment).
+    const disclosureRequired = !(await this.disclosures.isCurrent(
+      sub.userId,
+      RISK_WARNING_DISCLOSURE_ID,
+      tx?.c,
+    ));
     const rate = await this.fx.rate(inst.spec.quoteCcy, account.base_currency, now);
     const pos = valuation.positions.find((p) => p.symbol === req.symbol);
     const posQty = pos?.qty ?? new Decimal(0);
@@ -623,6 +630,8 @@ export class OmsService {
         );
         return { order, replay: false, legs: [] as OrderRow[], violations: ev.violations };
       }
+      // IRTC R4-06: only an order risk accepted binds its AI draft, in this same transaction.
+      if (sub.aiDraftId) await bindDraftToOrder(tx.c, sub.userId, sub.aiDraftId, order.id);
       order = await this.engine.transition(
         tx,
         order,
