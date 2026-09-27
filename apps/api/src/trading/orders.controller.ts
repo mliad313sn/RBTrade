@@ -109,7 +109,7 @@ export class OrdersController {
     @CurrentPrincipal() p: Principal,
     @Query(new ZodValidationPipe(CancelAllQuery)) q: z.infer<typeof CancelAllQuery>,
   ) {
-    return this.oms.cancelAll(p.sub, q.symbol);
+    return this.oms.cancelAll(p.sub, q.symbol, p.roles);
   }
 
   @Get(':id')
@@ -138,6 +138,6 @@ export class OrdersController {
     summary: 'Cancel an open order (audited). Cancelling an OCO group cancels its legs.',
   })
   cancel(@CurrentPrincipal() p: Principal, @Param('id', new ParseUUIDPipe()) id: string) {
-    return this.oms.cancel(p.sub, id);
+    return this.oms.cancel(p.sub, id, 'user_requested', { type: 'user', id: p.sub }, p.roles);
   }
 }
