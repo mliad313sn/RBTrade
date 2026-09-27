@@ -15,6 +15,7 @@ export const en = {
   'nav.autoInvest': 'Auto-invest',
   'nav.learn': 'Learn',
   'shell.env': 'Practice money',
+  'shell.envShort': 'Practice',
   'shell.envAria': 'Trading environment: practice money (paper)',
   'shell.lang.label': 'Language',
   'shell.banner.title': 'Trading can lose you money.',
@@ -295,7 +296,9 @@ export const en = {
   'review.fees': 'Fees of {fees} are already in these numbers.',
   'review.gap':
     'In very fast markets the price can jump past the safety net, so a loss can be a little larger.',
-  'review.check': 'I understand I could lose up to {loss}.',
+  // IRTC R5-20: the loss is about this much and can be larger if prices jump (see review.gap).
+  'review.check': 'I understand I could lose about {loss}, or more if prices jump.',
+  'review.rounded': 'We rounded {entered} to {used}, the closest amount this market allows.',
   'review.confirm': 'Confirm trade',
   'review.back': 'Go back',
   'review.done': 'Done. Your trade is open.',

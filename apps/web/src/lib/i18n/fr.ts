@@ -15,6 +15,7 @@ export const fr: Record<MessageKey, string> = {
   'nav.autoInvest': 'Robots',
   'nav.learn': 'Apprendre',
   'shell.env': 'Argent d’entraînement',
+  'shell.envShort': 'Entraînement',
   'shell.envAria': 'Environnement : argent d’entraînement (simulation)',
   'shell.lang.label': 'Langue',
   'shell.banner.title': 'Le trading peut vous faire perdre de l’argent.',
@@ -306,7 +307,8 @@ export const fr: Record<MessageKey, string> = {
   'review.fees': 'Les frais de {fees} sont déjà inclus dans ces chiffres.',
   'review.gap':
     'Sur un marché très rapide, le prix peut sauter au-delà du filet de sécurité, et la perte peut être un peu plus grande.',
-  'review.check': 'Je comprends que je pourrais perdre jusqu’à {loss}.',
+  'review.check': 'Je comprends que je pourrais perdre environ {loss}, ou plus si les prix sautent.',
+  'review.rounded': 'Nous avons arrondi {entered} à {used}, le montant le plus proche permis par ce marché.',
   'review.confirm': 'Confirmer le trade',
   'review.back': 'Revenir',
   'review.done': 'C’est fait. Votre trade est ouvert.',

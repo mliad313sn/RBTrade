@@ -73,7 +73,11 @@ test('onboards → sets limits → trades → reaches the limit → cooling-off 
   await expect(sheet.getByTestId('review-gain')).toContainText('you gain about');
   await expect(sheet.getByTestId('confirm-trade')).toBeDisabled();
   const loss = await page.getByTestId('most-you-could-lose').textContent();
-  await expect(sheet.getByText(`I understand I could lose up to ${loss}.`)).toBeVisible();
+  // IRTC R5-20: "about", not "up to": the line above says gaps can make the loss larger.
+  await expect(sheet.getByText(`I understand I could lose about ${loss}, or more if prices jump.`)).toBeVisible();
+  const putIn = (await sheet.innerText()).match(/You put in (\$[\d,.]+)\./)?.[1];
+  if (putIn !== '$5,000.00') await expect(sheet.getByTestId('review-rounded')).toContainText(`We rounded $5,000.00 to ${putIn}`);
+  else await expect(sheet.getByTestId('review-rounded')).toHaveCount(0);
   await sheet.getByTestId('understand').check();
   const placed = page.waitForResponse((r) => r.url().endsWith('/api/orders') && r.request().method() === 'POST');
   await sheet.getByTestId('confirm-trade').click();

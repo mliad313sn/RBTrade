@@ -78,11 +78,13 @@ export function NoviceShell({ children, disclosure }: { children: ReactNode; dis
             ))}
           </ul>
         </nav>
-        {/* Phones: row 1 = logo, language, account; row 2 = view and stop (always visible). The
-            practice-money chip shows from 640 px; on phones the banner below says it. */}
-        <div className="ml-auto md:ml-0 flex items-center gap-2 md:order-last">
-          <Chip tone="paper" role="status" aria-label={t('shell.envAria')} data-testid="env-chip" className="max-sm:hidden!">
-            {t('shell.env')}
+        {/* Phones: row 1 = logo, practice chip, language, account; row 2 = view and stop (always
+            visible). IRTC R5-26: the practice-money chip stays on phones in a short form, so PAPER is
+            always visible after scrolling past the banner (master goal). */}
+        <div className="ml-auto md:ml-0 flex flex-wrap items-center justify-end gap-2 md:order-last">
+          <Chip tone="paper" role="status" aria-label={t('shell.envAria')} data-testid="env-chip">
+            <span className="max-sm:hidden">{t('shell.env')}</span>
+            <span className="sm:hidden">{t('shell.envShort')}</span>
           </Chip>
           <LanguageSwitch />
           <UserMenu />

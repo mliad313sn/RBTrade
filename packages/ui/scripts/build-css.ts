@@ -15,7 +15,9 @@ export function tokensCss(): string {
   for (const [k, v] of Object.entries(space)) out.push(`  --k-space-${k}: ${v};`);
   out.push('}');
   for (const name of Object.keys(themes) as ThemeName[]) {
-    const sel = name === 'pro-dark' ? `:root, [data-theme='pro-dark']` : `[data-theme='novice-light']`;
+    // IRTC R5-26: the server renders <html data-theme="pro-dark"> before it knows the viewer's theme;
+    // `:root:has(...)` gives the page background the light palette from the first paint.
+    const sel = name === 'pro-dark' ? `:root, [data-theme='pro-dark']` : `[data-theme='novice-light'], :root:has(.k-root[data-theme='novice-light'])`;
     out.push(`${sel} {`);
     out.push(`  color-scheme: ${name === 'pro-dark' ? 'dark' : 'light'};`);
     for (const [k, v] of Object.entries(themes[name])) out.push(`  --k-${kebab(k)}: ${v};`);

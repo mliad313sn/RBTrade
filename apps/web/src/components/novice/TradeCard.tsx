@@ -1,6 +1,6 @@
 'use client';
 
-import { SAFETY_NET, type NoviceDirection } from '@kora/domain';
+import { dec, isDecimalString, SAFETY_NET, type NoviceDirection } from '@kora/domain';
 import { KoraApiError, type NoviceAsset, type NoviceTicketResponse } from '@kora/sdk';
 import { Button, Dialog, NumberInput, useToast } from '@kora/ui';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -310,6 +310,11 @@ export function TradeCard({
                 amount: money(ticket.amountUsed, currency),
               })}
             </p>
+            {isDecimalString(amount) && isDecimalString(ticket.amountUsed) && !dec(amount).eq(dec(ticket.amountUsed)) ? (
+              <p className="m-0 text-sm" data-testid="review-rounded">
+                {t('review.rounded', { entered: money(amount, currency), used: money(ticket.amountUsed, currency) })}
+              </p>
+            ) : null}
             <ul className="m-0 pl-5 flex flex-col gap-1">
               <li data-testid="review-loss">
                 <Rich text={t('review.loss', { loss: shown.mostYouCouldLose })} />

@@ -60,7 +60,7 @@
   --k-up-surface: #3A1616;
   --k-down-surface: #0F2A17;
 }
-[data-theme='novice-light'] {
+[data-theme='novice-light'], :root:has(.k-root[data-theme='novice-light']) {
   color-scheme: light;
   --k-bg: #F7F5F0;
   --k-panel: #FFFFFF;
