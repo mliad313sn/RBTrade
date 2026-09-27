@@ -32,7 +32,7 @@ The regression tests are:
 | R5-07 | Medium | Confirmed | `f1e7f55` | e2e `R5-01` (result line); `ticket-preview.test.ts` |
 | R5-08 | Medium | Confirmed | `27739a9` | `NumberInput.locale.test.tsx`; e2e `R5-08` |
 | R5-09 | Medium | Confirmed | `0d2f5ea` | e2e `R5-09` (Pro and FR novice) |
-| R5-10 | Medium | Confirmed | `712f7ee` | e2e `R5-10` |
+| R5-10 | Medium | Confirmed | `712f7ee`, revised in `6ecc46d` | e2e `R5-10` |
 | R5-11 | Medium | Confirmed | `6a98424` | e2e `R5-11` |
 | R5-12 | Medium | Confirmed | `712f7ee` | e2e `R5-12`; `i18n.test.ts` |
 | R5-13 | Medium | Confirmed | `0d2f5ea` | e2e `R5-13` |
@@ -47,8 +47,8 @@ The regression tests are:
 | R5-22 | Low | Confirmed | `662c710` | e2e `R5-22` |
 | R5-23 | Low | Confirmed; tile overflow and P5 colour fixed, page height and fold left open | `662c710` | manual (see below) |
 | R5-24 | Low | Confirmed | `662c710` | `PromotionChecklist.test.tsx` |
-| R5-25 | Low | Confirmed | `712f7ee` | e2e `R5-25` |
-| R5-26 | Low | Confirmed | `52cf5d4` | e2e `R5-26` |
+| R5-25 | Low | Confirmed | `712f7ee`, `7bad8dd` | e2e `R5-25`; `a11y-routes.spec.ts` (governance routes) |
+| R5-26 | Low | Confirmed | `52cf5d4`, `7bad8dd` | e2e `R5-26` |
 
 ## High
 
@@ -319,18 +319,69 @@ The regression tests are:
   e2e `R5-25` was written after the fix and **verified against a build with the fix reverted** (it failed:
   no Pro top bar), then passed with the fix. Evidence: `r5e/before/batch3-lows/…R5-25…/`.
 - **R5-26:** the practice-money chip stays on phones in a short form ("Practice" / "Entraînement"). The
-  light palette applies to `<html>` from the server render (`:root:has(.k-root[data-theme=novice-light])`
-  in the generated tokens), so a novice page no longer paints dark before hydration. e2e `R5-26`
-  (JavaScript disabled, 390 px).
+  root layout renders `<html data-theme>` from the theme the app shell resolved last time (a
+  display-only `kora_theme` cookie written by AppShell), so a returning novice's page is light from the
+  first paint. A first try with a `:root:has(...)` selector was dropped for that approach. e2e `R5-26`
+  (390 px chip; the server-rendered HTML carries `data-theme="novice-light"`). The very first page of a
+  new browser still renders dark until hydration.
 
 ## Visual-regression baseline
 
-See "Gate" for whether `terminal-visual.spec.ts` needed a new baseline. The intended visual changes on the
-terminal are the 24 px toolbar and ticket targets (R5-21) and the status-bar robots label (R5-03).
+`apps/web/e2e/terminal-visual.spec.ts-snapshots/terminal-1440-chromium-linux.png` was **regenerated
+on purpose** (commit `7bad8dd`). The old baseline is kept at `r5e/terminal-1440-baseline-before.png` and
+the new one at `r5e/baseline-new-v4.png`. The intended changes are:
+
+- the top bar and blotter are marked to market from the fixture quotes (R5-02). The fixture account was
+  also made internally consistent (equity = cash + Σ unrealized, margin = Σ position margin). Before,
+  it claimed 2,946 of unrealized P&L against 1,083 in the rows and 0 margin per position;
+- the toolbar, watchlist tools and ticket controls are 24 px (R5-21), which moves the rows by 2 px;
+- the status bar shows the robots label from the API (R5-03).
+
+The structure and perception comparisons against the prototype pass unchanged.
+
+## Issues found while running the gate
+
+- **Governance route axe test timed out** (`a11y-routes.spec.ts`, risk officer without the trader role).
+  After R5-25 that user gets the Pro rail. The rail prefetched the locked `/robots` link, and the 403
+  answer to that RSC prefetch never completed, so the page never reached network idle. Fix: locked rail
+  links are not prefetched. The middleware's 403 path for RSC prefetch requests is noted for R1.
+- **Goal 08 round-trip test** (`novice.spec.ts`: novice → Pro → back): this led to the R5-10 revision
+  above.
+- **Screen-reader spot check** asserted `aria-live` on the whole ticket preview, which is the R5-05
+  defect. It now asserts the new announcement status.
+- Two account pollers (top bar and halt banner) are now one reference-counted poller.
 
 ## Gate
 
-Filled in at the end of the correction (see below).
+This gate ran on 2026-09-27 on the final commit. It used its own databases (`kora_fix_r5_test`,
+`kora_fix_r5_e2e`) and its own ports (api 4065, web 3065, quant 8065, bot runner 4165).
+
+| Check | Result |
+|---|---|
+| `pnpm build` | pass (7/7 tasks) |
+| `pnpm lint` | pass |
+| `pnpm typecheck` | pass |
+| `pnpm test` | pass: web 92 tests (21 files, coverage thresholds met), ui 125, domain 185, api 151, sdk 16, market-data 72, bot-runner 11, ai-evals 4 |
+| `pnpm test:integration` | pass: 248 tests (40 files) |
+| `pnpm test:e2e`, run 1 | **86 passed**, 0 failed, 0 flaky (6.4 min) |
+| `pnpm test:e2e`, run 2 | **86 passed**, 0 failed, 0 flaky (6.2 min) |
+| `pnpm --filter @kora/web i18n:check` | pass (8 tests: EN/FR parity, variables, appropriateness overlay) |
+| `pnpm contrast` | 152/152 pairs pass (text 4.5:1, convention surfaces, meaning graphics 3:1) |
+| Storybook axe (`build-storybook` + `test:storybook-axe`) | 84/84 story renders, no violations |
+
+"After" screenshots are in `r5e/after/`:
+
+- `ticket_confirm_bound_to_fresh_preview.png`: the dialog for 0.5 BTC shows the same notional as the
+  fresh preview;
+- `ticket_updating_preview.png`;
+- `kill_switch_single_activation.png`;
+- `terminal_live_positions_robots.png`;
+- `portfolio.png`;
+- `fr320_home.png`;
+- `fr320_stop_tap.png`: a tap opens the French stop menu;
+- `fr_appropriateness.png`;
+- `fr_pro_route_in_simple_view.png`;
+- `fr_home_amount_and_risk_bars.png`.
 
 ## Open
 
@@ -342,3 +393,4 @@ Filled in at the end of the correction (see below).
 | Simulator page height and "Run projection" fold (R5-23) | S6 frontend (backlog) | Layout redesign |
 | French appropriateness wording | Compliance (OQ-UX3 / OQ-C1) | Needs qualified review |
 | Human screen-reader session on the new confirm step and announcements | Sponsor (human review, CHARTER §7) | Needs people |
+| Middleware 403 for RSC prefetch requests never completes (found while gating R5-25) | R1 (security) | `middleware.ts`; worked around in the UI (no prefetch of locked links) |
