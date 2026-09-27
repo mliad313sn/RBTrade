@@ -87,7 +87,15 @@ Daily (UTC) equity returns; annualisation factor = observed days per year (≈ 3
 
 - **Trials** are counted by the api, not the client: every distinct configuration evaluated for a
   strategy (backtest, optimisation, heatmap, walk-forward grid) is a row in `strategy_trials`, keyed by
-  the hash of the definition with its parameter values applied.
+  the hash of the definition with its parameter values applied **and its data context** (IRTC R3-02):
+  symbols, data window (UTC days), split (or walk-forward design) and cost override. Re-running the
+  same parameters with another split, window, symbol set or spread is a new trial.
+- **Promotion evidence** (IRTC R3-02, OQ-R8a) is only a *gate-eligible* backtest: the version's own
+  parameters and universe, all available history, the default 30 % holdout and the registry costs (no
+  `spreadTicks` override). Every run stores `gate_eligible` and the reasons when it is not. The
+  checklist deflates that run's holdout Sharpe with **every trial recorded at the time of the check**
+  (`holdout_dsr` ≥ 0.95) and needs ≥ 90 daily holdout observations (`oos_length`), next to the raw
+  OOS Sharpe and trade-count items. The backtest reports the same basis as `overfitting.holdout`.
 - **Deflated Sharpe** (Bailey & López de Prado, 2014) on the in-sample per-period Sharpe with
   N = trials and V[SR] = variance of the recorded trials' in-sample per-period Sharpes; with one trial
   it is the PSR against zero. Reproduces the paper's example (SR₀ = 0.1132, DSR = 0.9004).

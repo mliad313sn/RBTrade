@@ -5,7 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { hasAnyRole, type ChecklistItem, type Role } from '@kora/domain';
+import {
+  hasAnyRole,
+  holdoutDeflatedSharpe,
+  type ChecklistItem,
+  type HoldoutMoments,
+  type Role,
+} from '@kora/domain';
 
 import { AuditService } from '../audit/audit.service';
 import { DevIdpService } from '../auth/dev-idp.service';
@@ -15,7 +21,12 @@ import { DbService } from '../db/db.service';
 import { BacktestsService } from '../strategies/backtests.service';
 import type { RobotRow } from './robots.types';
 
-/** Checklist thresholds (SIMULATED placeholders pending Compliance, OQ-R8). */
+/**
+ * Checklist thresholds (SIMULATED placeholders pending Compliance, OQ-R8). The holdout DSR and the
+ * minimum holdout length were decided by the Product Owner under delegated Sponsor authority
+ * (OQ-R8a, IRTC R3-02): a raw OOS Sharpe is a point estimate with a standard error of about 2.7
+ * (annualised) on 50 days, so it is not a skill test on its own.
+ */
 export function promotionThresholds(env: NodeJS.ProcessEnv = process.env) {
   const n = (k: string, d: number) => {
     const v = Number(env[k] ?? '');
@@ -24,6 +35,8 @@ export function promotionThresholds(env: NodeJS.ProcessEnv = process.env) {
   return {
     minOosSharpe: n('KORA_PROMOTE_MIN_OOS_SHARPE', 0.8),
     minOosTrades: n('KORA_PROMOTE_MIN_OOS_TRADES', 100),
+    minOosDays: n('KORA_PROMOTE_MIN_OOS_DAYS', 90),
+    minHoldoutDsr: n('KORA_PROMOTE_MIN_HOLDOUT_DSR', 0.95),
     minPaperDays: n('KORA_PROMOTE_MIN_PAPER_DAYS', 30),
     maxTrackingErrorPct: n('KORA_PROMOTE_MAX_TE_PCT', 1),
   };
@@ -65,10 +78,28 @@ export class PromotionService {
     requesterId: string | null,
   ): Promise<{ items: ChecklistItem[]; complete: boolean; liveTradingEnabled: boolean }> {
     const t = promotionThresholds();
-    const bt = await this.backtests.latestBacktest(robot.version_id);
-    const s = (bt?.summary ?? {}) as { oosSharpe?: number | null; oosTrades?: number };
-    const oosSharpe = typeof s.oosSharpe === 'number' ? s.oosSharpe : null;
-    const oosTrades = s.oosTrades ?? 0;
+    // IRTC R3-02: only a gate-eligible run counts (own params and universe, all history, default
+    // holdout, registry costs), and its holdout Sharpe is deflated by every trial recorded so far.
+    const bt = await this.backtests.latestEvidenceBacktest(robot.version_id);
+    const s = (bt?.summary ?? {}) as Partial<HoldoutMoments>;
+    const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+    const oosSharpe = num(s.oosSharpe);
+    const oosTrades = num(s.oosTrades) ?? 0;
+    const oosObservations = num(s.oosObservations) ?? 0;
+    const trials = await this.backtests.trialStats(robot.strategy_id);
+    const deflated = holdoutDeflatedSharpe(
+      bt
+        ? {
+            oosSharpe,
+            oosTrades,
+            oosPeriodSharpe: num(s.oosPeriodSharpe),
+            oosObservations,
+            oosSkew: num(s.oosSkew),
+            oosKurtosis: num(s.oosKurtosis),
+          }
+        : null,
+      trials,
+    );
     const tracking = await this.db.query<{ tracking_error: number }>(
       'SELECT tracking_error FROM robot_tracking WHERE robot_id = $1 ORDER BY day DESC LIMIT $2',
       [robot.id, Math.max(1, Math.round(t.minPaperDays))],
@@ -104,6 +135,27 @@ export class PromotionService {
         label: `≥ ${t.minOosTrades} out-of-sample trades`,
         pass: oosTrades >= t.minOosTrades,
         evidence: { backtestRunId: bt?.id ?? null, oosTrades, threshold: t.minOosTrades },
+      },
+      {
+        id: 'oos_length',
+        label: `Out-of-sample holdout ≥ ${t.minOosDays} days`,
+        pass: bt !== null && oosObservations >= t.minOosDays,
+        evidence: {
+          backtestRunId: bt?.id ?? null,
+          oosObservations,
+          threshold: t.minOosDays,
+        },
+      },
+      {
+        id: 'holdout_dsr',
+        label: `Deflated Sharpe of the holdout ≥ ${t.minHoldoutDsr} (all trials counted)`,
+        pass: deflated.dsr !== null && deflated.dsr >= t.minHoldoutDsr,
+        evidence: {
+          backtestRunId: bt?.id ?? null,
+          dsr: deflated.dsr === null ? null : Number(deflated.dsr.toFixed(4)),
+          trials: deflated.trials,
+          threshold: String(t.minHoldoutDsr),
+        },
       },
       {
         id: 'paper_tracking',

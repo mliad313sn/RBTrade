@@ -155,7 +155,7 @@ export const TIMEFRAMES_FOR_ROBOTS = STRATEGY_TIMEFRAMES;
 
 /** Promotion checklist item (goal 06 §9). */
 export interface ChecklistItem {
-  id: 'oos_sharpe' | 'oos_trades' | 'paper_tracking' | 'risk_signoff';
+  id: 'oos_sharpe' | 'oos_trades' | 'oos_length' | 'holdout_dsr' | 'paper_tracking' | 'risk_signoff';
   label: string;
   pass: boolean;
   evidence: Record<string, string | number | boolean | null>;

@@ -220,6 +220,42 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .expect(404);
   });
 
+  it('IRTC R3-02: split, window, symbols and spread are part of a trial; tuned runs are never promotion evidence', async () => {
+    const run = (body: Record<string, unknown>) =>
+      request(http)
+        .post('/backtests')
+        .set(bearer(trader.token))
+        .send({ versionId: v1.id, ...body })
+        .expect(201);
+    const base = await run({});
+    expect(base.body.trialsAdded).toBe(0);
+    expect(base.body.gateEligible).toBe(true);
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ split: { oosFraction: 0.2 } }, 'custom_split'],
+      [{ spreadTicks: 0 }, 'cost_override'],
+      [{ from: T0 + 200 * H }, 'custom_window'],
+    ];
+    for (const [body, reason] of cases) {
+      const r = await run(body);
+      // Same parameters on another split, cost or window: a new trial, and not evidence.
+      expect(r.body.trialsAdded).toBe(1);
+      expect(r.body.gateEligible).toBe(false);
+      expect(r.body.gateIneligibleReasons).toContain(reason);
+      expect(r.body.overfitting.trials).toBe(r.body.trialsTotal);
+    }
+    const rows = await ownerQuery<{ gate_eligible: boolean; reasons: string[] }>(
+      `SELECT gate_eligible, evidence->'reasons' AS reasons FROM backtest_runs
+       WHERE version_id = $1 AND kind = 'backtest' ORDER BY created_at DESC LIMIT 4`,
+      [v1.id],
+    );
+    expect(rows.map((r) => r.gate_eligible)).toEqual([false, false, false, true]);
+    const ctx = await ownerQuery<{ context: { spreadTicks: number | null } }>(
+      `SELECT context FROM strategy_trials WHERE strategy_id = $1 AND context->>'spreadTicks' = '0'`,
+      [strategyId],
+    );
+    expect(ctx).toHaveLength(1);
+  });
+
   it('optimisation is capped and ranked by validation (holdout scored once); every combination is a trial', async () => {
     const big = await request(http)
       .post('/backtests/optimise')
@@ -307,10 +343,14 @@ describe('strategies, versions and research runs (goal 06)', () => {
     await request(http).get(`/backtests/${runId}`).set(bearer(other.token)).expect(404);
   });
   it('contract (goal 10): every api → quant exchange matches the quant OpenAPI', async () => {
-    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<
+      typeof validateExchanges
+    >[0];
     const traffic = proxy.exchanges.filter((x) => x.path !== '/health');
     expect(traffic.length).toBeGreaterThan(0);
-    expect([...new Set(traffic.map((x) => x.path))]).toEqual(expect.arrayContaining(['/bt/optimise', '/bt/run', '/bt/sensitivity', '/bt/walk-forward']));
+    expect([...new Set(traffic.map((x) => x.path))]).toEqual(
+      expect.arrayContaining(['/bt/optimise', '/bt/run', '/bt/sensitivity', '/bt/walk-forward']),
+    );
     expect(validateExchanges(doc, 'quant', traffic)).toEqual([]);
   });
 });

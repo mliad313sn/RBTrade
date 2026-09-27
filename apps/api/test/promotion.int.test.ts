@@ -87,6 +87,8 @@ describe('promote-to-LIVE workflow (four-eyes, TOTP, LIVE flag)', () => {
     expect(v.body.items.map((i: { id: string; pass: boolean }) => [i.id, i.pass])).toEqual([
       ['oos_sharpe', false],
       ['oos_trades', false],
+      ['oos_length', false],
+      ['holdout_dsr', false],
       ['paper_tracking', false],
       ['risk_signoff', false],
     ]);
@@ -152,15 +154,81 @@ describe('promote-to-LIVE workflow (four-eyes, TOTP, LIVE flag)', () => {
         [robotId],
       )
     )[0]!;
-    await ownerQuery(
-      `INSERT INTO backtest_runs (strategy_id, version_id, user_id, kind, request, summary, result) VALUES ($1, $2, $3, 'backtest', '{}', $4, '{}')`,
-      [r.strategy_id, r.version_id, owner.id, JSON.stringify({ oosSharpe: 1.2, oosTrades: 150 })],
+    const insertRun = (summary: Record<string, unknown>, eligible: boolean) =>
+      ownerQuery(
+        `INSERT INTO backtest_runs (strategy_id, version_id, user_id, kind, request, summary, result, gate_eligible)
+         VALUES ($1, $2, $3, 'backtest', '{}', $4, '{}', $5)`,
+        [r.strategy_id, r.version_id, owner.id, JSON.stringify(summary), eligible],
+      );
+    const passes = async () =>
+      (
+        await request(http).get(`/robots/${robotId}/promotion`).set(bearer(owner.token)).expect(200)
+      ).body.items.map((i: { id: string; pass: boolean }) => [i.id, i.pass]);
+    // IRTC R3-02: a tuned run (custom split, zero spread, ...) is not evidence, however good it looks.
+    await insertRun(
+      {
+        oosSharpe: 5.8,
+        oosTrades: 400,
+        oosPeriodSharpe: 0.5,
+        oosObservations: 200,
+        oosSkew: 0,
+        oosKurtosis: 3,
+      },
+      false,
+    );
+    expect(Object.fromEntries(await passes())).toMatchObject({
+      oos_sharpe: false,
+      oos_trades: false,
+      oos_length: false,
+      holdout_dsr: false,
+    });
+    // A noise-level holdout: high point Sharpe on 50 days fails the length and the deflated test.
+    await insertRun(
+      {
+        oosSharpe: 4.28,
+        oosTrades: 150,
+        oosPeriodSharpe: 4.28 / Math.sqrt(365),
+        oosObservations: 50,
+        oosSkew: 0,
+        oosKurtosis: 3,
+      },
+      true,
+    );
+    expect(Object.fromEntries(await passes())).toMatchObject({
+      oos_sharpe: true,
+      oos_trades: true,
+      oos_length: false,
+      holdout_dsr: false,
+    });
+    await insertRun(
+      {
+        oosSharpe: 1.2,
+        oosTrades: 150,
+        oosPeriodSharpe: 0.3,
+        oosObservations: 120,
+        oosSkew: 0,
+        oosKurtosis: 3,
+      },
+      true,
     );
     let v = await request(http)
       .get(`/robots/${robotId}/promotion`)
       .set(bearer(owner.token))
       .expect(200);
-    expect(v.body.items.map((i: { pass: boolean }) => i.pass)).toEqual([true, true, false, true]);
+    expect(v.body.items.map((i: { pass: boolean }) => i.pass)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+    ]);
+    expect(v.body.items.find((i: { id: string }) => i.id === 'holdout_dsr').evidence).toMatchObject(
+      {
+        trials: 1,
+        threshold: '0.95',
+      },
+    );
     await expect(promote(owner, robotId, code(owner)).expect(409)).resolves.toMatchObject({
       body: { error: 'checklist_incomplete' },
     });

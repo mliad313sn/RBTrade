@@ -98,6 +98,10 @@ checklist. A realised basis keeps both sides comparable without re-marking histo
 
 ### 9. Promotion stays a record, never a switch
 
+*Amended 2026-09-27 (IRTC R3-02, OQ-R8a):* the evidence is the latest **gate-eligible** backtest
+(own parameters and universe, all history, default holdout, registry costs), which must also show a
+holdout deflated Sharpe ≥ 0.95 with every recorded trial counted and ≥ 90 daily holdout observations;
+trials are keyed by configuration and data context (symbols, window, split, cost override).
 Checklist evidence: latest backtest OOS Sharpe ≥ `KORA_PROMOTE_MIN_OOS_SHARPE` and ≥ 100 OOS trades,
 ≥ 30 days paper with 30-day TE < 1 %, risk limits signed by a `risk_officer` who is neither the owner
 nor the requester, bound to the current limits hash (a limits change invalidates it; a database

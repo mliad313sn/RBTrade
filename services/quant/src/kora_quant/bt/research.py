@@ -177,6 +177,27 @@ def _overfitting(is_m: dict[str, Any], trials: int, sharpes: list[float]) -> dic
     }
 
 
+def _holdout_overfitting(
+    oos_m: dict[str, Any], trials: int, sharpes: list[float]
+) -> dict[str, Any]:
+    """DSR of the out-of-sample holdout, deflated by every trial recorded for the strategy
+    (IRTC R3-02: the promotion gate reads this basis, recomputed by the api at check time)."""
+    var = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else 0.0
+    sr = oos_m.get("periodSharpe")
+    base = {"trials": trials, "trialSharpeVariance": var, "basis": "out_of_sample_holdout"}
+    if sr is None or oos_m.get("skew") is None or oos_m.get("kurtosis") is None:
+        return {**base, "dsr": None, "sr0": None, "observations": oos_m.get("observations")}
+    dsr, sr0 = deflated_sharpe(
+        sr, int(oos_m["observations"]), float(oos_m["skew"]), float(oos_m["kurtosis"]), trials, var
+    )
+    return {
+        **base,
+        "dsr": None if dsr is None else round(dsr, 4),
+        "sr0": round(sr0, 6),
+        "observations": oos_m.get("observations"),
+    }
+
+
 def _trial_stat(
     values: dict[str, float], is_m: dict[str, Any], oos_m: dict[str, Any]
 ) -> dict[str, Any]:
@@ -222,7 +243,10 @@ def backtest(req: BacktestRunRequest) -> dict[str, Any]:
         "oosStart": split,
         "metrics": {"inSample": is_m, "outOfSample": oos_m, "all": all_m},
         "warnings": _warnings(is_m, oos_m, res),
-        "overfitting": _overfitting(is_m, trials, sharpes),
+        "overfitting": {
+            **_overfitting(is_m, trials, sharpes),
+            "holdout": _holdout_overfitting(oos_m, trials, sharpes),
+        },
         "equity": _downsample(res, req.max_points),
         "trades": [_trade_wire(t, split) for t in res.trades],
         "blocked": res.blocked,
