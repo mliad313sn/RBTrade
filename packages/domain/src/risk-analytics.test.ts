@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { dec } from './decimal.js';
 import {
+  alignedDailyReturns,
   correlationClusters,
   historicalVar,
   netExposureByCurrency,
@@ -135,5 +136,49 @@ describe('correlation clusters', () => {
     const sr = simpleReturns([100, 110, 99, 0, 5]);
     expect(sr).toHaveLength(3);
     [0.1, -0.1, -1].forEach((v, i) => expect(sr[i]).toBeCloseTo(v, 12));
+  });
+});
+
+describe('VaR and correlation inputs are aligned by date (IRTC R3-08)', () => {
+  const DAY = 86_400_000;
+  const T0 = Date.UTC(2026, 0, 5); // a Monday
+  // A 24/7 asset and a weekday-only index that closes at exactly the same prices on weekdays.
+  const crypto: Array<{ t: number; close: number }> = [];
+  const index: Array<{ t: number; close: number }> = [];
+  let p = 100;
+  for (let d = 0; d < 70; d++) {
+    p *= 1 + 0.02 * Math.sin(d * 1.7) + 0.004 * Math.cos(d * 0.3);
+    const t = T0 + d * DAY;
+    crypto.push({ t, close: p });
+    if (d % 7 < 5) index.push({ t, close: p });
+  }
+  const now = T0 + 67 * DAY + 5 * 3_600_000; // day 67 (a Friday) is still forming
+  const aligned = () => alignedDailyReturns({ C: crypto, I: index }, { now, tfMs: DAY });
+
+  it('drops the forming bar and joins on common dates (the weekend folds into Monday)', () => {
+    const r = aligned();
+    expect(r.C).toEqual(r.I);
+    const closedWeekdays = index.filter((c) => c.t + DAY <= now).length;
+    expect(closedWeekdays).toBe(index.filter((c) => c.t < T0 + 67 * DAY).length);
+    expect(r.I).toHaveLength(closedWeekdays - 1);
+    // Returns: Tue, Wed, Thu, Fri, then Fri → Mon over the weekend.
+    expect(r.C![4]).toBeCloseTo(crypto[7]!.close / crypto[4]!.close - 1, 12);
+  });
+
+  it('a perfectly hedged pair has zero VaR once dates are aligned (position-from-end did not)', () => {
+    const positions = [
+      { symbol: 'C', valueBase: 10_000 },
+      { symbol: 'I', valueBase: -10_000 },
+    ];
+    expect(historicalVar({ positions, returns: aligned() }).value).toBe('0.00');
+    const byPosition = historicalVar({
+      positions,
+      returns: {
+        C: simpleReturns(crypto.map((c) => c.close)),
+        I: simpleReturns(index.map((c) => c.close)),
+      },
+    });
+    expect(Number(byPosition.value)).toBeGreaterThan(100);
+    expect(correlationClusters(aligned()).matrix[0]![1]).toBe(1);
   });
 });

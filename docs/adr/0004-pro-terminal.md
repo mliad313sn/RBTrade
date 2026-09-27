@@ -73,7 +73,7 @@
   - An alert triggers once (`UPDATE … WHERE status='active' RETURNING`). Create, cancel and trigger are audited; the trigger is audited under the system actor `alerts-evaluator`.
 - **Risk tab: `GET /risk/summary`.**
   - Net exposure by currency (FX pairs expose both legs).
-  - One-day historical VaR(95 %), from full revaluation on up to 250 aligned daily returns, with at least 20 required. The quantile is type 7.
+  - One-day historical VaR(95 %), from full revaluation on up to 250 aligned daily returns, with at least 20 required. The quantile is type 7. *Amended 2026-09-27 (IRTC R3-08):* "aligned" now means joined on the bar date: the forming daily bar is dropped, only dates every held instrument traded are kept (a 24/7 series folds its weekend into Monday), and returns run between consecutive common dates (`alignedDailyReturns`). Before, series were matched by position from the end, which understated a long/long crypto-vs-index VaR by about 29 % and counted today's partial day as a full observation. Correlation clusters use the same aligned returns.
   - Correlation clusters: single linkage at |ρ| ≥ 0.7.
   - Daily loss against the limit.
 

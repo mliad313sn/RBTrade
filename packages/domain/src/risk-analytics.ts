@@ -92,10 +92,37 @@ export function quantile(values: readonly number[], q: number): number {
 
 export const VAR_MIN_OBSERVATIONS = 20;
 
+/**
+ * Daily returns of several instruments aligned by date (IRTC R3-08). Buckets that have not closed
+ * yet (`t + tf > now`, today's forming daily bar) are dropped; the remaining closes are joined on the
+ * bucket start and only dates every instrument traded are kept, so a 24/7 series is aggregated to
+ * the other calendar (a Monday return spans the weekend). Returns run between consecutive common
+ * dates, most recent last, all the same length.
+ */
+export function alignedDailyReturns(
+  closes: Record<string, ReadonlyArray<{ t: number; close: number }>>,
+  opts: { now: number; tfMs: number },
+): Record<string, number[]> {
+  const symbols = Object.keys(closes);
+  const done = symbols.map(
+    (s) =>
+      new Map(closes[s]!.filter((c) => c.t + opts.tfMs <= opts.now).map((c) => [c.t, c.close])),
+  );
+  const common = done.length
+    ? [...done[0]!.keys()].filter((t) => done.every((m) => m.has(t))).sort((a, b) => a - b)
+    : [];
+  return Object.fromEntries(
+    symbols.map((s, i) => [s, simpleReturns(common.map((t) => done[i]!.get(t)!))]),
+  );
+}
+
 export interface HistoricalVarInput {
   /** Current value of each position in the account currency (signed: shorts negative). */
   positions: Array<{ symbol: string; valueBase: number }>;
-  /** Daily simple returns per symbol, aligned by date (most recent last). */
+  /**
+   * Daily simple returns per symbol, aligned by date (most recent last): use `alignedDailyReturns`.
+   * The last N values of each series are read position by position.
+   */
   returns: Record<string, number[]>;
   confidence?: number;
   maxObservations?: number;

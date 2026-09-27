@@ -1,11 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  alignedDailyReturns,
   correlationClusters,
   dec,
   historicalVar,
   netExposureByCurrency,
-  simpleReturns,
   type Decimal,
 } from '@kora/domain';
 
@@ -81,16 +81,18 @@ export class RiskController {
       (c) => rates.get(c) ?? null,
     );
 
-    // Daily returns of each held instrument (SIMULATED history).
-    const returns: Record<string, number[]> = {};
+    // Daily returns of each held instrument (SIMULATED history), aligned by date with the forming
+    // daily bar dropped (IRTC R3-08): calendars differ across venues (24/7 crypto vs weekday index).
+    const closes: Record<string, Array<{ t: number; close: number }>> = {};
     for (const { v } of positions) {
       const { candles } = await this.candles.get({
         symbol: v.symbol,
         tf: '1D',
-        limit: VAR_LOOKBACK_DAYS + 1,
+        limit: VAR_LOOKBACK_DAYS + 2,
       });
-      returns[v.symbol] = simpleReturns(candles.map((c) => Number(c.close)));
+      closes[v.symbol] = candles.map((c) => ({ t: c.t, close: Number(c.close) }));
     }
+    const returns = alignedDailyReturns(closes, { now: Date.now(), tfMs: 86_400_000 });
     const valued = positions
       .filter(({ v }) => v.mark && v.fxRate)
       .map(({ v }) => ({
