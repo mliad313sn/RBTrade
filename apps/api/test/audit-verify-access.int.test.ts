@@ -26,17 +26,36 @@ describe('GET /audit/verify access (IRTC R1-08)', () => {
     vi.useRealTimers();
   });
 
-  const verify = (token: string, ip: string) => request(http).get('/audit/verify').set(bearer(token)).set('X-Forwarded-For', ip);
+  const verify = (token: string, ip: string) =>
+    request(http).get('/audit/verify').set(bearer(token)).set('X-Forwarded-For', ip);
 
   it('a novice or trader gets a self-scoped result without the platform count or head hash', async () => {
     const t = await createUser(app, 'trader');
-    await request(http).post('/kill-switch').set(bearer(t.token)).send({ scope: 'robots' }).expect(202);
+    await request(http)
+      .post('/kill-switch')
+      .set(bearer(t.token))
+      .send({ scope: 'robots' })
+      .expect(202);
     // other people's activity after the user's last event
-    for (let i = 0; i < 30; i++) await audit.record({ actorId: 'system', actorType: 'system', action: 'test.noise', entity: 'test', entityId: String(i) });
-    const { n, head } = (await ownerQuery<{ n: number; head: string }>(
-      'SELECT count(*)::int AS n, (SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1) AS head FROM audit_events',
-    ))[0]!;
-    const { own } = (await ownerQuery<{ own: number }>('SELECT count(*)::int AS own FROM audit_events WHERE actor_id = $1', [t.id]))[0]!;
+    for (let i = 0; i < 30; i++)
+      await audit.record({
+        actorId: 'system',
+        actorType: 'system',
+        action: 'test.noise',
+        entity: 'test',
+        entityId: String(i),
+      });
+    const { n, head } = (
+      await ownerQuery<{ n: number; head: string }>(
+        'SELECT count(*)::int AS n, (SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1) AS head FROM audit_events',
+      )
+    )[0]!;
+    const { own } = (
+      await ownerQuery<{ own: number }>(
+        'SELECT count(*)::int AS own FROM audit_events WHERE actor_id = $1',
+        [t.id],
+      )
+    )[0]!;
     const res = await verify(t.token, '198.51.100.31').expect(200);
     expect(res.body).toMatchObject({ valid: true, scope: 'own', firstBrokenId: null });
     expect(res.body.count).toBeGreaterThanOrEqual(own);
@@ -47,7 +66,9 @@ describe('GET /audit/verify access (IRTC R1-08)', () => {
   it('auditors, risk officers and admins verify the whole chain', async () => {
     const auditor = await createUser(app, 'novice', ['auditor']);
     const risk = await createUser(app, 'trader', ['risk_officer']);
-    const { n } = (await ownerQuery<{ n: number }>('SELECT count(*)::int AS n FROM audit_events'))[0]!;
+    const { n } = (
+      await ownerQuery<{ n: number }>('SELECT count(*)::int AS n FROM audit_events')
+    )[0]!;
     for (const [u, ip] of [
       [auditor, '198.51.100.32'],
       [risk, '198.51.100.33'],
@@ -60,7 +81,11 @@ describe('GET /audit/verify access (IRTC R1-08)', () => {
 
   it('the self-scoped check still detects a tampered own event', async () => {
     const u = await createUser(app, 'novice');
-    await request(http).post('/kill-switch').set(bearer(u.token)).send({ scope: 'robots' }).expect(202);
+    await request(http)
+      .post('/kill-switch')
+      .set(bearer(u.token))
+      .send({ scope: 'robots' })
+      .expect(202);
     const [target] = await ownerQuery<{ id: string; payload: unknown }>(
       "SELECT id::text AS id, payload FROM audit_events WHERE action = 'kill_switch.requested' AND actor_id = $1",
       [u.id],
@@ -74,7 +99,12 @@ describe('GET /audit/verify access (IRTC R1-08)', () => {
     await tamper({ scope: 'robots_cancel_flatten' });
     try {
       const res = await verify(u.token, '198.51.100.34').expect(200);
-      expect(res.body).toMatchObject({ valid: false, scope: 'own', firstBrokenId: target!.id, reason: 'hash_mismatch' });
+      expect(res.body).toMatchObject({
+        valid: false,
+        scope: 'own',
+        firstBrokenId: target!.id,
+        reason: 'hash_mismatch',
+      });
     } finally {
       await tamper(target!.payload);
     }

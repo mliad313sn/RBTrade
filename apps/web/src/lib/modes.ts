@@ -42,7 +42,11 @@ export const HOME: Record<ViewMode, string> = { pro: '/terminal', novice: '/home
 
 /** Goal 09: an internal auditor (3rd line, no operating role) lands on the internal audit view. */
 export function landingPath(roles: readonly string[], mode: ViewMode): string {
-  if (roles.includes('auditor') && !roles.some((r) => ['trader', 'quant', 'risk_officer', 'admin'].includes(r))) return '/internal-audit';
+  if (
+    roles.includes('auditor') &&
+    !roles.some((r) => ['trader', 'quant', 'risk_officer', 'admin'].includes(r))
+  )
+    return '/internal-audit';
   return HOME[mode];
 }
 

@@ -1,6 +1,12 @@
 import type { KillSwitchScope } from '@kora/domain';
 
-import type { CreateAlert, DepthSnapshot, PriceAlertDto, Timeframe, WatchlistDto } from '@kora/domain';
+import type {
+  CreateAlert,
+  DepthSnapshot,
+  PriceAlertDto,
+  Timeframe,
+  WatchlistDto,
+} from '@kora/domain';
 
 import type {
   CalendarResponse,
@@ -40,7 +46,14 @@ import type {
   UpdatePreferences,
   UserPreferences,
 } from './types.js';
-import type { PaperAnalytics, PaperProjection, PaperProjectRequest, ProjectRequest, SavedScenario, SimResult } from './sim-types.js';
+import type {
+  PaperAnalytics,
+  PaperProjection,
+  PaperProjectRequest,
+  ProjectRequest,
+  SavedScenario,
+  SimResult,
+} from './sim-types.js';
 import type {
   AutoInvestList,
   DisclosureAcknowledgement,
@@ -92,7 +105,11 @@ export class KoraClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { accept: 'application/json', 'x-kora-csrf': '1', ...this.opts.headers };
+    const headers: Record<string, string> = {
+      accept: 'application/json',
+      'x-kora-csrf': '1',
+      ...this.opts.headers,
+    };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (this.opts.token) headers.authorization = `Bearer ${this.opts.token}`;
     const res = await this.f(`${this.base}${path}`, {
@@ -106,7 +123,9 @@ export class KoraClient {
     const data: unknown = text ? JSON.parse(text) : undefined;
     if (!res.ok) {
       const b = (data ?? {}) as { error?: string; message?: string | string[] };
-      const message = Array.isArray(b.message) ? b.message.join(', ') : (b.message ?? res.statusText);
+      const message = Array.isArray(b.message)
+        ? b.message.join(', ')
+        : (b.message ?? res.statusText);
       throw new KoraApiError(res.status, b.error ?? `http_${res.status}`, message, data);
     }
     return data as T;
@@ -118,7 +137,11 @@ export class KoraClient {
 
   /** Everyone signs up as novice (B-018); Pro trading needs the appropriateness assessment. */
   signup(input: { email: string; password: string; displayName: string }) {
-    return this.request<{ accepted: true; mfaRequired: boolean; next: 'sign_in' }>('POST', '/auth/signup', input);
+    return this.request<{ accepted: true; mfaRequired: boolean; next: 'sign_in' }>(
+      'POST',
+      '/auth/signup',
+      input,
+    );
   }
 
   login(email: string, password: string) {
@@ -135,7 +158,10 @@ export class KoraClient {
 
   /** B-902: second factor with a one-time recovery code. */
   mfaRecovery(mfaToken: string, recoveryCode: string) {
-    return this.request<MfaRecoveryResponse>('POST', '/auth/mfa/recovery', { mfaToken, recoveryCode });
+    return this.request<MfaRecoveryResponse>('POST', '/auth/mfa/recovery', {
+      mfaToken,
+      recoveryCode,
+    });
   }
 
   /** B-902: replace the recovery codes (needs a fresh 6-digit code). */
@@ -160,11 +186,23 @@ export class KoraClient {
   }
 
   updatePreferences(patch: UpdatePreferences) {
-    return this.request<{ preferences: UserPreferences; capabilities: Capabilities }>('PUT', '/me/preferences', patch);
+    return this.request<{ preferences: UserPreferences; capabilities: Capabilities }>(
+      'PUT',
+      '/me/preferences',
+      patch,
+    );
   }
 
-  killSwitch(scope: KillSwitchScope, source: 'ui_button' | 'hotkey' | 'rest_fallback' = 'ui_button', reason?: string) {
-    return this.request<KillSwitchResponse>('POST', '/kill-switch', { scope, source, ...(reason ? { reason } : {}) });
+  killSwitch(
+    scope: KillSwitchScope,
+    source: 'ui_button' | 'hotkey' | 'rest_fallback' = 'ui_button',
+    reason?: string,
+  ) {
+    return this.request<KillSwitchResponse>('POST', '/kill-switch', {
+      scope,
+      source,
+      ...(reason ? { reason } : {}),
+    });
   }
 
   killSwitchState() {
@@ -173,14 +211,23 @@ export class KoraClient {
 
   resumeTrading(reason: string, accountId?: string) {
     return this.request<
-      | { resumed: true; accountId: string; previous: { scope: KillSwitchScope | null; haltedAt: string | null; haltedBy: string | null } }
+      | {
+          resumed: true;
+          accountId: string;
+          previous: {
+            scope: KillSwitchScope | null;
+            haltedAt: string | null;
+            haltedBy: string | null;
+          };
+        }
       // Goal 09: a firm halt answers 202 with a four-eyes request a second person approves.
-      | { resumed: false; accountId: string; pendingApproval: { id: string; status: string; requestedBy: string; expiresAt: string }; message: string }
-    >(
-      'POST',
-      `/kill-switch/resume${query({ accountId })}`,
-      { reason },
-    );
+      | {
+          resumed: false;
+          accountId: string;
+          pendingApproval: { id: string; status: string; requestedBy: string; expiresAt: string };
+          message: string;
+        }
+    >('POST', `/kill-switch/resume${query({ accountId })}`, { reason });
   }
 
   // ---- trading (goal 03) ----
@@ -210,7 +257,10 @@ export class KoraClient {
     return this.request<OrderDetail>('GET', `/orders/${encodeURIComponent(id)}`);
   }
 
-  amendOrder(id: string, patch: { qty?: string; limitPrice?: string; stopPrice?: string; trailAmount?: string }) {
+  amendOrder(
+    id: string,
+    patch: { qty?: string; limitPrice?: string; stopPrice?: string; trailAmount?: string },
+  ) {
     return this.request<OrderDto>('PATCH', `/orders/${encodeURIComponent(id)}`, patch);
   }
 
@@ -219,20 +269,32 @@ export class KoraClient {
   }
 
   positions() {
-    return this.request<{ accountId: string; currency: string; positions: PositionDto[] }>('GET', '/positions');
+    return this.request<{ accountId: string; currency: string; positions: PositionDto[] }>(
+      'GET',
+      '/positions',
+    );
   }
 
   closePosition(symbol: string) {
-    return this.request<PlaceOrderResponse>('POST', `/positions/${encodeURIComponent(symbol)}/close`);
+    return this.request<PlaceOrderResponse>(
+      'POST',
+      `/positions/${encodeURIComponent(symbol)}/close`,
+    );
   }
 
   fills(q: { limit?: number; before?: string; symbol?: string } = {}) {
-    return this.request<{ accountId: string; currency: string; fills: FillDto[] }>('GET', `/fills${query(q)}`);
+    return this.request<{ accountId: string; currency: string; fills: FillDto[] }>(
+      'GET',
+      `/fills${query(q)}`,
+    );
   }
 
   /** Cancels every open order (optionally one symbol) through the engine; each cancel is audited. */
   cancelAllOrders(symbol?: string) {
-    return this.request<{ accountId: string; cancelled: number; orders: OrderDto[] }>('DELETE', `/orders${query({ symbol })}`);
+    return this.request<{ accountId: string; cancelled: number; orders: OrderDto[] }>(
+      'DELETE',
+      `/orders${query({ symbol })}`,
+    );
   }
 
   // ---- Pro terminal (goal 04) ----
@@ -294,7 +356,12 @@ export class KoraClient {
     answers: Record<string, string>,
     riskWarning: { version: string; contentHash: string; locale: DisclosureLocale },
   ) {
-    return this.request<AttemptResponse>('POST', '/appropriateness/attempts', { questionnaireId, version, answers, riskWarning });
+    return this.request<AttemptResponse>('POST', '/appropriateness/attempts', {
+      questionnaireId,
+      version,
+      answers,
+      riskWarning,
+    });
   }
 
   audit(q: AuditListQuery = {}) {
@@ -325,7 +392,10 @@ export class KoraClient {
   }
 
   depth(symbol: string) {
-    return this.request<{ symbol: string; depth: DepthSnapshot | null }>('GET', `/depth/${encodeURIComponent(symbol)}`);
+    return this.request<{ symbol: string; depth: DepthSnapshot | null }>(
+      'GET',
+      `/depth/${encodeURIComponent(symbol)}`,
+    );
   }
 
   marketStatus() {
@@ -352,7 +422,10 @@ export class KoraClient {
   }
 
   simPaperAnalytics() {
-    return this.request<{ source: PaperProjection['source']; analytics: PaperAnalytics }>('GET', '/sim/paper/analytics');
+    return this.request<{ source: PaperProjection['source']; analytics: PaperAnalytics }>(
+      'GET',
+      '/sim/paper/analytics',
+    );
   }
 
   simPaperProject(body: PaperProjectRequest) {
@@ -361,15 +434,26 @@ export class KoraClient {
 
   /** B-505: saved, named scenarios. */
   simScenarios(kind?: 'practice' | 'pro') {
-    return this.request<{ scenarios: SavedScenario[]; max: number }>('GET', `/sim/scenarios${query({ kind })}`);
+    return this.request<{ scenarios: SavedScenario[]; max: number }>(
+      'GET',
+      `/sim/scenarios${query({ kind })}`,
+    );
   }
 
-  saveSimScenario(body: { kind: 'practice' | 'pro'; name: string; input: Record<string, unknown>; overwrite?: boolean }) {
+  saveSimScenario(body: {
+    kind: 'practice' | 'pro';
+    name: string;
+    input: Record<string, unknown>;
+    overwrite?: boolean;
+  }) {
     return this.request<SavedScenario>('POST', '/sim/scenarios', body);
   }
 
   deleteSimScenario(id: string) {
-    return this.request<{ deleted: true; id: string }>('DELETE', `/sim/scenarios/${encodeURIComponent(id)}`);
+    return this.request<{ deleted: true; id: string }>(
+      'DELETE',
+      `/sim/scenarios/${encodeURIComponent(id)}`,
+    );
   }
 
   // ---- Novice view (goal 08) ----
@@ -396,7 +480,10 @@ export class KoraClient {
   }
 
   noviceAssets() {
-    return this.request<{ currency: string; assets: NoviceAsset[]; simulated: true }>('GET', '/novice/assets');
+    return this.request<{ currency: string; assets: NoviceAsset[]; simulated: true }>(
+      'GET',
+      '/novice/assets',
+    );
   }
 
   /** Builds the novice order and returns the unchanged /orders/preview answer for it. */
@@ -409,7 +496,11 @@ export class KoraClient {
   }
 
   submitKnowledgeCheck(questionnaireId: string, version: number, answers: Record<string, string>) {
-    return this.request<KnowledgeAttemptResponse>('POST', '/novice/knowledge-check/attempts', { questionnaireId, version, answers });
+    return this.request<KnowledgeAttemptResponse>('POST', '/novice/knowledge-check/attempts', {
+      questionnaireId,
+      version,
+      answers,
+    });
   }
 
   autoInvest() {
@@ -421,20 +512,34 @@ export class KoraClient {
   }
 
   pauseAutoInvest(robotId: string) {
-    return this.request<AutoInvestList>('POST', `/novice/auto-invest/${encodeURIComponent(robotId)}/pause`);
+    return this.request<AutoInvestList>(
+      'POST',
+      `/novice/auto-invest/${encodeURIComponent(robotId)}/pause`,
+    );
   }
 
   resumeAutoInvest(robotId: string) {
-    return this.request<AutoInvestList>('POST', `/novice/auto-invest/${encodeURIComponent(robotId)}/resume`);
+    return this.request<AutoInvestList>(
+      'POST',
+      `/novice/auto-invest/${encodeURIComponent(robotId)}/resume`,
+    );
   }
 
   disclosure(id: string, locale: DisclosureLocale = 'en') {
-    return this.request<DisclosureResponse>('GET', `/disclosures/${encodeURIComponent(id)}${query({ locale })}`);
+    return this.request<DisclosureResponse>(
+      'GET',
+      `/disclosures/${encodeURIComponent(id)}${query({ locale })}`,
+    );
   }
 
   acknowledgeDisclosure(
     id: string,
-    body: { version: string; contentHash: string; locale: DisclosureLocale; context?: DisclosureAcknowledgement['context'] },
+    body: {
+      version: string;
+      contentHash: string;
+      locale: DisclosureLocale;
+      context?: DisclosureAcknowledgement['context'];
+    },
   ) {
     return this.request<{ acknowledgement: DisclosureAcknowledgement; acknowledged: true }>(
       'POST',

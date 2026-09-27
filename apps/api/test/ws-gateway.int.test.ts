@@ -17,10 +17,26 @@ describe('market data WebSocket gateway', () => {
   const prefix = process.env.KORA_MD_REDIS_PREFIX!;
   const saved = { ...process.env };
   const pub = (ch: string, data: unknown) => redis.publish(`${prefix}${ch}`, JSON.stringify(data));
-  const status = (state = 'ok') => ({ type: 'status', state, ts: Date.now(), feeds: [], staleSymbols: [], reason: null });
+  const status = (state = 'ok') => ({
+    type: 'status',
+    state,
+    ts: Date.now(),
+    feeds: [],
+    staleSymbols: [],
+    reason: null,
+  });
   const quote = (seq: number, bid = '1.08419') => ({
-    type: 'quote', symbol: 'EURUSD', bid, ask: '1.08421', bidSize: '1000000', askSize: '1000000', stale: false,
-    source: 'simulated', exchangeTs: Date.now(), receivedTs: Date.now(), seq,
+    type: 'quote',
+    symbol: 'EURUSD',
+    bid,
+    ask: '1.08421',
+    bidSize: '1000000',
+    askSize: '1000000',
+    stale: false,
+    source: 'simulated',
+    exchangeTs: Date.now(),
+    receivedTs: Date.now(),
+    seq,
   });
 
   beforeAll(async () => {
@@ -60,19 +76,44 @@ describe('market data WebSocket gateway', () => {
   }, 10_000);
 
   it('accepts the session cookie from an allowed Origin and refuses foreign Origins', async () => {
-    const ok = await TestWs.open(url, { origin: 'http://localhost:3000', cookie: `kora_at=${token}` });
+    const ok = await TestWs.open(url, {
+      origin: 'http://localhost:3000',
+      cookie: `kora_at=${token}`,
+    });
     ok.send({ op: 'ping', id: 7 });
     expect((await ok.waitFor((m) => m.type === 'pong')).msg.id).toBe(7);
     ok.close();
-    await expect(TestWs.open(url, { origin: 'https://evil.example', cookie: `kora_at=${token}` })).rejects.toThrow(/HTTP 403/);
+    await expect(
+      TestWs.open(url, { origin: 'https://evil.example', cookie: `kora_at=${token}` }),
+    ).rejects.toThrow(/HTTP 403/);
     await expect(TestWs.open(url.replace('/ws', '/other'))).rejects.toThrow();
   });
 
   it('validates channels, unknown symbols and the per-connection channel cap', async () => {
     const c = await TestWs.authed(url, token);
-    c.send({ op: 'subscribe', channels: ['quotes:EURUSD', 'quotes:NOPE', 'trades:EURUSD:1m', 'candles:EURUSD:2m', 'depth:7203.XTKS', 'candles:EURUSD:15m', 'status', 'quotes:GBPUSD', 'quotes:USDJPY'], id: 1 });
+    c.send({
+      op: 'subscribe',
+      channels: [
+        'quotes:EURUSD',
+        'quotes:NOPE',
+        'trades:EURUSD:1m',
+        'candles:EURUSD:2m',
+        'depth:7203.XTKS',
+        'candles:EURUSD:15m',
+        'status',
+        'quotes:GBPUSD',
+        'quotes:USDJPY',
+      ],
+      id: 1,
+    });
     const r = (await c.waitFor((m) => m.type === 'subscribed')).msg;
-    expect(r.channels).toEqual(['quotes:EURUSD', 'depth:7203.XTKS', 'candles:EURUSD:15m', 'status', 'quotes:GBPUSD']);
+    expect(r.channels).toEqual([
+      'quotes:EURUSD',
+      'depth:7203.XTKS',
+      'candles:EURUSD:15m',
+      'status',
+      'quotes:GBPUSD',
+    ]);
     expect(r.rejected).toEqual([
       { channel: 'quotes:NOPE', code: 'unknown_symbol' },
       { channel: 'trades:EURUSD:1m', code: 'invalid_channel' },
@@ -114,10 +155,13 @@ describe('market data WebSocket gateway', () => {
     }
     await pub('status', status());
     await c.waitFor((m) => m.ch === 'quotes:EURUSD' && m.data.seq === 1060, 3000, from);
-    const got = c.messages.slice(from).filter((m) => m.msg.ch === 'quotes:EURUSD' && !m.msg.snapshot);
+    const got = c.messages
+      .slice(from)
+      .filter((m) => m.msg.ch === 'quotes:EURUSD' && !m.msg.snapshot);
     const times = got.map((m) => m.at);
     // token bucket: 13 sends need ≥ (13 − 2) × 100 ms
-    for (let i = 12; i < times.length; i++) expect(times[i]! - times[i - 12]!).toBeGreaterThanOrEqual(1050);
+    for (let i = 12; i < times.length; i++)
+      expect(times[i]! - times[i - 12]!).toBeGreaterThanOrEqual(1050);
     expect(got.length).toBeLessThan(25);
     expect(hub.stats().conflated).toBeGreaterThan(0);
     c.close();
@@ -131,16 +175,32 @@ describe('market data WebSocket gateway', () => {
     await c.waitFor((m) => m.ch === 'quotes:EURUSD' && m.data.seq === 8);
     const from = c.messages.length;
     const down = await c.waitFor((m) => m.ch === 'status' && m.data.state === 'down', 3000, from);
-    expect(down.msg.data).toMatchObject({ reason: 'feed_heartbeat_lost', staleSymbols: ['EURUSD'] });
-    await c.waitFor((m) => m.ch === 'quotes:EURUSD' && m.data.stale === true && m.data.seq === 8, 2000, from);
-    const rest = await request(app.getHttpServer()).get('/quotes?symbols=EURUSD').set(bearer(token)).expect(200);
+    expect(down.msg.data).toMatchObject({
+      reason: 'feed_heartbeat_lost',
+      staleSymbols: ['EURUSD'],
+    });
+    await c.waitFor(
+      (m) => m.ch === 'quotes:EURUSD' && m.data.stale === true && m.data.seq === 8,
+      2000,
+      from,
+    );
+    const rest = await request(app.getHttpServer())
+      .get('/quotes?symbols=EURUSD')
+      .set(bearer(token))
+      .expect(200);
     expect(rest.body.quotes[0].quote.stale).toBe(true);
     await pub('status', status());
     await c.waitFor((m) => m.ch === 'status' && m.data.state === 'ok', 2000, from);
     expect(hub.stats().feedLost).toBe(false);
-    const st = await request(app.getHttpServer()).get('/market-data/status').set(bearer(token)).expect(200);
+    const st = await request(app.getHttpServer())
+      .get('/market-data/status')
+      .set(bearer(token))
+      .expect(200);
     expect(st.body).toMatchObject({ feedMode: 'off', status: { state: 'ok' } });
-    await request(app.getHttpServer()).post('/market-data/feeds/simulated/stop').set(bearer(token)).expect(403);
+    await request(app.getHttpServer())
+      .post('/market-data/feeds/simulated/stop')
+      .set(bearer(token))
+      .expect(403);
     c.close();
   });
 

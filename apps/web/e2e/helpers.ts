@@ -46,30 +46,57 @@ interface QuestionnaireData {
 
 /** The reviewed questionnaire data (apps/api); tests answer through the real API and web page. */
 export const QUESTIONNAIRE: QuestionnaireData = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../api/src/appropriateness/questionnaires/appropriateness.v1.json', import.meta.url)), 'utf8'),
+  readFileSync(
+    fileURLToPath(
+      new URL(
+        '../../api/src/appropriateness/questionnaires/appropriateness.v1.json',
+        import.meta.url,
+      ),
+    ),
+    'utf8',
+  ),
 ) as QuestionnaireData;
 
 export function answerKey(best = true): Record<string, string> {
   return Object.fromEntries(
-    QUESTIONNAIRE.questions.map((q) => [q.id, [...q.options].sort((a, b) => (best ? b.points - a.points : a.points - b.points))[0]!.id]),
+    QUESTIONNAIRE.questions.map((q) => [
+      q.id,
+      [...q.options].sort((a, b) => (best ? b.points - a.points : a.points - b.points))[0]!.id,
+    ]),
   );
 }
 
 /** Option labels are shown in the page; map the key to the option index for clicking radios. */
 export function answerIndex(best = true): Record<string, number> {
   const key = answerKey(best);
-  return Object.fromEntries(QUESTIONNAIRE.questions.map((q) => [q.id, q.options.findIndex((o) => o.id === key[q.id])]));
+  return Object.fromEntries(
+    QUESTIONNAIRE.questions.map((q) => [q.id, q.options.findIndex((o) => o.id === key[q.id])]),
+  );
 }
 
 /**
  * Goal 08 onboarding through the API: acknowledge the current risk warning, set the loss limits
  * (suggested defaults unless given), complete. The UI path is covered by novice.spec.ts.
  */
-export async function apiOnboard(req: APIRequestContext, limits?: { dailyLossLimit: string; monthlyLossLimit: string }): Promise<void> {
-  const doc = (await (await req.get('/api/disclosures/risk-warning?locale=en')).json()).document as { version: string; contentHash: string };
-  expect((await req.post('/api/disclosures/risk-warning/acknowledgements', { headers: CSRF, data: { version: doc.version, contentHash: doc.contentHash, locale: 'en' } })).status()).toBe(201);
+export async function apiOnboard(
+  req: APIRequestContext,
+  limits?: { dailyLossLimit: string; monthlyLossLimit: string },
+): Promise<void> {
+  const doc = (await (await req.get('/api/disclosures/risk-warning?locale=en')).json())
+    .document as { version: string; contentHash: string };
+  expect(
+    (
+      await req.post('/api/disclosures/risk-warning/acknowledgements', {
+        headers: CSRF,
+        data: { version: doc.version, contentHash: doc.contentHash, locale: 'en' },
+      })
+    ).status(),
+  ).toBe(201);
   const profile = await (await req.get('/api/novice/profile')).json();
-  const l = limits ?? { dailyLossLimit: profile.suggestedLimits.daily, monthlyLossLimit: profile.suggestedLimits.monthly };
+  const l = limits ?? {
+    dailyLossLimit: profile.suggestedLimits.daily,
+    monthlyLossLimit: profile.suggestedLimits.monthly,
+  };
   expect((await req.put('/api/novice/limits', { headers: CSRF, data: l })).status()).toBe(200);
   expect((await req.post('/api/novice/onboarding/complete', { headers: CSRF })).status()).toBe(200);
 }
@@ -86,8 +113,17 @@ export async function apiSignIn(
 ): Promise<{ email: string; secret?: string }> {
   const req: APIRequestContext = page.request;
   const email = uniqueEmail(accountType);
-  expect((await req.post('/api/auth/signup', { headers: CSRF, data: { email, password: PASSWORD, displayName: `E2E ${accountType}` } })).status()).toBe(201);
-  const first = await (await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
+  expect(
+    (
+      await req.post('/api/auth/signup', {
+        headers: CSRF,
+        data: { email, password: PASSWORD, displayName: `E2E ${accountType}` },
+      })
+    ).status(),
+  ).toBe(201);
+  const first = await (
+    await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })
+  ).json();
   expect(first.status).toBe('ok');
   if (accountType === 'novice') {
     // Goal 08: novice-only users land on onboarding until it is done; most specs start after it.
@@ -95,7 +131,8 @@ export async function apiSignIn(
     return { email };
   }
   // IRTC R4-09: the attempt confirms the risk warning in force.
-  const warning = (await (await req.get('/api/disclosures/risk-warning?locale=en')).json()).document as { version: string; contentHash: string };
+  const warning = (await (await req.get('/api/disclosures/risk-warning?locale=en')).json())
+    .document as { version: string; contentHash: string };
   const attempt = await req.post('/api/appropriateness/attempts', {
     headers: CSRF,
     data: {
@@ -107,10 +144,17 @@ export async function apiSignIn(
   });
   expect(attempt.status()).toBe(200);
   expect((await attempt.json()).passed).toBe(true);
-  const login = await (await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
+  const login = await (
+    await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })
+  ).json();
   expect(login.status).toBe('mfa_enrollment_required');
-  const enr = await (await req.post('/api/auth/mfa/enroll', { headers: CSRF, data: { mfaToken: login.mfaToken } })).json();
-  const v = await req.post('/api/auth/mfa/verify', { headers: CSRF, data: { mfaToken: login.mfaToken, code: totp(enr.secret) } });
+  const enr = await (
+    await req.post('/api/auth/mfa/enroll', { headers: CSRF, data: { mfaToken: login.mfaToken } })
+  ).json();
+  const v = await req.post('/api/auth/mfa/verify', {
+    headers: CSRF,
+    data: { mfaToken: login.mfaToken, code: totp(enr.secret) },
+  });
   expect(v.status()).toBe(200);
   return { email, secret: enr.secret };
 }

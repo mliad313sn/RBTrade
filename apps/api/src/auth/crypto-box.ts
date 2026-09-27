@@ -19,15 +19,25 @@ export class CryptoBox {
     const cipher = createCipheriv('aes-256-gcm', this.key, iv);
     cipher.setAAD(Buffer.from(aad));
     const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-    return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), ct.toString('base64url')].join('.');
+    return [
+      'v1',
+      iv.toString('base64url'),
+      cipher.getAuthTag().toString('base64url'),
+      ct.toString('base64url'),
+    ].join('.');
   }
 
   open(sealed: string, aad = ''): string {
     const [v, iv, tag, ct] = sealed.split('.');
     if (v !== 'v1' || !iv || !tag || ct === undefined) throw new Error('Unsupported sealed format');
-    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'), { authTagLength: 16 });
+    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'), {
+      authTagLength: 16,
+    });
     decipher.setAAD(Buffer.from(aad));
     decipher.setAuthTag(Buffer.from(tag, 'base64url'));
-    return Buffer.concat([decipher.update(Buffer.from(ct, 'base64url')), decipher.final()]).toString('utf8');
+    return Buffer.concat([
+      decipher.update(Buffer.from(ct, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
   }
 }

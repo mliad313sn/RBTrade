@@ -531,9 +531,13 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
     expect(list.body.robots.length).toBeGreaterThanOrEqual(2);
   });
   it('service contracts (goal 10): api → quant, runner → quant and runner → api match the providers’ OpenAPI', async () => {
-    const quantDoc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const quantDoc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<
+      typeof validateExchanges
+    >[0];
     const apiDoc = buildOpenApi(app) as unknown as Parameters<typeof validateExchanges>[0];
-    const quantTraffic = [...apiToQuant.exchanges, ...runnerToQuant.exchanges].filter((x) => x.path !== '/health');
+    const quantTraffic = [...apiToQuant.exchanges, ...runnerToQuant.exchanges].filter(
+      (x) => x.path !== '/health',
+    );
     const apiTraffic = runnerToApi.exchanges.filter((x) => x.path.startsWith('/internal/'));
     // the flows above exercised the live path end to end
     expect(new Set(runnerToQuant.exchanges.map((x) => x.path))).toContain('/bt/signal');

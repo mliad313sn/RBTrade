@@ -27,7 +27,11 @@ function Demo({ startOpen }: { startOpen: boolean }) {
   );
 }
 
-const meta = { title: 'Primitives/Dialog', component: Demo, args: { startOpen: true } } satisfies Meta<typeof Demo>;
+const meta = {
+  title: 'Primitives/Dialog',
+  component: Demo,
+  args: { startOpen: true },
+} satisfies Meta<typeof Demo>;
 export default meta;
 export const Open: StoryObj<typeof meta> = {};
 export const Closed: StoryObj<typeof meta> = { args: { startOpen: false } };

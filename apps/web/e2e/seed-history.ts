@@ -48,4 +48,3 @@ export async function seedHistory(): Promise<void> {
     await client.end();
   }
 }
-

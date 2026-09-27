@@ -27,7 +27,12 @@ import { DbService, type Queryable } from '../db/db.service';
 import { DbDisclosureRegistry } from '../disclosures/db-disclosure-registry';
 import { AccountsService } from '../trading/accounts.service';
 import { KillSwitchService } from '../trading/kill-switch.service';
-import { FourEyesStore, toFourEyesView, type FourEyesRow, type FourEyesView } from './four-eyes.store';
+import {
+  FourEyesStore,
+  toFourEyesView,
+  type FourEyesRow,
+  type FourEyesView,
+} from './four-eyes.store';
 import { GOVERNANCE_CONFIG, type GovernanceConfig } from './governance-config';
 
 /**
@@ -62,10 +67,14 @@ export class FourEyesService {
     switch (body.kind) {
       case 'limit_override': {
         const account = await this.accounts.byId(body.accountId);
-        if (!account) throw new NotFoundException({ error: 'not_found', message: 'Account not found' });
+        if (!account)
+          throw new NotFoundException({ error: 'not_found', message: 'Account not found' });
         const own = account.user_id === userId;
         if (!own && !hasAnyRole(roles, APPROVER_ROLES))
-          throw new ForbiddenException({ error: 'forbidden', message: 'Only the account holder or a risk officer can request this.' });
+          throw new ForbiddenException({
+            error: 'forbidden',
+            message: 'Only the account holder or a risk officer can request this.',
+          });
         const ownerRoles = await this.users.roles(account.user_id);
         if (isNoviceOnly(ownerRoles))
           throw new ForbiddenException({
@@ -86,7 +95,12 @@ export class FourEyesService {
             kind: 'limit_override',
             subjectType: 'account',
             subjectId: account.id,
-            payload: { accountId: account.id, ownerId: account.user_id, limits: body.limits, platform: platform as unknown as JsonValue },
+            payload: {
+              accountId: account.id,
+              ownerId: account.user_id,
+              limits: body.limits,
+              platform: platform as unknown as JsonValue,
+            },
             reason: body.reason,
             requestedBy: userId,
           }),
@@ -94,9 +108,15 @@ export class FourEyesService {
       }
       case 'mfa_reset': {
         if (!roles.includes('admin'))
-          throw new ForbiddenException({ error: 'forbidden', message: 'Only an admin can request a two-factor reset.' });
+          throw new ForbiddenException({
+            error: 'forbidden',
+            message: 'Only an admin can request a two-factor reset.',
+          });
         if (body.userId === userId)
-          throw new ForbiddenException({ error: 'four_eyes', message: 'You cannot request a two-factor reset for yourself.' });
+          throw new ForbiddenException({
+            error: 'four_eyes',
+            message: 'You cannot request a two-factor reset for yourself.',
+          });
         const target = await this.users.findById(body.userId);
         if (!target) throw new NotFoundException({ error: 'not_found', message: 'User not found' });
         return toFourEyesView(
@@ -112,7 +132,10 @@ export class FourEyesService {
       }
       case 'disclosure_publish': {
         if (!hasAnyRole(roles, APPROVER_ROLES))
-          throw new ForbiddenException({ error: 'forbidden', message: 'Only a risk officer or admin can request a publication.' });
+          throw new ForbiddenException({
+            error: 'forbidden',
+            message: 'Only a risk officer or admin can request a publication.',
+          });
         let subjectId: string;
         const payload: Record<string, JsonValue> = {
           jurisdiction: body.jurisdiction,
@@ -123,15 +146,29 @@ export class FourEyesService {
             'SELECT status, drafted_by FROM disclosure_documents WHERE id = $1 AND version = $2 AND jurisdiction = $3',
             [body.document.disclosureId, body.document.version, body.jurisdiction],
           );
-          if (!d[0]) throw new NotFoundException({ error: 'not_found', message: 'No such draft. Draft the version first.' });
+          if (!d[0])
+            throw new NotFoundException({
+              error: 'not_found',
+              message: 'No such draft. Draft the version first.',
+            });
           if (d[0].status !== 'draft')
-            throw new ConflictException({ error: 'already_published', message: 'This version is already published.' });
+            throw new ConflictException({
+              error: 'already_published',
+              message: 'This version is already published.',
+            });
           subjectId = `${body.document.disclosureId}:${body.document.version}:${body.jurisdiction}`;
           payload.document = { ...body.document, draftedBy: d[0].drafted_by };
         } else {
           const v = body.value!;
-          if (v.key === 'retailLossPct' && v.value !== null && (!/^\d{1,2}(\.\d{1,2})?$/.test(v.value) || Number(v.value) > 100))
-            throw new BadRequestException({ error: 'invalid_value', message: 'retailLossPct is a percentage such as 74 or 74.5.' });
+          if (
+            v.key === 'retailLossPct' &&
+            v.value !== null &&
+            (!/^\d{1,2}(\.\d{1,2})?$/.test(v.value) || Number(v.value) > 100)
+          )
+            throw new BadRequestException({
+              error: 'invalid_value',
+              message: 'retailLossPct is a percentage such as 74 or 74.5.',
+            });
           subjectId = `value:${v.key}:${body.jurisdiction}`;
           payload.value = v;
         }
@@ -151,7 +188,10 @@ export class FourEyesService {
 
   private assertApprover(roles: Role[]): void {
     if (!hasAnyRole(roles, APPROVER_ROLES))
-      throw new ForbiddenException({ error: 'forbidden', message: 'Only a risk officer or admin can decide four-eyes requests.' });
+      throw new ForbiddenException({
+        error: 'forbidden',
+        message: 'Only a risk officer or admin can decide four-eyes requests.',
+      });
   }
 
   /** Roles through which a request of this kind may be decided (role grants: admins only). */
@@ -162,7 +202,10 @@ export class FourEyesService {
   /** The approver may not be the person the request is about (account owner, MFA/role subject, drafter). */
   private assertIndependent(row: FourEyesRow, deciderId: string, roles: Role[]): void {
     if (!hasAnyRole(roles, this.approverRolesFor(row)))
-      throw new ForbiddenException({ error: 'forbidden', message: 'Only an admin can decide a role grant.' });
+      throw new ForbiddenException({
+        error: 'forbidden',
+        message: 'Only an admin can decide a role grant.',
+      });
     const p = row.payload as Record<string, JsonValue>;
     const about =
       row.kind === 'limit_override' || row.kind === 'kill_switch_resume'
@@ -173,7 +216,8 @@ export class FourEyesService {
     if (about && about === deciderId)
       throw new ForbiddenException({
         error: 'four_eyes',
-        message: 'Four-eyes rule: you cannot decide a request about your own account, credentials, roles or draft.',
+        message:
+          'Four-eyes rule: you cannot decide a request about your own account, credentials, roles or draft.',
       });
   }
 
@@ -181,19 +225,41 @@ export class FourEyesService {
    * IRTC R4-02: the decider must hold an approval role that the requester neither granted nor
    * approved, and that has passed the cooling period. Read from the database, not the token.
    */
-  private async assertApproverIndependent(c: Queryable, row: FourEyesRow, deciderId: string): Promise<void> {
+  private async assertApproverIndependent(
+    c: Queryable,
+    row: FourEyesRow,
+    deciderId: string,
+  ): Promise<void> {
     const grants = (
-      await c.query<{ role: string; granted_by: string | null; approved_by: string | null; granted_at: Date }>(
-        'SELECT role, granted_by, approved_by, granted_at FROM user_roles WHERE user_id = $1',
-        [deciderId],
-      )
+      await c.query<{
+        role: string;
+        granted_by: string | null;
+        approved_by: string | null;
+        granted_at: Date;
+      }>('SELECT role, granted_by, approved_by, granted_at FROM user_roles WHERE user_id = $1', [
+        deciderId,
+      ])
     ).rows
       .filter((g) => isRole(g.role))
-      .map((g) => ({ role: g.role as Role, grantedBy: g.granted_by, approvedBy: g.approved_by, grantedAt: g.granted_at }));
+      .map((g) => ({
+        role: g.role as Role,
+        grantedBy: g.granted_by,
+        approvedBy: g.approved_by,
+        grantedAt: g.granted_at,
+      }));
     const now = (await c.query<{ now: Date }>('SELECT clock_timestamp() AS now')).rows[0]!.now;
-    const issue = approverIndependenceIssue(grants, row.requested_by, this.approverRolesFor(row), now, this.cfg.approverCoolingMs);
+    const issue = approverIndependenceIssue(
+      grants,
+      row.requested_by,
+      this.approverRolesFor(row),
+      now,
+      this.cfg.approverCoolingMs,
+    );
     if (issue === 'no_approver_role')
-      throw new ForbiddenException({ error: 'forbidden', message: 'Your account no longer holds a role that can decide this request.' });
+      throw new ForbiddenException({
+        error: 'forbidden',
+        message: 'Your account no longer holds a role that can decide this request.',
+      });
     if (issue)
       throw new ForbiddenException({
         error: 'approver_not_independent',
@@ -237,19 +303,33 @@ export class FourEyesService {
     return toFourEyesView(
       await this.db.tx(async (c) => {
         await this.store.expireStale(c);
-        const r = (await c.query<FourEyesRow>('SELECT * FROM four_eyes_requests WHERE id = $1 FOR UPDATE', [id])).rows[0];
+        const r = (
+          await c.query<FourEyesRow>('SELECT * FROM four_eyes_requests WHERE id = $1 FOR UPDATE', [
+            id,
+          ])
+        ).rows[0];
         if (!r) throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
         if (r.requested_by !== userId)
-          throw new ForbiddenException({ error: 'forbidden', message: 'Only the person who asked can withdraw a request.' });
+          throw new ForbiddenException({
+            error: 'forbidden',
+            message: 'Only the person who asked can withdraw a request.',
+          });
         if (r.status !== 'pending')
-          throw new ConflictException({ error: 'not_pending', message: `This request is already ${r.status}.` });
+          throw new ConflictException({
+            error: 'not_pending',
+            message: `This request is already ${r.status}.`,
+          });
         return this.store.decide(c, r, userId, 'cancelled', note);
       }),
     );
   }
 
   /** Runs the approved action inside the approval transaction (kill-switch resume uses its own). */
-  private async execute(c: Queryable, r: FourEyesRow, approver: string): Promise<Record<string, JsonValue>> {
+  private async execute(
+    c: Queryable,
+    r: FourEyesRow,
+    approver: string,
+  ): Promise<Record<string, JsonValue>> {
     const p = r.payload as Record<string, JsonValue>;
     switch (r.kind) {
       case 'limit_override': {
@@ -258,7 +338,8 @@ export class FourEyesService {
           'UPDATE accounts SET limit_overrides = limit_overrides || $2::jsonb, updated_at = now() WHERE id = $1 RETURNING limit_overrides',
           [r.subject_id, JSON.stringify(limits)],
         );
-        if (!upd.rows[0]) throw new NotFoundException({ error: 'not_found', message: 'Account not found' });
+        if (!upd.rows[0])
+          throw new NotFoundException({ error: 'not_found', message: 'Account not found' });
         await this.audit.record(
           {
             actorId: approver,
@@ -266,7 +347,13 @@ export class FourEyesService {
             action: 'account.limit_override_applied',
             entity: 'account',
             entityId: r.subject_id,
-            payload: { accountId: r.subject_id, limits, requestId: r.id, requestedBy: r.requested_by, approvedBy: approver },
+            payload: {
+              accountId: r.subject_id,
+              limits,
+              requestId: r.id,
+              requestedBy: r.requested_by,
+              approvedBy: approver,
+            },
           },
           c,
         );
@@ -291,11 +378,20 @@ export class FourEyesService {
         const current = await this.users.roles(userId, c);
         // The request describes a change from a known state; if the roles moved since, ask again.
         if ([...current].sort().join(',') !== [...before].sort().join(','))
-          throw new ConflictException({ error: 'stale_request', message: "The user's roles changed since this was requested. Ask again." });
+          throw new ConflictException({
+            error: 'stale_request',
+            message: "The user's roles changed since this was requested. Ask again.",
+          });
         const conflict = rolesConflict(after);
         if (conflict)
-          throw new BadRequestException({ error: 'segregation_of_duties', message: `Segregation of duties: ${conflict[0]} cannot be combined with ${conflict[1]}.` });
-        await this.users.setRoles(c, userId, after, r.requested_by, { approvedBy: approver, requestId: r.id });
+          throw new BadRequestException({
+            error: 'segregation_of_duties',
+            message: `Segregation of duties: ${conflict[0]} cannot be combined with ${conflict[1]}.`,
+          });
+        await this.users.setRoles(c, userId, after, r.requested_by, {
+          approvedBy: approver,
+          requestId: r.id,
+        });
         await this.sessions.invalidateAll(userId, c);
         await this.audit.record(
           {
@@ -320,7 +416,9 @@ export class FourEyesService {
       case 'mfa_reset': {
         const del = await c.query('DELETE FROM user_mfa WHERE user_id = $1', [r.subject_id]);
         // Goal 10: old recovery codes and sessions end with the reset (B-902).
-        await c.query('DELETE FROM mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL', [r.subject_id]);
+        await c.query('DELETE FROM mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL', [
+          r.subject_id,
+        ]);
         await this.sessions.invalidateAll(r.subject_id, c);
         await this.audit.record(
           {
@@ -329,7 +427,13 @@ export class FourEyesService {
             action: 'auth.mfa_reset',
             entity: 'user',
             entityId: r.subject_id,
-            payload: { userId: r.subject_id, hadMfa: (del.rowCount ?? 0) > 0, requestId: r.id, requestedBy: r.requested_by, approvedBy: approver },
+            payload: {
+              userId: r.subject_id,
+              hadMfa: (del.rowCount ?? 0) > 0,
+              requestId: r.id,
+              requestedBy: r.requested_by,
+              approvedBy: approver,
+            },
           },
           c,
         );
@@ -345,7 +449,11 @@ export class FourEyesService {
              WHERE id = $1 AND version = $2 AND jurisdiction = $3 AND status = 'draft' RETURNING effective_from`,
             [d.disclosureId, d.version, p.jurisdiction, effectiveFrom, approver, r.id],
           );
-          if (!upd.rowCount) throw new ConflictException({ error: 'not_draft', message: 'The draft no longer exists or is already published.' });
+          if (!upd.rowCount)
+            throw new ConflictException({
+              error: 'not_draft',
+              message: 'The draft no longer exists or is already published.',
+            });
           await this.audit.record(
             {
               actorId: approver,
@@ -353,7 +461,14 @@ export class FourEyesService {
               action: 'disclosure.published',
               entity: 'disclosure',
               entityId: d.disclosureId,
-              payload: { ...d, jurisdiction: p.jurisdiction as string, effectiveFrom, requestId: r.id, requestedBy: r.requested_by, approvedBy: approver },
+              payload: {
+                ...d,
+                jurisdiction: p.jurisdiction as string,
+                effectiveFrom,
+                requestId: r.id,
+                requestedBy: r.requested_by,
+                approvedBy: approver,
+              },
             },
             c,
           );
@@ -367,7 +482,15 @@ export class FourEyesService {
         await c.query(
           `INSERT INTO disclosure_values (key, jurisdiction, effective_from, value, owner, open_question, set_by)
            VALUES ($1, $2, COALESCE($3::timestamptz, clock_timestamp()), $4, $5, $6, $7)`,
-          [v.key, p.jurisdiction, effectiveFrom, v.value, prev.rows[0]?.owner ?? 'Compliance', prev.rows[0]?.open_question ?? null, approver],
+          [
+            v.key,
+            p.jurisdiction,
+            effectiveFrom,
+            v.value,
+            prev.rows[0]?.owner ?? 'Compliance',
+            prev.rows[0]?.open_question ?? null,
+            approver,
+          ],
         );
         await this.audit.record(
           {
@@ -376,7 +499,15 @@ export class FourEyesService {
             action: 'disclosure.value_set',
             entity: 'disclosure_value',
             entityId: v.key,
-            payload: { key: v.key, value: v.value, jurisdiction: p.jurisdiction as string, effectiveFrom, requestId: r.id, requestedBy: r.requested_by, approvedBy: approver },
+            payload: {
+              key: v.key,
+              value: v.value,
+              jurisdiction: p.jurisdiction as string,
+              effectiveFrom,
+              requestId: r.id,
+              requestedBy: r.requested_by,
+              approvedBy: approver,
+            },
           },
           c,
         );

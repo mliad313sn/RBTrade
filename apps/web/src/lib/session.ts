@@ -15,9 +15,16 @@ function config() {
   const apiUrl = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
   const kcIssuer = `${(process.env.KEYCLOAK_URL ?? 'http://localhost:8080').replace(/\/$/, '')}/realms/${process.env.KEYCLOAK_REALM ?? 'kora'}`;
   return {
-    issuer: provider === 'keycloak' ? kcIssuer : (process.env.KORA_JWT_ISSUER ?? 'http://localhost:4000/auth'),
+    issuer:
+      provider === 'keycloak'
+        ? kcIssuer
+        : (process.env.KORA_JWT_ISSUER ?? 'http://localhost:4000/auth'),
     audience: process.env.KORA_JWT_AUDIENCE ?? 'kora-api',
-    jwksUrl: process.env.KORA_JWKS_URL ?? (provider === 'keycloak' ? `${kcIssuer}/protocol/openid-connect/certs` : `${apiUrl}/auth/jwks.json`),
+    jwksUrl:
+      process.env.KORA_JWKS_URL ??
+      (provider === 'keycloak'
+        ? `${kcIssuer}/protocol/openid-connect/certs`
+        : `${apiUrl}/auth/jwks.json`),
   };
 }
 

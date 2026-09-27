@@ -5,11 +5,19 @@ import { describe, expect, it } from 'vitest';
 
 import { SEED_INSTRUMENTS } from '../seed/instruments.js';
 import { simProfileFor } from '../seed/sim-profiles.js';
-import { isAffected, SimulatedMarket, type EventShock, type SimInstrument, type SimStep } from './simulated-market.js';
+import {
+  isAffected,
+  SimulatedMarket,
+  type EventShock,
+  type SimInstrument,
+  type SimStep,
+} from './simulated-market.js';
 
 const START = Date.parse('2026-09-25T10:00:00Z');
 const SYMBOLS = ['EURUSD', 'XAUUSD', 'BTCUSD', '7203.XTKS'];
-const SHOCKS: EventShock[] = [{ id: 'us-cpi', ts: START + 50_000, country: 'US', currency: 'USD', impact: 3 }];
+const SHOCKS: EventShock[] = [
+  { id: 'us-cpi', ts: START + 50_000, country: 'US', currency: 'USD', impact: 3 },
+];
 
 function instruments(): SimInstrument[] {
   return SYMBOLS.map((s) => {
@@ -19,11 +27,17 @@ function instruments(): SimInstrument[] {
 }
 
 function run(seed: string | number, steps: number): SimStep[] {
-  const m = new SimulatedMarket({ seed, startTs: START, instruments: instruments(), shocks: SHOCKS });
+  const m = new SimulatedMarket({
+    seed,
+    startTs: START,
+    instruments: instruments(),
+    shocks: SHOCKS,
+  });
   return Array.from({ length: steps }, () => m.step());
 }
 
-const digest = (steps: SimStep[]) => createHash('sha256').update(JSON.stringify(steps)).digest('hex');
+const digest = (steps: SimStep[]) =>
+  createHash('sha256').update(JSON.stringify(steps)).digest('hex');
 
 describe('SimulatedMarket determinism (acceptance: same seed → identical sequence)', () => {
   it('matches the committed snapshot for seed 42 (2 000 steps × 4 instruments)', () => {
@@ -50,7 +64,11 @@ describe('SimulatedMarket determinism (acceptance: same seed → identical seque
 
   it('per-symbol streams are independent of the instrument set', () => {
     const spec = SEED_INSTRUMENTS.find((i) => i.symbol === 'EURUSD')!;
-    const alone = new SimulatedMarket({ seed: 7, startTs: START, instruments: [{ spec, profile: simProfileFor(spec) }] });
+    const alone = new SimulatedMarket({
+      seed: 7,
+      startTs: START,
+      instruments: [{ spec, profile: simProfileFor(spec) }],
+    });
     const all = new SimulatedMarket({ seed: 7, startTs: START, instruments: instruments() });
     for (let i = 0; i < 200; i++) {
       const a = alone.step().outputs[0]!;
@@ -76,24 +94,38 @@ describe('SimulatedMarket determinism (acceptance: same seed → identical seque
   });
 
   it('event shocks switch affected instruments to high-vol and leave others alone', () => {
-    const m = new SimulatedMarket({ seed: 3, startTs: START, instruments: instruments(), shocks: SHOCKS });
+    const m = new SimulatedMarket({
+      seed: 3,
+      startTs: START,
+      instruments: instruments(),
+      shocks: SHOCKS,
+    });
     for (let i = 0; i < 500; i++) m.step();
     expect(m.regime('EURUSD')).toBe('high_vol');
     expect(m.regime('XAUUSD')).toBe('high_vol');
     expect(m.regime('BTCUSD')).toBe('high_vol');
     const toyota = instruments()[3]!;
     expect(isAffected(toyota, SHOCKS[0]!)).toBe(false);
-    expect(isAffected({ ...toyota, countries: ['JP'] }, { country: 'JP', currency: 'JPY' })).toBe(true);
+    expect(isAffected({ ...toyota, countries: ['JP'] }, { country: 'JP', currency: 'JPY' })).toBe(
+      true,
+    );
     expect(m.lastQuote('NOPE')).toBeNull();
     expect(m.lastDepth('NOPE')).toBeNull();
     expect(m.regime('NOPE')).toBeNull();
-    m.addShocks([{ ...SHOCKS[0]!, ts: START + 60_000 }, { id: 'x', ts: START + 70_000, country: 'GB', currency: 'GBP', impact: 1 }]);
+    m.addShocks([
+      { ...SHOCKS[0]!, ts: START + 60_000 },
+      { id: 'x', ts: START + 70_000, country: 'GB', currency: 'GBP', impact: 1 },
+    ]);
     expect(m.symbols()).toEqual(SYMBOLS);
   });
 
   it('funds quote rarely (quoteEveryNSteps from the profile)', () => {
     const spec = SEED_INSTRUMENTS.find((i) => i.assetClass === 'fund')!;
-    const m = new SimulatedMarket({ seed: 1, startTs: START, instruments: [{ spec, profile: simProfileFor(spec) }] });
+    const m = new SimulatedMarket({
+      seed: 1,
+      startTs: START,
+      instruments: [{ spec, profile: simProfileFor(spec) }],
+    });
     let quotes = 0;
     for (let i = 0; i < 1200; i++) quotes += m.step().outputs[0]!.quote ? 1 : 0;
     expect(quotes).toBe(2);

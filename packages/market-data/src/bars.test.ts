@@ -2,10 +2,25 @@ import { dec, TIMEFRAMES, type Timeframe } from '@kora/domain';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import { aggregateBars, BarBuilder, CandleTracker, isValidBar, mergeBars, type OhlcvBar } from './bars.js';
+import {
+  aggregateBars,
+  BarBuilder,
+  CandleTracker,
+  isValidBar,
+  mergeBars,
+  type OhlcvBar,
+} from './bars.js';
 
 const T0 = Date.parse('2026-09-25T10:00:00Z');
-const bar = (sec: number, o: string, h: string, l: string, c: string, v: string, n = 1): OhlcvBar => ({
+const bar = (
+  sec: number,
+  o: string,
+  h: string,
+  l: string,
+  c: string,
+  v: string,
+  n = 1,
+): OhlcvBar => ({
   bucket: T0 + sec * 1000,
   open: o,
   high: h,
@@ -28,13 +43,37 @@ describe('aggregateBars vs hand-computed bars', () => {
 
   it('1m: open first, high max, low min, close last, sums', () => {
     expect(aggregateBars(bars1s, '1m')).toEqual([
-      { bucket: T0, open: '1.08400', high: '1.08430', low: '1.08380', close: '1.08390', volume: '6000', trades: 6 },
-      { bucket: T0 + 60_000, open: '1.08391', high: '1.08450', low: '1.08370', close: '1.08441', volume: '6000', trades: 7 },
+      {
+        bucket: T0,
+        open: '1.08400',
+        high: '1.08430',
+        low: '1.08380',
+        close: '1.08390',
+        volume: '6000',
+        trades: 6,
+      },
+      {
+        bucket: T0 + 60_000,
+        open: '1.08391',
+        high: '1.08450',
+        low: '1.08370',
+        close: '1.08441',
+        volume: '6000',
+        trades: 7,
+      },
     ]);
   });
 
   it('5m and 15m buckets align to UTC and equal the one-step aggregate', () => {
-    const five = { bucket: T0, open: '1.08400', high: '1.08450', low: '1.08370', close: '1.08441', volume: '12000', trades: 13 };
+    const five = {
+      bucket: T0,
+      open: '1.08400',
+      high: '1.08450',
+      low: '1.08370',
+      close: '1.08441',
+      volume: '12000',
+      trades: 13,
+    };
     expect(aggregateBars(bars1s, '5m')).toEqual([five]);
     expect(aggregateBars(aggregateBars(bars1s, '1m'), '15m')).toEqual([five]);
     const late = [bar(-1, '1.0', '1.0', '1.0', '1.0', '1')]; // 09:59:59 → previous 15m bucket
@@ -42,14 +81,30 @@ describe('aggregateBars vs hand-computed bars', () => {
   });
 
   it('volume precision can be forced; unordered input is rejected', () => {
-    expect(aggregateBars([bar(0, '1', '1', '1', '1', '0.1'), bar(1, '1', '2', '1', '2', '0.2')], '1m', 3)[0]!.volume).toBe('0.300');
+    expect(
+      aggregateBars(
+        [bar(0, '1', '1', '1', '1', '0.1'), bar(1, '1', '2', '1', '2', '0.2')],
+        '1m',
+        3,
+      )[0]!.volume,
+    ).toBe('0.300');
     expect(aggregateBars([bar(0, '1', '1', '1', '1', '1')], '1m', 2)[0]!.volume).toBe('1.00');
-    expect(() => aggregateBars([bar(5, '1', '1', '1', '1', '1'), bar(1, '1', '1', '1', '1', '1')], '1m')).toThrow(RangeError);
+    expect(() =>
+      aggregateBars([bar(5, '1', '1', '1', '1', '1'), bar(1, '1', '1', '1', '1', '1')], '1m'),
+    ).toThrow(RangeError);
   });
 
   it('property: hierarchical aggregation equals direct aggregation and bars stay valid', () => {
     const barArb = fc.array(
-      fc.record({ gap: fc.integer({ min: 1, max: 400 }), o: fc.integer({ min: 1, max: 9999 }), c: fc.integer({ min: 1, max: 9999 }), up: fc.integer({ min: 0, max: 50 }), dn: fc.integer({ min: 0, max: 50 }), v: fc.integer({ min: 0, max: 1000 }), n: fc.integer({ min: 0, max: 9 }) }),
+      fc.record({
+        gap: fc.integer({ min: 1, max: 400 }),
+        o: fc.integer({ min: 1, max: 9999 }),
+        c: fc.integer({ min: 1, max: 9999 }),
+        up: fc.integer({ min: 0, max: 50 }),
+        dn: fc.integer({ min: 0, max: 50 }),
+        v: fc.integer({ min: 0, max: 1000 }),
+        n: fc.integer({ min: 0, max: 9 }),
+      }),
       { minLength: 1, maxLength: 300 },
     );
     const chain: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1D'];
@@ -60,7 +115,15 @@ describe('aggregateBars vs hand-computed bars', () => {
           t += r.gap * 1000;
           const hi = Math.max(r.o, r.c) + r.up;
           const lo = Math.max(1, Math.min(r.o, r.c) - r.dn);
-          return { bucket: t, open: String(r.o), high: String(hi), low: String(lo), close: String(r.c), volume: String(r.v), trades: r.n };
+          return {
+            bucket: t,
+            open: String(r.o),
+            high: String(hi),
+            low: String(lo),
+            close: String(r.c),
+            volume: String(r.v),
+            trades: r.n,
+          };
         });
         let prev = input;
         for (const tf of chain) {
@@ -82,12 +145,19 @@ describe('aggregateBars vs hand-computed bars', () => {
 describe('BarBuilder and CandleTracker', () => {
   it('builds 1 s bars from trades and closes them on the next second or on flush', () => {
     const b = new BarBuilder(() => 0);
-    const tr = (ms: number, price: string, qty: string) => ({ symbol: 'X', price, qty, exchangeTs: T0 + ms });
+    const tr = (ms: number, price: string, qty: string) => ({
+      symbol: 'X',
+      price,
+      qty,
+      exchangeTs: T0 + ms,
+    });
     expect(b.onTrade(tr(100, '10', '1'))).toEqual([]);
     expect(b.onTrade(tr(900, '12', '2'))).toEqual([]);
     expect(b.onTrade(tr(500, '9', '1'))).toEqual([]); // same second, out of order is still merged by time bucket
     const closed = b.onTrade(tr(1200, '11', '1'));
-    expect(closed).toEqual([{ bucket: T0, open: '10', high: '12', low: '9', close: '9', volume: '4', trades: 3 }]);
+    expect(closed).toEqual([
+      { bucket: T0, open: '10', high: '12', low: '9', close: '9', volume: '4', trades: 3 },
+    ]);
     expect(b.onTrade(tr(200, '1', '1'))).toEqual([]); // late trade for a closed second is ignored
     expect(b.peek('X')!.bucket).toBe(T0 + 1000);
     expect(b.flush(T0 + 1500)).toEqual([]);
@@ -104,13 +174,33 @@ describe('BarBuilder and CandleTracker', () => {
     expect(c.current('X', '1m')).toMatchObject({ high: '13', close: '12', volume: '3', trades: 2 });
     const roll = c.update('X', bar(61, '12', '12', '8', '8', '1'), 3, 0);
     const closed1m = roll.find((x) => x.tf === '1m' && x.closed)!;
-    expect(closed1m).toMatchObject({ bucket: T0, open: '10', high: '13', low: '9', close: '12', volume: '3', seq: 3 });
-    expect(roll.find((x) => x.tf === '5m')).toMatchObject({ closed: false, low: '8', close: '8', volume: '4' });
+    expect(closed1m).toMatchObject({
+      bucket: T0,
+      open: '10',
+      high: '13',
+      low: '9',
+      close: '12',
+      volume: '3',
+      seq: 3,
+    });
+    expect(roll.find((x) => x.tf === '5m')).toMatchObject({
+      closed: false,
+      low: '8',
+      close: '8',
+      volume: '4',
+    });
   });
 
   it('mergeBars and isValidBar', () => {
     const m = mergeBars(bar(0, '5', '6', '4', '5', '1.5'), bar(0, '5', '7', '3', '6', '0.5'), 1);
-    expect(m).toMatchObject({ open: '5', high: '7', low: '3', close: '6', volume: '2.0', trades: 2 });
+    expect(m).toMatchObject({
+      open: '5',
+      high: '7',
+      low: '3',
+      close: '6',
+      volume: '2.0',
+      trades: 2,
+    });
     expect(isValidBar(m)).toBe(true);
     expect(isValidBar({ ...m, high: '1' })).toBe(false);
   });

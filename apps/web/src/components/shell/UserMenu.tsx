@@ -24,7 +24,8 @@ export function UserMenu() {
   const [open, setOpen] = useState(false);
   // Goal 08: localised and 44 px in the Novice view; Pro text and size unchanged.
   const { t, novice } = useI18n();
-  const tx = (en: string, key: Parameters<typeof t>[0], vars?: Record<string, string>) => (novice ? t(key, vars) : en);
+  const tx = (en: string, key: Parameters<typeof t>[0], vars?: Record<string, string>) =>
+    novice ? t(key, vars) : en;
   return (
     <div className="relative">
       <button
@@ -49,14 +50,30 @@ export function UserMenu() {
             {me.mfa ? ` · ${tx('2FA on', 'user.twoStepOn')}` : ''}
           </p>
           {!me.roles.includes('trader') ? (
-            <Link role="menuitem" className="block px-2 py-2 rounded hover:bg-raised no-underline text-accent" href="/appropriateness" onClick={() => setOpen(false)} data-testid="unlock-pro">
+            <Link
+              role="menuitem"
+              className="block px-2 py-2 rounded hover:bg-raised no-underline text-accent"
+              href="/appropriateness"
+              onClick={() => setOpen(false)}
+              data-testid="unlock-pro"
+            >
               {tx('Unlock Pro trading', 'user.unlockPro')}
             </Link>
           ) : null}
-          <Link role="menuitem" className="block px-2 py-2 rounded hover:bg-raised no-underline" href="/settings" onClick={() => setOpen(false)}>
+          <Link
+            role="menuitem"
+            className="block px-2 py-2 rounded hover:bg-raised no-underline"
+            href="/settings"
+            onClick={() => setOpen(false)}
+          >
             {tx('Settings', 'user.settings')}
           </Link>
-          <Link role="menuitem" className="block px-2 py-2 rounded hover:bg-raised no-underline" href="/audit" onClick={() => setOpen(false)}>
+          <Link
+            role="menuitem"
+            className="block px-2 py-2 rounded hover:bg-raised no-underline"
+            href="/audit"
+            onClick={() => setOpen(false)}
+          >
             {tx('Audit log', 'user.audit')}
           </Link>
           <button

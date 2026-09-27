@@ -26,7 +26,12 @@ interface ShellExtras {
   explainMode: ExplainMode;
 }
 
-function Themed({ children, locale, disclosure, explainMode }: { children: ReactNode } & ShellExtras) {
+function Themed({
+  children,
+  locale,
+  disclosure,
+  explainMode,
+}: { children: ReactNode } & ShellExtras) {
   const { me } = useShell();
   const pathname = usePathname();
   // IRTC R5-25: second- and third-line screens (risk console, internal audit, administration) belong to
@@ -46,7 +51,12 @@ function Themed({ children, locale, disclosure, explainMode }: { children: React
   }, [theme, me.preferences.colourConvention, lang, mode]);
   return (
     <I18nProvider locale={lang} novice={mode === 'novice'}>
-      <div data-theme={theme} data-colors={me.preferences.colourConvention} data-mode={mode} className="k-root min-h-screen">
+      <div
+        data-theme={theme}
+        data-colors={me.preferences.colourConvention}
+        data-mode={mode}
+        className="k-root min-h-screen"
+      >
         {mode === 'pro' ? (
           <ProShell>{children}</ProShell>
         ) : (
@@ -59,7 +69,11 @@ function Themed({ children, locale, disclosure, explainMode }: { children: React
   );
 }
 
-export function AppShell({ me, children, ...extras }: { me: MeResponse; children: ReactNode } & ShellExtras) {
+export function AppShell({
+  me,
+  children,
+  ...extras
+}: { me: MeResponse; children: ReactNode } & ShellExtras) {
   return (
     <ShellProvider initialMe={me}>
       <ToastProvider>

@@ -12,12 +12,16 @@ import { heartbeatMs, limitsHash } from './robots.service';
 import { serviceToken, ServiceTokenGuard } from './service-token.guard';
 
 const ctx = (header?: string) =>
-  ({ switchToHttp: () => ({ getRequest: () => ({ header: () => header }) }) }) as unknown as ExecutionContext;
+  ({
+    switchToHttp: () => ({ getRequest: () => ({ header: () => header }) }),
+  }) as unknown as ExecutionContext;
 
 describe('robots config and guards', () => {
   it('limits hash is stable across key order and changes with any limit', () => {
     const a = limitsHash(DEFAULT_ROBOT_LIMITS);
-    const reordered = Object.fromEntries(Object.entries(DEFAULT_ROBOT_LIMITS).reverse()) as typeof DEFAULT_ROBOT_LIMITS;
+    const reordered = Object.fromEntries(
+      Object.entries(DEFAULT_ROBOT_LIMITS).reverse(),
+    ) as typeof DEFAULT_ROBOT_LIMITS;
     expect(limitsHash(reordered)).toBe(a);
     expect(limitsHash({ ...DEFAULT_ROBOT_LIMITS, maxDrawdownPct: 9 })).not.toBe(a);
   });

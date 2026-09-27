@@ -31,7 +31,8 @@ describe('WebSocket session revalidation (IRTC R1-03)', () => {
 
   it('logout mid-socket closes the open socket (4401)', async () => {
     const t = await createUser(app, 'trader');
-    const accountId = (await request(http).get('/accounts/me').set(bearer(t.token)).expect(200)).body.id as string;
+    const accountId = (await request(http).get('/accounts/me').set(bearer(t.token)).expect(200))
+      .body.id as string;
     const sock = await TestWs.authed(ws, t.token, [`orders:${accountId}`]);
     await request(http).post('/auth/logout').set(bearer(t.token)).expect(200);
     expect(await sock.waitClose(3000)).toMatchObject({ code: 4401 });
@@ -39,11 +40,17 @@ describe('WebSocket session revalidation (IRTC R1-03)', () => {
 
   it('a demoted risk officer loses the socket and cannot subscribe to other accounts or risk alerts', async () => {
     const victim = await createUser(app, 'trader');
-    const victimAccount = (await request(http).get('/accounts/me').set(bearer(victim.token)).expect(200)).body.id as string;
+    const victimAccount = (
+      await request(http).get('/accounts/me').set(bearer(victim.token)).expect(200)
+    ).body.id as string;
     const risk = await createUser(app, 'trader', ['risk_officer']);
     const admin = await createUser(app, 'novice', ['admin']);
     const sock = await TestWs.authed(ws, risk.token, ['risk:alerts', `orders:${victimAccount}`]);
-    await request(http).put(`/admin/users/${risk.id}/roles`).set(bearer(admin.token)).send({ roles: ['novice', 'trader'] }).expect(200);
+    await request(http)
+      .put(`/admin/users/${risk.id}/roles`)
+      .set(bearer(admin.token))
+      .send({ roles: ['novice', 'trader'] })
+      .expect(200);
     // either the socket is closed at once, or at the latest the next subscribe is refused by closing it
     const closed = await sock.waitClose(3000).catch(() => null);
     if (!closed) {
@@ -52,17 +59,22 @@ describe('WebSocket session revalidation (IRTC R1-03)', () => {
     } else {
       expect(closed.code).toBe(4401);
     }
-    expect(sock.messages.some((m) => m.msg.type === 'subscribed' && m.msg.id === 'after')).toBe(false);
+    expect(sock.messages.some((m) => m.msg.type === 'subscribed' && m.msg.id === 'after')).toBe(
+      false,
+    );
   });
 
   it('a subscribe after the session was revoked out of band (disabled in the DB) closes the socket', async () => {
     const u = await createUser(app, 'trader');
-    const accountId = (await request(http).get('/accounts/me').set(bearer(u.token)).expect(200)).body.id as string;
+    const accountId = (await request(http).get('/accounts/me').set(bearer(u.token)).expect(200))
+      .body.id as string;
     const sock = await TestWs.authed(ws, u.token);
     await ownerQuery(`UPDATE users SET status = 'disabled' WHERE id = $1`, [u.id]);
     sock.send({ op: 'subscribe', channels: [`orders:${accountId}`], id: 'late' });
     expect(await sock.waitClose(3000)).toMatchObject({ code: 4401 });
-    expect(sock.messages.some((m) => m.msg.type === 'subscribed' && m.msg.id === 'late')).toBe(false);
+    expect(sock.messages.some((m) => m.msg.type === 'subscribed' && m.msg.id === 'late')).toBe(
+      false,
+    );
   });
 
   it('a logout on one api replica closes the socket held by another replica (Redis relay, not the sweep)', async () => {

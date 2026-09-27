@@ -17,7 +17,11 @@
       "options": [
         { "id": "learn", "label": "To learn how markets work, with practice money.", "points": 1 },
         { "id": "grow", "label": "To grow savings slowly over several years.", "points": 2 },
-        { "id": "active", "label": "To trade actively and take larger risks for larger possible gains.", "points": 4 }
+        {
+          "id": "active",
+          "label": "To trade actively and take larger risks for larger possible gains.",
+          "points": 4
+        }
       ]
     },
     {
@@ -67,7 +71,11 @@
       "options": [
         { "id": "avoid", "label": "I do not want to borrow to trade.", "points": 0 },
         { "id": "small", "label": "I might borrow a little once I understand it.", "points": 2 },
-        { "id": "comfortable", "label": "I am comfortable with borrowing and know I can lose more quickly.", "points": 4 }
+        {
+          "id": "comfortable",
+          "label": "I am comfortable with borrowing and know I can lose more quickly.",
+          "points": 4
+        }
       ]
     }
   ]

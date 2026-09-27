@@ -30,7 +30,10 @@ export function TerminalProvider({ wsPort, children }: { wsPort: string; childre
     const setFeed = useFeedState.getState().set;
     const offStatus = store.onStatus((s) => setFeed({ feed: s.state }));
     const offState = store.onState((s) => setFeed({ socket: s }));
-    const perf = setInterval(() => setFeed({ tickP95: percentile(store.perf.ticks.slice(-200), 0.95) }), 2000);
+    const perf = setInterval(
+      () => setFeed({ tickP95: percentile(store.perf.ticks.slice(-200), 0.95) }),
+      2000,
+    );
     return () => {
       stop();
       offStatus();

@@ -55,7 +55,11 @@ export class TestWs {
   }
 
   /** Resolves with the first message (from index `from`) matching pred. */
-  async waitFor(pred: (m: Msg) => boolean, timeoutMs = 5000, from = 0): Promise<{ at: number; msg: Msg; index: number }> {
+  async waitFor(
+    pred: (m: Msg) => boolean,
+    timeoutMs = 5000,
+    from = 0,
+  ): Promise<{ at: number; msg: Msg; index: number }> {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const i = this.messages.findIndex((x, idx) => idx >= from && pred(x.msg));

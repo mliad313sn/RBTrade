@@ -22,11 +22,25 @@ describe('preferences', () => {
     expect(UpdatePreferencesSchema.safeParse({ hotkeys: many }).success).toBe(false);
   });
   it('terminal settings: defaults, partial updates and validation (goal 04)', () => {
-    expect(defaultPreferences(['trader']).terminal).toEqual({ density: 'compact', timeDisplay: 'utc', soundOnFills: false, perTradeRiskPct: '1' });
-    expect(UpdatePreferencesSchema.safeParse({ terminal: { soundOnFills: true } }).success).toBe(true);
-    expect(UpdatePreferencesSchema.safeParse({ terminal: { perTradeRiskPct: '0.5' } }).success).toBe(true);
-    for (const bad of ['0', '101', '1.234', 'x', '-1']) expect(UpdatePreferencesSchema.safeParse({ terminal: { perTradeRiskPct: bad } }).success).toBe(false);
-    expect(UpdatePreferencesSchema.safeParse({ terminal: { density: 'huge' } }).success).toBe(false);
+    expect(defaultPreferences(['trader']).terminal).toEqual({
+      density: 'compact',
+      timeDisplay: 'utc',
+      soundOnFills: false,
+      perTradeRiskPct: '1',
+    });
+    expect(UpdatePreferencesSchema.safeParse({ terminal: { soundOnFills: true } }).success).toBe(
+      true,
+    );
+    expect(
+      UpdatePreferencesSchema.safeParse({ terminal: { perTradeRiskPct: '0.5' } }).success,
+    ).toBe(true);
+    for (const bad of ['0', '101', '1.234', 'x', '-1'])
+      expect(
+        UpdatePreferencesSchema.safeParse({ terminal: { perTradeRiskPct: bad } }).success,
+      ).toBe(false);
+    expect(UpdatePreferencesSchema.safeParse({ terminal: { density: 'huge' } }).success).toBe(
+      false,
+    );
     expect(UpdatePreferencesSchema.safeParse({ terminal: { extra: 1 } }).success).toBe(false);
   });
 });

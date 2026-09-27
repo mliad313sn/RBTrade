@@ -34,8 +34,30 @@ export class InternalAuditService {
   async exportEvents(q: AuditQuery, actor: string) {
     const page = await this.audit.list({ ...q, limit: 500 });
     const csv = toCsv(
-      ['id', 'ts', 'actor_id', 'actor_type', 'action', 'entity', 'entity_id', 'payload', 'prev_hash', 'hash'],
-      page.events.map((e) => [e.id, e.ts, e.actorId, e.actorType, e.action, e.entity, e.entityId, JSON.stringify(e.payload), e.prevHash, e.hash]),
+      [
+        'id',
+        'ts',
+        'actor_id',
+        'actor_type',
+        'action',
+        'entity',
+        'entity_id',
+        'payload',
+        'prev_hash',
+        'hash',
+      ],
+      page.events.map((e) => [
+        e.id,
+        e.ts,
+        e.actorId,
+        e.actorType,
+        e.action,
+        e.entity,
+        e.entityId,
+        JSON.stringify(e.payload),
+        e.prevHash,
+        e.hash,
+      ]),
     );
     await this.audit.record({
       actorId: actor,
@@ -43,7 +65,10 @@ export class InternalAuditService {
       action: 'internal_audit.events_exported',
       entity: 'audit_events',
       entityId: null,
-      payload: { filter: JSON.parse(JSON.stringify(q)) as Record<string, string>, rows: page.events.length },
+      payload: {
+        filter: JSON.parse(JSON.stringify(q)) as Record<string, string>,
+        rows: page.events.length,
+      },
     });
     return { csv, rows: page.events.length, nextBeforeId: page.nextBeforeId };
   }
@@ -94,9 +119,16 @@ export class InternalAuditService {
    * actions), or the rows of its evidence table when the control has no audit actions. Same seed,
    * same population → same sample.
    */
-  async sample(controlId: string, n: number, range: Range, seedInput: string | undefined, actor: string) {
+  async sample(
+    controlId: string,
+    n: number,
+    range: Range,
+    seedInput: string | undefined,
+    actor: string,
+  ) {
     const control = controlById(controlId);
-    if (!control) throw new NotFoundException({ error: 'not_found', message: `No control ${controlId}.` });
+    if (!control)
+      throw new NotFoundException({ error: 'not_found', message: `No control ${controlId}.` });
     const seedText = seedInput ?? String(randomInt(1, 2 ** 31 - 1));
     const seed = seedFrom(seedText);
     let result: {
@@ -119,7 +151,12 @@ export class InternalAuditService {
     } else {
       const ev = await this.evidence.run(controlId, range, actor);
       const rows = sample(ev.evidence.rows, n, seed);
-      result = { population: ev.evidence.rows.length, kind: 'evidence_rows', columns: ev.evidence.columns, rows };
+      result = {
+        population: ev.evidence.rows.length,
+        kind: 'evidence_rows',
+        columns: ev.evidence.columns,
+        rows,
+      };
     }
     const size = result.events?.length ?? result.rows?.length ?? 0;
     await this.audit.record({

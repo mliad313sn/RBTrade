@@ -26,11 +26,18 @@ export interface MarketDataAdapter {
   disconnect(): Promise<void>;
   subscribeQuotes(symbols: string[], onQuote: (q: Quote) => void): Unsubscribe;
   subscribeTrades(symbols: string[], onTrade: (t: Trade) => void): Unsubscribe;
-  subscribeDepth(symbols: string[], levels: number, onDepth: (d: DepthSnapshot | DepthDelta) => void): Unsubscribe;
+  subscribeDepth(
+    symbols: string[],
+    levels: number,
+    onDepth: (d: DepthSnapshot | DepthDelta) => void,
+  ): Unsubscribe;
   /** Historical candles with bucket in [from, to). */
   getCandles(symbol: string, tf: Timeframe, from: number, to: number): Promise<Candle[]>;
   /** Current state for a resync after a gap. */
-  snapshot(symbol: string, levels: number): Promise<{ quote: Quote | null; depth: DepthSnapshot | null }>;
+  snapshot(
+    symbol: string,
+    levels: number,
+  ): Promise<{ quote: Quote | null; depth: DepthSnapshot | null }>;
   health(): AdapterHealth;
   /** Called on every state change (connect, disconnect, error). */
   onStateChange(listener: (h: AdapterHealth) => void): Unsubscribe;

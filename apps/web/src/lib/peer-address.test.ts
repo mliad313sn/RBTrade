@@ -19,7 +19,8 @@ describe('client address behind the web proxy (IRTC R1-05)', () => {
   let port = 0;
   const server = createServer((req, res) => {
     const h = new Headers();
-    for (const [k, v] of Object.entries(req.headers as IncomingHttpHeaders)) if (typeof v === 'string') h.set(k, v);
+    for (const [k, v] of Object.entries(req.headers as IncomingHttpHeaders))
+      if (typeof v === 'string') h.set(k, v);
     res.end(JSON.stringify({ hops0: clientAddress(h, 0), hops1: clientAddress(h, 1) }));
   });
   beforeAll(async () => {
@@ -47,7 +48,10 @@ describe('client address behind the web proxy (IRTC R1-05)', () => {
   });
 
   it('a client-chosen X-Forwarded-For or x-kora-peer-addr is never trusted without a configured hop', async () => {
-    const a = await call('127.0.0.2', { 'x-forwarded-for': '203.0.113.5', 'x-kora-peer-addr': '198.51.100.99' });
+    const a = await call('127.0.0.2', {
+      'x-forwarded-for': '203.0.113.5',
+      'x-kora-peer-addr': '198.51.100.99',
+    });
     expect(a.hops0.replace(/^::ffff:/, '')).toBe('127.0.0.2');
   });
 
@@ -64,7 +68,10 @@ describe('clientAddress without the preload stamp', () => {
     const saved = g[flag];
     g[flag] = undefined;
     try {
-      const h = new Headers({ 'x-kora-peer-addr': '198.51.100.99', 'x-forwarded-for': '203.0.113.5' });
+      const h = new Headers({
+        'x-kora-peer-addr': '198.51.100.99',
+        'x-forwarded-for': '203.0.113.5',
+      });
       expect(clientAddress(h, 0)).toBe('127.0.0.1');
     } finally {
       g[flag] = saved;

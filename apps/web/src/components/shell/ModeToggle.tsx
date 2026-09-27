@@ -31,7 +31,10 @@ export function ModeToggle() {
         router.push(counterpartPath(pathname, target, search.toString()));
         router.refresh();
       } catch {
-        toast.push(mode === 'novice' ? t('mode.error') : 'Could not switch view. Please try again.', 'critical');
+        toast.push(
+          mode === 'novice' ? t('mode.error') : 'Could not switch view. Please try again.',
+          'critical',
+        );
       }
     });
   };

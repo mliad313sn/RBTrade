@@ -10,7 +10,10 @@ import { apiSignIn } from './helpers';
 
 /** "108,420.69 USD" / "−200.00 USD · 0.08% eq." / "1 : 2.00" → the first decimal number. */
 function firstNumber(text: string | null): number {
-  const m = (text ?? '').replace(/,/g, '').replace('−', '-').match(/-?\d+(\.\d+)?/);
+  const m = (text ?? '')
+    .replace(/,/g, '')
+    .replace('−', '-')
+    .match(/-?\d+(\.\d+)?/);
   return m ? Number(m[0]) : NaN;
 }
 
@@ -19,7 +22,9 @@ async function quote(page: Page, symbol: string): Promise<{ bid: string; ask: st
   return r.quotes[0].quote;
 }
 
-test('search EUR/USD → limit buy with SL/TP → preview matches the API → confirm → Orders → drag the line to amend → fill → Positions and Fills (slippage) → close', async ({ page }) => {
+test('search EUR/USD → limit buy with SL/TP → preview matches the API → confirm → Orders → drag the line to amend → fill → Positions and Fills (slippage) → close', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await apiSignIn(page, 'trader');
   await page.goto('/terminal?symbol=BTCUSD');
@@ -53,7 +58,13 @@ test('search EUR/USD → limit buy with SL/TP → preview matches the API → co
   page.on('response', async (r) => {
     if (!r.url().endsWith('/api/orders/preview') || r.request().method() !== 'POST') return;
     const body = r.request().postDataJSON() as Record<string, unknown>;
-    if (body.limitPrice === limit && body.stopLossPrice && body.takeProfitPrice && body.qty === '100000') lastPreview = { body, res: await r.json() };
+    if (
+      body.limitPrice === limit &&
+      body.stopLossPrice &&
+      body.takeProfitPrice &&
+      body.qty === '100000'
+    )
+      lastPreview = { body, res: await r.json() };
   });
   await ticket.getByTestId('ticket-qty').fill('100000');
   await ticket.getByTestId('ticket-limit').fill(limit);
@@ -64,43 +75,62 @@ test('search EUR/USD → limit buy with SL/TP → preview matches the API → co
   // 3. The previewed values on screen equal the API response.
   await expect.poll(() => lastPreview !== null, { timeout: 10_000 }).toBe(true);
   const sent = lastPreview!.body;
-  expect(sent).toMatchObject({ symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '100000', limitPrice: limit });
+  expect(sent).toMatchObject({
+    symbol: 'EURUSD',
+    side: 'buy',
+    type: 'limit',
+    qty: '100000',
+    limitPrice: limit,
+  });
   expect(Number(sent.stopLossPrice)).toBeCloseTo(Number(limit) - 0.002, 6); // 20 pips of 0.0001 (registry pip size)
   expect(Number(sent.takeProfitPrice)).toBeCloseTo(Number(limit) + 0.004, 6);
   await expect
-    .poll(async () => {
-      const p = lastPreview!.res.preview;
-      const shown = {
-        notional: firstNumber(await page.getByTestId('preview-notional').textContent()),
-        fees: firstNumber(await page.getByTestId('preview-fees').textContent()),
-        margin: firstNumber(await page.getByTestId('preview-margin').textContent()),
-        loss: firstNumber(await page.getByTestId('preview-loss').textContent()),
-        rr: Number((await page.getByTestId('preview-rr').textContent())?.split(':')[1]),
-      };
-      return (
-        shown.notional === Number(p.notional.base) &&
-        shown.fees === Number(p.fees.total) &&
-        shown.margin === Number(p.margin.required) &&
-        shown.loss === -Number(p.lossIfStopHit.total) &&
-        shown.rr === Number(p.rewardRisk)
-      );
-    }, { timeout: 10_000 })
+    .poll(
+      async () => {
+        const p = lastPreview!.res.preview;
+        const shown = {
+          notional: firstNumber(await page.getByTestId('preview-notional').textContent()),
+          fees: firstNumber(await page.getByTestId('preview-fees').textContent()),
+          margin: firstNumber(await page.getByTestId('preview-margin').textContent()),
+          loss: firstNumber(await page.getByTestId('preview-loss').textContent()),
+          rr: Number((await page.getByTestId('preview-rr').textContent())?.split(':')[1]),
+        };
+        return (
+          shown.notional === Number(p.notional.base) &&
+          shown.fees === Number(p.fees.total) &&
+          shown.margin === Number(p.margin.required) &&
+          shown.loss === -Number(p.lossIfStopHit.total) &&
+          shown.rr === Number(p.rewardRisk)
+        );
+      },
+      { timeout: 10_000 },
+    )
     .toBe(true);
-  await expect(page.getByTestId('preview-loss')).toContainText(`${lastPreview!.res.preview.lossIfStopHit.pctEquity}% eq.`);
+  await expect(page.getByTestId('preview-loss')).toContainText(
+    `${lastPreview!.res.preview.lossIfStopHit.pctEquity}% eq.`,
+  );
 
   // 4. Review → confirmation (notional above the 50,000 threshold) → place.
   await ticket.getByTestId('place-order').click();
   const confirm = page.getByTestId('confirm-order');
   await expect(confirm).toBeVisible();
   await confirm.getByTestId('confirm-place').click();
-  await expect(ticket.getByTestId('ticket-result')).toContainText('Order working: buy 100,000 EURUSD');
+  await expect(ticket.getByTestId('ticket-result')).toContainText(
+    'Order working: buy 100,000 EURUSD',
+  );
 
   // 5. It appears in Orders (streamed).
   await page.getByRole('tab', { name: /^Orders \(\d+\)/ }).click();
   const orders = page.getByTestId('blotter-orders');
-  const open = (await (await page.request.get('/api/orders?status=open')).json()).orders as Array<{ id: string; role: string; limitPrice: string }>;
+  const open = (await (await page.request.get('/api/orders?status=open')).json()).orders as Array<{
+    id: string;
+    role: string;
+    limitPrice: string;
+  }>;
   const primary = open.find((o) => o.role === 'primary')!;
-  await expect(orders.getByTestId(`order-row-${primary.id}`)).toContainText(limit.replace(/(\d)(?=(\d{3})+\.)/g, '$1,'));
+  await expect(orders.getByTestId(`order-row-${primary.id}`)).toContainText(
+    limit.replace(/(\d)(?=(\d{3})+\.)/g, '$1,'),
+  );
 
   // 6. Drag the working order's price line above the ask, confirm the amendment.
   const handle = page.getByTestId(`order-line-${primary.id}`);
@@ -123,12 +153,18 @@ test('search EUR/USD → limit buy with SL/TP → preview matches the API → co
   const amend = page.getByTestId('confirm-amend');
   await expect(amend).toBeVisible();
   await expect(amend).toContainText(`→ ${draggedTo.toFixed(5)}`);
-  const patch = page.waitForResponse((r) => r.url().includes(`/api/orders/${primary.id}`) && r.request().method() === 'PATCH');
+  const patch = page.waitForResponse(
+    (r) => r.url().includes(`/api/orders/${primary.id}`) && r.request().method() === 'PATCH',
+  );
   await amend.getByTestId('confirm-amend-ok').click();
   expect((await patch).status()).toBe(200);
 
   // 7. It fills in the simulated market → Positions and Fills (with slippage).
-  await expect.poll(async () => (await (await page.request.get('/api/positions')).json()).positions.length, { timeout: 15_000 }).toBe(1);
+  await expect
+    .poll(async () => (await (await page.request.get('/api/positions')).json()).positions.length, {
+      timeout: 15_000,
+    })
+    .toBe(1);
   await page.getByRole('tab', { name: /^Positions/ }).click();
   const pos = page.getByTestId('blotter-positions');
   await expect(pos.getByTestId('pos-EURUSD')).toContainText('▲ Long');
@@ -143,7 +179,11 @@ test('search EUR/USD → limit buy with SL/TP → preview matches the API → co
   // 8. Close the position from Positions.
   await page.getByRole('tab', { name: /^Positions/ }).click();
   await pos.getByTestId('close-EURUSD').click();
-  await expect.poll(async () => (await (await page.request.get('/api/positions')).json()).positions.length, { timeout: 15_000 }).toBe(0);
+  await expect
+    .poll(async () => (await (await page.request.get('/api/positions')).json()).positions.length, {
+      timeout: 15_000,
+    })
+    .toBe(0);
   await expect(page.getByTestId('blotter-positions')).toHaveCount(0);
   await page.getByRole('tab', { name: 'Fills' }).click();
   await expect(page.getByTestId('blotter-fills').getByRole('row')).toHaveCount(3);
@@ -151,19 +191,27 @@ test('search EUR/USD → limit buy with SL/TP → preview matches the API → co
   expect((await (await page.request.get('/api/orders?status=open')).json()).orders).toHaveLength(0);
 });
 
-test('layouts: dock a panel elsewhere, save it by name, reset to default, load it back', async ({ page }) => {
+test('layouts: dock a panel elsewhere, save it by name, reset to default, load it back', async ({
+  page,
+}) => {
   await apiSignIn(page, 'trader');
   await page.goto('/terminal');
   await expect(page.getByTestId('chart-panel')).toBeVisible();
   // Dock the Risk tab into the chart group (drag its tab onto the chart's content).
   await page.getByRole('tab', { name: 'Risk' }).dragTo(page.getByTestId('chart-canvas'));
-  const chartGroupTabs = page.getByRole('tablist').filter({ has: page.getByRole('tab', { name: 'Chart' }) });
+  const chartGroupTabs = page
+    .getByRole('tablist')
+    .filter({ has: page.getByRole('tab', { name: 'Chart' }) });
   await expect(chartGroupTabs.getByRole('tab', { name: 'Risk' })).toBeVisible();
   await page.getByTestId('layout-menu').click();
   await page.getByTestId('layout-name').fill('Risk desk');
   await page.getByTestId('layout-save').click();
   await expect(page.getByTestId('layout-load-Risk desk')).toBeVisible();
-  expect((await (await page.request.get('/api/me/layouts')).json()).layouts.map((l: { name: string }) => l.name)).toContain('Risk desk');
+  expect(
+    (await (await page.request.get('/api/me/layouts')).json()).layouts.map(
+      (l: { name: string }) => l.name,
+    ),
+  ).toContain('Risk desk');
   await page.getByTestId('layout-reset').click();
   await expect(chartGroupTabs.getByRole('tab', { name: 'Risk' })).toHaveCount(0);
   await page.getByTestId('layout-menu').click();
@@ -178,17 +226,27 @@ test('layouts: dock a panel elsewhere, save it by name, reset to default, load i
   await expect(page.getByTestId('chart-panel')).toBeVisible();
 });
 
-test('watchlists: global list covers every venue with session badges; add via ⌘K; keyboard reorder persists', async ({ page }) => {
+test('watchlists: global list covers every venue with session badges; add via ⌘K; keyboard reorder persists', async ({
+  page,
+}) => {
   await apiSignIn(page, 'trader');
   await page.goto('/terminal');
   const wl = page.getByTestId('watchlist');
   await expect(wl.getByTestId('wl-EURUSD')).toBeVisible();
-  const lists = (await (await page.request.get('/api/me/watchlists')).json()).watchlists as Array<{ id: string; name: string; symbols: string[] }>;
+  const lists = (await (await page.request.get('/api/me/watchlists')).json()).watchlists as Array<{
+    id: string;
+    name: string;
+    symbols: string[];
+  }>;
   const global = lists.find((l) => l.name === 'Global')!;
   await page.getByTestId('watchlist-select').selectOption(global.id);
-  await expect(page.getByTestId('watchlist-rows')).toHaveAttribute('data-total', String(global.symbols.length));
+  await expect(page.getByTestId('watchlist-rows')).toHaveAttribute(
+    'data-total',
+    String(global.symbols.length),
+  );
   // One instrument for every venue that lists an active instrument (all five continents + global).
-  const instruments = (await (await page.request.get('/api/instruments')).json()).instruments as Array<{ venue: string; status: string }>;
+  const instruments = (await (await page.request.get('/api/instruments')).json())
+    .instruments as Array<{ venue: string; status: string }>;
   const venues = new Set(instruments.filter((i) => i.status === 'active').map((i) => i.venue));
   expect(global.symbols.length).toBe(venues.size);
   expect(venues.size).toBeGreaterThanOrEqual(15);
@@ -207,13 +265,19 @@ test('watchlists: global list covers every venue with session badges; add via �
   await expect(wl.getByTestId(`wl-${sym}`)).toBeVisible();
   await wl.getByTestId(`wl-${sym}`).click();
   await page.keyboard.press('Alt+ArrowUp');
-  await expect.poll(async () => {
-    const r = (await (await page.request.get('/api/me/watchlists')).json()).watchlists.find((l: { id: string }) => l.id === majors.id);
-    return r.symbols.slice(-2);
-  }).toEqual([sym, 'WTI']);
+  await expect
+    .poll(async () => {
+      const r = (await (await page.request.get('/api/me/watchlists')).json()).watchlists.find(
+        (l: { id: string }) => l.id === majors.id,
+      );
+      return r.symbols.slice(-2);
+    })
+    .toEqual([sym, 'WTI']);
 });
 
-test('settings: per-trade risk rule drives the ticket warning; hotkeys are configurable; UTC/local and density persist', async ({ page }) => {
+test('settings: per-trade risk rule drives the ticket warning; hotkeys are configurable; UTC/local and density persist', async ({
+  page,
+}) => {
   await apiSignIn(page, 'trader');
   await page.goto('/settings');
   await page.getByTestId('settings-risk-pct').fill('0.5');
@@ -224,7 +288,12 @@ test('settings: per-trade risk rule drives the ticket warning; hotkeys are confi
   await page.getByTestId('settings-density').selectOption('comfortable');
   await page.getByTestId('hotkey-ticketSell').fill('Alt+S');
   await page.getByTestId('hotkey-ticketSell').press('Enter');
-  await expect.poll(async () => (await (await page.request.get('/api/me')).json()).preferences).toMatchObject({ hotkeys: { ticketSell: 'Alt+S' }, terminal: { perTradeRiskPct: '0.5', timeDisplay: 'local', density: 'comfortable' } });
+  await expect
+    .poll(async () => (await (await page.request.get('/api/me')).json()).preferences)
+    .toMatchObject({
+      hotkeys: { ticketSell: 'Alt+S' },
+      terminal: { perTradeRiskPct: '0.5', timeDisplay: 'local', density: 'comfortable' },
+    });
 
   await page.goto('/terminal?symbol=BTCUSD');
   await expect(page.getByTestId('terminal-dock')).toHaveAttribute('data-density', 'comfortable');
@@ -236,7 +305,9 @@ test('settings: per-trade risk rule drives the ticket warning; hotkeys are confi
   await ticket.getByTestId('ticket-sl').fill('10');
   await ticket.getByTestId('ticket-sl').blur();
   // Loss at a 10 % stop on 0.1 BTC ≈ 0.65 % of 100,000: above the 0.5 % rule (below the 1 % default).
-  await expect(page.locator('[data-code="RISK_ABOVE_RULE"]')).toContainText('above your per-trade rule of 0.5%');
+  await expect(page.locator('[data-code="RISK_ABOVE_RULE"]')).toContainText(
+    'above your per-trade rule of 0.5%',
+  );
   // Rebound hotkey: Alt+S picks the sell side; plain S no longer does.
   await page.locator('main').click({ position: { x: 3, y: 3 } });
   await page.keyboard.press('s');

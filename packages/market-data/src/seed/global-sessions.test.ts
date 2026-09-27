@@ -8,15 +8,20 @@ import { SEED_VENUES } from './venues.js';
  * (SIMULATED sample) calendars of XNYS, XLON, XTKS, XHKG, XJSE, BVMF and XASX.
  */
 const venue = (mic: string) => SEED_VENUES.find((v) => v.mic === mic)!;
-const st = (mic: string, iso: string) => sessionState(venue(mic).calendar, venue(mic).timezone, Date.parse(iso));
-const status = (mic: string, iso: string) => sessionStatus(venue(mic).calendar, venue(mic).timezone, Date.parse(iso));
+const st = (mic: string, iso: string) =>
+  sessionState(venue(mic).calendar, venue(mic).timezone, Date.parse(iso));
+const status = (mic: string, iso: string) =>
+  sessionStatus(venue(mic).calendar, venue(mic).timezone, Date.parse(iso));
 
 describe('seeded venue sessions: DST and holidays', () => {
   it('XNYS: DST switch, Good Friday and Thanksgiving holidays, the early close after Thanksgiving', () => {
     expect(st('XNYS', '2026-03-06T14:00:00Z')).toBe('closed'); // 09:00 EST
     expect(st('XNYS', '2026-03-09T14:00:00Z')).toBe('open'); // 10:00 EDT
     expect(st('XNYS', '2026-04-03T15:00:00Z')).toBe('holiday');
-    expect(status('XNYS', '2026-11-26T16:00:00Z')).toMatchObject({ state: 'holiday', nextState: 'closed' });
+    expect(status('XNYS', '2026-11-26T16:00:00Z')).toMatchObject({
+      state: 'holiday',
+      nextState: 'closed',
+    });
     expect(st('XNYS', '2026-11-27T17:30:00Z')).toBe('open'); // 12:30 EST
     expect(st('XNYS', '2026-11-27T18:30:00Z')).toBe('closed'); // after the 13:00 early close
   });

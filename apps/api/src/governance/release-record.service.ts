@@ -36,7 +36,9 @@ export class ReleaseRecordService implements OnApplicationBootstrap {
         },
       });
       if (!this.cfg.releaseApprovalRef && this.cfg.env !== 'dev' && this.cfg.env !== 'test')
-        this.log.warn('KORA_RELEASE_APPROVAL_REF is empty: this release is reported as an exception by control KC-11');
+        this.log.warn(
+          'KORA_RELEASE_APPROVAL_REF is empty: this release is reported as an exception by control KC-11',
+        );
     } catch (e) {
       // The schema may not be migrated yet (e2e starts the api before migrating); never block boot.
       this.log.warn(`release record skipped: ${(e as Error).message}`);

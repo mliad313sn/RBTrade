@@ -51,8 +51,14 @@ export function KpiTiles({ result }: { result: SimResult }) {
           ends against the starting capital: a P5 above the start is a gain, not "down". */}
       <Tile label="P5 · P95 final" testId="kpi-range" value={f.p5}>
         <span className="k-num text-base flex flex-wrap gap-x-1 min-w-0">
-          {([['5th', f.p5], ['95th', f.p95]] as const).map(([pct, v], i) => {
-            const dir = v > result.startingCapital ? 'up' : v < result.startingCapital ? 'down' : 'flat';
+          {(
+            [
+              ['5th', f.p5],
+              ['95th', f.p95],
+            ] as const
+          ).map(([pct, v], i) => {
+            const dir =
+              v > result.startingCapital ? 'up' : v < result.startingCapital ? 'down' : 'flat';
             return (
               <span key={pct} className="whitespace-nowrap">
                 {i ? <span className="text-muted">· </span> : null}
@@ -97,11 +103,21 @@ const UNBOUNDED = 'not defined: no losing trade in the sample';
 export function RiskTable({ result }: { result: SimResult }) {
   const rows: [string, string][] = [
     result.expectancyUnit === 'pct'
-      ? ['Full Kelly (multiple of your paper sizing)', result.kelly.full === null ? UNBOUNDED : `${result.kelly.full.toFixed(2)}×`]
-      : ['Kelly fraction (full, after costs)', result.kelly.full === null ? UNBOUNDED : fmtPct(result.kelly.full)],
+      ? [
+          'Full Kelly (multiple of your paper sizing)',
+          result.kelly.full === null ? UNBOUNDED : `${result.kelly.full.toFixed(2)}×`,
+        ]
+      : [
+          'Kelly fraction (full, after costs)',
+          result.kelly.full === null ? UNBOUNDED : fmtPct(result.kelly.full),
+        ],
     [
       result.expectancyUnit === 'pct' ? 'Your sizing / Kelly' : 'Your risk / Kelly',
-      result.kelly.full === null ? '—' : result.kelly.ratio === null ? 'no edge' : `${result.kelly.ratio.toFixed(2)}×`,
+      result.kelly.full === null
+        ? '—'
+        : result.kelly.ratio === null
+          ? 'no edge'
+          : `${result.kelly.ratio.toFixed(2)}×`,
     ],
     ['Longest losing streak (median)', `${result.longestLosingStreak.median} trades`],
     ['Periods under water (median)', `${result.timeUnderWater.median} of ${result.periods}`],

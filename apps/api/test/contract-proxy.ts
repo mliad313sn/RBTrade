@@ -46,7 +46,13 @@ export class RecordingProxy {
       req.on('end', () => {
         const body = Buffer.concat(chunks);
         const up = httpRequest(
-          { host: t.hostname, port: t.port, method: req.method, path: req.url, headers: { ...req.headers, host: t.host } },
+          {
+            host: t.hostname,
+            port: t.port,
+            method: req.method,
+            path: req.url,
+            headers: { ...req.headers, host: t.host },
+          },
           (upRes) => {
             const out: Buffer[] = [];
             upRes.on('data', (c: Buffer) => out.push(c));
@@ -82,13 +88,26 @@ export class RecordingProxy {
   }
 }
 
-type OpenApiDoc = { paths: Record<string, Record<string, { requestBody?: { content?: Record<string, unknown> }; responses?: Record<string, { content?: Record<string, unknown> }> }>> };
+type OpenApiDoc = {
+  paths: Record<
+    string,
+    Record<
+      string,
+      {
+        requestBody?: { content?: Record<string, unknown> };
+        responses?: Record<string, { content?: Record<string, unknown> }>;
+      }
+    >
+  >;
+};
 
 /** Finds the templated OpenAPI path (`/orders/{id}`) that matches a concrete path. */
 export function matchPath(doc: OpenApiDoc, path: string): string | null {
   if (doc.paths[path]) return path;
   for (const p of Object.keys(doc.paths)) {
-    const re = new RegExp(`^${p.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\\?\{[^}]+\\?\}/g, '[^/]+')}$`);
+    const re = new RegExp(
+      `^${p.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\\?\{[^}]+\\?\}/g, '[^/]+')}$`,
+    );
     if (re.test(path)) return p;
   }
   return null;
@@ -109,21 +128,33 @@ export function validateExchanges(doc: OpenApiDoc, name: string, exchanges: Exch
     const m = x.method.toLowerCase();
     const op = p ? doc.paths[p]?.[m] : undefined;
     if (!p || !op) {
-      problems.push(`${x.consumer} → ${name}: ${x.method} ${x.path} is not in the provider's OpenAPI`);
+      problems.push(
+        `${x.consumer} → ${name}: ${x.method} ${x.path} is not in the provider's OpenAPI`,
+      );
       continue;
     }
     const base = `${name}#/paths/${esc(p)}/${m}`;
     if (x.requestBody !== undefined && op.requestBody?.content?.['application/json']) {
       const v = ajv.compile({ $ref: `${base}/requestBody/content/application~1json/schema` });
-      if (!v(x.requestBody)) problems.push(`${x.consumer} → ${name}: ${x.method} ${p} request: ${ajv.errorsText(v.errors)}`);
+      if (!v(x.requestBody))
+        problems.push(
+          `${x.consumer} → ${name}: ${x.method} ${p} request: ${ajv.errorsText(v.errors)}`,
+        );
     }
     const res = op.responses?.[String(x.status)];
     if (x.status >= 200 && x.status < 300) {
       if (res?.content?.['application/json'] && x.responseBody !== undefined) {
-        const v = ajv.compile({ $ref: `${base}/responses/${x.status}/content/application~1json/schema` });
-        if (!v(x.responseBody)) problems.push(`${x.consumer} ← ${name}: ${x.method} ${p} ${x.status} response: ${ajv.errorsText(v.errors)}`);
+        const v = ajv.compile({
+          $ref: `${base}/responses/${x.status}/content/application~1json/schema`,
+        });
+        if (!v(x.responseBody))
+          problems.push(
+            `${x.consumer} ← ${name}: ${x.method} ${p} ${x.status} response: ${ajv.errorsText(v.errors)}`,
+          );
       } else if (!res) {
-        problems.push(`${x.consumer} ← ${name}: ${x.method} ${p} answered ${x.status}, which the provider does not document`);
+        problems.push(
+          `${x.consumer} ← ${name}: ${x.method} ${p} answered ${x.status}, which the provider does not document`,
+        );
       }
     }
   }

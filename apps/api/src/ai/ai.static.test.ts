@@ -92,14 +92,19 @@ describe('copilot code cannot reach execution paths (static)', () => {
         .join('\n');
       for (const re of FORBIDDEN_CALLS) {
         // read-ports.ts is the one place that holds the OMS/robots/strategies services (read calls only, checked below).
-        if (f.endsWith('read-ports.ts') && (re.source.startsWith('OmsService') || re.source === 'AccountsService')) continue;
+        if (
+          f.endsWith('read-ports.ts') &&
+          (re.source.startsWith('OmsService') || re.source === 'AccountsService')
+        )
+          continue;
         expect(src, `${re} in ${f}`).not.toMatch(re);
       }
     },
   );
 
   it('no file in the ai or intel module uses ModuleRef (IRTC R6-02: no dynamic provider lookups)', () => {
-    for (const f of all) expect(readFileSync(f, 'utf8'), f).not.toMatch(/@nestjs\/core|\bModuleRef\b/);
+    for (const f of all)
+      expect(readFileSync(f, 'utf8'), f).not.toMatch(/@nestjs\/core|\bModuleRef\b/);
   });
 
   it('only read-ports.ts imports the accounts, OMS, robots and strategies services', () => {
@@ -127,8 +132,11 @@ describe('copilot code cannot reach execution paths (static)', () => {
     'MdConfig', // static config
   ];
   const constructorDeps = (src: string, cls: string): string[] => {
-    const body = new RegExp(`class ${cls}[\\s\\S]*?constructor\\(([\\s\\S]*?)\\)\\s*\\{`).exec(src)?.[1] ?? '';
-    return [...body.matchAll(/(?:private|public|protected)?\s*(?:readonly\s+)?\w+\s*:\s*([\w.]+)/g)].map((m) => m[1]!);
+    const body =
+      new RegExp(`class ${cls}[\\s\\S]*?constructor\\(([\\s\\S]*?)\\)\\s*\\{`).exec(src)?.[1] ?? '';
+    return [
+      ...body.matchAll(/(?:private|public|protected)?\s*(?:readonly\s+)?\w+\s*:\s*([\w.]+)/g),
+    ].map((m) => m[1]!);
   };
 
   it('the tool backend injects only allow-listed read ports (IRTC R6-02)', () => {
@@ -140,14 +148,23 @@ describe('copilot code cannot reach execution paths (static)', () => {
 
   it('the read ports inject only the services whose read calls are checked below (IRTC R6-02)', () => {
     const src = readFileSync(join(AI_DIR, 'read-ports.ts'), 'utf8');
-    expect(constructorDeps(src, 'AiReadPorts').sort()).toEqual(
-      ['AccountsService', 'BacktestsService', 'OmsService', 'RobotsService', 'StrategiesService'],
-    );
+    expect(constructorDeps(src, 'AiReadPorts').sort()).toEqual([
+      'AccountsService',
+      'BacktestsService',
+      'OmsService',
+      'RobotsService',
+      'StrategiesService',
+    ]);
   });
 
   it('the constructor scan sees an injected writer (self-check)', () => {
-    const fake = 'class AiToolBackend {\n  constructor(\n    private readonly accounts: AccountsService,\n    private readonly db: DbService,\n    @Inject(MD_CONFIG) md: MdConfig,\n  ) {\n';
-    expect(constructorDeps(fake, 'AiToolBackend')).toEqual(['AccountsService', 'DbService', 'MdConfig']);
+    const fake =
+      'class AiToolBackend {\n  constructor(\n    private readonly accounts: AccountsService,\n    private readonly db: DbService,\n    @Inject(MD_CONFIG) md: MdConfig,\n  ) {\n';
+    expect(constructorDeps(fake, 'AiToolBackend')).toEqual([
+      'AccountsService',
+      'DbService',
+      'MdConfig',
+    ]);
   });
 
   it('tool code runs no SQL and reaches no private member by cast or computed key (IRTC R6-02)', () => {
@@ -155,7 +172,9 @@ describe('copilot code cannot reach execution paths (static)', () => {
       const src = readFileSync(join(AI_DIR, name), 'utf8');
       expect(src, name).not.toMatch(/db\/db\.service|DbService|\bPool\b|ioredis/);
       expect(src, name).not.toMatch(/\.query\s*[(<]|\.tx\s*\(/);
-      expect(src, name).not.toMatch(/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|TRUNCATE)\b/i);
+      expect(src, name).not.toMatch(
+        /\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|TRUNCATE)\b/i,
+      );
       expect(src, name).not.toMatch(/as\s+unknown\s+as|as\s+any\b/);
       expect(src, name).not.toMatch(/this\.\w+\s*\[/);
     }
@@ -163,9 +182,9 @@ describe('copilot code cannot reach execution paths (static)', () => {
 
   it('read-ports.ts only calls read functions (and the pure validator)', () => {
     const src = readFileSync(join(AI_DIR, 'read-ports.ts'), 'utf8');
-    const calls = [...src.matchAll(/this\.(accounts|oms|robots|strategies|backtests)\.(\w+)\(/g)].map(
-      (m) => `${m[1]}.${m[2]}`,
-    );
+    const calls = [
+      ...src.matchAll(/this\.(accounts|oms|robots|strategies|backtests)\.(\w+)\(/g),
+    ].map((m) => `${m[1]}.${m[2]}`);
     expect(new Set(calls)).toEqual(
       new Set([
         'accounts.ensure',

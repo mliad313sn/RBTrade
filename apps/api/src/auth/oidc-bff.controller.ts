@@ -1,6 +1,15 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { BadRequestException, Controller, Get, Inject, NotFoundException, Query, Req, Res } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Inject,
+  NotFoundException,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Response } from 'express';
 
@@ -77,7 +86,10 @@ export class OidcBffController {
     }
     res.clearCookie(OIDC_COOKIE, { path: '/' });
     if (!code || !state || !saved.state || state !== saved.state || !saved.verifier) {
-      throw new BadRequestException({ error: 'oidc_state', message: 'Login expired. Please start again.' });
+      throw new BadRequestException({
+        error: 'oidc_state',
+        message: 'Login expired. Please start again.',
+      });
     }
     const tokenRes = await fetch(`${kc.issuer}/protocol/openid-connect/token`, {
       method: 'POST',
@@ -91,12 +103,18 @@ export class OidcBffController {
         code_verifier: saved.verifier,
       }),
     });
-    if (!tokenRes.ok) throw new BadRequestException({ error: 'oidc_exchange', message: 'Login failed' });
+    if (!tokenRes.ok)
+      throw new BadRequestException({ error: 'oidc_exchange', message: 'Login failed' });
     const body = (await tokenRes.json()) as { access_token?: string };
-    if (!body.access_token) throw new BadRequestException({ error: 'oidc_exchange', message: 'Login failed' });
+    if (!body.access_token)
+      throw new BadRequestException({ error: 'oidc_exchange', message: 'Login failed' });
     await this.tokens.verifyAccessToken(body.access_token); // issuer, audience, signature
     setAccessCookie(res, body.access_token, this.config);
     // Same-site hop so the SameSite=Strict cookie is sent on the next navigation.
-    res.type('html').send('<!doctype html><meta http-equiv="refresh" content="0;url=/"><title>Signing in…</title>');
+    res
+      .type('html')
+      .send(
+        '<!doctype html><meta http-equiv="refresh" content="0;url=/"><title>Signing in…</title>',
+      );
   }
 }

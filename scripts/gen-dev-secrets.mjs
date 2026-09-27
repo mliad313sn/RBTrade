@@ -12,7 +12,9 @@ const generators = {
   // Bot runner ↔ api service token (goal 06, B-301).
   KORA_SERVICE_TOKEN: () => randomBytes(32).toString('base64url'),
   KORA_DEV_IDP_PRIVATE_JWK: () => {
-    const jwk = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ format: 'jwk' });
+    const jwk = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({
+      format: 'jwk',
+    });
     return JSON.stringify({ ...jwk, kid: `kora-dev-${Date.now()}` });
   },
 };

@@ -43,7 +43,11 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
   const handleLogin = (res: LoginResponse) => {
     if (res.status === 'ok') return done();
     setCode('');
-    setStep(res.status === 'mfa_required' ? { kind: 'verify', mfaToken: res.mfaToken } : { kind: 'enroll', mfaToken: res.mfaToken });
+    setStep(
+      res.status === 'mfa_required'
+        ? { kind: 'verify', mfaToken: res.mfaToken }
+        : { kind: 'enroll', mfaToken: res.mfaToken },
+    );
   };
 
   useEffect(() => {
@@ -88,7 +92,8 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
       if (step.kind !== 'enroll' && step.kind !== 'verify') return;
       const res = await api.mfaVerify(step.mfaToken, code.trim());
       // B-902: show the one-time recovery codes once, right after enrolment.
-      if (res.recoveryCodes?.length) return setStep({ kind: 'recovery-codes', codes: res.recoveryCodes });
+      if (res.recoveryCodes?.length)
+        return setStep({ kind: 'recovery-codes', codes: res.recoveryCodes });
       done();
     } catch (err) {
       setError(message(err));
@@ -130,9 +135,24 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
         ) : step.kind === 'credentials' ? (
           <form className="flex flex-col gap-4" onSubmit={submitCredentials} noValidate>
             {mode === 'signup' ? (
-              <Input label="Your name" name="displayName" autoComplete="name" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <Input
+                label="Your name"
+                name="displayName"
+                autoComplete="name"
+                required
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
             ) : null}
-            <Input label="Email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              label="Email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
             <Input
               label="Password"
               name="password"
@@ -146,8 +166,9 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
             />
             {mode === 'signup' ? (
               <p className="m-0 text-sm text-muted" data-testid="signup-appropriateness-note">
-                Everyone starts in the Simple view with practice money: plain language, protective limits on, no borrowing. To unlock the Pro
-                terminal, take a short appropriateness assessment after signing up; Pro accounts then set up two-factor authentication.
+                Everyone starts in the Simple view with practice money: plain language, protective
+                limits on, no borrowing. To unlock the Pro terminal, take a short appropriateness
+                assessment after signing up; Pro accounts then set up two-factor authentication.
               </p>
             ) : null}
             <Button type="submit" variant="primary" size="lg" block disabled={busy}>
@@ -156,11 +177,17 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
             <p className="text-sm text-muted m-0">
               {mode === 'signup' ? (
                 <>
-                  Already have an account? <Link href="/login" className="text-accent underline">Sign in</Link>
+                  Already have an account?{' '}
+                  <Link href="/login" className="text-accent underline">
+                    Sign in
+                  </Link>
                 </>
               ) : (
                 <>
-                  New to KORA? <Link href="/signup" className="text-accent underline">Create an account</Link>
+                  New to KORA?{' '}
+                  <Link href="/signup" className="text-accent underline">
+                    Create an account
+                  </Link>
                 </>
               )}
             </p>
@@ -168,10 +195,13 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
         ) : step.kind === 'recovery-codes' ? (
           <div className="flex flex-col gap-4" data-testid="recovery-codes">
             <p className="m-0">
-              If you lose your authenticator app, each of these codes lets you sign in once. Store them somewhere safe, like a password manager.
-              They are shown only now.
+              If you lose your authenticator app, each of these codes lets you sign in once. Store
+              them somewhere safe, like a password manager. They are shown only now.
             </p>
-            <ul className="grid grid-cols-2 gap-2 m-0 p-0 list-none k-num" aria-label="Recovery codes">
+            <ul
+              className="grid grid-cols-2 gap-2 m-0 p-0 list-none k-num"
+              aria-label="Recovery codes"
+            >
               {step.codes.map((c) => (
                 <li key={c} className="k-panel px-2 py-1 text-center">
                   {c}
@@ -187,24 +217,39 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
             {step.kind === 'enroll' ? (
               <div className="flex flex-col gap-3" data-testid="mfa-enroll">
                 <p className="m-0">
-                  Scan this code with an authenticator app (for example 1Password, Google Authenticator or Authy), then enter the 6-digit code it shows.
+                  Scan this code with an authenticator app (for example 1Password, Google
+                  Authenticator or Authy), then enter the 6-digit code it shows.
                 </p>
                 {step.qr ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={step.qr} width={180} height={180} alt="QR code for your authenticator app" className="self-center" />
+                  <img
+                    src={step.qr}
+                    width={180}
+                    height={180}
+                    alt="QR code for your authenticator app"
+                    className="self-center"
+                  />
                 ) : (
                   <p className="text-muted">Preparing your code…</p>
                 )}
                 {step.secret ? (
                   <p className="m-0 text-sm">
-                    Can&apos;t scan? Enter this key: <code className="k-num break-all" data-testid="mfa-secret">{step.secret}</code>
+                    Can&apos;t scan? Enter this key:{' '}
+                    <code className="k-num break-all" data-testid="mfa-secret">
+                      {step.secret}
+                    </code>
                   </p>
                 ) : null}
               </div>
             ) : recovering ? (
-              <p className="m-0">Enter one of the recovery codes you saved when you set up two-factor authentication. Each code works once.</p>
+              <p className="m-0">
+                Enter one of the recovery codes you saved when you set up two-factor authentication.
+                Each code works once.
+              </p>
             ) : (
-              <p className="m-0">Open your authenticator app and enter the current code for KORA.</p>
+              <p className="m-0">
+                Open your authenticator app and enter the current code for KORA.
+              </p>
             )}
             {recovering ? (
               <Input
@@ -229,7 +274,15 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               />
             )}
-            <Button type="submit" variant="primary" size="lg" block disabled={busy || (recovering ? code.replace(/-/g, '').length !== 10 : code.length !== 6)}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              block
+              disabled={
+                busy || (recovering ? code.replace(/-/g, '').length !== 10 : code.length !== 6)
+              }
+            >
               {step.kind === 'enroll' ? 'Turn on two-factor and continue' : 'Verify'}
             </Button>
             {step.kind === 'verify' ? (
@@ -241,7 +294,9 @@ export function AuthFlow({ mode }: { mode: 'login' | 'signup' }) {
                   setStep({ kind: 'verify', mfaToken: step.mfaToken, recovery: !step.recovery });
                 }}
               >
-                {step.recovery ? 'Use my authenticator app instead' : 'Lost your authenticator? Use a recovery code'}
+                {step.recovery
+                  ? 'Use my authenticator app instead'
+                  : 'Lost your authenticator? Use a recovery code'}
               </Button>
             ) : null}
             <Button variant="ghost" onClick={() => setStep({ kind: 'credentials' })}>

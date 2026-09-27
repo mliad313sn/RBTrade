@@ -86,7 +86,13 @@ export class OrdersController {
     // IRTC R4-06: the server, not the client, decides whether this order comes from an AI draft.
     const origin = await decideOrderSource(this.db.pool, p.sub, body);
     const out = await this.oms.submit(
-      { userId: p.sub, roles: p.roles, actor: { type: 'user', id: p.sub }, source: origin.source, aiDraftId: origin.aiDraftId },
+      {
+        userId: p.sub,
+        roles: p.roles,
+        actor: { type: 'user', id: p.sub },
+        source: origin.source,
+        aiDraftId: origin.aiDraftId,
+      },
       { ...body, source: origin.source === 'ai-draft-accepted' ? 'ai-draft-accepted' : 'manual' },
     );
     res.status(out.idempotentReplay ? 200 : 201);
@@ -109,7 +115,8 @@ export class OrdersController {
   @Delete()
   @Throttle(orderThrottle())
   @ApiOperation({
-    summary: 'Cancel every open order, optionally for one symbol (Pro terminal "Cancel all"; each cancel is audited).',
+    summary:
+      'Cancel every open order, optionally for one symbol (Pro terminal "Cancel all"; each cancel is audited).',
   })
   @ApiQuery({ name: 'symbol', required: false })
   cancelAll(

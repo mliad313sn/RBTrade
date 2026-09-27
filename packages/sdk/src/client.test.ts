@@ -3,13 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { KoraApiError, KoraClient } from './client.js';
 
 function mockFetch(status: number, body: unknown) {
-  return vi.fn(async (_url: string, _init?: RequestInit) => new Response(body === undefined ? '' : JSON.stringify(body), { status }));
+  return vi.fn(
+    async (_url: string, _init?: RequestInit) =>
+      new Response(body === undefined ? '' : JSON.stringify(body), { status }),
+  );
 }
 
 describe('KoraClient', () => {
   it('sends csrf header, bearer token and JSON body', async () => {
     const f = mockFetch(202, { accepted: true });
-    const c = new KoraClient({ baseUrl: 'http://api/', token: 't0k', fetch: f as unknown as typeof fetch });
+    const c = new KoraClient({
+      baseUrl: 'http://api/',
+      token: 't0k',
+      fetch: f as unknown as typeof fetch,
+    });
     await c.killSwitch('robots_cancel', 'hotkey');
     const [url, init] = f.mock.calls[0]!;
     expect(url).toBe('http://api/kill-switch');
@@ -30,17 +37,28 @@ describe('KoraClient', () => {
   });
 
   it('maps API errors to KoraApiError', async () => {
-    const c = new KoraClient({ baseUrl: '/api', fetch: mockFetch(403, { error: 'forbidden', message: 'nope' }) as unknown as typeof fetch });
+    const c = new KoraClient({
+      baseUrl: '/api',
+      fetch: mockFetch(403, { error: 'forbidden', message: 'nope' }) as unknown as typeof fetch,
+    });
     await expect(c.me()).rejects.toMatchObject({ status: 403, code: 'forbidden', message: 'nope' });
-    const c2 = new KoraClient({ baseUrl: '/api', fetch: mockFetch(500, undefined) as unknown as typeof fetch });
+    const c2 = new KoraClient({
+      baseUrl: '/api',
+      fetch: mockFetch(500, undefined) as unknown as typeof fetch,
+    });
     await expect(c2.health()).rejects.toBeInstanceOf(KoraApiError);
-    const c3 = new KoraClient({ baseUrl: '/api', fetch: mockFetch(400, { message: ['a', 'b'] }) as unknown as typeof fetch });
+    const c3 = new KoraClient({
+      baseUrl: '/api',
+      fetch: mockFetch(400, { message: ['a', 'b'] }) as unknown as typeof fetch,
+    });
     await expect(c3.logout()).rejects.toMatchObject({ code: 'http_400', message: 'a, b' });
   });
 
   it('covers every endpoint path', async () => {
     const f = mockFetch(200, {});
-    const c = new KoraClient({ baseUrl: '/api', fetch: f as unknown as typeof fetch }).withToken('x');
+    const c = new KoraClient({ baseUrl: '/api', fetch: f as unknown as typeof fetch }).withToken(
+      'x',
+    );
     await c.health();
     await c.signup({ email: 'a@b.c', password: 'p', displayName: 'd' });
     await c.login('a@b.c', 'p');
@@ -51,8 +69,15 @@ describe('KoraClient', () => {
     await c.updatePreferences({ viewMode: 'novice' });
     await c.verifyAudit();
     expect(f.mock.calls.map((x) => x[0])).toEqual([
-      '/api/health', '/api/auth/signup', '/api/auth/login', '/api/auth/mfa/enroll', '/api/auth/mfa/verify',
-      '/api/me', '/api/me/preferences', '/api/me/preferences', '/api/audit/verify',
+      '/api/health',
+      '/api/auth/signup',
+      '/api/auth/login',
+      '/api/auth/mfa/enroll',
+      '/api/auth/mfa/verify',
+      '/api/me',
+      '/api/me/preferences',
+      '/api/me/preferences',
+      '/api/audit/verify',
     ]);
   });
 
@@ -62,7 +87,13 @@ describe('KoraClient', () => {
     await c.account();
     await c.updateAccountSettings({ confirmMode: 'always' });
     await c.previewOrder({ symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000' });
-    await c.placeOrder({ clientOrderId: 'c1', symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000' });
+    await c.placeOrder({
+      clientOrderId: 'c1',
+      symbol: 'EURUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '1000',
+    });
     await c.orders({ status: 'all' });
     await c.order('o 1');
     await c.amendOrder('o1', { qty: '2000' });
@@ -74,7 +105,12 @@ describe('KoraClient', () => {
     await c.killSwitchState();
     await c.resumeTrading('checked', 'a1');
     await c.appropriateness();
-    await c.submitAppropriateness('appropriateness', 1, { q: 'a' }, { version: 'v1', contentHash: 'a'.repeat(64), locale: 'en' });
+    await c.submitAppropriateness(
+      'appropriateness',
+      1,
+      { q: 'a' },
+      { version: 'v1', contentHash: 'a'.repeat(64), locale: 'en' },
+    );
     const calls = f.mock.calls.map((x) => [x[1]?.method, x[0]]);
     expect(calls).toEqual([
       ['GET', '/api/accounts/me'],
@@ -94,7 +130,11 @@ describe('KoraClient', () => {
       ['GET', '/api/appropriateness/questionnaire'],
       ['POST', '/api/appropriateness/attempts'],
     ]);
-    expect(JSON.parse(String(f.mock.calls[11]![1]!.body))).toEqual({ scope: 'robots', source: 'hotkey', reason: 'why' });
+    expect(JSON.parse(String(f.mock.calls[11]![1]!.body))).toEqual({
+      scope: 'robots',
+      source: 'hotkey',
+      reason: 'why',
+    });
   });
 
   it('goal 08: typed sim (B-506), scenarios (B-505), novice, disclosure and MFA opt-in routes', async () => {
@@ -103,7 +143,13 @@ describe('KoraClient', () => {
     await c.simProject({} as never);
     await c.simFromTrades({ trades: [1] });
     await c.simPaperAnalytics();
-    await c.simPaperProject({ tradesPerPeriod: 1, horizonPeriods: 1, ruinFloorPct: 50, seed: 1, paths: 100 });
+    await c.simPaperProject({
+      tradesPerPeriod: 1,
+      horizonPeriods: 1,
+      ruinFloorPct: 50,
+      seed: 1,
+      paths: 100,
+    });
     await c.simScenarios('practice');
     await c.saveSimScenario({ kind: 'practice', name: 'A', input: {} });
     await c.deleteSimScenario('id/1');

@@ -24,7 +24,19 @@ describe('GET /health', () => {
   it('serves the OpenAPI document', async () => {
     const res = await request(app.getHttpServer()).get('/openapi.json').expect(200);
     expect(Object.keys(res.body.paths)).toEqual(
-      expect.arrayContaining(['/health', '/auth/signup', '/audit', '/audit/verify', '/kill-switch', '/me/preferences', '/instruments', '/candles', '/quotes', '/calendar', '/market-data/status']),
+      expect.arrayContaining([
+        '/health',
+        '/auth/signup',
+        '/audit',
+        '/audit/verify',
+        '/kill-switch',
+        '/me/preferences',
+        '/instruments',
+        '/candles',
+        '/quotes',
+        '/calendar',
+        '/market-data/status',
+      ]),
     );
   });
 });

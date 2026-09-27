@@ -5,7 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { fourEyesViolation, type FourEyesKind, type FourEyesStatus, type JsonValue } from '@kora/domain';
+import {
+  fourEyesViolation,
+  type FourEyesKind,
+  type FourEyesStatus,
+  type JsonValue,
+} from '@kora/domain';
 
 import { AuditService } from '../audit/audit.service';
 import { DbService, type Queryable } from '../db/db.service';
@@ -102,7 +107,15 @@ export class FourEyesStore {
         await q.query<FourEyesRow>(
           `INSERT INTO four_eyes_requests (kind, subject_type, subject_id, payload, reason, requested_by, expires_at)
            VALUES ($1, $2, $3, $4::jsonb, $5, $6, clock_timestamp() + $7 * interval '1 millisecond') RETURNING *`,
-          [req.kind, req.subjectType, req.subjectId, JSON.stringify(req.payload), req.reason, req.requestedBy, this.cfg.fourEyesTtlMs],
+          [
+            req.kind,
+            req.subjectType,
+            req.subjectId,
+            JSON.stringify(req.payload),
+            req.reason,
+            req.requestedBy,
+            this.cfg.fourEyesTtlMs,
+          ],
         )
       ).rows[0]!;
       await this.audit.record(
@@ -130,12 +143,18 @@ export class FourEyesStore {
   }
 
   async get(id: string, c?: Queryable): Promise<FourEyesRow> {
-    const r = await (c ?? this.db.pool).query<FourEyesRow>('SELECT * FROM four_eyes_requests WHERE id = $1', [id]);
-    if (!r.rows[0]) throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
+    const r = await (c ?? this.db.pool).query<FourEyesRow>(
+      'SELECT * FROM four_eyes_requests WHERE id = $1',
+      [id],
+    );
+    if (!r.rows[0])
+      throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
     return r.rows[0];
   }
 
-  async list(q: { status?: FourEyesStatus; kind?: FourEyesKind; subjectId?: string; limit?: number } = {}): Promise<FourEyesRow[]> {
+  async list(
+    q: { status?: FourEyesStatus; kind?: FourEyesKind; subjectId?: string; limit?: number } = {},
+  ): Promise<FourEyesRow[]> {
     await this.expireStale(this.db.pool);
     const where: string[] = [];
     const params: unknown[] = [];
@@ -160,15 +179,23 @@ export class FourEyesStore {
   /** Locks a pending request for a decision; enforces "not the requester". */
   async lockPending(c: Queryable, id: string, deciderId: string): Promise<FourEyesRow> {
     await this.expireStale(c);
-    const r = await c.query<FourEyesRow>('SELECT * FROM four_eyes_requests WHERE id = $1 FOR UPDATE', [id]);
+    const r = await c.query<FourEyesRow>(
+      'SELECT * FROM four_eyes_requests WHERE id = $1 FOR UPDATE',
+      [id],
+    );
     const row = r.rows[0];
     if (!row) throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
     if (row.status !== 'pending')
-      throw new ConflictException({ error: 'not_pending', message: `This request is already ${row.status}.`, status: row.status });
+      throw new ConflictException({
+        error: 'not_pending',
+        message: `This request is already ${row.status}.`,
+        status: row.status,
+      });
     if (fourEyesViolation(row.requested_by, deciderId))
       throw new ForbiddenException({
         error: 'four_eyes',
-        message: 'Four-eyes rule: you cannot approve or reject your own request. Another authorised person must decide.',
+        message:
+          'Four-eyes rule: you cannot approve or reject your own request. Another authorised person must decide.',
       });
     return row;
   }

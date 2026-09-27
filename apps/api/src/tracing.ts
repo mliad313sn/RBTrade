@@ -22,12 +22,20 @@ export function startTracing(serviceName = 'kora-api'): NodeSDK | null {
   const spanProcessors: SpanProcessor[] = [];
   if (endpoint) spanProcessors.push(new BatchSpanProcessor(new OTLPTraceExporter()));
   // Batched: a synchronous write per span would itself slow the request path it measures.
-  const fileProcessor = file ? new BatchSpanProcessor(new FileSpanExporter(file), { scheduledDelayMillis: 500, maxQueueSize: 100_000, maxExportBatchSize: 5_000 }) : null;
+  const fileProcessor = file
+    ? new BatchSpanProcessor(new FileSpanExporter(file), {
+        scheduledDelayMillis: 500,
+        maxQueueSize: 100_000,
+        maxExportBatchSize: 5_000,
+      })
+    : null;
   if (fileProcessor) spanProcessors.push(fileProcessor);
   const sdk = new NodeSDK({
     spanProcessors,
     instrumentations: [
-      new HttpInstrumentation({ ignoreIncomingRequestHook: (req) => req.url === '/health' || req.url === '/metrics' }),
+      new HttpInstrumentation({
+        ignoreIncomingRequestHook: (req) => req.url === '/health' || req.url === '/metrics',
+      }),
       new ExpressInstrumentation(),
       new PgInstrumentation(),
       new UndiciInstrumentation(),

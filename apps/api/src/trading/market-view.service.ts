@@ -83,7 +83,12 @@ export class MarketViewService {
       } else {
         const paused = !prev || quote.receivedTs - prev.receivedTs > inst.staleAfterMs;
         lastMidMove = paused ? dec(0) : mid.sub(prev.mid).abs();
-        this.lastQuote.set(sym, { seq: quote.seq, mid, move: lastMidMove, receivedTs: quote.receivedTs });
+        this.lastQuote.set(sym, {
+          seq: quote.seq,
+          mid,
+          move: lastMidMove,
+          receivedTs: quote.receivedTs,
+        });
       }
     }
     // Depth must belong to the same instant's book side; ignore a depth older than the quote's stale window.

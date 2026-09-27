@@ -16,7 +16,10 @@ export interface MoneyProps extends MoneyOptions {
 export function Money({ amount, currency, colored, className, ...opts }: MoneyProps) {
   const dir = direction(amount);
   return (
-    <span className={cx('k-num', colored && `k-dir--${dir}`, className)} data-direction={colored ? dir : undefined}>
+    <span
+      className={cx('k-num', colored && `k-dir--${dir}`, className)}
+      data-direction={colored ? dir : undefined}
+    >
       {formatMoney(amount, currency, opts)}
     </span>
   );

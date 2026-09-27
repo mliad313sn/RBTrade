@@ -1,6 +1,22 @@
-import { ConflictException, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
+import {
+  ConflictException,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { depthChannel, quoteChannel, SYMBOL_RE, TIMEFRAMES, type DepthSnapshot, type Quote } from '@kora/domain';
+import {
+  depthChannel,
+  quoteChannel,
+  SYMBOL_RE,
+  TIMEFRAMES,
+  type DepthSnapshot,
+  type Quote,
+} from '@kora/domain';
 import { SimulatedCalendarProvider } from '@kora/market-data';
 import { z } from 'zod';
 
@@ -21,14 +37,27 @@ const instant = z.union([
 const symbol = z.string().regex(SYMBOL_RE);
 
 const CandlesQuery = z
-  .object({ symbol, tf: z.enum(TIMEFRAMES), limit: z.coerce.number().int().min(1).max(5000).default(500), from: instant.optional(), to: instant.optional() })
+  .object({
+    symbol,
+    tf: z.enum(TIMEFRAMES),
+    limit: z.coerce.number().int().min(1).max(5000).default(500),
+    from: instant.optional(),
+    to: instant.optional(),
+  })
   .strict();
 const QuotesQuery = z
   .object({
     symbols: z
       .string()
       .max(4000)
-      .transform((s) => [...new Set(s.split(',').map((x) => x.trim()).filter(Boolean))])
+      .transform((s) => [
+        ...new Set(
+          s
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean),
+        ),
+      ])
       .pipe(z.array(symbol).min(1).max(200)),
   })
   .strict();
@@ -72,7 +101,11 @@ export class MarketDataController {
     return {
       quotes: q.symbols.map((s, i) => {
         const quote = last[i] ? (JSON.parse(last[i]!) as Quote) : null;
-        return { symbol: s, quote: quote && lost ? { ...quote, stale: true } : quote, dayOpen: opens.get(s) ?? null };
+        return {
+          symbol: s,
+          quote: quote && lost ? { ...quote, stale: true } : quote,
+          dayOpen: opens.get(s) ?? null,
+        };
       }),
     };
   }
@@ -86,7 +119,9 @@ export class MarketDataController {
   }
 
   @Get('market-data/status')
-  @ApiOperation({ summary: 'Feed status (as published on the status channel) and gateway counters.' })
+  @ApiOperation({
+    summary: 'Feed status (as published on the status channel) and gateway counters.',
+  })
   status() {
     return {
       status: this.feed.isRunning ? this.feed.status() : this.hub.lastStatus(),
@@ -96,13 +131,19 @@ export class MarketDataController {
   }
 
   @Get('calendar')
-  @ApiOperation({ summary: 'Economic calendar (SIMULATED provider; times and events are invented). Max 31 days.' })
+  @ApiOperation({
+    summary: 'Economic calendar (SIMULATED provider; times and events are invented). Max 31 days.',
+  })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   async events(@Query(new ZodValidationPipe(CalendarQuery)) q: z.infer<typeof CalendarQuery>) {
     const from = q.from ?? Math.floor(Date.now() / DAY) * DAY;
     const to = Math.min(q.to ?? from + 7 * DAY, from + 31 * DAY);
-    return { source: this.calendar.source, simulated: true, events: await this.calendar.getEvents(from, to) };
+    return {
+      source: this.calendar.source,
+      simulated: true,
+      events: await this.calendar.getEvents(from, to),
+    };
   }
 
   @Post('market-data/feeds/:source/stop')
@@ -116,13 +157,19 @@ export class MarketDataController {
   @Post('market-data/feeds/:source/start')
   @HttpCode(202)
   @Roles('admin')
-  @ApiOperation({ summary: 'Start a stopped feed adapter (resyncs on the resulting gap). Admin only, audited.' })
+  @ApiOperation({
+    summary: 'Start a stopped feed adapter (resyncs on the resulting gap). Admin only, audited.',
+  })
   async start(@CurrentPrincipal() p: Principal, @Param('source') source: string) {
     return this.control(p, source, 'start');
   }
 
   private async control(p: Principal, source: string, action: 'stop' | 'start') {
-    if (!this.feed.isRunning) throw new ConflictException({ error: 'feed_not_in_process', message: 'The feed runs in another process (KORA_MD_FEED=off)' });
+    if (!this.feed.isRunning)
+      throw new ConflictException({
+        error: 'feed_not_in_process',
+        message: 'The feed runs in another process (KORA_MD_FEED=off)',
+      });
     if (action === 'stop') await this.feed.stopAdapter(source);
     else await this.feed.startAdapter(source);
     const event = await this.audit.record({

@@ -23,7 +23,16 @@ export interface VirtualRowsProps<T> extends Omit<HTMLAttributes<HTMLDivElement>
  * Virtualised rows (TanStack Virtual): only the rows in view plus `overscan` are in the DOM, so a
  * 500-symbol watchlist stays cheap to stream into (goal 04).
  */
-export function VirtualRows<T>({ items, rowHeight, overscan = 6, getKey, renderRow, handleRef, initialRect, ...rest }: VirtualRowsProps<T>) {
+export function VirtualRows<T>({
+  items,
+  rowHeight,
+  overscan = 6,
+  getKey,
+  renderRow,
+  handleRef,
+  initialRect,
+  ...rest
+}: VirtualRowsProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtual = useVirtualizer({
     count: items.length,
@@ -33,11 +42,23 @@ export function VirtualRows<T>({ items, rowHeight, overscan = 6, getKey, renderR
     getItemKey: (i) => getKey(items[i]!, i),
     ...(initialRect ? { initialRect } : {}),
   });
-  useImperativeHandle(handleRef, () => ({ scrollToIndex: (i: number) => virtual.scrollToIndex(i), element: () => parentRef.current }), [virtual]);
+  useImperativeHandle(
+    handleRef,
+    () => ({
+      scrollToIndex: (i: number) => virtual.scrollToIndex(i),
+      element: () => parentRef.current,
+    }),
+    [virtual],
+  );
   return (
     <div ref={parentRef} {...rest}>
-      <div style={{ height: virtual.getTotalSize(), position: 'relative' }} data-testid="virtual-spacer">
-        {virtual.getVirtualItems().map((vi) => renderRow(items[vi.index]!, vi.index, { size: vi.size, start: vi.start }))}
+      <div
+        style={{ height: virtual.getTotalSize(), position: 'relative' }}
+        data-testid="virtual-spacer"
+      >
+        {virtual
+          .getVirtualItems()
+          .map((vi) => renderRow(items[vi.index]!, vi.index, { size: vi.size, start: vi.start }))}
       </div>
     </div>
   );

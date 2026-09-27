@@ -1,4 +1,13 @@
-import { ASSET_CLASSES, assertTimeZone, CalendarEventSchema, MIC_RE, REGIONS, sessionState, SYMBOL_RE, validateCalendar } from '@kora/domain';
+import {
+  ASSET_CLASSES,
+  assertTimeZone,
+  CalendarEventSchema,
+  MIC_RE,
+  REGIONS,
+  sessionState,
+  SYMBOL_RE,
+  validateCalendar,
+} from '@kora/domain';
 import { describe, expect, it } from 'vitest';
 
 import { Prng } from '../prng.js';
@@ -31,7 +40,20 @@ function isinValid(isin: string): boolean {
 describe('seed registry (SIMULATED)', () => {
   it('covers the prototype watchlist and every asset class', () => {
     const symbols = SEED_INSTRUMENTS.map((i) => i.symbol);
-    for (const s of ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD', 'US500', 'NAS100', 'AAPL', 'NVDA', 'WTI']) expect(symbols).toContain(s);
+    for (const s of [
+      'EURUSD',
+      'GBPUSD',
+      'USDJPY',
+      'XAUUSD',
+      'BTCUSD',
+      'ETHUSD',
+      'US500',
+      'NAS100',
+      'AAPL',
+      'NVDA',
+      'WTI',
+    ])
+      expect(symbols).toContain(s);
     expect(new Set(symbols).size).toBe(symbols.length);
     expect(symbols.length).toBeGreaterThanOrEqual(30);
     const classes = new Set(SEED_INSTRUMENTS.map((i) => i.assetClass));
@@ -64,7 +86,8 @@ describe('seed registry (SIMULATED)', () => {
 
   it('seeded venue calendars behave across DST (XNYS, XLON, XTKS, XHKG, XJSE, BVMF, XASX)', () => {
     const v = (mic: string) => SEED_VENUES.find((x) => x.mic === mic)!;
-    const st = (mic: string, iso: string) => sessionState(v(mic).calendar, v(mic).timezone, Date.parse(iso));
+    const st = (mic: string, iso: string) =>
+      sessionState(v(mic).calendar, v(mic).timezone, Date.parse(iso));
     expect(st('XNYS', '2026-03-06T14:00:00Z')).toBe('closed');
     expect(st('XNYS', '2026-03-09T14:00:00Z')).toBe('open');
     expect(st('XNYS', '2026-04-03T15:00:00Z')).toBe('holiday');
@@ -83,14 +106,19 @@ describe('seed registry (SIMULATED)', () => {
   it('ISINs carry valid check digits', () => {
     const withIsin = SEED_INSTRUMENTS.filter((i) => i.isin);
     expect(withIsin.length).toBeGreaterThanOrEqual(10);
-    for (const i of withIsin) expect({ symbol: i.symbol, ok: isinValid(i.isin!) }).toEqual({ symbol: i.symbol, ok: true });
+    for (const i of withIsin)
+      expect({ symbol: i.symbol, ok: isinValid(i.isin!) }).toEqual({ symbol: i.symbol, ok: true });
     expect(isinValid('US0378331006')).toBe(false);
   });
 
   it('every instrument has a sim profile (defaults for unknown symbols) and aliases resolve', () => {
     for (const i of SEED_INSTRUMENTS) expect(Number(simProfileFor(i).refPrice)).toBeGreaterThan(0);
-    expect(simProfileFor({ symbol: 'NEWFX', assetClass: 'fx', tickSize: '0.00001' }).refPrice).toBe('1');
-    expect(simProfileFor({ symbol: 'NEWEQ', assetClass: 'equity', tickSize: '0.01' }).refPrice).toBe('100');
+    expect(simProfileFor({ symbol: 'NEWFX', assetClass: 'fx', tickSize: '0.00001' }).refPrice).toBe(
+      '1',
+    );
+    expect(
+      simProfileFor({ symbol: 'NEWEQ', assetClass: 'equity', tickSize: '0.01' }).refPrice,
+    ).toBe('100');
     const symbols = new Set(SEED_INSTRUMENTS.map((i) => i.symbol));
     expect(SEED_ALIASES.every((a) => symbols.has(a.symbol))).toBe(true);
     expect(aliasMap('broker-fxcfd').EUR_USD).toBe('EURUSD');
@@ -116,7 +144,11 @@ describe('SimulatedCalendarProvider', () => {
     expect(new Set(a.map((e) => e.id)).size).toBe(a.length);
     const mid = await p.getEvents(from + 12 * 3_600_000, from + 13 * 3_600_000);
     expect(mid.every((e) => Date.parse(e.time) >= from + 12 * 3_600_000)).toBe(true);
-    expect(eventsToShocks(a.slice(0, 1))[0]).toMatchObject({ id: a[0]!.id, ts: Date.parse(a[0]!.time), impact: a[0]!.impact });
+    expect(eventsToShocks(a.slice(0, 1))[0]).toMatchObject({
+      id: a[0]!.id,
+      ts: Date.parse(a[0]!.time),
+      impact: a[0]!.impact,
+    });
   });
 });
 

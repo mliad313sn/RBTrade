@@ -11,7 +11,14 @@ import { asRecord, StubAdapterBase, vendorDecimal, type StubCapabilities } from 
  * every value goes through the registry rounding before it enters KORA.
  */
 
-const AGG: Partial<Record<Timeframe, string>> = { '1m': '1/minute', '5m': '5/minute', '15m': '15/minute', '1h': '1/hour', '4h': '4/hour', '1D': '1/day' };
+const AGG: Partial<Record<Timeframe, string>> = {
+  '1m': '1/minute',
+  '5m': '5/minute',
+  '15m': '15/minute',
+  '1h': '1/hour',
+  '4h': '4/hour',
+  '1D': '1/day',
+};
 
 export class EquitiesProviderStubAdapter extends StubAdapterBase {
   readonly source = 'equities-provider';
@@ -24,7 +31,12 @@ export class EquitiesProviderStubAdapter extends StubAdapterBase {
   };
 
   encodeSubscription(symbols: string[]): unknown {
-    return { action: 'subscribe', params: symbols.flatMap((s) => [`Q.${this.vendorSymbol(s)}`, `T.${this.vendorSymbol(s)}`]).join(',') };
+    return {
+      action: 'subscribe',
+      params: symbols
+        .flatMap((s) => [`Q.${this.vendorSymbol(s)}`, `T.${this.vendorSymbol(s)}`])
+        .join(','),
+    };
   }
 
   decode(frame: unknown): Array<Quote | Trade> {
@@ -37,7 +49,8 @@ export class EquitiesProviderStubAdapter extends StubAdapterBase {
       const spec = this.spec(String(e.sym));
       const ts = Number(e.t);
       const seq = Number(e.q);
-      if (!Number.isSafeInteger(ts) || !Number.isSafeInteger(seq)) throw new TypeError('t/q: expected integers');
+      if (!Number.isSafeInteger(ts) || !Number.isSafeInteger(seq))
+        throw new TypeError('t/q: expected integers');
       if (e.ev === 'Q') {
         out.push({
           type: 'quote',
@@ -109,9 +122,14 @@ export class EquitiesProviderStubAdapter extends StubAdapterBase {
     return `/last/quote/${vendorSymbol}`;
   }
 
-  protected decodeSnapshot(symbol: string, body: unknown): { quote: Quote | null; depth: DepthSnapshot | null } {
+  protected decodeSnapshot(
+    symbol: string,
+    body: unknown,
+  ): { quote: Quote | null; depth: DepthSnapshot | null } {
     const r = asRecord(body, 'last').results;
-    const [quote] = this.decode([{ ...asRecord(r, 'results'), ev: 'Q', sym: this.vendorSymbol(symbol) }]);
+    const [quote] = this.decode([
+      { ...asRecord(r, 'results'), ev: 'Q', sym: this.vendorSymbol(symbol) },
+    ]);
     return { quote: (quote as Quote | undefined) ?? null, depth: null };
   }
 }

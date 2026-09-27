@@ -28,7 +28,9 @@ export interface PreviewFigures {
 /** Short spoken summary of a settled preview ("Loss if stop hit 150.00 USD, margin 32,523.00 USD, fees 3.20 USD."). */
 export function previewSummary(p: PreviewFigures | null, violations: number): string {
   if (!p) return '';
-  const loss = p.lossIfStopHit ? `Loss if stop hit ${formatMoney(p.lossIfStopHit.total, p.currency)}` : 'No stop: loss not capped';
+  const loss = p.lossIfStopHit
+    ? `Loss if stop hit ${formatMoney(p.lossIfStopHit.total, p.currency)}`
+    : 'No stop: loss not capped';
   const risk = violations ? ` ${violations} risk check${violations === 1 ? '' : 's'} failed.` : '';
   return `${loss}, margin ${formatMoney(p.margin.required, p.currency)}, fees ${formatMoney(p.fees.total, p.currency)}.${risk}`;
 }

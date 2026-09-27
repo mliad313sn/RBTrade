@@ -65,7 +65,11 @@ export function priceMultiplier(
   mode: MultiplierMode,
 ): Decimal {
   const base =
-    mode === 'unit' ? new Decimal(1) : mode === 'contract' ? dec(spec.contractSize) : new Decimal('0.01');
+    mode === 'unit'
+      ? new Decimal(1)
+      : mode === 'contract'
+        ? dec(spec.contractSize)
+        : new Decimal('0.01');
   return spec.priceUnitFactor ? base.mul(dec(spec.priceUnitFactor)) : base;
 }
 
@@ -120,7 +124,11 @@ export function incrementalCommission(
   quoteCcy: string,
 ): Decimal {
   const charged = hadFills ? orderCommission(fs, rawBefore, quoteCcy) : ZERO;
-  const total = orderCommission(fs, rawBefore.add(commissionRaw(fs, qty, price, multiplier)), quoteCcy);
+  const total = orderCommission(
+    fs,
+    rawBefore.add(commissionRaw(fs, qty, price, multiplier)),
+    quoteCcy,
+  );
   return total.sub(charged);
 }
 

@@ -35,7 +35,11 @@ describe('trading integrity', () => {
 
   const buy = async (u: TestUser, symbol: string, qty: string) => {
     await md.touch();
-    return request(http).post('/orders').set(bearer(u.token)).send({ clientOrderId: cid(), symbol, side: 'buy', type: 'market', qty }).expect(201);
+    return request(http)
+      .post('/orders')
+      .set(bearer(u.token))
+      .send({ clientOrderId: cid(), symbol, side: 'buy', type: 'market', qty })
+      .expect(201);
   };
 
   it('reconciliation is clean after trading and raises a critical alert on a position or cash mismatch', async () => {
@@ -48,24 +52,44 @@ describe('trading integrity', () => {
     expect(clean.body).toMatchObject({ trigger: 'manual', accountsChecked: 1, mismatches: [] });
 
     const acct = (await request(http).get('/accounts/me').set(bearer(u.token)).expect(200)).body;
-    await ownerQuery(`UPDATE positions SET qty = qty + 1000 WHERE account_id = $1 AND symbol = 'EURUSD'`, [acct.id]);
+    await ownerQuery(
+      `UPDATE positions SET qty = qty + 1000 WHERE account_id = $1 AND symbol = 'EURUSD'`,
+      [acct.id],
+    );
     await ownerQuery(`UPDATE accounts SET cash = cash + 1 WHERE id = $1`, [acct.id]);
     const run = await app.get(ReconciliationService).run('schedule');
     const mine = run!.mismatches.filter((m) => m.accountId === acct.id);
     expect(mine.map((m) => m.kind).sort()).toEqual(['cash', 'position_qty']);
-    expect(mine.find((m) => m.kind === 'position_qty')).toMatchObject({ symbol: 'EURUSD', engine: '51000', broker: '50000' });
-    const alerts = (await request(http).get('/alerts').set(bearer(u.token)).expect(200)).body.alerts;
-    expect(alerts[0]).toMatchObject({ severity: 'critical', kind: 'reconciliation.mismatch', account_id: acct.id });
-    const audit = await ownerQuery<{ payload: { severity: string } }>(`SELECT payload FROM audit_events WHERE action = 'reconciliation.mismatch' AND entity_id = $1`, [acct.id]);
+    expect(mine.find((m) => m.kind === 'position_qty')).toMatchObject({
+      symbol: 'EURUSD',
+      engine: '51000',
+      broker: '50000',
+    });
+    const alerts = (await request(http).get('/alerts').set(bearer(u.token)).expect(200)).body
+      .alerts;
+    expect(alerts[0]).toMatchObject({
+      severity: 'critical',
+      kind: 'reconciliation.mismatch',
+      account_id: acct.id,
+    });
+    const audit = await ownerQuery<{ payload: { severity: string } }>(
+      `SELECT payload FROM audit_events WHERE action = 'reconciliation.mismatch' AND entity_id = $1`,
+      [acct.id],
+    );
     expect(audit[0]!.payload.severity).toBe('critical');
     // Repair so later runs stay clean.
-    await ownerQuery(`UPDATE positions SET qty = qty - 1000 WHERE account_id = $1 AND symbol = 'EURUSD'`, [acct.id]);
+    await ownerQuery(
+      `UPDATE positions SET qty = qty - 1000 WHERE account_id = $1 AND symbol = 'EURUSD'`,
+      [acct.id],
+    );
     await ownerQuery(`UPDATE accounts SET cash = cash - 1 WHERE id = $1`, [acct.id]);
     expect(await app.get(ReconciliationService).checkAccount(acct.id)).toEqual([]);
     // Only risk officers/admins run it across all accounts; novices cannot run it at all.
     const risk = await createUser(app, 'trader', ['risk_officer']);
     await request(http).get('/accounts/me').set(bearer(risk.token)).expect(200);
-    await expect(ownerQuery(`UPDATE fills SET price = price WHERE account_id = $1`, [acct.id])).rejects.toThrow(/append-only/);
+    await expect(
+      ownerQuery(`UPDATE fills SET price = price WHERE account_id = $1`, [acct.id]),
+    ).rejects.toThrow(/append-only/);
     const all = await request(http).post('/reconciliation/run').set(bearer(risk.token)).expect(200);
     expect(all.body.accountsChecked).toBeGreaterThan(1);
     const nov = await createUser(app, 'novice');
@@ -82,13 +106,21 @@ describe('trading integrity', () => {
         [acct.id],
       ),
     ).rejects.toThrow(/unbalanced/);
-    await expect(appQuery(`UPDATE ledger_entries SET amount = amount WHERE account_id = $1`, [acct.id])).rejects.toMatchObject({ code: '42501' });
-    await expect(appQuery(`DELETE FROM ledger_entries WHERE account_id = $1`, [acct.id])).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      appQuery(`UPDATE ledger_entries SET amount = amount WHERE account_id = $1`, [acct.id]),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      appQuery(`DELETE FROM ledger_entries WHERE account_id = $1`, [acct.id]),
+    ).rejects.toMatchObject({ code: '42501' });
     await expect(appQuery(`DELETE FROM fills`)).rejects.toMatchObject({ code: '42501' });
     // Even the owner is stopped by the append-only trigger on fills (once rows exist).
     await ownerQuery('SELECT 1');
-    const ledger = (await request(http).get('/accounts/me/ledger').set(bearer(u.token)).expect(200)).body;
-    expect(ledger).toMatchObject({ trialBalance: '0', balances: { cash: '100000', capital: '-100000' } });
+    const ledger = (await request(http).get('/accounts/me/ledger').set(bearer(u.token)).expect(200))
+      .body;
+    expect(ledger).toMatchObject({
+      trialBalance: '0',
+      balances: { cash: '100000', capital: '-100000' },
+    });
   });
 
   it('daily roll books overnight funding once per account per day (swap journal, audited)', async () => {
@@ -108,21 +140,42 @@ describe('trading integrity', () => {
     );
     // 100,000 × 1.0842 (mid) × −150 bps / 360 = −4.5175, charged in whole cents (IRTC R2-07)
     expect(swaps).toEqual([{ amount: '-4.52' }]);
-    const ev = await ownerQuery<{ payload: { symbol: string; amount: string } }>(`SELECT payload FROM audit_events WHERE action = 'position.swap_booked' AND payload->>'accountId' = $1`, [acct.id]);
+    const ev = await ownerQuery<{ payload: { symbol: string; amount: string } }>(
+      `SELECT payload FROM audit_events WHERE action = 'position.swap_booked' AND payload->>'accountId' = $1`,
+      [acct.id],
+    );
     expect(ev[0]!.payload).toMatchObject({ symbol: 'EURUSD', amount: '-4.52' });
     expect(await app.get(ReconciliationService).checkAccount(acct.id)).toEqual([]);
   });
 
   it('LIVE stays off: config refuses the flag, the stub broker refuses, and LIVE accounts need a sign-off', async () => {
-    const stub = new LiveBrokerStub({ liveTradingEnabled: false, hasActiveSignoff: async () => true });
+    const stub = new LiveBrokerStub({
+      liveTradingEnabled: false,
+      hasActiveSignoff: async () => true,
+    });
     await expect(stub.submit()).rejects.toBeInstanceOf(LiveTradingDisabledError);
-    await expect(new LiveBrokerStub({ liveTradingEnabled: true, hasActiveSignoff: async () => false }).positions()).rejects.toThrow(/compliance sign-off/);
-    await expect(new LiveBrokerStub({ liveTradingEnabled: true, hasActiveSignoff: async () => true }).cancel()).rejects.toThrow(/OQ-B1/);
+    await expect(
+      new LiveBrokerStub({
+        liveTradingEnabled: true,
+        hasActiveSignoff: async () => false,
+      }).positions(),
+    ).rejects.toThrow(/compliance sign-off/);
+    await expect(
+      new LiveBrokerStub({ liveTradingEnabled: true, hasActiveSignoff: async () => true }).cancel(),
+    ).rejects.toThrow(/OQ-B1/);
     const u = await createUser(app, 'trader');
-    await expect(ownerQuery(`UPDATE accounts SET environment = 'LIVE' WHERE user_id = $1`, [u.id])).resolves.toBeDefined(); // no account yet: no row
+    await expect(
+      ownerQuery(`UPDATE accounts SET environment = 'LIVE' WHERE user_id = $1`, [u.id]),
+    ).resolves.toBeDefined(); // no account yet: no row
     await request(http).get('/accounts/me').set(bearer(u.token)).expect(200);
-    await expect(ownerQuery(`UPDATE accounts SET environment = 'LIVE' WHERE user_id = $1`, [u.id])).rejects.toThrow(/compliance sign-off/);
-    await expect(appQuery(`INSERT INTO compliance_signoffs (scope, signed_by, signer_role, document_ref) VALUES ('live_trading', 'x', 'x', 'x')`)).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      ownerQuery(`UPDATE accounts SET environment = 'LIVE' WHERE user_id = $1`, [u.id]),
+    ).rejects.toThrow(/compliance sign-off/);
+    await expect(
+      appQuery(
+        `INSERT INTO compliance_signoffs (scope, signed_by, signer_role, document_ref) VALUES ('live_trading', 'x', 'x', 'x')`,
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
     const health = await request(http).get('/health').expect(200);
     expect(health.body).toMatchObject({ environment: 'PAPER', liveTradingEnabled: false });
   });

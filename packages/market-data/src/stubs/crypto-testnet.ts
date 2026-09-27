@@ -1,4 +1,13 @@
-import type { Candle, DepthDelta, DepthLevel, DepthSnapshot, InstrumentSpec, Quote, Timeframe, Trade } from '@kora/domain';
+import type {
+  Candle,
+  DepthDelta,
+  DepthLevel,
+  DepthSnapshot,
+  InstrumentSpec,
+  Quote,
+  Timeframe,
+  Trade,
+} from '@kora/domain';
 
 import { formatPrice, formatSize } from '../precision.js';
 import { asRecord, StubAdapterBase, vendorDecimal, type StubCapabilities } from './base.js';
@@ -11,7 +20,14 @@ import { asRecord, StubAdapterBase, vendorDecimal, type StubCapabilities } from 
  * prevSeq = U − 1 so the order book accepts overlapping ranges and detects real gaps.
  */
 
-const INTERVAL: Partial<Record<Timeframe, string>> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1D': '1d' };
+const INTERVAL: Partial<Record<Timeframe, string>> = {
+  '1m': '1m',
+  '5m': '5m',
+  '15m': '15m',
+  '1h': '1h',
+  '4h': '4h',
+  '1D': '1d',
+};
 
 export class CryptoTestnetStubAdapter extends StubAdapterBase {
   readonly source = 'crypto-testnet';
@@ -123,7 +139,10 @@ export class CryptoTestnetStubAdapter extends StubAdapterBase {
     return `/depth?symbol=${vendorSymbol}&limit=${levels}`;
   }
 
-  protected decodeSnapshot(symbol: string, body: unknown): { quote: Quote | null; depth: DepthSnapshot | null } {
+  protected decodeSnapshot(
+    symbol: string,
+    body: unknown,
+  ): { quote: Quote | null; depth: DepthSnapshot | null } {
     const spec = this.spec(symbol);
     const b = asRecord(body, 'depth');
     const seq = int(b.lastUpdateId, 'lastUpdateId');
@@ -142,7 +161,19 @@ export class CryptoTestnetStubAdapter extends StubAdapterBase {
     const [ba] = depth.asks;
     const quote: Quote | null =
       bb && ba
-        ? { type: 'quote', symbol: spec.symbol, bid: bb[0], ask: ba[0], bidSize: bb[1], askSize: ba[1], stale: false, source: this.source, exchangeTs: now, receivedTs: now, seq }
+        ? {
+            type: 'quote',
+            symbol: spec.symbol,
+            bid: bb[0],
+            ask: ba[0],
+            bidSize: bb[1],
+            askSize: ba[1],
+            stale: false,
+            source: this.source,
+            exchangeTs: now,
+            receivedTs: now,
+            seq,
+          }
         : null;
     return { quote, depth };
   }
@@ -157,6 +188,9 @@ function levels(v: unknown, spec: InstrumentSpec, what: string): DepthLevel[] {
   if (!Array.isArray(v)) throw new TypeError(`${what}: expected array`);
   return v.map((l: unknown) => {
     if (!Array.isArray(l) || l.length < 2) throw new TypeError(`${what}: level`);
-    return [formatPrice(vendorDecimal(l[0], what), spec), formatSize(vendorDecimal(l[1], what), spec)] as DepthLevel;
+    return [
+      formatPrice(vendorDecimal(l[0], what), spec),
+      formatSize(vendorDecimal(l[1], what), spec),
+    ] as DepthLevel;
   });
 }

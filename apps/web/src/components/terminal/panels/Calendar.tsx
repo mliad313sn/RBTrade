@@ -28,7 +28,9 @@ export function CalendarPanel({ onTitle }: { onTitle?: (t: string) => void }) {
         .then((r) => {
           if (cancelled) return;
           setSimulated(r.simulated);
-          setEvents(r.events.filter((e) => Date.parse(e.time) >= Date.now() - 30 * 60_000).slice(0, 12));
+          setEvents(
+            r.events.filter((e) => Date.parse(e.time) >= Date.now() - 30 * 60_000).slice(0, 12),
+          );
         })
         .catch(() => !cancelled && setEvents([]));
     void load();
@@ -40,7 +42,13 @@ export function CalendarPanel({ onTitle }: { onTitle?: (t: string) => void }) {
   }, []);
 
   return (
-    <div className="cal h-full overflow-auto" data-testid="calendar" data-panel-root="calendar" tabIndex={0} aria-label="Economic calendar">
+    <div
+      className="cal h-full overflow-auto"
+      data-testid="calendar"
+      data-panel-root="calendar"
+      tabIndex={0}
+      aria-label="Economic calendar"
+    >
       {events === null ? (
         <p className="text-muted text-xs m-0">Loading…</p>
       ) : events.length === 0 ? (
@@ -50,9 +58,15 @@ export function CalendarPanel({ onTitle }: { onTitle?: (t: string) => void }) {
           {events.map((e) => (
             <li key={e.id} className="cal-row">
               <span className="k-num">{formatClock(e.time, timeDisplay).slice(0, 5)}</span>
-              <span className={`cal-impact cal-impact--${e.impact}`} aria-label={IMPACT[e.impact]} role="img">
+              <span
+                className={`cal-impact cal-impact--${e.impact}`}
+                aria-label={IMPACT[e.impact]}
+                role="img"
+              >
                 {'●'.repeat(e.impact)}
-                <span className="cal-impact-rest" aria-hidden="true">{'●'.repeat(3 - e.impact)}</span>
+                <span className="cal-impact-rest" aria-hidden="true">
+                  {'●'.repeat(3 - e.impact)}
+                </span>
               </span>
               <span className="truncate" title={`${e.currency} · ${e.title}`}>
                 <span className="text-muted">{e.currency}</span> {e.title}

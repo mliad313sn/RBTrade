@@ -18,7 +18,9 @@ describe('provider adapter matrix (goal 07B)', () => {
 
   it('lists market data and news sources on every continent', () => {
     for (const c of CONTINENTS) {
-      expect(PROVIDER_MATRIX.some((p) => p.kind === 'market_data' && p.continents.includes(c))).toBe(true);
+      expect(
+        PROVIDER_MATRIX.some((p) => p.kind === 'market_data' && p.continents.includes(c)),
+      ).toBe(true);
       expect(PROVIDER_MATRIX.some((p) => p.kind === 'news' && p.continents.includes(c))).toBe(true);
     }
   });
@@ -26,7 +28,9 @@ describe('provider adapter matrix (goal 07B)', () => {
   it('covers every seeded venue and asset class', () => {
     const venues = new Set(PROVIDER_MATRIX.flatMap((p) => p.venues));
     for (const v of SEED_VENUES) expect(venues.has(v.mic)).toBe(true);
-    const classes = new Set(PROVIDER_MATRIX.filter((p) => p.kind === 'market_data').flatMap((p) => p.assetClasses));
+    const classes = new Set(
+      PROVIDER_MATRIX.filter((p) => p.kind === 'market_data').flatMap((p) => p.assetClasses),
+    );
     for (const a of ASSET_CLASSES) expect(classes.has(a)).toBe(true);
   });
 

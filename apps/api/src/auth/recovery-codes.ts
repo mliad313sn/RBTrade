@@ -21,5 +21,7 @@ export function normaliseRecoveryCode(code: string): string {
  * are single-use behind the login lockout, so a fast hash is enough (no offline dictionary to fear).
  */
 export function hashRecoveryCode(userId: string, code: string): string {
-  return createHash('sha256').update(`kora-recovery:${userId}:${normaliseRecoveryCode(code)}`).digest('hex');
+  return createHash('sha256')
+    .update(`kora-recovery:${userId}:${normaliseRecoveryCode(code)}`)
+    .digest('hex');
 }

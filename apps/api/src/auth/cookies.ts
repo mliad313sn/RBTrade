@@ -15,5 +15,10 @@ export function setAccessCookie(res: Response, token: string, config: AppConfig)
 }
 
 export function clearAccessCookie(res: Response, config: AppConfig): void {
-  res.clearCookie(ACCESS_COOKIE, { httpOnly: true, sameSite: 'strict', secure: config.auth.secureCookies, path: '/' });
+  res.clearCookie(ACCESS_COOKIE, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: config.auth.secureCookies,
+    path: '/',
+  });
 }

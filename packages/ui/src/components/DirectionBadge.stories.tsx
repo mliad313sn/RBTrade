@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { DirectionBadge } from './DirectionBadge';
 
-const meta = { title: 'Primitives/DirectionBadge', component: DirectionBadge, args: { value: '0.0018', format: 'percent' } } satisfies Meta<typeof DirectionBadge>;
+const meta = {
+  title: 'Primitives/DirectionBadge',
+  component: DirectionBadge,
+  args: { value: '0.0018', format: 'percent' },
+} satisfies Meta<typeof DirectionBadge>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Up: Story = {};

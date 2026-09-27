@@ -3,13 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "lib": [
-      "ES2023",
-      "DOM"
-    ]
+    "lib": ["ES2023", "DOM"]
   },
-  "include": [
-    "src",
-    "vitest.config.ts"
-  ]
+  "include": ["src", "vitest.config.ts"]
 }

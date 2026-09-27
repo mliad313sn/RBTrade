@@ -42,30 +42,79 @@ describe('matching loop and private trading channels', () => {
   });
 
   it('orders:{account} streams every state change (never conflated); positions and account follow', async () => {
-    const ws = await TestWs.authed(url, u.token, [`orders:${accountId}`, `positions:${accountId}`, `account:${accountId}`]);
+    const ws = await TestWs.authed(url, u.token, [
+      `orders:${accountId}`,
+      `positions:${accountId}`,
+      `account:${accountId}`,
+    ]);
     await md.touch();
-    const placed = await request(http).post('/orders').set(bearer(u.token)).send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'limit', qty: '0.01', limitPrice: '64500.0' }).expect(201);
+    const placed = await request(http)
+      .post('/orders')
+      .set(bearer(u.token))
+      .send({
+        clientOrderId: cid(),
+        symbol: 'BTCUSD',
+        side: 'buy',
+        type: 'limit',
+        qty: '0.01',
+        limitPrice: '64500.0',
+      })
+      .expect(201);
     const id = placed.body.order.id as string;
-    const working = await ws.waitFor((m) => m.ch === `orders:${accountId}` && m.data.orders.some((o: { id: string; status: string }) => o.id === id && o.status === 'working'));
+    const working = await ws.waitFor(
+      (m) =>
+        m.ch === `orders:${accountId}` &&
+        m.data.orders.some(
+          (o: { id: string; status: string }) => o.id === id && o.status === 'working',
+        ),
+    );
     expect(working.msg.data).toMatchObject({ type: 'orders', accountId });
 
     // The loop is subscribed to BTCUSD quotes on the bus: a print through the limit fills it.
     await new Promise((r) => setTimeout(r, 400)); // let the sweep subscribe
     await md.status();
     await md.quote('BTCUSD', '64480.0', '64490.0');
-    const filled = await ws.waitFor((m) => m.ch === `orders:${accountId}` && m.data.orders.some((o: { id: string; status: string }) => o.id === id && o.status === 'filled'), 5000);
-    expect(filled.msg.data.orders.find((o: { id: string }) => o.id === id)).toMatchObject({ filledQty: '0.01', avgFillPrice: '64500' });
-    const pos = await ws.waitFor((m) => m.ch === `positions:${accountId}` && m.data.positions.length === 1, 5000);
-    expect(pos.msg.data.positions[0]).toMatchObject({ symbol: 'BTCUSD', qty: '0.01', avgPrice: '64500' });
-    const acct = await ws.waitFor((m) => m.ch === `account:${accountId}` && m.data.account.openPositions === 1, 5000);
-    expect(acct.msg.data.account).toMatchObject({ id: accountId, baseCurrency: 'USD', simulated: true });
+    const filled = await ws.waitFor(
+      (m) =>
+        m.ch === `orders:${accountId}` &&
+        m.data.orders.some(
+          (o: { id: string; status: string }) => o.id === id && o.status === 'filled',
+        ),
+      5000,
+    );
+    expect(filled.msg.data.orders.find((o: { id: string }) => o.id === id)).toMatchObject({
+      filledQty: '0.01',
+      avgFillPrice: '64500',
+    });
+    const pos = await ws.waitFor(
+      (m) => m.ch === `positions:${accountId}` && m.data.positions.length === 1,
+      5000,
+    );
+    expect(pos.msg.data.positions[0]).toMatchObject({
+      symbol: 'BTCUSD',
+      qty: '0.01',
+      avgPrice: '64500',
+    });
+    const acct = await ws.waitFor(
+      (m) => m.ch === `account:${accountId}` && m.data.account.openPositions === 1,
+      5000,
+    );
+    expect(acct.msg.data.account).toMatchObject({
+      id: accountId,
+      baseCurrency: 'USD',
+      simulated: true,
+    });
     ws.ws.close();
   });
 
   it("other users cannot subscribe to someone else's account channels", async () => {
     const other = await createUser(app, 'trader', [], { realClock: true });
     const ws = await TestWs.authed(url, other.token);
-    ws.send({ op: 'subscribe', channels: [`orders:${accountId}`, `account:${accountId}`, 'orders:not-a-uuid'], id: 'x' });
+    ws.send({
+      op: 'subscribe',
+      channels: [`orders:${accountId}`, `account:${accountId}`, 'orders:not-a-uuid'],
+      id: 'x',
+    });
     const r = await ws.waitFor((m) => m.type === 'subscribed' && m.id === 'x');
     expect(r.msg.channels).toEqual([]);
     expect(r.msg.rejected).toEqual([
@@ -76,7 +125,9 @@ describe('matching loop and private trading channels', () => {
     const risk = await createUser(app, 'trader', ['risk_officer'], { realClock: true });
     const rw = await TestWs.authed(url, risk.token);
     rw.send({ op: 'subscribe', channels: [`orders:${accountId}`], id: 'y' });
-    expect((await rw.waitFor((m) => m.type === 'subscribed' && m.id === 'y')).msg.channels).toEqual([`orders:${accountId}`]);
+    expect((await rw.waitFor((m) => m.type === 'subscribed' && m.id === 'y')).msg.channels).toEqual(
+      [`orders:${accountId}`],
+    );
     ws.ws.close();
     rw.ws.close();
   });

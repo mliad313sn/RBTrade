@@ -164,7 +164,13 @@ export class DisclosureAcknowledgements {
     for (const r of rows) {
       const rec = toRecord(r);
       const doc =
-        this.registry.render?.(rec.disclosureId, rec.version, rec.jurisdiction ?? 'GLOBAL', rec.locale, rec.values) ?? null;
+        this.registry.render?.(
+          rec.disclosureId,
+          rec.version,
+          rec.jurisdiction ?? 'GLOBAL',
+          rec.locale,
+          rec.values,
+        ) ?? null;
       const now = this.registry.current(rec.disclosureId, rec.locale);
       out.push({
         ...rec,

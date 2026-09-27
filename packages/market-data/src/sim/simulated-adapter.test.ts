@@ -1,4 +1,10 @@
-import { CandleSchema, type DepthDelta, type DepthSnapshot, type Quote, type Trade } from '@kora/domain';
+import {
+  CandleSchema,
+  type DepthDelta,
+  type DepthSnapshot,
+  type Quote,
+  type Trade,
+} from '@kora/domain';
 import { describe, expect, it } from 'vitest';
 
 import { AdapterNotConfiguredError } from '../adapter.js';
@@ -102,12 +108,19 @@ describe('SimulatedAdapter', () => {
     expect(m1[0]!.source).toBe('simulated-history');
     expect(await adapter.getCandles('EURUSD', '1s', 0, to)).toEqual([]);
     expect(await adapter.getCandles('EURUSD', '15m', to - 86_400_000, to)).toEqual(c15);
-    await expect(adapter.getCandles('NOPE', '1m', 0, 1)).rejects.toBeInstanceOf(AdapterNotConfiguredError);
-    expect(() => adapter.subscribeQuotes(['NOPE'], () => undefined)).toThrow(AdapterNotConfiguredError);
+    await expect(adapter.getCandles('NOPE', '1m', 0, 1)).rejects.toBeInstanceOf(
+      AdapterNotConfiguredError,
+    );
+    expect(() => adapter.subscribeQuotes(['NOPE'], () => undefined)).toThrow(
+      AdapterNotConfiguredError,
+    );
   });
 
   it('respectSessions pauses closed venues (AAPL on a Saturday) but not crypto', async () => {
-    const { adapter, advance } = setup({ respectSessions: true, start: Date.parse('2026-09-26T15:00:00Z') });
+    const { adapter, advance } = setup({
+      respectSessions: true,
+      start: Date.parse('2026-09-26T15:00:00Z'),
+    });
     const seen = new Set<string>();
     adapter.subscribeQuotes(['EURUSD', 'BTCUSD', 'AAPL'], (q) => seen.add(q.symbol));
     await adapter.connect();

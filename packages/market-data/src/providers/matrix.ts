@@ -132,7 +132,8 @@ export const PROVIDER_MATRIX: readonly ProviderEntry[] = [
   {
     id: 'md-global-otc',
     kind: 'market_data',
-    description: 'FX, spot metals, CFDs and crypto from a liquidity provider / broker (all continents)',
+    description:
+      'FX, spot metals, CFDs and crypto from a liquidity provider / broker (all continents)',
     continents: [...CONTINENTS],
     venues: ['KSIM', 'KCRY'],
     assetClasses: ['fx', 'metal', 'cfd', 'crypto', 'bond', 'fund'],
@@ -140,7 +141,8 @@ export const PROVIDER_MATRIX: readonly ProviderEntry[] = [
     flag: STUB_FLAGS['broker-fxcfd'],
     flagged: true,
     licensed: false,
-    licensingNeed: 'Broker/liquidity-provider price-feed agreement (with OQ-B1), crypto venue API terms',
+    licensingNeed:
+      'Broker/liquidity-provider price-feed agreement (with OQ-B1), crypto venue API terms',
     openQuestion: MD,
   },
   {
@@ -155,7 +157,8 @@ export const PROVIDER_MATRIX: readonly ProviderEntry[] = [
     flagged: true,
     licensed: false,
     languages: ['en', 'es', 'pt', 'fr'],
-    licensingNeed: 'News redistribution licence including the right to process articles with an AI model',
+    licensingNeed:
+      'News redistribution licence including the right to process articles with an AI model',
     openQuestion: NEWS,
   },
   {

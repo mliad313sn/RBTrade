@@ -15,7 +15,8 @@ import { barJobId, type BarCloseJob } from './jobs.js';
  */
 export const robotControlChannel = (prefix = 'kora:'): string => `${prefix}ctl:robots`;
 export const robotEventsChannel = (prefix = 'kora:'): string => `${prefix}robots:events`;
-export const heartbeatKey = (robotId: string, prefix = 'kora:'): string => `${prefix}robots:hb:${robotId}`;
+export const heartbeatKey = (robotId: string, prefix = 'kora:'): string =>
+  `${prefix}robots:hb:${robotId}`;
 
 export interface RunningRobot {
   robotId: string;
@@ -169,7 +170,10 @@ export class Bots extends EventEmitter {
       const robotIds = [...this.robots.values()]
         .filter((r) => r.accountId === msg.accountId)
         .map((r) => r.robotId);
-      if (robotIds.length) await this.pub.del(...robotIds.map((id) => heartbeatKey(id, this.cfg.ctlPrefix))).catch(() => undefined);
+      if (robotIds.length)
+        await this.pub
+          .del(...robotIds.map((id) => heartbeatKey(id, this.cfg.ctlPrefix)))
+          .catch(() => undefined);
       const event = {
         type: 'halted',
         accountId: msg.accountId,
@@ -178,7 +182,9 @@ export class Bots extends EventEmitter {
         latencyMs: msg.ts ? reactedAt - msg.ts : null,
       };
       this.emit('halted', event);
-      await this.pub.publish(robotEventsChannel(this.cfg.ctlPrefix), JSON.stringify(event)).catch(() => undefined);
+      await this.pub
+        .publish(robotEventsChannel(this.cfg.ctlPrefix), JSON.stringify(event))
+        .catch(() => undefined);
       await this.dropQueued(new Set(robotIds));
       return;
     }
@@ -244,8 +250,10 @@ export class Bots extends EventEmitter {
   /** Evaluates one closed bar: context (api) → decision (quant) → act (api → OMS). */
   async processBar(job: BarCloseJob): Promise<Record<string, unknown>> {
     // Goal 10: one trace per bar close, runner → api → quant → api → OMS.
-    return withSpan('runner.bar_close', { 'kora.robot_id': job.robotId, 'kora.symbol': job.symbol, 'kora.bar_ts': job.barTs }, () =>
-      this.processBarInSpan(job),
+    return withSpan(
+      'runner.bar_close',
+      { 'kora.robot_id': job.robotId, 'kora.symbol': job.symbol, 'kora.bar_ts': job.barTs },
+      () => this.processBarInSpan(job),
     );
   }
 
@@ -285,7 +293,9 @@ export class Bots extends EventEmitter {
       orderId: decision.orderId ?? null,
     };
     this.emit('decision', event);
-    await this.pub.publish(robotEventsChannel(this.cfg.ctlPrefix), JSON.stringify(event)).catch(() => undefined);
+    await this.pub
+      .publish(robotEventsChannel(this.cfg.ctlPrefix), JSON.stringify(event))
+      .catch(() => undefined);
     return event;
   }
 

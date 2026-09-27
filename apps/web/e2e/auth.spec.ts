@@ -6,7 +6,11 @@ test('health reports db, redis and keycloak through the web proxy', async ({ req
   const res = await request.get('/api/health');
   expect(res.status()).toBe(200);
   const body = await res.json();
-  expect(body).toMatchObject({ environment: 'PAPER', liveTradingEnabled: false, checks: { db: { status: 'up' }, redis: { status: 'up' } } });
+  expect(body).toMatchObject({
+    environment: 'PAPER',
+    liveTradingEnabled: false,
+    checks: { db: { status: 'up' }, redis: { status: 'up' } },
+  });
   expect(body.checks.keycloak.status).toBe('skipped');
 });
 
@@ -15,11 +19,15 @@ test('anonymous users are sent to /login', async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Fterminal/);
 });
 
-test('no self-service trader (B-018): sign up as novice → appropriateness assessment → sign in again → MFA enrolment → Pro terminal → TOTP login', async ({ page }) => {
+test('no self-service trader (B-018): sign up as novice → appropriateness assessment → sign in again → MFA enrolment → Pro terminal → TOTP login', async ({
+  page,
+}) => {
   const email = uniqueEmail('ui-trader');
   await page.goto('/signup');
   await expect(page.getByLabel(/Pro trader/)).toHaveCount(0);
-  await expect(page.getByTestId('signup-appropriateness-note')).toContainText('appropriateness assessment');
+  await expect(page.getByTestId('signup-appropriateness-note')).toContainText(
+    'appropriateness assessment',
+  );
   await page.getByLabel('Your name').fill('Ada Trader');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
@@ -32,7 +40,8 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   await expect(page).toHaveURL(/\/appropriateness/);
   await expect(page.getByTestId('appropriateness-simulated')).toContainText('SIMULATED');
   const idx = answerIndex(true);
-  for (const [qid, i] of Object.entries(idx)) await page.getByTestId(`question-${qid}`).getByRole('radio').nth(i).check();
+  for (const [qid, i] of Object.entries(idx))
+    await page.getByTestId(`question-${qid}`).getByRole('radio').nth(i).check();
   // IRTC R4-09: the risk warning is confirmed on the assessment page before submitting.
   await expect(page.getByTestId('appropriateness-risk-warning')).toBeVisible();
   await page.getByTestId('appropriateness-risk-ack').check();
@@ -43,14 +52,20 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Set up two-factor authentication' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Set up two-factor authentication' }),
+  ).toBeVisible();
   await expect(page.getByAltText('QR code for your authenticator app')).toBeVisible();
   const secret = (await page.getByTestId('mfa-secret').textContent())!.trim();
   await page.getByLabel('6-digit code').fill(totp(secret));
   await page.getByRole('button', { name: /Turn on two-factor/ }).click();
   // B-902 (goal 10): ten one-time recovery codes are shown once after enrolment.
   await expect(page.getByTestId('recovery-codes').getByRole('listitem')).toHaveCount(10);
-  const recoveryCode = (await page.getByTestId('recovery-codes').getByRole('listitem').first().textContent())!.trim();
+  const recoveryCode = (await page
+    .getByTestId('recovery-codes')
+    .getByRole('listitem')
+    .first()
+    .textContent())!.trim();
   await page.getByRole('button', { name: 'I have saved my codes' }).click();
 
   await expect(page).toHaveURL(/\/terminal/);
@@ -86,11 +101,14 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   await expect(page).toHaveURL(/\/terminal/);
 });
 
-test('a failed assessment shows the topics to review and starts a cool-down; the account stays novice', async ({ page }) => {
+test('a failed assessment shows the topics to review and starts a cool-down; the account stays novice', async ({
+  page,
+}) => {
   await apiSignIn(page, 'novice');
   await page.goto('/appropriateness');
   const idx = answerIndex(false);
-  for (const [qid, i] of Object.entries(idx)) await page.getByTestId(`question-${qid}`).getByRole('radio').nth(i).check();
+  for (const [qid, i] of Object.entries(idx))
+    await page.getByTestId(`question-${qid}`).getByRole('radio').nth(i).check();
   // IRTC R4-09: the risk warning is confirmed on the assessment page before submitting.
   await expect(page.getByTestId('appropriateness-risk-warning')).toBeVisible();
   await page.getByTestId('appropriateness-risk-ack').check();
@@ -116,7 +134,9 @@ test('sign-up as novice lands in the simple view without MFA', async ({ page }) 
   await expect(page.getByText('[XX]% of retail accounts lose money')).toBeVisible();
 });
 
-test('web security headers (goal 10): nonce CSP without unsafe-inline scripts, framing refused, no x-powered-by', async ({ request }) => {
+test('web security headers (goal 10): nonce CSP without unsafe-inline scripts, framing refused, no x-powered-by', async ({
+  request,
+}) => {
   for (const path of ['/login', '/terminal']) {
     const res = await request.get(path, { maxRedirects: 0 });
     const h = res.headers();
@@ -136,17 +156,28 @@ test('web security headers (goal 10): nonce CSP without unsafe-inline scripts, f
 });
 
 // IRTC R1-06: `next=` must stay a same-origin relative path after a genuine sign-in.
-for (const next of ['/%5Cevil.example/phish', '/%09/evil.example/phish', '//evil.example/phish', '/%2F%2Fevil.example/phish']) {
+for (const next of [
+  '/%5Cevil.example/phish',
+  '/%09/evil.example/phish',
+  '//evil.example/phish',
+  '/%2F%2Fevil.example/phish',
+]) {
   test(`post-login redirect refuses an off-site next (${next})`, async ({ page, baseURL }) => {
     const email = uniqueEmail('redirect');
-    const signup = await page.request.post('/api/auth/signup', { headers: { 'x-kora-csrf': '1' }, data: { email, password: PASSWORD, displayName: 'Redirect' } });
+    const signup = await page.request.post('/api/auth/signup', {
+      headers: { 'x-kora-csrf': '1' },
+      data: { email, password: PASSWORD, displayName: 'Redirect' },
+    });
     expect(signup.status()).toBe(201);
     const offsite: string[] = [];
     // only the attacker host (the login URL itself contains the string "evil.example")
-    await page.route((url) => url.hostname === 'evil.example', (route) => {
-      offsite.push(route.request().url());
-      return route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>attacker</h1>' });
-    });
+    await page.route(
+      (url) => url.hostname === 'evil.example',
+      (route) => {
+        offsite.push(route.request().url());
+        return route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>attacker</h1>' });
+      },
+    );
     await page.goto(`/login?next=${next}`);
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(PASSWORD);

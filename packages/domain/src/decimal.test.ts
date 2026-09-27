@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { dec, Decimal, DecimalParseError, decimalPlaces, isDecimalString, quantize, roundToTick } from './decimal.js';
+import {
+  dec,
+  Decimal,
+  DecimalParseError,
+  decimalPlaces,
+  isDecimalString,
+  quantize,
+  roundToTick,
+} from './decimal.js';
 
 describe('dec', () => {
   it('parses decimal strings exactly', () => {

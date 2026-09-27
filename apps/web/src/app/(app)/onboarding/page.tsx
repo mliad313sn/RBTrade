@@ -21,5 +21,11 @@ export default async function OnboardingPage() {
       .catch(() => null),
   ]);
   if (profile.onboarding.completed) redirect('/home');
-  return <Onboarding profile={profile} disclosure={disclosure} startingBalance={summary?.startingBalance ?? null} />;
+  return (
+    <Onboarding
+      profile={profile}
+      disclosure={disclosure}
+      startingBalance={summary?.startingBalance ?? null}
+    />
+  );
 }

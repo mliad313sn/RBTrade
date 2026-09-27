@@ -421,7 +421,10 @@ const ROWS: Row[] = [
   eq('BHP.XASX', 'BHP Group Ltd.', 'XASX', 'AUD', '0.01', 2, 'AU000000BHP4', '1', 'BHP'),
   eq('AIR.XNZE', 'Air New Zealand Ltd.', 'XNZE', 'NZD', '0.005', 3, undefined, '1', 'AIR'),
   // B-202: London equities are quoted in pence (GBX); SIMULATED tick of 0.1p.
-  { ...eq('HSBA.XLON', 'HSBC Holdings plc', 'XLON', 'GBP', '0.1', 1, 'GB0005405286', '1', 'HSBA'), unit: ['GBX', '0.01'] },
+  {
+    ...eq('HSBA.XLON', 'HSBC Holdings plc', 'XLON', 'GBP', '0.1', 1, 'GB0005405286', '1', 'HSBA'),
+    unit: ['GBX', '0.01'],
+  },
   eq('SAP.XETR', 'SAP SE', 'XETR', 'EUR', '0.02', 2, 'DE0007164600', '1', 'SAP'),
   eq(
     'MC.XPAR',

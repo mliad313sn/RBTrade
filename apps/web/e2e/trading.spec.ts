@@ -11,7 +11,9 @@ test.beforeEach(async ({ page }) => {
   await apiSignIn(page, 'trader');
 });
 
-test('order ticket: server preview (notional, fees, margin, loss at stop) → place → blotter and top bar update', async ({ page }) => {
+test('order ticket: server preview (notional, fees, margin, loss at stop) → place → blotter and top bar update', async ({
+  page,
+}) => {
   await page.goto('/terminal?symbol=BTCUSD');
   await expect(page.getByTestId('account-equity')).toContainText('100,000.00 USD');
   const ticket = page.getByTestId('order-ticket');
@@ -41,14 +43,35 @@ test('order ticket: server preview (notional, fees, margin, loss at stop) → pl
   await expect(page.getByTestId('blotter-fills').getByRole('row')).toHaveCount(3);
 });
 
-test('kill switch scope 3 cancels and flattens through the engine; halted banner; resume with a reason', async ({ page }) => {
+test('kill switch scope 3 cancels and flattens through the engine; halted banner; resume with a reason', async ({
+  page,
+}) => {
   const req = page.request;
-  const buy = await req.post('/api/orders', { headers: CSRF, data: { clientOrderId: `e2e-${Date.now()}-1`, symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.01' } });
+  const buy = await req.post('/api/orders', {
+    headers: CSRF,
+    data: {
+      clientOrderId: `e2e-${Date.now()}-1`,
+      symbol: 'BTCUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '0.01',
+    },
+  });
   expect(buy.status()).toBe(201);
   const quote = await (await req.get('/api/quotes?symbols=BTCUSD')).json();
   const bid = quote.quotes[0].quote.bid as string;
   const limit = (Math.floor(Number(bid) * 0.98 * 10) / 10).toFixed(1); // test-side arithmetic for a resting price
-  const rest = await req.post('/api/orders', { headers: CSRF, data: { clientOrderId: `e2e-${Date.now()}-2`, symbol: 'BTCUSD', side: 'buy', type: 'limit', qty: '0.01', limitPrice: limit } });
+  const rest = await req.post('/api/orders', {
+    headers: CSRF,
+    data: {
+      clientOrderId: `e2e-${Date.now()}-2`,
+      symbol: 'BTCUSD',
+      side: 'buy',
+      type: 'limit',
+      qty: '0.01',
+      limitPrice: limit,
+    },
+  });
   expect(rest.status()).toBe(201);
 
   await page.goto('/terminal');
@@ -57,7 +80,9 @@ test('kill switch scope 3 cancels and flattens through the engine; halted banner
   await page.waitForTimeout(1650);
   await page.keyboard.up(' ');
   await page.getByTestId('kill-scope-robots_cancel_flatten').click();
-  await expect(page.getByText(/1 order cancelled\. 1 position closed\. Audit event #\d+/)).toBeVisible();
+  await expect(
+    page.getByText(/1 order cancelled\. 1 position closed\. Audit event #\d+/),
+  ).toBeVisible();
   const banner = page.getByTestId('halt-banner');
   await expect(banner).toContainText('Trading halted: Halt, cancel + flatten');
   expect((await (await req.get('/api/positions')).json()).positions).toHaveLength(0);

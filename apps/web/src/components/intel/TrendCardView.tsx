@@ -61,22 +61,33 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
   };
 
   const p = card.probability;
-  const template = card.direction === 'down' ? 'trend-x' : card.trend?.kind.startsWith('breakout') ? 'breakout-crypto' : 'trend-x';
+  const template =
+    card.direction === 'down'
+      ? 'trend-x'
+      : card.trend?.kind.startsWith('breakout')
+        ? 'breakout-crypto'
+        : 'trend-x';
   return (
-    <article className="flex flex-col gap-3 text-sm" data-testid="trend-card" aria-labelledby="trend-card-title">
+    <article
+      className="flex flex-col gap-3 text-sm"
+      data-testid="trend-card"
+      aria-labelledby="trend-card-title"
+    >
       <header>
         <h2 id="trend-card-title" className="m-0 text-base font-semibold">
           {card.name} <span className="text-muted">({card.symbol})</span>
         </h2>
         <p className="m-0 text-xs text-muted">
-          {card.regionLabel} · {card.assetClass} · {card.sector.replace(/_/g, ' ')} · {card.venue} · {card.currency} · SIMULATED data
+          {card.regionLabel} · {card.assetClass} · {card.sector.replace(/_/g, ' ')} · {card.venue} ·{' '}
+          {card.currency} · SIMULATED data
         </p>
       </header>
 
       <section aria-label="View" className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span data-testid="trend-direction">
           {card.trend ? `${trendArrow(card.trend.kind)} ${card.trend.label}` : 'No trend label'}
-          {card.direction ? ` · direction ${card.direction === 'up' ? '▲ up' : '▼ down'}` : ''} · horizon {card.horizon}
+          {card.direction ? ` · direction ${card.direction === 'up' ? '▲ up' : '▼ down'}` : ''} ·
+          horizon {card.horizon}
         </span>
         {p.status === 'calibrated' ? (
           <span data-testid="trend-probability" className="font-semibold">
@@ -107,12 +118,20 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs" data-testid="trend-news">
             {card.news.map((n) => (
               <li key={n.id} data-testid="trend-news-item" data-article-id={n.id}>
-                <a href={n.url} rel="noopener noreferrer nofollow" target="_blank" className="underline">
+                <a
+                  href={n.url}
+                  rel="noopener noreferrer nofollow"
+                  target="_blank"
+                  className="underline"
+                >
                   {n.translatedTitle ?? n.title}
                 </a>{' '}
                 <span className="text-muted">
-                  — {n.source}, {n.publishedAt.slice(0, 16).replace('T', ' ')} UTC{n.language && n.language !== 'en' ? ` · translated from ${n.language}` : ''}
-                  {n.sentiment !== null ? ` · sentiment ${n.sentiment > 0 ? '▲' : n.sentiment < 0 ? '▼' : '•'} ${signed(n.sentiment)}` : ' · not scored'}
+                  — {n.source}, {n.publishedAt.slice(0, 16).replace('T', ' ')} UTC
+                  {n.language && n.language !== 'en' ? ` · translated from ${n.language}` : ''}
+                  {n.sentiment !== null
+                    ? ` · sentiment ${n.sentiment > 0 ? '▲' : n.sentiment < 0 ? '▼' : '•'} ${signed(n.sentiment)}`
+                    : ' · not scored'}
                 </span>
               </li>
             ))}
@@ -127,7 +146,8 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
           What would invalidate this view
         </h3>
         <p className="m-0 text-xs" data-testid="trend-invalidation">
-          {card.invalidation?.rule ?? 'There is no directional view, so there is no invalidation level.'}
+          {card.invalidation?.rule ??
+            'There is no directional view, so there is no invalidation level.'}
         </p>
       </section>
 
@@ -140,14 +160,20 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
           <dd className="k-num m-0">{card.risk.lastClose ?? '—'}</dd>
           <dt className="text-muted">ATR (14)</dt>
           <dd className="k-num m-0">
-            {card.risk.atr ?? '—'} {card.risk.atrPct !== null ? `(${card.risk.atrPct}% of price)` : ''}
+            {card.risk.atr ?? '—'}{' '}
+            {card.risk.atrPct !== null ? `(${card.risk.atrPct}% of price)` : ''}
           </dd>
           <dt className="text-muted">Regime</dt>
           <dd className="m-0">
-            trending {pct(card.regime.trending)} · ranging {pct(card.regime.ranging)} · volatile {pct(card.regime.volatile)}
+            trending {pct(card.regime.trending)} · ranging {pct(card.regime.ranging)} · volatile{' '}
+            {pct(card.regime.volatile)}
           </dd>
           <dt className="text-muted">Next high-impact event</dt>
-          <dd className="m-0">{card.risk.eventMinutes === null ? 'none scheduled' : `in ${card.risk.eventMinutes} min`}</dd>
+          <dd className="m-0">
+            {card.risk.eventMinutes === null
+              ? 'none scheduled'
+              : `in ${card.risk.eventMinutes} min`}
+          </dd>
         </dl>
       </section>
 
@@ -156,16 +182,28 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
           <h3 id="summary-h" className="m-0 text-xs font-semibold uppercase text-ai">
             ✦ Copilot summary
           </h3>
-          <button type="button" className="ai-strip__btn" onClick={() => void explain()} disabled={explaining} data-testid="trend-explain">
+          <button
+            type="button"
+            className="ai-strip__btn"
+            onClick={() => void explain()}
+            disabled={explaining}
+            data-testid="trend-explain"
+          >
             {explaining ? 'Writing…' : 'Explain'}
           </button>
         </div>
         {summary ? (
-          <p className="m-0 mt-1 whitespace-pre-line text-xs" data-testid="trend-summary" aria-live="polite">
+          <p
+            className="m-0 mt-1 whitespace-pre-line text-xs"
+            data-testid="trend-summary"
+            aria-live="polite"
+          >
             {summary}
           </p>
         ) : (
-          <p className="m-0 mt-1 text-xs text-muted">Written from this card only; every number is checked against it.</p>
+          <p className="m-0 mt-1 text-xs text-muted">
+            Written from this card only; every number is checked against it.
+          </p>
         )}
       </section>
 
@@ -177,7 +215,13 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
 
       <div className="flex flex-wrap gap-2">
         {canDraft && card.direction && (
-          <button type="button" className="ai-strip__btn" onClick={() => void draft()} disabled={drafting} data-testid="trend-draft">
+          <button
+            type="button"
+            className="ai-strip__btn"
+            onClick={() => void draft()}
+            disabled={drafting}
+            data-testid="trend-draft"
+          >
             {drafting ? 'Drafting…' : 'Draft to ticket'}
           </button>
         )}
@@ -192,7 +236,8 @@ export function TrendCardView({ card, canDraft, canBuild, onDraft }: TrendCardVi
         )}
       </div>
       <p className="m-0 text-xs text-muted">
-        Drafts open in the ticket for you to review; nothing is sent until you preview and confirm. {card.disclaimer}
+        Drafts open in the ticket for you to review; nothing is sent until you preview and confirm.{' '}
+        {card.disclaimer}
       </p>
     </article>
   );

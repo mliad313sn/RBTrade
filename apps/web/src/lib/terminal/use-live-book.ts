@@ -13,7 +13,11 @@ import { useLiveQuotes, useTrading } from './trading';
  * engine snapshot (REST poll or `account:` push), repriced from the live quotes while a terminal is
  * streaming. The top bar, the blotter rows and the blotter summary all read this hook.
  */
-export function useLiveBook(): { positions: MarkedPosition[]; account: AccountView | null; live: boolean } {
+export function useLiveBook(): {
+  positions: MarkedPosition[];
+  account: AccountView | null;
+  live: boolean;
+} {
   const positions = useTrading((s) => s.positions);
   const positionsAt = useTrading((s) => s.positionsAt);
   const streaming = useTrading((s) => s.streaming);
@@ -31,6 +35,9 @@ export function useLiveBook(): { positions: MarkedPosition[]; account: AccountVi
     () => markPositions(positions, streaming ? quotes : new Map(), { now, positionsAt, currency }),
     [positions, quotes, streaming, now, positionsAt, currency],
   );
-  const account = useMemo(() => (base && streaming ? liveAccount(base, marked) : base), [base, streaming, marked]);
+  const account = useMemo(
+    () => (base && streaming ? liveAccount(base, marked) : base),
+    [base, streaming, marked],
+  );
   return { positions: marked, account, live: streaming && marked.some((p) => p.live) };
 }

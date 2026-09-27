@@ -644,17 +644,14 @@ describe('IRTC R2 regressions (trading and money correctness)', () => {
     await md.depth('EURUSD', [['1.08419', '1000000']], depth);
     const px: string[] = [];
     for (let i = 0; i < 3; i++) {
-      const r = await request(http)
-        .post('/orders')
-        .set(bearer(u.token))
-        .send({
-          clientOrderId: cid(),
-          symbol: 'EURUSD',
-          side: 'buy',
-          type: 'market',
-          qty: '100000',
-          tif: 'ioc',
-        });
+      const r = await request(http).post('/orders').set(bearer(u.token)).send({
+        clientOrderId: cid(),
+        symbol: 'EURUSD',
+        side: 'buy',
+        type: 'market',
+        qty: '100000',
+        tif: 'ioc',
+      });
       px.push(r.body.order.avgFillPrice as string);
     }
     expect(px).toEqual(['1.08421', '1.08431', '1.08441']);

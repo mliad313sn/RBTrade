@@ -79,12 +79,26 @@ export class SimulatedCalendarProvider implements EconomicCalendarProvider {
       used.add(slot);
       const t = TEMPLATES[rng.int(TEMPLATES.length)]!;
       const time = new Date(day + slot * 30 * 60_000).toISOString();
-      events.push({ id: `sim-${time.slice(0, 16)}-${t.country}`, time, country: t.country, currency: t.currency, impact: t.impact, title: t.title, source: this.source });
+      events.push({
+        id: `sim-${time.slice(0, 16)}-${t.country}`,
+        time,
+        country: t.country,
+        currency: t.currency,
+        impact: t.impact,
+        title: t.title,
+        source: this.source,
+      });
     }
     return events.sort((a, b) => a.time.localeCompare(b.time));
   }
 }
 
 export function eventsToShocks(events: CalendarEvent[]): EventShock[] {
-  return events.map((e) => ({ id: e.id, ts: Date.parse(e.time), country: e.country, currency: e.currency, impact: e.impact }));
+  return events.map((e) => ({
+    id: e.id,
+    ts: Date.parse(e.time),
+    country: e.country,
+    currency: e.currency,
+    impact: e.impact,
+  }));
 }

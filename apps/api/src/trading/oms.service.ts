@@ -1,6 +1,13 @@
 import { createHash } from 'node:crypto';
 
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import {
   availableSize,
   canonicalJson,
@@ -210,7 +217,11 @@ export class OmsService {
     req: AnyOrderRequest,
     sub: Pick<Submitter, 'userId' | 'roles' | 'source'>,
     tx?: TradingTx,
-    opts: { excludeOrderId?: string; excludeOcoGroup?: string | null; skipRegistryChecks?: boolean } = {},
+    opts: {
+      excludeOrderId?: string;
+      excludeOcoGroup?: string | null;
+      skipRegistryChecks?: boolean;
+    } = {},
   ): Promise<EvaluatedOrder> {
     const t0 = performance.now();
     const inst = await this.registry.get(req.symbol);
@@ -319,7 +330,8 @@ export class OmsService {
       .sub(notional(posQty, posMark, inst.multiplier).mul(pos?.fxRate ?? fxRate))
       .add(notional(after, price, inst.multiplier).mul(fxRate));
     const marginRate = this.registry.marginRate(inst.spec, account.margin_tier);
-    const marginOf = (q: Decimal) => notional(q, price, inst.multiplier).mul(fxRate).mul(marginRate);
+    const marginOf = (q: Decimal) =>
+      notional(q, price, inst.multiplier).mul(fxRate).mul(marginRate);
     const marginAfter = preview
       ? valuation.summary.marginUsed.add(marginOf(after)).sub(marginOf(posQty))
       : valuation.summary.marginUsed;
@@ -414,7 +426,14 @@ export class OmsService {
        WHERE account_id = $1 AND symbol = $2 AND side = $3 AND status = ANY($4) AND exec_type <> 'none'
          AND NOT reduce_only AND ($5::uuid IS NULL OR id <> $5::uuid)
          AND ($6::uuid IS NULL OR oco_group IS NULL OR oco_group <> $6::uuid)`,
-      [accountId, symbol, side, OPEN_ORDER_STATUSES, exclude.excludeOrderId ?? null, exclude.excludeOcoGroup ?? null],
+      [
+        accountId,
+        symbol,
+        side,
+        OPEN_ORDER_STATUSES,
+        exclude.excludeOrderId ?? null,
+        exclude.excludeOcoGroup ?? null,
+      ],
     );
     const groups = new Map<string, Decimal>();
     let total = new Decimal(0);
@@ -486,19 +505,34 @@ export class OmsService {
     try {
       const out = await withSpan(
         'oms.submit',
-        { 'kora.symbol': req.symbol, 'kora.side': req.side, 'kora.order_type': req.type, 'kora.source': sub.source, 'kora.client_order_id': req.clientOrderId },
+        {
+          'kora.symbol': req.symbol,
+          'kora.side': req.side,
+          'kora.order_type': req.type,
+          'kora.source': sub.source,
+          'kora.client_order_id': req.clientOrderId,
+        },
         () => this.submitInSpan(sub, req),
       );
-      const outcome = out.idempotentReplay ? 'replay' : out.order.status === 'rejected' ? 'rejected' : 'accepted';
+      const outcome = out.idempotentReplay
+        ? 'replay'
+        : out.order.status === 'rejected'
+          ? 'rejected'
+          : 'accepted';
       this.metrics?.orderSubmit.observe({ outcome, source }, (performance.now() - t0) / 1000);
-      if (outcome === 'rejected') this.metrics?.orderRejections.inc({ code: out.order.rejectCode ?? 'unknown' });
+      if (outcome === 'rejected')
+        this.metrics?.orderRejections.inc({ code: out.order.rejectCode ?? 'unknown' });
       return out;
     } catch (e) {
       // A pre-trade risk rejection is answered as 422 (the order row is stored as rejected).
-      const body = e instanceof UnprocessableEntityException ? (e.getResponse() as { error?: string; code?: string }) : null;
+      const body =
+        e instanceof UnprocessableEntityException
+          ? (e.getResponse() as { error?: string; code?: string })
+          : null;
       const outcome = body?.error === 'risk_rejected' ? 'rejected' : 'error';
       this.metrics?.orderSubmit.observe({ outcome, source }, (performance.now() - t0) / 1000);
-      if (outcome === 'rejected') this.metrics?.orderRejections.inc({ code: body?.code ?? 'unknown' });
+      if (outcome === 'rejected')
+        this.metrics?.orderRejections.inc({ code: body?.code ?? 'unknown' });
       throw e;
     }
   }
@@ -539,7 +573,9 @@ export class OmsService {
         }
         return { order: o, replay: true, legs: [] as OrderRow[] };
       }
-      const ev = await withSpan('risk.evaluate', { 'kora.symbol': req.symbol }, () => this.evaluate(tx.account, req, sub, tx));
+      const ev = await withSpan('risk.evaluate', { 'kora.symbol': req.symbol }, () =>
+        this.evaluate(tx.account, req, sub, tx),
+      );
       const execType = execTypeFor(req);
       const expireAt =
         req.tif === 'gtd'
@@ -870,7 +906,8 @@ export class OmsService {
         throw riskRejection([
           {
             code: 'POST_ONLY_WOULD_TAKE',
-            message: 'A post-only order must not trade immediately; this price would cross the spread.',
+            message:
+              'A post-only order must not trade immediately; this price would cross the spread.',
           },
         ]);
       // IRTC R2-01: an amend is a new approval of the order. Anything but a pure size reduction runs
@@ -914,7 +951,8 @@ export class OmsService {
       type: execType,
       qty: qty.toFixed(),
       limitPrice: fields.limit_price ?? order.limit_price ?? undefined,
-      stopPrice: execType === 'trailing' ? undefined : (fields.stop_price ?? order.stop_price ?? undefined),
+      stopPrice:
+        execType === 'trailing' ? undefined : (fields.stop_price ?? order.stop_price ?? undefined),
       trailAmount: fields.trail_amount ?? order.trail_amount ?? undefined,
       tif: order.tif === 'gtd' || order.tif === 'day' ? 'gtc' : order.tif,
       reduceOnly: order.reduce_only,
@@ -922,11 +960,17 @@ export class OmsService {
       source: 'manual',
     } as unknown as PreviewOrderRequest;
     const source = who.actor.type === 'robot' ? order.source : 'manual';
-    const ev = await this.evaluate(tx.account, req, { userId: who.userId, roles: who.roles, source: source as OrderSource }, tx, {
-      excludeOrderId: order.id,
-      excludeOcoGroup: order.oco_group,
-      skipRegistryChecks: true,
-    });
+    const ev = await this.evaluate(
+      tx.account,
+      req,
+      { userId: who.userId, roles: who.roles, source: source as OrderSource },
+      tx,
+      {
+        excludeOrderId: order.id,
+        excludeOcoGroup: order.oco_group,
+        skipRegistryChecks: true,
+      },
+    );
     return ev.violations.filter((v) => !AMEND_EXEMPT_CODES.has(v.code));
   }
 
@@ -1159,7 +1203,8 @@ export function nextDayRoll(now: number): number {
     const local = now + zoneOffsetMs(now, DAY_ROLL_TIMEZONE);
     const dayStart = Math.floor(local / DAY_MS) * DAY_MS + d * DAY_MS;
     const guess = dayStart + DAY_ROLL_MINUTES * 60_000;
-    const utc = guess - zoneOffsetMs(guess - zoneOffsetMs(guess, DAY_ROLL_TIMEZONE), DAY_ROLL_TIMEZONE);
+    const utc =
+      guess - zoneOffsetMs(guess - zoneOffsetMs(guess, DAY_ROLL_TIMEZONE), DAY_ROLL_TIMEZONE);
     if (utc > now) return utc;
   }
   return now + DAY_MS;
@@ -1191,7 +1236,8 @@ export function dayExpiry(inst: TradableInstrument, now: number): Date {
     t = next + 1;
   }
   // Daily breaks every day and no weekly close in sight: the day ends at the break or the roll.
-  if (breakAt !== null && breakAt - now <= DAY_MS) return new Date(Math.min(breakAt, nextDayRoll(now)));
+  if (breakAt !== null && breakAt - now <= DAY_MS)
+    return new Date(Math.min(breakAt, nextDayRoll(now)));
   const s = sessionStatus(cal, tz, now);
   const [y, m, d] = s.localDate.split('-').map(Number) as [number, number, number];
   const localMidnightUtc = Date.UTC(y, m - 1, d + 1);

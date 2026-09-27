@@ -35,23 +35,51 @@ describe('minor-unit quotes (B-202)', () => {
   });
 
   it('the registry exposes the unit and factor', async () => {
-    const res = await request(http).get('/instruments/HSBA.XLON').set(bearer(trader.token)).expect(200);
+    const res = await request(http)
+      .get('/instruments/HSBA.XLON')
+      .set(bearer(trader.token))
+      .expect(200);
     const hsba = res.body.instrument ?? res.body;
-    expect(hsba).toMatchObject({ quoteCcy: 'GBP', priceUnit: 'GBX', priceUnitFactor: '0.01', tickSize: '0.1', pricePrecision: 1 });
+    expect(hsba).toMatchObject({
+      quoteCcy: 'GBP',
+      priceUnit: 'GBX',
+      priceUnitFactor: '0.01',
+      tickSize: '0.1',
+      pricePrecision: 1,
+    });
   });
 
   it('preview and fill: 1,000 shares at 684.2p are worth 6,842 GBP, not 684,200', async () => {
     await md.touch();
-    const p = await request(http).post('/orders/preview').set(bearer(trader.token)).send({ symbol: 'HSBA.XLON', side: 'buy', type: 'market', qty: '1000' }).expect(200);
-    expect(p.body.instrument).toMatchObject({ quoteCcy: 'GBP', multiplier: '0.01', tickSize: '0.1' });
+    const p = await request(http)
+      .post('/orders/preview')
+      .set(bearer(trader.token))
+      .send({ symbol: 'HSBA.XLON', side: 'buy', type: 'market', qty: '1000' })
+      .expect(200);
+    expect(p.body.instrument).toMatchObject({
+      quoteCcy: 'GBP',
+      multiplier: '0.01',
+      tickSize: '0.1',
+    });
     expect(p.body.preview.notional).toMatchObject({ quoteCcy: 'GBP', quote: '6842.00' });
     // Converted to the USD account at the GBP/USD mid (1.26412): about 8,649 USD.
     expect(Number(p.body.preview.notional.base)).toBeGreaterThan(8600);
     expect(Number(p.body.preview.notional.base)).toBeLessThan(8700);
     expect(p.body.risk.ok).toBe(true);
-    const o = await request(http).post('/orders').set(bearer(trader.token)).send({ clientOrderId: `mu-${process.pid}`, symbol: 'HSBA.XLON', side: 'buy', type: 'market', qty: '1000' }).expect(201);
+    const o = await request(http)
+      .post('/orders')
+      .set(bearer(trader.token))
+      .send({
+        clientOrderId: `mu-${process.pid}`,
+        symbol: 'HSBA.XLON',
+        side: 'buy',
+        type: 'market',
+        qty: '1000',
+      })
+      .expect(201);
     expect(o.body.order.status).toBe('filled');
-    const pos = (await request(http).get('/positions').set(bearer(trader.token)).expect(200)).body.positions[0];
+    const pos = (await request(http).get('/positions').set(bearer(trader.token)).expect(200)).body
+      .positions[0];
     expect(pos).toMatchObject({ symbol: 'HSBA.XLON', avgPrice: '684.2', quoteCcy: 'GBP' });
     expect(Number(pos.notional)).toBeLessThan(8700);
   });

@@ -1,18 +1,18 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "services/bot-runner"
-  - "services/ai-evals"
-  - "services/quant"
+  - 'apps/*'
+  - 'packages/*'
+  - 'services/bot-runner'
+  - 'services/ai-evals'
+  - 'services/quant'
 
 onlyBuiltDependencies:
-  - "@swc/core"
+  - '@swc/core'
   - esbuild
-  - "@nestjs/core"
+  - '@nestjs/core'
   - sharp
 
 ignoredBuiltDependencies:
-  - "@scarf/scarf"
+  - '@scarf/scarf'
   - protobufjs
 
 # Supply-chain hardening (goal 10, Semgrep pnpm rules): new versions must be seven days old before they

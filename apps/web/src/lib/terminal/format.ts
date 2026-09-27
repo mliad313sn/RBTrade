@@ -23,7 +23,11 @@ export function formatQty(qty: string, qtyPrecision: number): string {
 }
 
 /** Spread in pips for instruments with a pip size, else in price units. */
-export function formatSpread(bid: string, ask: string, spec: Pick<InstrumentSpec, 'pipSize' | 'tickSize' | 'pricePrecision'>): string {
+export function formatSpread(
+  bid: string,
+  ask: string,
+  spec: Pick<InstrumentSpec, 'pipSize' | 'tickSize' | 'pricePrecision'>,
+): string {
   const diff = dec(ask).sub(dec(bid));
   if (spec.pipSize) return `${formatDecimal(diff.div(pipSizeOf(spec)), 1)} pip`;
   return formatDecimal(diff, spec.pricePrecision);
@@ -38,7 +42,10 @@ export function orderResultText(
   o: { status: string; side: string; qty: string; symbol: string; avgFillPrice?: string | null },
   precision: { qty: number; price: number },
 ): string {
-  const at = o.avgFillPrice && isDecimalString(o.avgFillPrice) ? ` at ${formatPrice(o.avgFillPrice, precision.price)}` : '';
+  const at =
+    o.avgFillPrice && isDecimalString(o.avgFillPrice)
+      ? ` at ${formatPrice(o.avgFillPrice, precision.price)}`
+      : '';
   return `Order ${o.status.replace('_', ' ')}: ${o.side} ${formatQty(o.qty, precision.qty)} ${o.symbol}${at}.`;
 }
 
@@ -73,14 +80,20 @@ export function midOf(bid: string, ask: string, precision: number): string {
 }
 
 /** "EUR/USD" style label from the registry display name (falls back to the symbol). */
-export function displayName(spec: Pick<InstrumentSpec, 'displayName' | 'symbol'> | null | undefined, symbol: string): string {
+export function displayName(
+  spec: Pick<InstrumentSpec, 'displayName' | 'symbol'> | null | undefined,
+  symbol: string,
+): string {
   return spec?.displayName || symbol;
 }
 
 /** Plays a short, quiet tone for a fill (Settings → sound on fills; off by default). */
 export function playFillSound(): void {
   try {
-    const Ctx = (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext | undefined;
+    const Ctx = (window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
+      | typeof AudioContext
+      | undefined;
     if (!Ctx) return;
     const ctx = new Ctx();
     const osc = ctx.createOscillator();

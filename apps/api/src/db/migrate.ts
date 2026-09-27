@@ -15,7 +15,10 @@ export interface MigrationResult {
  * Forward-only SQL migrations (ADR 0001). Each file runs in its own transaction and is recorded
  * with its SHA-256; editing an applied migration fails loudly.
  */
-export async function runMigrations(connectionString: string, dir = MIGRATIONS_DIR): Promise<MigrationResult> {
+export async function runMigrations(
+  connectionString: string,
+  dir = MIGRATIONS_DIR,
+): Promise<MigrationResult> {
   const files = readdirSync(dir)
     .filter((f) => /^\d{4}_[a-z0-9_]+\.sql$/.test(f))
     .sort();
@@ -48,11 +51,10 @@ export async function runMigrations(connectionString: string, dir = MIGRATIONS_D
       await client.query('BEGIN');
       try {
         await client.query(sql);
-        await client.query('INSERT INTO schema_migrations (version, name, sha256) VALUES ($1, $2, $3)', [
-          version,
-          file,
-          sha,
-        ]);
+        await client.query(
+          'INSERT INTO schema_migrations (version, name, sha256) VALUES ($1, $2, $3)',
+          [version, file, sha],
+        );
         await client.query('COMMIT');
         result.applied.push(file);
       } catch (err) {
@@ -61,7 +63,9 @@ export async function runMigrations(connectionString: string, dir = MIGRATIONS_D
       }
     }
   } finally {
-    await client.query("SELECT pg_advisory_unlock(hashtext('kora.migrations'))").catch(() => undefined);
+    await client
+      .query("SELECT pg_advisory_unlock(hashtext('kora.migrations'))")
+      .catch(() => undefined);
     await client.end();
   }
   return result;

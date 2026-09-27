@@ -15,7 +15,11 @@ export function generateMetadata() {
  * Novice home (goal 08). Data is fetched on the server so the balance is in the first paint
  * (mobile LCP). Novice-only users who have not finished onboarding go there first.
  */
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ symbol?: string }> }) {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ symbol?: string }>;
+}) {
   const symbol = ((await searchParams).symbol ?? DEFAULT_SYMBOL).toUpperCase();
   const [me, client] = await Promise.all([requireMe(), serverClient()]);
   const [profile, summary, assets, autoInvest] = await Promise.all([

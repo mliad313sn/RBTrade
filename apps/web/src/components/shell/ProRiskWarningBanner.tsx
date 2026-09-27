@@ -41,10 +41,17 @@ export function ProRiskWarningBanner({ className }: { className?: string }) {
     setBusy(true);
     setError(null);
     try {
-      await api.acknowledgeDisclosure('risk-warning', { version: doc.version, contentHash: doc.contentHash, locale: 'en', context: 'banner' });
+      await api.acknowledgeDisclosure('risk-warning', {
+        version: doc.version,
+        contentHash: doc.contentHash,
+        locale: 'en',
+        context: 'banner',
+      });
       setNeeded(false);
     } catch {
-      setError('The risk warning changed or could not be saved. Reload the page and confirm again.');
+      setError(
+        'The risk warning changed or could not be saved. Reload the page and confirm again.',
+      );
     } finally {
       setBusy(false);
     }
@@ -53,7 +60,10 @@ export function ProRiskWarningBanner({ className }: { className?: string }) {
   return (
     <div className={className} data-testid="pro-risk-warning">
       <Banner tone="warn" title="Confirm the risk warning before trading">
-        <span className="block">New orders that add exposure need the current risk warning confirmed. Closing or reducing positions always works.</span>
+        <span className="block">
+          New orders that add exposure need the current risk warning confirmed. Closing or reducing
+          positions always works.
+        </span>
         {open ? (
           <div className="mt-2 flex flex-col gap-2">
             <strong>{doc.title}</strong>
@@ -63,18 +73,35 @@ export function ProRiskWarningBanner({ className }: { className?: string }) {
               ))}
             </ul>
             <label className="flex gap-2 items-start cursor-pointer">
-              <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} data-testid="pro-risk-warning-ack" />
+              <input
+                type="checkbox"
+                checked={ticked}
+                onChange={(e) => setTicked(e.target.checked)}
+                data-testid="pro-risk-warning-ack"
+              />
               <span className="font-semibold">{doc.acknowledge}</span>
             </label>
             {error ? <span role="alert">{error}</span> : null}
             <div>
-              <Button size="sm" variant="primary" disabled={!ticked || busy} onClick={() => void confirm()} data-testid="pro-risk-warning-confirm">
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={!ticked || busy}
+                onClick={() => void confirm()}
+                data-testid="pro-risk-warning-confirm"
+              >
                 Confirm
               </Button>
             </div>
           </div>
         ) : (
-          <Button size="sm" variant="secondary" className="mt-2" onClick={() => setOpen(true)} data-testid="pro-risk-warning-open">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-2"
+            onClick={() => setOpen(true)}
+            data-testid="pro-risk-warning-open"
+          >
             Read and confirm
           </Button>
         )}

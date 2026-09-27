@@ -11,7 +11,8 @@ import { hashPassword } from '../auth/password';
  */
 async function main(): Promise<void> {
   const password = process.env.KORA_SEED_PASSWORD;
-  if (!password || password.length < 12) throw new Error('Set KORA_SEED_PASSWORD (min 12 chars) to seed demo users');
+  if (!password || password.length < 12)
+    throw new Error('Set KORA_SEED_PASSWORD (min 12 chars) to seed demo users');
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const users: Array<[string, string, Role]> = [
     ['novice@kora.local', 'Simulated Novice', 'novice'],
@@ -28,11 +29,14 @@ async function main(): Promise<void> {
       [email, name, hash],
     );
     const id = rows[0]!.id;
-    await pool.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, role]);
-    await pool.query('INSERT INTO user_preferences (user_id, view_mode) VALUES ($1, $2) ON CONFLICT DO NOTHING', [
-      id,
-      role === 'novice' ? 'novice' : 'pro',
-    ]);
+    await pool.query(
+      'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [id, role],
+    );
+    await pool.query(
+      'INSERT INTO user_preferences (user_id, view_mode) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [id, role === 'novice' ? 'novice' : 'pro'],
+    );
     console.warn(`[seed] ${email} (${role})`);
   }
   await pool.end();

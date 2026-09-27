@@ -10,7 +10,13 @@ interface ShellState {
 
 const Ctx = createContext<ShellState | null>(null);
 
-export function ShellProvider({ initialMe, children }: { initialMe: MeResponse; children: ReactNode }) {
+export function ShellProvider({
+  initialMe,
+  children,
+}: {
+  initialMe: MeResponse;
+  children: ReactNode;
+}) {
   const [me, setMe] = useState(initialMe);
   // Keep in sync when the server layout re-renders after router.refresh().
   const [seen, setSeen] = useState(initialMe);

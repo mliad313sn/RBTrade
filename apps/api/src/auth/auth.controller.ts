@@ -24,7 +24,14 @@ import { authThrottle, signupLimitPerHour } from '../common/auth-throttle';
 import { clientIp, type KoraRequest } from '../common/request';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
-import { LoginSchema, MfaEnrollSchema, MfaRecoverySchema, MfaVerifySchema, RecoveryCodesRegenerateSchema, SignupSchema } from './auth.schemas';
+import {
+  LoginSchema,
+  MfaEnrollSchema,
+  MfaRecoverySchema,
+  MfaVerifySchema,
+  RecoveryCodesRegenerateSchema,
+  SignupSchema,
+} from './auth.schemas';
 import { clearAccessCookie, setAccessCookie } from './cookies';
 import { Public } from './decorators';
 import { AuthError, DevIdpService } from './dev-idp.service';
@@ -52,7 +59,6 @@ function mapAuthError(e: unknown, res?: Response): never {
   throw e;
 }
 
-
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -66,7 +72,10 @@ export class AuthController {
 
   private assertDevIdp(): void {
     if (this.config.auth.provider !== 'dev') {
-      throw new NotFoundException({ error: 'not_found', message: 'Use the OIDC login (/auth/oidc/start)' });
+      throw new NotFoundException({
+        error: 'not_found',
+        message: 'Use the OIDC login (/auth/oidc/start)',
+      });
     }
   }
 
@@ -98,9 +107,15 @@ export class AuthController {
   @Public()
   @Throttle({ ...authThrottle(), long: { limit: () => signupLimitPerHour(), ttl: 3_600_000 } })
   @Post('signup')
-  @ApiOperation({ summary: 'Create an account. Everyone starts as novice (PAPER); Pro trading needs the appropriateness assessment, then TOTP enrolment at the next login.' })
+  @ApiOperation({
+    summary:
+      'Create an account. Everyone starts as novice (PAPER); Pro trading needs the appropriateness assessment, then TOTP enrolment at the next login.',
+  })
   @ApiBody({ schema: openApiSchema(SignupSchema) })
-  async signup(@Body(new ZodValidationPipe(SignupSchema)) body: z.infer<typeof SignupSchema>, @Req() req: KoraRequest) {
+  async signup(
+    @Body(new ZodValidationPipe(SignupSchema)) body: z.infer<typeof SignupSchema>,
+    @Req() req: KoraRequest,
+  ) {
     this.assertDevIdp();
     return this.idp.signup(body, clientIp(req)).catch(mapAuthError);
   }
@@ -117,7 +132,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     this.assertDevIdp();
-    const out = await this.idp.login(body.email, body.password, clientIp(req)).catch((e: unknown) => mapAuthError(e, res));
+    const out = await this.idp
+      .login(body.email, body.password, clientIp(req))
+      .catch((e: unknown) => mapAuthError(e, res));
     if (out.status === 'ok') setAccessCookie(res, out.accessToken, this.config);
     return out;
   }
@@ -128,7 +145,9 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Start TOTP enrolment. Returns the otpauth URI and base32 secret.' })
   @ApiBody({ schema: openApiSchema(MfaEnrollSchema) })
-  async enroll(@Body(new ZodValidationPipe(MfaEnrollSchema)) body: z.infer<typeof MfaEnrollSchema>) {
+  async enroll(
+    @Body(new ZodValidationPipe(MfaEnrollSchema)) body: z.infer<typeof MfaEnrollSchema>,
+  ) {
     this.assertDevIdp();
     return this.idp.enroll(body.mfaToken).catch(mapAuthError);
   }
@@ -137,7 +156,9 @@ export class AuthController {
   @Throttle(authThrottle())
   @Post('mfa/verify')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Verify a TOTP code (completes enrolment on first use) and issue the session.' })
+  @ApiOperation({
+    summary: 'Verify a TOTP code (completes enrolment on first use) and issue the session.',
+  })
   @ApiBody({ schema: openApiSchema(MfaVerifySchema) })
   async verify(
     @Body(new ZodValidationPipe(MfaVerifySchema)) body: z.infer<typeof MfaVerifySchema>,
@@ -154,7 +175,10 @@ export class AuthController {
   @Throttle(authThrottle())
   @Post('mfa/recovery')
   @HttpCode(200)
-  @ApiOperation({ summary: 'B-902: second factor with a one-time recovery code (lost authenticator); issues the session.' })
+  @ApiOperation({
+    summary:
+      'B-902: second factor with a one-time recovery code (lost authenticator); issues the session.',
+  })
   @ApiBody({ schema: openApiSchema(MfaRecoverySchema) })
   async recovery(
     @Body(new ZodValidationPipe(MfaRecoverySchema)) body: z.infer<typeof MfaRecoverySchema>,
@@ -162,7 +186,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     this.assertDevIdp();
-    const out = await this.idp.recover(body.mfaToken, body.recoveryCode, clientIp(req)).catch(mapAuthError);
+    const out = await this.idp
+      .recover(body.mfaToken, body.recoveryCode, clientIp(req))
+      .catch(mapAuthError);
     setAccessCookie(res, out.accessToken, this.config);
     return { status: 'ok' as const, ...out };
   }
@@ -170,15 +196,22 @@ export class AuthController {
   @Throttle(authThrottle())
   @Post('mfa/recovery-codes')
   @HttpCode(200)
-  @ApiOperation({ summary: 'B-902: replace the recovery codes (needs a fresh 6-digit code); returns them once.' })
+  @ApiOperation({
+    summary: 'B-902: replace the recovery codes (needs a fresh 6-digit code); returns them once.',
+  })
   @ApiBody({ schema: openApiSchema(RecoveryCodesRegenerateSchema) })
   async regenerateRecoveryCodes(
-    @Body(new ZodValidationPipe(RecoveryCodesRegenerateSchema)) body: z.infer<typeof RecoveryCodesRegenerateSchema>,
+    @Body(new ZodValidationPipe(RecoveryCodesRegenerateSchema))
+    body: z.infer<typeof RecoveryCodesRegenerateSchema>,
     @Req() req: KoraRequest,
   ) {
     this.assertDevIdp();
     const codes = await this.idp.regenerateRecoveryCodes(req.principal!.sub, body.code);
-    if (!codes) throw new UnauthorizedException({ error: 'invalid_code', message: 'That code is not valid. Check your authenticator app and try again.' });
+    if (!codes)
+      throw new UnauthorizedException({
+        error: 'invalid_code',
+        message: 'That code is not valid. Check your authenticator app and try again.',
+      });
     return { recoveryCodes: codes };
   }
 
@@ -191,12 +224,21 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(200)
-  @ApiOperation({ summary: 'End the session: clears the cookie and revokes the token server side (goal 10).' })
+  @ApiOperation({
+    summary: 'End the session: clears the cookie and revokes the token server side (goal 10).',
+  })
   async logout(@Req() req: KoraRequest, @Res({ passthrough: true }) res: Response) {
     clearAccessCookie(res, this.config);
     const p = req.principal!;
     await this.sessions.revoke(p, 'logout');
-    await this.audit.record({ actorId: p.sub, actorType: 'user', action: 'auth.logout', entity: 'user', entityId: p.sub, payload: {} });
+    await this.audit.record({
+      actorId: p.sub,
+      actorType: 'user',
+      action: 'auth.logout',
+      entity: 'user',
+      entityId: p.sub,
+      payload: {},
+    });
     return { status: 'ok' };
   }
 }

@@ -21,7 +21,8 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (e) {
     if (e instanceof KoraApiError) {
-      const issues = ((e.body ?? {}) as { issues?: { path: string; message: string }[] }).issues ?? [];
+      const issues =
+        ((e.body ?? {}) as { issues?: { path: string; message: string }[] }).issues ?? [];
       const message = issues.length ? issues.map((i) => i.message).join(' ') : e.message;
       throw new SimApiError(e.status, e.code, message, issues);
     }
@@ -37,7 +38,11 @@ export const simApi = {
   fromTrades: (req: Record<string, unknown>) => call(() => api.simFromTrades(req)),
   /** B-505: saved scenarios. */
   scenarios: (kind: 'practice' | 'pro') => call(() => api.simScenarios(kind)),
-  saveScenario: (body: { kind: 'practice' | 'pro'; name: string; input: Record<string, unknown>; overwrite?: boolean }) =>
-    call(() => api.saveSimScenario(body)),
+  saveScenario: (body: {
+    kind: 'practice' | 'pro';
+    name: string;
+    input: Record<string, unknown>;
+    overwrite?: boolean;
+  }) => call(() => api.saveSimScenario(body)),
   deleteScenario: (id: string) => call(() => api.deleteSimScenario(id)),
 };

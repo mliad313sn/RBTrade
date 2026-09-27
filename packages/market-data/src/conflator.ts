@@ -49,7 +49,12 @@ export class Conflator<T> {
   offer(channel: string, value: T): void {
     let st = this.channels.get(channel);
     if (!st) {
-      st = { tokens: this.burst, refilledAt: this.clock.now(), pending: undefined, timer: undefined };
+      st = {
+        tokens: this.burst,
+        refilledAt: this.clock.now(),
+        pending: undefined,
+        timer: undefined,
+      };
       this.channels.set(channel, st);
     }
     if (st.timer !== undefined) {

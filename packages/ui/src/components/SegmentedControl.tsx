@@ -19,10 +19,22 @@ export interface SegmentedControlProps<V extends string> {
 }
 
 /** Radio-group semantics with roving focus (arrow keys). Used for the Pro ⇄ Novice switch. */
-export function SegmentedControl<V extends string>({ label, value, options, onChange, className, ...rest }: SegmentedControlProps<V>) {
+export function SegmentedControl<V extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+  ...rest
+}: SegmentedControlProps<V>) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const onKey = (e: KeyboardEvent, i: number) => {
-    const delta = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    const delta =
+      e.key === 'ArrowRight' || e.key === 'ArrowDown'
+        ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+          ? -1
+          : 0;
     if (!delta) return;
     e.preventDefault();
     const j = (i + delta + options.length) % options.length;

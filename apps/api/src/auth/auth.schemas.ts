@@ -4,14 +4,25 @@ import { MIN_PASSWORD_LENGTH } from './password';
 
 export const SignupSchema = z
   .object({
-    email: z.email().max(320).transform((e) => e.toLowerCase()),
-    password: z.string().min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`).max(256),
+    email: z
+      .email()
+      .max(320)
+      .transform((e) => e.toLowerCase()),
+    password: z
+      .string()
+      .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
+      .max(256),
     displayName: z.string().trim().min(1).max(80),
     /**
      * Sponsor decision OQ-S2 (B-018): no self-service trader. Only `novice` is accepted; `trader`
      * is granted by passing the appropriateness assessment (POST /appropriateness/attempts).
      */
-    accountType: z.literal('novice', { error: 'Everyone starts as novice. Pass the appropriateness assessment to unlock Pro trading.' }).default('novice'),
+    accountType: z
+      .literal('novice', {
+        error:
+          'Everyone starts as novice. Pass the appropriateness assessment to unlock Pro trading.',
+      })
+      .default('novice'),
   })
   .strict();
 
@@ -43,4 +54,6 @@ export const MfaRecoverySchema = z
   .strict();
 
 /** B-902: regenerating recovery codes needs a fresh TOTP code (step-up). */
-export const RecoveryCodesRegenerateSchema = z.object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') }).strict();
+export const RecoveryCodesRegenerateSchema = z
+  .object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') })
+  .strict();

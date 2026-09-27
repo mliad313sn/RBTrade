@@ -54,7 +54,8 @@ export function markPositions(
     const k = dec(p.notional).div(qty.abs().mul(serverMark));
     const mark = dec(qty.isNegative() ? q.ask : q.bid);
     const exposure = qty.abs().mul(mark).mul(k);
-    const marginRate = p.marginUsed && !dec(p.notional).isZero() ? dec(p.marginUsed).div(dec(p.notional)) : null;
+    const marginRate =
+      p.marginUsed && !dec(p.notional).isZero() ? dec(p.marginUsed).div(dec(p.notional)) : null;
     return {
       ...p,
       markPrice: mark.toFixed(),
@@ -73,7 +74,8 @@ export function markPositions(
  */
 export function liveAccount(account: AccountView, marked: readonly MarkedPosition[]): AccountView {
   if (!marked.some((p) => p.live)) return account;
-  if (account.openPositions !== marked.length || marked.some((p) => p.unrealizedPnl === null)) return account;
+  if (account.openPositions !== marked.length || marked.some((p) => p.unrealizedPnl === null))
+    return account;
   const ccy = account.baseCurrency;
   const unrealized = marked.reduce((a, p) => a.add(dec(p.unrealizedPnl!)), dec(0));
   // Margin per position is optional on the wire; without it for every position keep the engine's total.
@@ -92,7 +94,9 @@ export function liveAccount(account: AccountView, marked: readonly MarkedPositio
     marginUsed: formatAmount(margin, ccy),
     marginFree: formatAmount(equity.sub(margin), ccy),
     marginUsedPct: equity.gt(0) ? formatPct(margin.div(equity)) : account.marginUsedPct,
-    dailyLossUsedPct: limit.gt(0) ? formatPct((dayPnl.isNegative() ? dayPnl.neg() : dec(0)).div(limit)) : account.dailyLossUsedPct,
+    dailyLossUsedPct: limit.gt(0)
+      ? formatPct((dayPnl.isNegative() ? dayPnl.neg() : dec(0)).div(limit))
+      : account.dailyLossUsedPct,
   };
 }
 
@@ -104,6 +108,10 @@ export function newerAccount(a: AccountView | null, b: AccountView | null): Acco
 }
 
 /** Top-bar stale state: the last account request failed, or the last good snapshot is too old. */
-export function accountStale(s: { error: boolean; okAt: number | null }, now: number, staleMs = LIVE_STALE_MS): boolean {
+export function accountStale(
+  s: { error: boolean; okAt: number | null },
+  now: number,
+  staleMs = LIVE_STALE_MS,
+): boolean {
   return s.error || s.okAt === null || now - s.okAt > staleMs;
 }

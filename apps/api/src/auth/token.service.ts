@@ -78,7 +78,8 @@ export class TokenService implements OnModuleInit {
   }
 
   private signer(payload: JWTPayload, audience: string, ttlSeconds: number): SignJWT {
-    if (!this.privateKey || !this.publicJwk) throw new Error('Token signing is only available with AUTH_PROVIDER=dev');
+    if (!this.privateKey || !this.publicJwk)
+      throw new Error('Token signing is only available with AUTH_PROVIDER=dev');
     return new SignJWT(payload)
       .setProtectedHeader({ alg: ALG, kid: this.publicJwk.kid!, typ: 'JWT' })
       .setIssuer(this.config.auth.issuer)
@@ -112,7 +113,8 @@ export class TokenService implements OnModuleInit {
         audience: MFA_AUDIENCE,
         algorithms: [ALG],
       });
-      if (payload.purpose !== 'mfa' || !payload.sub) throw new InvalidTokenError('not an mfa token');
+      if (payload.purpose !== 'mfa' || !payload.sub)
+        throw new InvalidTokenError('not an mfa token');
       return { sub: payload.sub, stage: payload.stage === 'enroll' ? 'enroll' : 'verify' };
     } catch (e) {
       throw new InvalidTokenError((e as Error).message);
@@ -130,7 +132,8 @@ export class TokenService implements OnModuleInit {
     } catch (e) {
       throw new InvalidTokenError((e as Error).message);
     }
-    if (payload.purpose !== undefined || !payload.sub) throw new InvalidTokenError('not an access token');
+    if (payload.purpose !== undefined || !payload.sub)
+      throw new InvalidTokenError('not an access token');
     const realm = payload.realm_access as { roles?: unknown } | undefined;
     const roles = Array.isArray(realm?.roles) ? realm.roles.filter(isRole) : [];
     const amr = Array.isArray(payload.amr) ? (payload.amr as unknown[]).map(String) : [];

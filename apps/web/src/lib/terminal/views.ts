@@ -16,7 +16,11 @@ export interface WatchRowView {
 }
 
 /** Pure row computation (decimals at registry precision). Exported for tests. */
-export function watchRowView(q: Pick<Quote, 'bid' | 'ask'>, dayOpen: string | null | undefined, spec: Pick<InstrumentDto, 'pricePrecision' | 'pipSize' | 'tickSize'>): WatchRowView {
+export function watchRowView(
+  q: Pick<Quote, 'bid' | 'ask'>,
+  dayOpen: string | null | undefined,
+  spec: Pick<InstrumentDto, 'pricePrecision' | 'pipSize' | 'tickSize'>,
+): WatchRowView {
   const mid = midOf(q.bid, q.ask, spec.pricePrecision);
   let change: string | null = null;
   let dir: WatchRowView['dir'] = 'flat';
@@ -26,9 +30,14 @@ export function watchRowView(q: Pick<Quote, 'bid' | 'ask'>, dayOpen: string | nu
     dir = displayDirection(ratio.mul(100).toFixed(), 2);
     change = formatPercent(ratio);
   }
-  return { mid, last: formatPrice(mid, spec.pricePrecision), change, dir, spread: formatSpread(q.bid, q.ask, spec) };
+  return {
+    mid,
+    last: formatPrice(mid, spec.pricePrecision),
+    change,
+    dir,
+    spread: formatSpread(q.bid, q.ask, spec),
+  };
 }
-
 
 export interface BookLevel {
   price: string;
@@ -68,25 +77,40 @@ export function bookView(d: Pick<DepthSnapshot, 'bids' | 'asks'>, levels = 10): 
   };
 }
 
-
 /** Price and field an order line represents (null = not drawn). */
-export function orderLine(o: Pick<OrderDto, 'execType' | 'limitPrice' | 'stopPrice' | 'status'>): { price: string; field: 'limitPrice' | 'stopPrice'; draggable: boolean } | null {
+export function orderLine(
+  o: Pick<OrderDto, 'execType' | 'limitPrice' | 'stopPrice' | 'status'>,
+): { price: string; field: 'limitPrice' | 'stopPrice'; draggable: boolean } | null {
   if (!['working', 'partially_filled', 'accepted', 'new'].includes(o.status)) return null;
-  if (o.execType === 'limit' && o.limitPrice) return { price: o.limitPrice, field: 'limitPrice', draggable: true };
-  if ((o.execType === 'stop' || o.execType === 'stop_limit') && o.stopPrice) return { price: o.stopPrice, field: 'stopPrice', draggable: true };
-  if (o.execType === 'trailing' && o.stopPrice) return { price: o.stopPrice, field: 'stopPrice', draggable: false };
+  if (o.execType === 'limit' && o.limitPrice)
+    return { price: o.limitPrice, field: 'limitPrice', draggable: true };
+  if ((o.execType === 'stop' || o.execType === 'stop_limit') && o.stopPrice)
+    return { price: o.stopPrice, field: 'stopPrice', draggable: true };
+  if (o.execType === 'trailing' && o.stopPrice)
+    return { price: o.stopPrice, field: 'stopPrice', draggable: false };
   return null;
 }
 
-
 /** Protective (reduce-only, opposite side) orders per symbol → stop and target columns. */
-export function protectiveLevels(orders: OrderDto[], p: Pick<PositionDto, 'symbol' | 'qty'>): { stop: OrderDto | null; target: OrderDto | null } {
+export function protectiveLevels(
+  orders: OrderDto[],
+  p: Pick<PositionDto, 'symbol' | 'qty'>,
+): { stop: OrderDto | null; target: OrderDto | null } {
   const long = !p.qty.startsWith('-');
   const exitSide = long ? 'sell' : 'buy';
-  const mine = orders.filter((o) => o.symbol === p.symbol && o.side === exitSide && (o.reduceOnly || o.role === 'stop_loss' || o.role === 'take_profit' || o.role === 'oco_leg'));
+  const mine = orders.filter(
+    (o) =>
+      o.symbol === p.symbol &&
+      o.side === exitSide &&
+      (o.reduceOnly || o.role === 'stop_loss' || o.role === 'take_profit' || o.role === 'oco_leg'),
+  );
   return {
-    stop: mine.find((o) => (o.execType === 'stop' || o.execType === 'stop_limit' || o.execType === 'trailing') && o.stopPrice) ?? null,
+    stop:
+      mine.find(
+        (o) =>
+          (o.execType === 'stop' || o.execType === 'stop_limit' || o.execType === 'trailing') &&
+          o.stopPrice,
+      ) ?? null,
     target: mine.find((o) => o.execType === 'limit' && o.limitPrice) ?? null,
   };
 }
-

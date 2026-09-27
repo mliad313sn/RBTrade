@@ -4,7 +4,11 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { bandFor, suitabilityBands } from '../compliance/suitability.service';
-import { renderDisclosure, placeholderFor, DisclosureDefinitionSchema } from '../disclosures/disclosure-render';
+import {
+  renderDisclosure,
+  placeholderFor,
+  DisclosureDefinitionSchema,
+} from '../disclosures/disclosure-render';
 import riskWarningV1 from '../disclosures/risk-warning.v1.json';
 import { CONTROL_AREAS, CONTROLS } from './controls/catalogue';
 import { EVIDENCE } from './controls/evidence-queries';
@@ -21,7 +25,14 @@ const ROOT = resolve(__dirname, '../../../..');
 
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === 'dist' || name === '.next' || name === 'coverage' || name.startsWith('.')) continue;
+    if (
+      name === 'node_modules' ||
+      name === 'dist' ||
+      name === '.next' ||
+      name === 'coverage' ||
+      name.startsWith('.')
+    )
+      continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) sources(p, out);
     else if (/\.(ts|tsx|json|sql|py)$/.test(name)) out.push(p);
@@ -36,7 +47,8 @@ describe('control catalogue', () => {
     for (const c of CONTROLS) {
       expect(c.id).toMatch(/^KC-\d{2}$/);
       expect(c.cobit.length, c.id).toBeGreaterThan(0);
-      for (const ref of c.cobit) expect(ref, c.id).toMatch(/^(EDM|APO|BAI|DSS|MEA)\d{2}(\.\d{2})?$/);
+      for (const ref of c.cobit)
+        expect(ref, c.id).toMatch(/^(EDM|APO|BAI|DSS|MEA)\d{2}(\.\d{2})?$/);
       expect([1, 2, 3]).toContain(c.ownerLine);
       expect(c.objective.length).toBeGreaterThan(20);
       expect(c.risk.length).toBeGreaterThan(20);
@@ -48,10 +60,16 @@ describe('control catalogue', () => {
   });
 
   it('covers every area goal 09 lists, and all three lines of defence', () => {
-    for (const a of CONTROL_AREAS) expect(CONTROLS.some((c) => c.area === a), a).toBe(true);
+    for (const a of CONTROL_AREAS)
+      expect(
+        CONTROLS.some((c) => c.area === a),
+        a,
+      ).toBe(true);
     expect(new Set(CONTROLS.map((c) => c.ownerLine))).toEqual(new Set([1, 2, 3]));
     // Segregation of duties covers the three four-eyes cases the goal names.
-    const sod = CONTROLS.filter((c) => c.area === 'segregation_of_duties').map((c) => c.title.toLowerCase()).join(' ');
+    const sod = CONTROLS.filter((c) => c.area === 'segregation_of_duties')
+      .map((c) => c.title.toLowerCase())
+      .join(' ');
     for (const w of ['promotion', 'loosening', 'resum']) expect(sod).toContain(w);
   });
 
@@ -80,8 +98,15 @@ describe('export writers', () => {
   });
 
   it('PDF is well-formed: header, objects, xref offsets, trailer; long tables paginate', () => {
-    const rows = Array.from({ length: 200 }, (_, i) => [i, `row ${i} (with parens) \\ and ünïcödé ≥ →`, true]);
-    const pdf = renderPdf([{ text: 'Title', font: 'F2', size: 14 }, ...tableLines(['n', 'text', 'ok'], rows)], { title: 'T', footer: 'F' });
+    const rows = Array.from({ length: 200 }, (_, i) => [
+      i,
+      `row ${i} (with parens) \\ and ünïcödé ≥ →`,
+      true,
+    ]);
+    const pdf = renderPdf(
+      [{ text: 'Title', font: 'F2', size: 14 }, ...tableLines(['n', 'text', 'ok'], rows)],
+      { title: 'T', footer: 'F' },
+    );
     const s = pdf.toString('latin1');
     expect(s.startsWith('%PDF-1.4')).toBe(true);
     expect(s.trimEnd().endsWith('%%EOF')).toBe(true);
@@ -90,18 +115,51 @@ describe('export writers', () => {
     const xref = Number(/startxref\n(\d+)/.exec(s)![1]);
     expect(s.slice(xref, xref + 4)).toBe('xref');
     // Every xref offset points at "<n> 0 obj".
-    const entries = s.slice(xref).split('\n').slice(3).filter((l) => /^\d{10} 00000 n $/.test(l));
-    entries.forEach((e, i) => expect(s.slice(Number(e.slice(0, 10)), Number(e.slice(0, 10)) + 12)).toMatch(new RegExp(`^${i + 1} 0 obj`)));
+    const entries = s
+      .slice(xref)
+      .split('\n')
+      .slice(3)
+      .filter((l) => /^\d{10} 00000 n $/.test(l));
+    entries.forEach((e, i) =>
+      expect(s.slice(Number(e.slice(0, 10)), Number(e.slice(0, 10)) + 12)).toMatch(
+        new RegExp(`^${i + 1} 0 obj`),
+      ),
+    );
     expect(s).toContain('\\(with parens\\)');
     expect(s).toContain('>=');
   });
 
   it('XLSX zips round-trip, escape XML and are deterministic', () => {
-    const a = renderXlsx([{ name: 'S', columns: [{ header: 'A & B' }, { header: 'n' }], rows: [['<x>', 2], [null, true]] }]);
-    const b = renderXlsx([{ name: 'S', columns: [{ header: 'A & B' }, { header: 'n' }], rows: [['<x>', 2], [null, true]] }]);
+    const a = renderXlsx([
+      {
+        name: 'S',
+        columns: [{ header: 'A & B' }, { header: 'n' }],
+        rows: [
+          ['<x>', 2],
+          [null, true],
+        ],
+      },
+    ]);
+    const b = renderXlsx([
+      {
+        name: 'S',
+        columns: [{ header: 'A & B' }, { header: 'n' }],
+        rows: [
+          ['<x>', 2],
+          [null, true],
+        ],
+      },
+    ]);
     expect(a.equals(b)).toBe(true);
     const files = unzip(a);
-    expect([...files.keys()]).toEqual(expect.arrayContaining(['[Content_Types].xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml', 'xl/styles.xml']));
+    expect([...files.keys()]).toEqual(
+      expect.arrayContaining([
+        '[Content_Types].xml',
+        'xl/workbook.xml',
+        'xl/worksheets/sheet1.xml',
+        'xl/styles.xml',
+      ]),
+    );
     const sheet = files.get('xl/worksheets/sheet1.xml')!;
     expect(sheet).toContain('A &amp; B');
     expect(sheet).toContain('&lt;x&gt;');
@@ -112,7 +170,14 @@ describe('export writers', () => {
 
   it('the matrix workbook has the control sheet with every control and the required columns', () => {
     const sheet = unzip(renderMatrixXlsx()).get('xl/worksheets/sheet1.xml')!;
-    for (const h of ['COBIT 2019', 'Owner line', 'Frequency', 'Automated evidence source', 'Test procedure']) expect(sheet).toContain(h);
+    for (const h of [
+      'COBIT 2019',
+      'Owner line',
+      'Frequency',
+      'Automated evidence source',
+      'Test procedure',
+    ])
+      expect(sheet).toContain(h);
     for (const c of CONTROLS) expect(sheet).toContain(`>${c.id}<`);
   });
 });
@@ -128,8 +193,16 @@ describe('governance settings and helpers', () => {
 
   it('defaults are conservative; the anchor key is required outside dev/test', () => {
     const c = loadGovernanceConfig({ KORA_ENV: 'dev' });
-    expect(c).toMatchObject({ resumePolicy: 'firm', nearPausePct: 70, nearLimitPct: 80, jurisdiction: 'GLOBAL', releaseRecord: true });
-    expect(loadGovernanceConfig({ KORA_ENV: 'dev', KORA_FOUR_EYES_RESUME: 'all' }).resumePolicy).toBe('all');
+    expect(c).toMatchObject({
+      resumePolicy: 'firm',
+      nearPausePct: 70,
+      nearLimitPct: 80,
+      jurisdiction: 'GLOBAL',
+      releaseRecord: true,
+    });
+    expect(
+      loadGovernanceConfig({ KORA_ENV: 'dev', KORA_FOUR_EYES_RESUME: 'all' }).resumePolicy,
+    ).toBe('all');
     expect(() => loadGovernanceConfig({ KORA_ENV: 'production' })).toThrow(/KORA_AUDIT_ANCHOR_JWK/);
     expect(() => loadGovernanceConfig({ KORA_ENV: 'dev', KORA_JURISDICTION: 'france' })).toThrow();
     // IRTC R6-12: an unset KORA_ENV is production (the unsigned-anchor leniency is refused).
@@ -141,7 +214,8 @@ describe('governance settings and helpers', () => {
     expect(retentionDays(audit, {})).toBeNull();
     expect(retentionDays(audit, { KORA_RETENTION_AUDIT_EVENTS_DAYS: '2555' })).toBe(2555);
     expect(retentionDays(RETENTION_CLASSES.find((c) => c.id === 'md_trades')!, {})).toBe(7);
-    for (const c of RETENTION_CLASSES) if (c.defaultDays === null) expect(c.openQuestion, c.id).toMatch(/^OQ-/);
+    for (const c of RETENTION_CLASSES)
+      if (c.defaultDays === null) expect(c.openQuestion, c.id).toMatch(/^OQ-/);
   });
 
   it('suitability bands are SIMULATED placeholders with an env override', () => {
@@ -176,11 +250,22 @@ describe('regulatory placeholder register', () => {
       if (m) rows.set(m[1]!, line.split('|')[4]!.trim()); // columns: ID | Question | Placeholder | Owner | …
     }
     const used = new Set<string>();
-    for (const dir of ['apps/api/src', 'apps/api/migrations', 'apps/web/src', 'packages/domain/src', 'packages/market-data/src', 'services/quant/src'])
-      for (const f of sources(resolve(ROOT, dir))) for (const m of readFileSync(f, 'utf8').matchAll(/OQ-[A-Z]{1,2}\d+/g)) used.add(m[0]);
+    for (const dir of [
+      'apps/api/src',
+      'apps/api/migrations',
+      'apps/web/src',
+      'packages/domain/src',
+      'packages/market-data/src',
+      'services/quant/src',
+    ])
+      for (const f of sources(resolve(ROOT, dir)))
+        for (const m of readFileSync(f, 'utf8').matchAll(/OQ-[A-Z]{1,2}\d+/g)) used.add(m[0]);
     expect(used.size).toBeGreaterThan(10);
     for (const id of used) {
-      expect(rows.has(id), `${id} is referenced in the code but missing from docs/open-questions.md`).toBe(true);
+      expect(
+        rows.has(id),
+        `${id} is referenced in the code but missing from docs/open-questions.md`,
+      ).toBe(true);
       expect(rows.get(id)!.length, `${id} has no owner`).toBeGreaterThan(2);
     }
   });

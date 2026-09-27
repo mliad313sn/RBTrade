@@ -1,6 +1,11 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
-function scrypt(password: string, salt: Buffer, keylen: number, opts: ScryptOptions): Promise<Buffer> {
+function scrypt(
+  password: string,
+  salt: Buffer,
+  keylen: number,
+  opts: ScryptOptions,
+): Promise<Buffer> {
   return new Promise((resolve, reject) =>
     scryptCb(password, salt, keylen, opts, (err, key) => (err ? reject(err) : resolve(key))),
   );
@@ -12,7 +17,12 @@ export const MIN_PASSWORD_LENGTH = 12;
 /** scrypt$N$r$p$salt$hash (base64url). */
 export async function hashPassword(password: string, N = 131072, r = 8, p = 1): Promise<string> {
   const salt = randomBytes(16);
-  const key = await scrypt(password.normalize('NFKC'), salt, KEYLEN, { N, r, p, maxmem: 256 * N * r });
+  const key = await scrypt(password.normalize('NFKC'), salt, KEYLEN, {
+    N,
+    r,
+    p,
+    maxmem: 256 * N * r,
+  });
   return ['scrypt', N, r, p, salt.toString('base64url'), key.toString('base64url')].join('$');
 }
 
@@ -25,12 +35,17 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const P = Number(p);
   if (![N, R, P].every(Number.isSafeInteger)) return false;
   const expected = Buffer.from(hashB64, 'base64url');
-  const key = await scrypt(password.normalize('NFKC'), Buffer.from(saltB64, 'base64url'), expected.length, {
-    N,
-    r: R,
-    p: P,
-    maxmem: 256 * N * R,
-  });
+  const key = await scrypt(
+    password.normalize('NFKC'),
+    Buffer.from(saltB64, 'base64url'),
+    expected.length,
+    {
+      N,
+      r: R,
+      p: P,
+      maxmem: 256 * N * R,
+    },
+  );
   return key.length === expected.length && timingSafeEqual(key, expected);
 }
 

@@ -96,7 +96,7 @@ groups:
         for: 5m
         labels: { severity: warning, slo: SLO-4 }
         annotations:
-          summary: "{{ $value }} symbols have been stale for 5 minutes."
+          summary: '{{ $value }} symbols have been stale for 5 minutes.'
           runbook_url: https://github.com/mliad313sn/rbtrade/blob/main/docs/runbooks/feed-outage.md
   - name: kora-ai
     rules:

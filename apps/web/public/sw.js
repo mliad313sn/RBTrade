@@ -8,7 +8,12 @@
  */
 const VERSION = 'kora-shell-v1';
 const OFFLINE_URL = '/offline';
-const PRECACHE = [OFFLINE_URL, '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const PRECACHE = [
+  OFFLINE_URL,
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -19,7 +24,9 @@ self.addEventListener('install', (event) => {
       const res = await cache.match(OFFLINE_URL);
       if (res) {
         const html = await res.text();
-        const assets = [...html.matchAll(/(?:href|src)="(\/_next\/static\/[^"]+)"/g)].map((m) => m[1]);
+        const assets = [...html.matchAll(/(?:href|src)="(\/_next\/static\/[^"]+)"/g)].map(
+          (m) => m[1],
+        );
         await Promise.all([...new Set(assets)].map((a) => cache.add(a).catch(() => undefined)));
       }
       await self.skipWaiting();

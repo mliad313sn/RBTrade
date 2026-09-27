@@ -22,7 +22,12 @@ import { diffDepth } from '../order-book.js';
 import { formatSize } from '../precision.js';
 import { eventsToShocks, type EconomicCalendarProvider } from './calendar.js';
 import { generateHistory1m } from './history.js';
-import { SimulatedMarket, type EventShock, type SimInstrument, type SimStep } from './simulated-market.js';
+import {
+  SimulatedMarket,
+  type EventShock,
+  type SimInstrument,
+  type SimStep,
+} from './simulated-market.js';
 
 export interface Timers {
   setInterval(fn: () => void, ms: number): unknown;
@@ -106,10 +111,15 @@ export class SimulatedAdapter implements MarketDataAdapter {
     this.setState('connecting', null);
     if (this.opts.calendar) {
       const from = this.market.now - 3_600_000;
-      this.market.addShocks(eventsToShocks(await this.opts.calendar.getEvents(from, from + 15 * 86_400_000)));
+      this.market.addShocks(
+        eventsToShocks(await this.opts.calendar.getEvents(from, from + 15 * 86_400_000)),
+      );
     }
     this.fastForward(this.targetStep());
-    this.timer = this.timers.setInterval(() => this.tick(), Math.max(10, Math.floor(this.stepMs / 2)));
+    this.timer = this.timers.setInterval(
+      () => this.tick(),
+      Math.max(10, Math.floor(this.stepMs / 2)),
+    );
     this.setState('connected', null);
   }
 
@@ -139,7 +149,11 @@ export class SimulatedAdapter implements MarketDataAdapter {
     return this.addSub(this.tradeSubs, symbols, onTrade);
   }
 
-  subscribeDepth(symbols: string[], _levels: number, onDepth: (d: DepthSnapshot | DepthDelta) => void): Unsubscribe {
+  subscribeDepth(
+    symbols: string[],
+    _levels: number,
+    onDepth: (d: DepthSnapshot | DepthDelta) => void,
+  ): Unsubscribe {
     const un = this.addSub(this.depthSubs, symbols, onDepth);
     for (const s of symbols) {
       const d = this.lastDelivered.get(s);
@@ -194,7 +208,12 @@ export class SimulatedAdapter implements MarketDataAdapter {
   }
 
   health(): AdapterHealth {
-    return { source: this.source, state: this.state, lastMessageTs: this.lastMessageTs, detail: this.detail };
+    return {
+      source: this.source,
+      state: this.state,
+      lastMessageTs: this.lastMessageTs,
+      detail: this.detail,
+    };
   }
 
   onStateChange(listener: (h: AdapterHealth) => void): Unsubscribe {
@@ -240,7 +259,11 @@ export class SimulatedAdapter implements MarketDataAdapter {
         const next = { ...o.depth, receivedTs: now };
         const prev = this.lastDelivered.get(o.symbol);
         const spec = this.instruments.get(o.symbol)!.spec;
-        this.fan(this.depthSubs, o.symbol, prev ? diffDepth(prev, next, formatSize('0', spec)) : next);
+        this.fan(
+          this.depthSubs,
+          o.symbol,
+          prev ? diffDepth(prev, next, formatSize('0', spec)) : next,
+        );
         this.lastDelivered.set(o.symbol, next);
       }
       this.lastMessageTs = now;

@@ -1,4 +1,12 @@
-import { bucketStart, type Decimal, dec, TIMEFRAMES, type Candle, type Timeframe, type Trade } from '@kora/domain';
+import {
+  bucketStart,
+  type Decimal,
+  dec,
+  TIMEFRAMES,
+  type Candle,
+  type Timeframe,
+  type Trade,
+} from '@kora/domain';
 
 /**
  * OHLCV aggregation shared by the live bar builder, the history generator and tests. The SQL
@@ -38,7 +46,11 @@ export function mergeBars(a: OhlcvBar, b: OhlcvBar, volumePlaces?: number): Ohlc
 }
 
 /** Aggregate time-ordered finer bars into `tf` buckets. Input bars must each fit inside one bucket. */
-export function aggregateBars(bars: readonly OhlcvBar[], tf: Timeframe, volumePlaces?: number): OhlcvBar[] {
+export function aggregateBars(
+  bars: readonly OhlcvBar[],
+  tf: Timeframe,
+  volumePlaces?: number,
+): OhlcvBar[] {
   const out: OhlcvBar[] = [];
   let cur: OhlcvBar | null = null;
   let prevBucket = -Infinity;
@@ -50,7 +62,8 @@ export function aggregateBars(bars: readonly OhlcvBar[], tf: Timeframe, volumePl
     if (cur && cur.bucket === bucket) cur = mergeBars(cur, bb, volumePlaces);
     else {
       if (cur) out.push(cur);
-      cur = volumePlaces === undefined ? bb : { ...bb, volume: dec(bb.volume).toFixed(volumePlaces) };
+      cur =
+        volumePlaces === undefined ? bb : { ...bb, volume: dec(bb.volume).toFixed(volumePlaces) };
     }
   }
   if (cur) out.push(cur);
@@ -66,7 +79,15 @@ export class BarBuilder {
   onTrade(t: Pick<Trade, 'symbol' | 'price' | 'qty' | 'exchangeTs'>): OhlcvBar[] {
     const bucket = bucketStart(t.exchangeTs, '1s');
     const cur = this.current.get(t.symbol);
-    const bar: OhlcvBar = { bucket, open: t.price, high: t.price, low: t.price, close: t.price, volume: t.qty, trades: 1 };
+    const bar: OhlcvBar = {
+      bucket,
+      open: t.price,
+      high: t.price,
+      low: t.price,
+      close: t.price,
+      volume: t.qty,
+      trades: 1,
+    };
     if (!cur) {
       this.current.set(t.symbol, bar);
       return [];
@@ -117,7 +138,8 @@ export class CandleTracker {
       let next: OhlcvBar;
       if (prev && prev.bucket === bucket) next = mergeBars(prev, { ...bar, bucket }, volumePlaces);
       else {
-        if (prev && prev.bucket < bucket) out.push(this.toCandle(symbol, tf, prev, true, seq, bar.bucket));
+        if (prev && prev.bucket < bucket)
+          out.push(this.toCandle(symbol, tf, prev, true, seq, bar.bucket));
         next = { ...bar, bucket };
       }
       this.state.set(key, next);
@@ -130,7 +152,14 @@ export class CandleTracker {
     return this.state.get(`${symbol}|${tf}`);
   }
 
-  private toCandle(symbol: string, tf: Timeframe, b: OhlcvBar, closed: boolean, seq: number, ts: number): Candle {
+  private toCandle(
+    symbol: string,
+    tf: Timeframe,
+    b: OhlcvBar,
+    closed: boolean,
+    seq: number,
+    ts: number,
+  ): Candle {
     return {
       type: 'candle',
       symbol,
@@ -153,6 +182,12 @@ export class CandleTracker {
 
 /** Invariants every OHLCV bar must satisfy (used by tests and ingestion guards). */
 export function isValidBar(b: OhlcvBar): boolean {
-  const [o, h, l, c, v] = [b.open, b.high, b.low, b.close, b.volume].map((x) => dec(x)) as [Decimal, Decimal, Decimal, Decimal, Decimal];
+  const [o, h, l, c, v] = [b.open, b.high, b.low, b.close, b.volume].map((x) => dec(x)) as [
+    Decimal,
+    Decimal,
+    Decimal,
+    Decimal,
+    Decimal,
+  ];
   return h.gte(o) && h.gte(c) && h.gte(l) && l.lte(o) && l.lte(c) && v.gte(0) && b.trades >= 0;
 }

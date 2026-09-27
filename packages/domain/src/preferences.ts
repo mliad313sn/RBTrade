@@ -77,7 +77,11 @@ export const UserPreferencesSchema = z.object({
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
-export const UpdatePreferencesSchema = UserPreferencesSchema.extend({ terminal: TerminalSettingsSchema.partial() }).partial().strict();
+export const UpdatePreferencesSchema = UserPreferencesSchema.extend({
+  terminal: TerminalSettingsSchema.partial(),
+})
+  .partial()
+  .strict();
 export type UpdatePreferences = z.infer<typeof UpdatePreferencesSchema>;
 
 export function defaultPreferences(roles: readonly string[]): UserPreferences {
@@ -92,7 +96,9 @@ export function defaultPreferences(roles: readonly string[]): UserPreferences {
 }
 
 /** Theme actually rendered: 'system' follows the view mode (Pro = dark, Novice = light). */
-export function resolveTheme(prefs: Pick<UserPreferences, 'theme' | 'viewMode'>): 'pro-dark' | 'novice-light' {
+export function resolveTheme(
+  prefs: Pick<UserPreferences, 'theme' | 'viewMode'>,
+): 'pro-dark' | 'novice-light' {
   if (prefs.theme !== 'system') return prefs.theme;
   return prefs.viewMode === 'pro' ? 'pro-dark' : 'novice-light';
 }

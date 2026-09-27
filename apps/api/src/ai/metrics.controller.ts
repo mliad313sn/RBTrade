@@ -36,7 +36,10 @@ export class MetricsController {
     // Goal 10 (S9): fail closed. Outside dev/test the endpoint answers only with a configured token.
     // IRTC R6-12: an unset KORA_ENV is production here too.
     if (!token && !isExplicitDevOrTest(process.env))
-      throw new UnauthorizedException({ error: 'unauthorized', message: 'Metrics are disabled until KORA_METRICS_TOKEN is set.' });
+      throw new UnauthorizedException({
+        error: 'unauthorized',
+        message: 'Metrics are disabled until KORA_METRICS_TOKEN is set.',
+      });
     if (token && !sameToken(auth ?? '', `Bearer ${token}`))
       throw new UnauthorizedException({
         error: 'unauthorized',

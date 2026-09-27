@@ -9,18 +9,34 @@ import tseslint from 'typescript-eslint';
 const noFloatMoney = {
   'no-restricted-globals': [
     'error',
-    { name: 'parseFloat', message: 'Use Decimal from @kora/domain for money, prices and quantities.' },
+    {
+      name: 'parseFloat',
+      message: 'Use Decimal from @kora/domain for money, prices and quantities.',
+    },
   ],
   'no-restricted-properties': [
     'error',
     { object: 'Number', property: 'parseFloat', message: 'Use Decimal from @kora/domain.' },
-    { object: 'Math', property: 'random', message: 'Use a seeded RNG or crypto; Math.random is not allowed.' },
+    {
+      object: 'Math',
+      property: 'random',
+      message: 'Use a seeded RNG or crypto; Math.random is not allowed.',
+    },
   ],
 };
 
 export function koraConfig({ react = false, nest = false, ignores = [] } = {}) {
   return tseslint.config(
-    { ignores: ['dist/**', '.next/**', 'coverage/**', 'storybook-static/**', 'next-env.d.ts', ...ignores] },
+    {
+      ignores: [
+        'dist/**',
+        '.next/**',
+        'coverage/**',
+        'storybook-static/**',
+        'next-env.d.ts',
+        ...ignores,
+      ],
+    },
     js.configs.recommended,
     ...tseslint.configs.recommended,
     {
@@ -29,9 +45,14 @@ export function koraConfig({ react = false, nest = false, ignores = [] } = {}) {
       },
       rules: {
         ...noFloatMoney,
-        '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+        '@typescript-eslint/no-unused-vars': [
+          'error',
+          { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        ],
         // NestJS DI reads constructor param types via emitDecoratorMetadata: type-only imports break it.
-        '@typescript-eslint/consistent-type-imports': nest ? 'off' : ['error', { fixStyle: 'inline-type-imports' }],
+        '@typescript-eslint/consistent-type-imports': nest
+          ? 'off'
+          : ['error', { fixStyle: 'inline-type-imports' }],
         'no-console': ['warn', { allow: ['warn', 'error'] }],
         eqeqeq: ['error', 'always'],
       },

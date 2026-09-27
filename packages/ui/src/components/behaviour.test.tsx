@@ -48,7 +48,11 @@ describe('HoldToConfirmButton', () => {
 
   it('works with keyboard Space-hold and Enter-hold; key repeat does not restart', () => {
     const onConfirm = vi.fn();
-    render(<HoldToConfirmButton onConfirm={onConfirm} holdMs={1500}>Kill</HoldToConfirmButton>);
+    render(
+      <HoldToConfirmButton onConfirm={onConfirm} holdMs={1500}>
+        Kill
+      </HoldToConfirmButton>,
+    );
     const btn = screen.getByRole('button');
     fireEvent.keyDown(btn, { key: ' ' });
     act(() => vi.advanceTimersByTime(800));
@@ -69,9 +73,15 @@ describe('HoldToConfirmButton', () => {
 
   it('announces the hold instruction and ignores input when disabled', () => {
     const onConfirm = vi.fn();
-    render(<HoldToConfirmButton onConfirm={onConfirm} disabled description="Opens the scope menu.">Kill</HoldToConfirmButton>);
+    render(
+      <HoldToConfirmButton onConfirm={onConfirm} disabled description="Opens the scope menu.">
+        Kill
+      </HoldToConfirmButton>,
+    );
     const btn = screen.getByRole('button');
-    expect(btn).toHaveAccessibleDescription('Press and hold for 1.5 seconds to confirm, or activate once to confirm in a dialog. Opens the scope menu.');
+    expect(btn).toHaveAccessibleDescription(
+      'Press and hold for 1.5 seconds to confirm, or activate once to confirm in a dialog. Opens the scope menu.',
+    );
     fireEvent.keyDown(btn, { key: ' ' });
     act(() => vi.advanceTimersByTime(2000));
     expect(onConfirm).not.toHaveBeenCalled();
@@ -104,7 +114,14 @@ describe('NumberInput (decimal-safe)', () => {
     const [v, setV] = useState(initial);
     return (
       <>
-        <NumberInput label="Limit price" value={v} onValueChange={setV} precision={5} step="0.00001" min={min} />
+        <NumberInput
+          label="Limit price"
+          value={v}
+          onValueChange={setV}
+          precision={5}
+          step="0.00001"
+          min={min}
+        />
         <output data-testid="out">{v}</output>
       </>
     );
@@ -144,7 +161,15 @@ describe('SegmentedControl', () => {
   it('uses radio semantics and arrow keys', () => {
     const onChange = vi.fn();
     render(
-      <SegmentedControl label="View mode" value="pro" onChange={onChange} options={[{ value: 'pro', label: 'Pro' }, { value: 'novice', label: 'Novice' }]} />,
+      <SegmentedControl
+        label="View mode"
+        value="pro"
+        onChange={onChange}
+        options={[
+          { value: 'pro', label: 'Pro' },
+          { value: 'novice', label: 'Novice' },
+        ]}
+      />,
     );
     expect(screen.getByRole('radio', { name: 'Pro' })).toHaveAttribute('aria-checked', 'true');
     fireEvent.keyDown(screen.getByRole('radio', { name: 'Pro' }), { key: 'ArrowRight' });
@@ -169,13 +194,20 @@ describe('display primitives', () => {
     expect(screen.getByText('up 0.0019 USD')).toBeInTheDocument();
   });
   it('Money and Price format from decimal strings', () => {
-    render(<><Money amount="-744" currency="USD" signed colored /><Price value="1.0842" precision={5} /></>);
+    render(
+      <>
+        <Money amount="-744" currency="USD" signed colored />
+        <Price value="1.0842" precision={5} />
+      </>,
+    );
     expect(screen.getByText('−744.00 USD')).toHaveAttribute('data-direction', 'down');
     expect(screen.getByText('1.08420')).toBeInTheDocument();
   });
   it('EnvChip always labels PAPER as simulated', () => {
     render(<EnvChip env="PAPER" />);
-    expect(screen.getByTestId('env-chip')).toHaveAccessibleName('Trading environment: paper (simulated money)');
+    expect(screen.getByTestId('env-chip')).toHaveAccessibleName(
+      'Trading environment: paper (simulated money)',
+    );
   });
   it('IconButton requires an accessible name', () => {
     render(<IconButton label="Settings" icon="⚙" />);
@@ -186,14 +218,31 @@ describe('display primitives', () => {
 describe('Table', () => {
   it('virtualises: renders a window of rows but reports the total', () => {
     const rows = Array.from({ length: 1000 }, (_, i) => ({ id: String(i) }));
-    render(<Table label="Rows" rows={rows} rowKey={(r) => r.id} columns={[{ key: 'id', header: 'Id', cell: (r) => r.id }]} height={200} rowHeight={20} />);
+    render(
+      <Table
+        label="Rows"
+        rows={rows}
+        rowKey={(r) => r.id}
+        columns={[{ key: 'id', header: 'Id', cell: (r) => r.id }]}
+        height={200}
+        rowHeight={20}
+      />,
+    );
     expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '1001');
     const rendered = screen.getAllByRole('row').length;
     expect(rendered).toBeGreaterThan(1);
     expect(rendered).toBeLessThan(60);
   });
   it('shows an empty state', () => {
-    render(<Table label="Rows" rows={[]} rowKey={() => 'x'} columns={[{ key: 'id', header: 'Id', cell: () => null }]} empty="No orders" />);
+    render(
+      <Table
+        label="Rows"
+        rows={[]}
+        rowKey={() => 'x'}
+        columns={[{ key: 'id', header: 'Id', cell: () => null }]}
+        empty="No orders"
+      />,
+    );
     expect(screen.getByText('No orders')).toBeInTheDocument();
   });
 });
@@ -210,7 +259,11 @@ describe('Toast, Dialog, Tabs', () => {
         </>
       );
     }
-    render(<ToastProvider><Push /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <Push />
+      </ToastProvider>,
+    );
     fireEvent.click(screen.getByText('save'));
     fireEvent.click(screen.getByText('crit'));
     expect(screen.getByRole('status')).toHaveTextContent('Saved');
@@ -227,11 +280,29 @@ describe('Toast, Dialog, Tabs', () => {
     expect(() => render(<Bad />)).toThrow(/ToastProvider/);
   });
   it('Dialog renders title, description and alertdialog role', () => {
-    render(<Dialog open onOpenChange={() => undefined} title="Kill switch" description="Choose a scope" alert />);
-    expect(screen.getByRole('alertdialog', { name: 'Kill switch' })).toHaveAccessibleDescription('Choose a scope');
+    render(
+      <Dialog
+        open
+        onOpenChange={() => undefined}
+        title="Kill switch"
+        description="Choose a scope"
+        alert
+      />,
+    );
+    expect(screen.getByRole('alertdialog', { name: 'Kill switch' })).toHaveAccessibleDescription(
+      'Choose a scope',
+    );
   });
   it('Tabs switch content', () => {
-    render(<Tabs label="t" items={[{ value: 'a', label: 'A', content: 'Alpha' }, { value: 'b', label: 'B', content: 'Beta' }]} />);
+    render(
+      <Tabs
+        label="t"
+        items={[
+          { value: 'a', label: 'A', content: 'Alpha' },
+          { value: 'b', label: 'B', content: 'Beta' },
+        ]}
+      />,
+    );
     expect(screen.getByText('Alpha')).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'B' }));
     expect(screen.getByRole('tab', { name: 'B' })).toHaveAttribute('aria-selected', 'true');

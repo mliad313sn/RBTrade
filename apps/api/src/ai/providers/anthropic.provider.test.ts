@@ -20,9 +20,14 @@ function sse(events: Array<Record<string, unknown>>): string {
   return events.map((e) => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`).join('');
 }
 
-function transport(responder: (c: Captured) => { status: number; body: string; contentType?: string }) {
+function transport(
+  responder: (c: Captured) => { status: number; body: string; contentType?: string },
+) {
   const calls: Captured[] = [];
-  const fetchImpl = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  const fetchImpl = async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response> => {
     const c: Captured = {
       url: String(input instanceof Request ? input.url : input),
       body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
@@ -30,13 +35,21 @@ function transport(responder: (c: Captured) => { status: number; body: string; c
     };
     calls.push(c);
     const r = responder(c);
-    return new Response(r.body, { status: r.status, headers: { 'content-type': r.contentType ?? 'text/event-stream', 'request-id': 'req_test' } });
+    return new Response(r.body, {
+      status: r.status,
+      headers: { 'content-type': r.contentType ?? 'text/event-stream', 'request-id': 'req_test' },
+    });
   };
   return { calls, fetchImpl };
 }
 
 function client(fetchImpl: typeof fetch, maxRetries = 0): Anthropic {
-  return new Anthropic({ apiKey: 'test-key-not-real', baseURL: 'http://anthropic.test', fetch: fetchImpl, maxRetries });
+  return new Anthropic({
+    apiKey: 'test-key-not-real',
+    baseURL: 'http://anthropic.test',
+    fetch: fetchImpl,
+    maxRetries,
+  });
 }
 
 const toolUseStream = sse([
@@ -50,18 +63,39 @@ const toolUseStream = sse([
       content: [],
       stop_reason: null,
       stop_sequence: null,
-      usage: { input_tokens: 120, output_tokens: 1, cache_read_input_tokens: 100, cache_creation_input_tokens: 7 },
+      usage: {
+        input_tokens: 120,
+        output_tokens: 1,
+        cache_read_input_tokens: 100,
+        cache_creation_input_tokens: 7,
+      },
     },
   },
   { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
   { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Checking ' } },
   { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'the quote.' } },
   { type: 'content_block_stop', index: 0 },
-  { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_1', name: 'get_quote', input: {} } },
-  { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"symbol":' } },
-  { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '"BTCUSD"}' } },
+  {
+    type: 'content_block_start',
+    index: 1,
+    content_block: { type: 'tool_use', id: 'toolu_1', name: 'get_quote', input: {} },
+  },
+  {
+    type: 'content_block_delta',
+    index: 1,
+    delta: { type: 'input_json_delta', partial_json: '{"symbol":' },
+  },
+  {
+    type: 'content_block_delta',
+    index: 1,
+    delta: { type: 'input_json_delta', partial_json: '"BTCUSD"}' },
+  },
   { type: 'content_block_stop', index: 1 },
-  { type: 'message_delta', delta: { stop_reason: 'tool_use', stop_sequence: null }, usage: { output_tokens: 42 } },
+  {
+    type: 'message_delta',
+    delta: { stop_reason: 'tool_use', stop_sequence: null },
+    usage: { output_tokens: 42 },
+  },
   { type: 'message_stop' },
 ]);
 
@@ -70,17 +104,37 @@ const request: ProviderRequest = {
   maxTokens: 2048,
   messages: [{ role: 'user', content: 'What is the BTCUSD price?' }],
   tools: [
-    { name: 'get_quote', description: 'Last quote', input_schema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
-    { name: 'get_candles', description: 'Candles', input_schema: { type: 'object', properties: {} } },
+    {
+      name: 'get_quote',
+      description: 'Last quote',
+      input_schema: {
+        type: 'object',
+        properties: { symbol: { type: 'string' } },
+        required: ['symbol'],
+      },
+    },
+    {
+      name: 'get_candles',
+      description: 'Candles',
+      input_schema: { type: 'object', properties: {} },
+    },
   ],
 };
 
 const cfg = (extra: Record<string, string> = {}) =>
-  loadAiConfig({ KORA_ENV: 'test', KORA_AI_PROVIDER: 'anthropic', KORA_AI_MODEL: MODEL, ANTHROPIC_API_KEY: 'k', ...extra });
+  loadAiConfig({
+    KORA_ENV: 'test',
+    KORA_AI_PROVIDER: 'anthropic',
+    KORA_AI_MODEL: MODEL,
+    ANTHROPIC_API_KEY: 'k',
+    ...extra,
+  });
 
 describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)', () => {
   it('refuses to construct without KORA_AI_MODEL (no default model id)', () => {
-    expect(() => new AnthropicProvider(loadAiConfig({ KORA_ENV: 'test' }))).toThrow(/KORA_AI_MODEL/);
+    expect(() => new AnthropicProvider(loadAiConfig({ KORA_ENV: 'test' }))).toThrow(
+      /KORA_AI_MODEL/,
+    );
   });
 
   it('streams a tool-use turn: request shape, caching marks, text deltas, content and usage', async () => {
@@ -98,7 +152,9 @@ describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)
       model: MODEL,
       max_tokens: 2048,
       stream: true,
-      system: [{ type: 'text', text: 'You are the KORA copilot.', cache_control: { type: 'ephemeral' } }],
+      system: [
+        { type: 'text', text: 'You are the KORA copilot.', cache_control: { type: 'ephemeral' } },
+      ],
       tool_choice: { type: 'auto' },
       thinking: { type: 'adaptive' },
       messages: request.messages,
@@ -118,23 +174,56 @@ describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)
     expect(turn.content[0]).toMatchObject({ type: 'text', text: 'Checking the quote.' });
     expect(turn.content[1]).toMatchObject({ type: 'tool_use', id: 'toolu_1', name: 'get_quote' });
     expect((turn.content[1] as { input: unknown }).input).toEqual({ symbol: 'BTCUSD' });
-    expect(turn.usage).toEqual({ inputTokens: 120, outputTokens: 42, cacheReadTokens: 100, cacheWriteTokens: 7 });
+    expect(turn.usage).toEqual({
+      inputTokens: 120,
+      outputTokens: 42,
+      cacheReadTokens: 100,
+      cacheWriteTokens: 7,
+    });
   });
 
   it('structured output: format + effort in output_config, no tools, thinking omitted when configured', async () => {
     const t = transport(() => ({
       status: 200,
       body: sse([
-        { type: 'message_start', message: { id: 'msg_2', type: 'message', role: 'assistant', model: MODEL, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 1 } } },
+        {
+          type: 'message_start',
+          message: {
+            id: 'msg_2',
+            type: 'message',
+            role: 'assistant',
+            model: MODEL,
+            content: [],
+            stop_reason: null,
+            stop_sequence: null,
+            usage: { input_tokens: 5, output_tokens: 1 },
+          },
+        },
         { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '{"sentiment":0.2}' } },
+        {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: '{"sentiment":0.2}' },
+        },
         { type: 'content_block_stop', index: 0 },
-        { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 9 } },
+        {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn', stop_sequence: null },
+          usage: { output_tokens: 9 },
+        },
         { type: 'message_stop' },
       ]),
     }));
-    const p = new AnthropicProvider(cfg({ KORA_AI_EFFORT: 'low', KORA_AI_THINKING: 'omit' }), client(t.fetchImpl as typeof fetch));
-    const schema = { type: 'object', properties: { sentiment: { type: 'number' } }, required: ['sentiment'], additionalProperties: false };
+    const p = new AnthropicProvider(
+      cfg({ KORA_AI_EFFORT: 'low', KORA_AI_THINKING: 'omit' }),
+      client(t.fetchImpl as typeof fetch),
+    );
+    const schema = {
+      type: 'object',
+      properties: { sentiment: { type: 'number' } },
+      required: ['sentiment'],
+      additionalProperties: false,
+    };
     const turn = await p.complete({ ...request, outputFormat: { name: 'score', schema } });
     const body = t.calls[0]!.body;
     expect(body.tools).toBeUndefined();
@@ -145,7 +234,12 @@ describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)
     expect(turn.content).toHaveLength(1);
     expect(turn.content[0]).toMatchObject({ type: 'text', text: '{"sentiment":0.2}' });
     // Absent cache counters read as 0.
-    expect(turn.usage).toEqual({ inputTokens: 5, outputTokens: 9, cacheReadTokens: 0, cacheWriteTokens: 0 });
+    expect(turn.usage).toEqual({
+      inputTokens: 5,
+      outputTokens: 9,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    });
   });
 
   it.each([
@@ -155,14 +249,21 @@ describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)
     [400, 'invalid_request_error', 'provider_bad_request', false],
     [404, 'not_found_error', 'provider_bad_request', false],
     [500, 'api_error', 'provider_error', true],
-  ] as const)('an HTTP %i (%s) surfaces as a typed SDK error mapped to %s', async (status, type, code, retryable) => {
-    const t = transport(() => ({ status, body: JSON.stringify({ type: 'error', error: { type, message: 'nope' } }), contentType: 'application/json' }));
-    const p = new AnthropicProvider(cfg(), client(t.fetchImpl as typeof fetch));
-    const err = await p.complete(request).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(Anthropic.APIError);
-    expect(friendlyProviderError(err)).toMatchObject({ code, retryable });
-    expect(t.calls).toHaveLength(1); // retries disabled in this client
-  });
+  ] as const)(
+    'an HTTP %i (%s) surfaces as a typed SDK error mapped to %s',
+    async (status, type, code, retryable) => {
+      const t = transport(() => ({
+        status,
+        body: JSON.stringify({ type: 'error', error: { type, message: 'nope' } }),
+        contentType: 'application/json',
+      }));
+      const p = new AnthropicProvider(cfg(), client(t.fetchImpl as typeof fetch));
+      const err = await p.complete(request).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Anthropic.APIError);
+      expect(friendlyProviderError(err)).toMatchObject({ code, retryable });
+      expect(t.calls).toHaveLength(1); // retries disabled in this client
+    },
+  );
 
   it('a transport failure maps to provider_unreachable; anything else to a generic, nothing-changed message', async () => {
     const failing = (async () => {
@@ -171,7 +272,10 @@ describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)
     const p = new AnthropicProvider(cfg(), client(failing));
     const err = await p.complete(request).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Anthropic.APIConnectionError);
-    expect(friendlyProviderError(err)).toMatchObject({ code: 'provider_unreachable', retryable: true });
+    expect(friendlyProviderError(err)).toMatchObject({
+      code: 'provider_unreachable',
+      retryable: true,
+    });
     expect(friendlyProviderError(new Error('boom'))).toEqual({
       code: 'copilot_error',
       message: 'The copilot could not answer this time. Nothing was changed.',
@@ -183,7 +287,14 @@ describe('AnthropicProvider through the SDK with a mocked transport (IRTC R6-06)
     let n = 0;
     const t = transport(() =>
       ++n === 1
-        ? { status: 529, body: JSON.stringify({ type: 'error', error: { type: 'overloaded_error', message: 'busy' } }), contentType: 'application/json' }
+        ? {
+            status: 529,
+            body: JSON.stringify({
+              type: 'error',
+              error: { type: 'overloaded_error', message: 'busy' },
+            }),
+            contentType: 'application/json',
+          }
         : { status: 200, body: toolUseStream },
     );
     const p = new AnthropicProvider(cfg(), client(t.fetchImpl as typeof fetch, 1));

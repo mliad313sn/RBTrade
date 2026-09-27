@@ -41,7 +41,14 @@ export const AREA_LABELS: Record<ControlArea, string> = {
 };
 
 export type OwnerLine = 1 | 2 | 3;
-export type Frequency = 'continuous' | 'per event' | 'every 60 s' | 'daily' | 'weekly' | 'monthly' | 'quarterly';
+export type Frequency =
+  | 'continuous'
+  | 'per event'
+  | 'every 60 s'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly';
 
 export interface ControlDefinition {
   id: string;
@@ -67,7 +74,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-01',
     area: 'access_mfa',
     title: 'MFA enforced for every privileged role',
-    objective: 'Only users who pass TOTP MFA can use trader, quant, risk officer, auditor or admin capabilities.',
+    objective:
+      'Only users who pass TOTP MFA can use trader, quant, risk officer, auditor or admin capabilities.',
     cobit: ['DSS05.04'],
     risk: 'Account takeover of a privileged user leads to unauthorised trading, limit changes or data access.',
     ownerLine: 1,
@@ -77,7 +85,8 @@ export const CONTROLS: ControlDefinition[] = [
     automation: 'automated',
     evidence: {
       kind: 'query',
-      source: 'user_roles × user_mfa: privileged users and MFA state; auth.login / auth.mfa_failed audit events in the period',
+      source:
+        'user_roles × user_mfa: privileged users and MFA state; auth.login / auth.mfa_failed audit events in the period',
     },
     testProcedure: [
       'Export the evidence for the period; confirm "privileged users without enabled MFA" is 0 or each exception is a user who has not signed in since the role was granted.',
@@ -123,7 +132,10 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'daily',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'auth.login_failed audit events per day and reason; users currently locked' },
+    evidence: {
+      kind: 'query',
+      source: 'auth.login_failed audit events per day and reason; users currently locked',
+    },
     testProcedure: [
       'Export the evidence; investigate any day with an unusual count of bad_password failures.',
       'Re-perform: 5 bad passwords lock the account (automated in test/lockout.int.test.ts).',
@@ -142,7 +154,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'user_roles: auditors and any auditor holding trader/quant/risk_officer/admin (must be 0; also refused by trigger user_roles_sod)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'user_roles: auditors and any auditor holding trader/quant/risk_officer/admin (must be 0; also refused by trigger user_roles_sod)',
+    },
     testProcedure: [
       'Export the evidence; confirm the conflict count is 0.',
       'Re-perform: an admin role change combining auditor with trader is refused (API 400 and database trigger).',
@@ -154,7 +170,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-05',
     area: 'segregation_of_duties',
     title: 'Four-eyes risk sign-off before robot promotion',
-    objective: 'A robot can be promoted only after a risk officer who is not its owner signs its exact limits.',
+    objective:
+      'A robot can be promoted only after a risk officer who is not its owner signs its exact limits.',
     cobit: ['DSS06.03', 'BAI06.01'],
     risk: 'An owner promotes an untested or over-risked robot without independent review.',
     ownerLine: 2,
@@ -162,7 +179,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'robot_risk_signoffs and robot_promotions in the period with owner, signer and outcome; signer = owner count (must be 0)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'robot_risk_signoffs and robot_promotions in the period with owner, signer and outcome; signer = owner count (must be 0)',
+    },
     testProcedure: [
       'Export the evidence; confirm "signed by owner" is 0.',
       'Sample 5 promotions and confirm each passed only with a sign-off bound to the current limits hash.',
@@ -174,7 +195,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-06',
     area: 'segregation_of_duties',
     title: 'Four-eyes on loosening risk limits above the platform default',
-    objective: 'Raising an account limit above the platform default needs a requester and a different approver.',
+    objective:
+      'Raising an account limit above the platform default needs a requester and a different approver.',
     cobit: ['DSS06.03', 'APO12.06'],
     risk: 'One person raises limits and exposes the firm to losses beyond appetite.',
     ownerLine: 2,
@@ -182,18 +204,28 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'four_eyes_requests (limit_override) in the period with requester, approver, status; requester = approver count (must be 0)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'four_eyes_requests (limit_override) in the period with requester, approver, status; requester = approver count (must be 0)',
+    },
     testProcedure: [
       'Export the evidence; confirm every approved override has an approver different from the requester and from the account holder.',
       'Re-perform: the requester approving their own request gets 403 four_eyes; the database trigger refuses it too.',
     ],
-    auditActions: ['four_eyes.requested', 'four_eyes.approved', 'four_eyes.rejected', 'account.limit_override_applied'],
+    auditActions: [
+      'four_eyes.requested',
+      'four_eyes.approved',
+      'four_eyes.rejected',
+      'account.limit_override_applied',
+    ],
   },
   {
     id: 'KC-07',
     area: 'segregation_of_duties',
     title: 'Four-eyes on resuming trading after a firm halt',
-    objective: 'A halt set by the firm (risk officer or global kill switch) is lifted only by two people.',
+    objective:
+      'A halt set by the firm (risk officer or global kill switch) is lifted only by two people.',
     cobit: ['DSS06.03', 'APO12.06'],
     risk: 'A single person lifts a firm-wide halt before the cause is understood.',
     ownerLine: 2,
@@ -201,7 +233,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'kill_switch.resumed audit events in the period: firm halts must carry a four-eyes request id with approver ≠ requester' },
+    evidence: {
+      kind: 'query',
+      source:
+        'kill_switch.resumed audit events in the period: firm halts must carry a four-eyes request id with approver ≠ requester',
+    },
     testProcedure: [
       'Export the evidence; confirm "firm resumes without four-eyes" is 0.',
       'Re-perform: POST /kill-switch/resume on a firm halt returns 202 and the requester cannot approve it.',
@@ -211,7 +247,8 @@ export const CONTROLS: ControlDefinition[] = [
   {
     id: 'KC-08',
     area: 'segregation_of_duties',
-    title: 'Four-eyes on MFA resets, disclosure publications and privileged role grants, with independent approvers',
+    title:
+      'Four-eyes on MFA resets, disclosure publications and privileged role grants, with independent approvers',
     objective:
       'Resetting a user’s second factor, publishing regulatory text or figures and granting a privileged role need two people, and the approver’s own approval role was not granted or approved by the requester.',
     cobit: ['DSS05.04', 'MEA03.02'],
@@ -231,14 +268,20 @@ export const CONTROLS: ControlDefinition[] = [
       'Confirm each published disclosure version has approved_by ≠ drafted_by (disclosure_documents).',
       'Re-perform: a user whose risk_officer role the requester granted cannot approve that requester (403 approver_not_independent, test/role-grants.int.test.ts).',
     ],
-    auditActions: ['auth.mfa_reset', 'disclosure.published', 'disclosure.value_set', 'admin.roles_changed'],
+    auditActions: [
+      'auth.mfa_reset',
+      'disclosure.published',
+      'disclosure.value_set',
+      'admin.roles_changed',
+    ],
   },
   // ---------------------------------------------------------------- Change management
   {
     id: 'KC-09',
     area: 'change_management',
     title: 'Strategy changes are versioned, attributed and immutable',
-    objective: 'Every robot strategy change is a new immutable version with author, reason and content hash.',
+    objective:
+      'Every robot strategy change is a new immutable version with author, reason and content hash.',
     cobit: ['BAI06.01', 'BAI06.04'],
     risk: 'Untraceable changes to automated trading logic.',
     ownerLine: 1,
@@ -246,7 +289,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'strategy_versions created in the period (author, reason, hash) + presence of the immutability trigger' },
+    evidence: {
+      kind: 'query',
+      source:
+        'strategy_versions created in the period (author, reason, hash) + presence of the immutability trigger',
+    },
     testProcedure: [
       'Export the evidence; confirm every version has an author and a reason, and the trigger is present.',
       'Sample 5 versions and confirm the running robot version matches an audited strategy.version_created event.',
@@ -257,7 +304,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-10',
     area: 'change_management',
     title: 'Database changes through forward-only, checksummed migrations',
-    objective: 'Schema changes are applied only by reviewed migration files whose checksums cannot change.',
+    objective:
+      'Schema changes are applied only by reviewed migration files whose checksums cannot change.',
     cobit: ['BAI06.03', 'BAI10'],
     risk: 'Ad-hoc schema changes bypass review and break controls (e.g. drop an immutability trigger).',
     ownerLine: 1,
@@ -265,7 +313,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'schema_migrations ledger (version, name, sha256, applied_at), flagged when applied in the period' },
+    evidence: {
+      kind: 'query',
+      source:
+        'schema_migrations ledger (version, name, sha256, applied_at), flagged when applied in the period',
+    },
     testProcedure: [
       'Export the evidence; match each migration applied in the period to a merged, reviewed pull request.',
       'Confirm the migration runner refuses a modified applied file (test coverage in the runner).',
@@ -284,7 +336,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'log', source: 'system.release_started audit events in the period (build SHA, approval reference, environment)' },
+    evidence: {
+      kind: 'log',
+      source:
+        'system.release_started audit events in the period (build SHA, approval reference, environment)',
+    },
     testProcedure: [
       'Export the evidence; every production release has a non-empty approval reference that matches the deployment approval record.',
       'Releases without an approval reference outside dev/test are exceptions.',
@@ -296,7 +352,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-12',
     area: 'audit_log_integrity',
     title: 'Hash-chain verification of the audit log',
-    objective: 'The append-only audit log is verified end to end; any tamper is detected with the first broken id.',
+    objective:
+      'The append-only audit log is verified end to end; any tamper is detected with the first broken id.',
     cobit: ['DSS06.05', 'MEA02.01'],
     risk: 'Altered or deleted audit records hide misconduct or errors.',
     ownerLine: 2,
@@ -304,7 +361,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'daily',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'report', source: 'AuditService.verify(): {valid, count, firstBrokenId, headHash} + events recorded in the period' },
+    evidence: {
+      kind: 'report',
+      source:
+        'AuditService.verify(): {valid, count, firstBrokenId, headHash} + events recorded in the period',
+    },
     testProcedure: [
       'Export the evidence; confirm valid = true and the head hash matches the latest signed anchor (KC-13).',
       'Re-perform: a tamper (trigger disabled by the owner) is detected (test/audit.int.test.ts).',
@@ -315,7 +376,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-13',
     area: 'audit_log_integrity',
     title: 'Signed anchors of the audit head (external digest)',
-    objective: 'The head hash is signed and written outside the database at least daily, so a rewrite of the chain is detectable.',
+    objective:
+      'The head hash is signed and written outside the database at least daily, so a rewrite of the chain is detectable.',
     cobit: ['DSS06.05', 'MEA04'],
     risk: 'A privileged insider rewrites the whole chain consistently.',
     ownerLine: 3,
@@ -338,7 +400,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-14',
     area: 'audit_log_integrity',
     title: 'Append-only records cannot be changed by the application',
-    objective: 'The runtime database role cannot update or delete audit, ledger, fill, acknowledgement or approval records.',
+    objective:
+      'The runtime database role cannot update or delete audit, ledger, fill, acknowledgement or approval records.',
     cobit: ['DSS06.05', 'DSS06.06'],
     risk: 'An application bug or compromise rewrites history.',
     ownerLine: 1,
@@ -346,7 +409,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'pg catalog: kora_app privileges on audit_events and immutability triggers on append-only tables' },
+    evidence: {
+      kind: 'query',
+      source:
+        'pg catalog: kora_app privileges on audit_events and immutability triggers on append-only tables',
+    },
     testProcedure: [
       'Export the evidence; confirm UPDATE/DELETE privileges are false and every listed trigger is present and enabled.',
     ],
@@ -357,7 +424,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-15',
     area: 'pre_trade_risk',
     title: 'Pre-trade risk limits block breaching orders',
-    objective: 'Orders that would breach notional, position, leverage, margin, loss or rate limits are rejected before they reach the engine.',
+    objective:
+      'Orders that would breach notional, position, leverage, margin, loss or rate limits are rejected before they reach the engine.',
     cobit: ['APO12.06', 'DSS06.02'],
     risk: 'Losses beyond appetite from a single order or a runaway strategy.',
     ownerLine: 1,
@@ -365,7 +433,10 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'orders rejected in the period by risk code + risk.limit_breach alerts' },
+    evidence: {
+      kind: 'query',
+      source: 'orders rejected in the period by risk code + risk.limit_breach alerts',
+    },
     testProcedure: [
       'Export the evidence; review the rejection mix for unusual patterns.',
       'Re-perform: each risk code has a negative unit test (packages/domain risk.test.ts) and an API test.',
@@ -376,7 +447,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-16',
     area: 'pre_trade_risk',
     title: 'Novice guardrails enforced server-side',
-    objective: 'Guarded users trade market + stop only, without borrowing, with cooling-off and delayed loosening.',
+    objective:
+      'Guarded users trade market + stop only, without borrowing, with cooling-off and delayed loosening.',
     cobit: ['DSS06.02', 'MEA03.02'],
     risk: 'Retail customers take risks they do not understand.',
     ownerLine: 1,
@@ -384,7 +456,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'guardrail rejections (NOVICE_*, MONTHLY_LOSS_LIMIT, DISCLOSURE_NOT_ACKNOWLEDGED) and guarded loosening requests in the period' },
+    evidence: {
+      kind: 'query',
+      source:
+        'guardrail rejections (NOVICE_*, MONTHLY_LOSS_LIMIT, DISCLOSURE_NOT_ACKNOWLEDGED) and guarded loosening requests in the period',
+    },
     testProcedure: [
       'Export the evidence; review repeated cooling-off triggers per user for conduct follow-up.',
       'Re-perform: test/novice-guardrails.int.test.ts.',
@@ -395,7 +471,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-17',
     area: 'pre_trade_risk',
     title: 'Kill switch available and fast',
-    objective: 'The kill switch halts robots, cancels and flattens within 2 s, with every child action audited.',
+    objective:
+      'The kill switch halts robots, cancels and flattens within 2 s, with every child action audited.',
     cobit: ['APO12.06', 'DSS04'],
     risk: 'A runaway robot or market event cannot be stopped quickly.',
     ownerLine: 1,
@@ -403,7 +480,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'corrective',
     automation: 'automated',
-    evidence: { kind: 'log', source: 'kill_switch.completed audit events in the period with duration, cancelled and flattened counts' },
+    evidence: {
+      kind: 'log',
+      source:
+        'kill_switch.completed audit events in the period with duration, cancelled and flattened counts',
+    },
     testProcedure: [
       'Export the evidence; confirm every durationMs is below 2,000.',
       'Re-perform: test/kill-switch.int.test.ts (1,000 orders + 4 positions) and the tabletop exercise.',
@@ -422,7 +503,10 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'corrective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'robot.* alerts in the period (auto-pause reason, robot, detail)' },
+    evidence: {
+      kind: 'query',
+      source: 'robot.* alerts in the period (auto-pause reason, robot, detail)',
+    },
     testProcedure: [
       'Export the evidence; confirm each auto-pause stayed paused until a human restarted it.',
       'Re-perform: test/robots.int.test.ts auto-pause case.',
@@ -433,7 +517,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-19',
     area: 'pre_trade_risk',
     title: 'Risk alerts reach the 2nd line and are acknowledged',
-    objective: 'Breach, kill-switch, robot and reconciliation alerts reach the risk console within 5 s and are acknowledged.',
+    objective:
+      'Breach, kill-switch, robot and reconciliation alerts reach the risk console within 5 s and are acknowledged.',
     cobit: ['APO12.03', 'MEA01.04'],
     risk: 'Alerts are raised but nobody acts on them.',
     ownerLine: 2,
@@ -441,7 +526,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'daily',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'alerts in the period with severity, kind, created and acknowledged times (time to acknowledge)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'alerts in the period with severity, kind, created and acknowledged times (time to acknowledge)',
+    },
     testProcedure: [
       'Export the evidence; critical alerts unacknowledged after 1 business day are exceptions.',
       'Re-perform: test/risk-console.int.test.ts (breach alert over the WebSocket in < 5 s).',
@@ -453,7 +542,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-20',
     area: 'reconciliation',
     title: 'Positions and cash reconciled every 60 seconds',
-    objective: 'Engine positions and cash are compared with an independent replay of fills and the ledger; breaks raise critical alerts.',
+    objective:
+      'Engine positions and cash are compared with an independent replay of fills and the ledger; breaks raise critical alerts.',
     cobit: ['DSS06.02', 'DSS06.04'],
     risk: 'Book errors go unnoticed and customers see wrong balances.',
     ownerLine: 1,
@@ -461,7 +551,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'every 60 s',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'reconciliation_runs in the period (runs, accounts checked, mismatches, longest gap between runs)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'reconciliation_runs in the period (runs, accounts checked, mismatches, longest gap between runs)',
+    },
     testProcedure: [
       'Export the evidence; confirm the longest gap between scheduled runs is under 5 minutes during operating hours.',
       'For each run with mismatches, trace the alert, the incident and its resolution.',
@@ -473,7 +567,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-21',
     area: 'ai_oversight',
     title: 'AI suggests, a human decides',
-    objective: 'The copilot only creates drafts; a person accepts or rejects each, and orders from drafts are placed by the user.',
+    objective:
+      'The copilot only creates drafts; a person accepts or rejects each, and orders from drafts are placed by the user.',
     cobit: ['EDM03.02', 'APO12.06', 'MEA01.04'],
     risk: 'Automated advice executes without human judgement.',
     ownerLine: 2,
@@ -481,7 +576,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'weekly',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'ai.draft / ai.draft_accepted / ai.draft_rejected counts and orders with source ai-draft-accepted (actor must be a user)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'ai.draft / ai.draft_accepted / ai.draft_rejected counts and orders with source ai-draft-accepted (actor must be a user)',
+    },
     testProcedure: [
       'Export the evidence; confirm "AI-draft orders placed by a non-user actor" is 0.',
       'Review the acceptance rate trend; a sudden rise is a conduct signal.',
@@ -492,7 +591,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-22',
     area: 'ai_oversight',
     title: 'AI requests logged with model, prompt hash and guard flags',
-    objective: 'Every AI call is attributable (model id from configuration, prompt hash, tokens, guard flags).',
+    objective:
+      'Every AI call is attributable (model id from configuration, prompt hash, tokens, guard flags).',
     cobit: ['DSS06.05', 'MEA01.04'],
     risk: 'AI output cannot be reconstructed or its failures noticed.',
     ownerLine: 1,
@@ -500,7 +600,10 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'weekly',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'log', source: 'ai.request audit events in the period by surface and model id, with flagged answers' },
+    evidence: {
+      kind: 'log',
+      source: 'ai.request audit events in the period by surface and model id, with flagged answers',
+    },
     testProcedure: [
       'Export the evidence; review flagged answers and confirm each was withheld or corrected.',
       'Confirm no hard-coded model id (the model comes from KORA_AI_MODEL).',
@@ -512,7 +615,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-23',
     area: 'data_retention',
     title: 'Record retention schedule monitored',
-    objective: 'Each record class has a retention period (placeholder until Compliance sets it) and nothing is purged early.',
+    objective:
+      'Each record class has a retention period (placeholder until Compliance sets it) and nothing is purged early.',
     cobit: ['APO14', 'DSS06.05'],
     risk: 'Records are lost before the regulatory period, or kept longer than allowed.',
     ownerLine: 2,
@@ -520,7 +624,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'monthly',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'report', source: 'Retention report: per record class, period (or placeholder), count and oldest record' },
+    evidence: {
+      kind: 'report',
+      source:
+        'Retention report: per record class, period (or placeholder), count and oldest record',
+    },
     testProcedure: [
       'Export the evidence; confirm every class with a set period has no record older than it unless on legal hold, and placeholders are listed in open questions (OQ-R4).',
     ],
@@ -538,7 +646,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'log', source: 'privacy.subject_access_exported audit events in the period (self-service or on behalf, sections exported)' },
+    evidence: {
+      kind: 'log',
+      source:
+        'privacy.subject_access_exported audit events in the period (self-service or on behalf, sections exported)',
+    },
     testProcedure: [
       'Export the evidence; match each request in the privacy mailbox to an export within the deadline set by Compliance.',
     ],
@@ -549,7 +661,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-25',
     area: 'incident_management',
     title: 'Incidents detected, logged, classified, resolved and reviewed (ITIL 4)',
-    objective: 'Every incident follows the workflow; P1/P2 incidents close only with a post-incident review.',
+    objective:
+      'Every incident follows the workflow; P1/P2 incidents close only with a post-incident review.',
     cobit: ['DSS02.02', 'DSS02.05', 'DSS02.06', 'DSS03'],
     risk: 'Incidents recur because causes are not reviewed.',
     ownerLine: 1,
@@ -557,12 +670,20 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'per event',
     nature: 'corrective',
     automation: 'semi-automated',
-    evidence: { kind: 'query', source: 'incidents in the period with state timestamps, priority and review reference' },
+    evidence: {
+      kind: 'query',
+      source: 'incidents in the period with state timestamps, priority and review reference',
+    },
     testProcedure: [
       'Export the evidence; confirm every closed P1/P2 has a review reference and time to resolve is recorded.',
       'Sample 3 incidents and read the post-incident review.',
     ],
-    auditActions: ['incident.logged', 'incident.classified', 'incident.resolved', 'incident.closed'],
+    auditActions: [
+      'incident.logged',
+      'incident.classified',
+      'incident.resolved',
+      'incident.closed',
+    ],
   },
   // ---------------------------------------------------------------- Backup and restore
   {
@@ -577,7 +698,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'daily',
     nature: 'corrective',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'backup_runs in the period (backups and restore tests, size, checksum, rows checked, result)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'backup_runs in the period (backups and restore tests, size, checksum, rows checked, result)',
+    },
     testProcedure: [
       'Export the evidence; confirm one successful backup per day and at least one successful restore test in the month.',
       'Re-perform scripts/backup.sh against a scratch database.',
@@ -589,7 +714,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-27',
     area: 'compliance',
     title: 'Risk warning acknowledged before the first order',
-    objective: 'A novice acknowledges the risk warning version and figures in force before any order adds exposure.',
+    objective:
+      'A novice acknowledges the risk warning version and figures in force before any order adds exposure.',
     cobit: ['MEA03.02'],
     risk: 'Customers trade without having seen the required warning.',
     ownerLine: 2,
@@ -597,7 +723,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'acknowledgements in the period by version and jurisdiction + novice orders placed before any acknowledgement (must be 0)' },
+    evidence: {
+      kind: 'query',
+      source:
+        'acknowledgements in the period by version and jurisdiction + novice orders placed before any acknowledgement (must be 0)',
+    },
     testProcedure: [
       'Export the evidence; confirm the violation count is 0 for orders after the gate went live.',
       'Retrieve 5 acknowledgements through /compliance/acknowledgements and confirm verified = true.',
@@ -608,7 +738,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-28',
     area: 'compliance',
     title: 'Appropriateness assessment before trader access',
-    objective: 'The trader role is granted only after a passed, versioned appropriateness assessment.',
+    objective:
+      'The trader role is granted only after a passed, versioned appropriateness assessment.',
     cobit: ['MEA03.02', 'DSS06.03'],
     risk: 'Customers get complex products without an appropriateness check.',
     ownerLine: 2,
@@ -616,7 +747,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'users holding trader without a passed appropriateness attempt (must be 0) + attempts in the period' },
+    evidence: {
+      kind: 'query',
+      source:
+        'users holding trader without a passed appropriateness attempt (must be 0) + attempts in the period',
+    },
     testProcedure: [
       'Export the evidence; each exception must be a four-eyes role_grant flagged appropriatenessOverride, with a documented reason (KC-02 evidence).',
       'Re-perform: an admin granting trader without a reason gets 400; with a reason it becomes a pending role_grant approved by a second admin; a Keycloak token carrying trader without a passed attempt is stripped of it.',
@@ -627,7 +762,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-29',
     area: 'compliance',
     title: 'Best-execution monitoring',
-    objective: 'Slippage against the reference price is measured by instrument and hour and reviewed.',
+    objective:
+      'Slippage against the reference price is measured by instrument and hour and reviewed.',
     cobit: ['MEA03.03', 'MEA01.04'],
     risk: 'Customers systematically get worse prices than the market.',
     ownerLine: 2,
@@ -635,7 +771,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'monthly',
     nature: 'detective',
     automation: 'automated',
-    evidence: { kind: 'report', source: 'fills in the period: count, mean / median / p95 slippage in price units and bps, adverse share, by instrument' },
+    evidence: {
+      kind: 'report',
+      source:
+        'fills in the period: count, mean / median / p95 slippage in price units and bps, adverse share, by instrument',
+    },
     testProcedure: [
       'Export the evidence; investigate instruments whose adverse share or p95 slippage stands out.',
     ],
@@ -645,7 +785,8 @@ export const CONTROLS: ControlDefinition[] = [
     id: 'KC-30',
     area: 'compliance',
     title: 'LIVE trading stays disabled without a compliance sign-off',
-    objective: 'No LIVE account or robot exists and the LIVE flag stays off until the Sponsor’s sign-off.',
+    objective:
+      'No LIVE account or robot exists and the LIVE flag stays off until the Sponsor’s sign-off.',
     cobit: ['EDM03.02', 'MEA03.01'],
     risk: 'Real money is traded before legal and regulatory approval.',
     ownerLine: 2,
@@ -653,7 +794,10 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'continuous',
     nature: 'preventive',
     automation: 'automated',
-    evidence: { kind: 'query', source: 'LIVE accounts, LIVE robots, active compliance sign-offs and the runtime LIVE flag' },
+    evidence: {
+      kind: 'query',
+      source: 'LIVE accounts, LIVE robots, active compliance sign-offs and the runtime LIVE flag',
+    },
     testProcedure: [
       'Export the evidence; confirm LIVE accounts = 0, LIVE robots = 0 and the flag is false.',
     ],
@@ -672,7 +816,11 @@ export const CONTROLS: ControlDefinition[] = [
     frequency: 'quarterly',
     nature: 'detective',
     automation: 'semi-automated',
-    evidence: { kind: 'log', source: 'internal_audit.sample_drawn and governance.evidence_exported audit events in the period' },
+    evidence: {
+      kind: 'log',
+      source:
+        'internal_audit.sample_drawn and governance.evidence_exported audit events in the period',
+    },
     testProcedure: [
       'Export the evidence; confirm every control was sampled at least once in the audit cycle.',
     ],

@@ -44,7 +44,9 @@ function chain(n: number): AuditEvent[] {
 
 describe('hash chain', () => {
   it('matches a known SHA-256 vector', () => {
-    expect(sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(sha256Hex('abc')).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
   });
   it('verifies a clean chain', () => {
     const r = verifyAuditChain(chain(5));
@@ -55,7 +57,11 @@ describe('hash chain', () => {
   it('detects a tampered payload with the first broken id', () => {
     const c = chain(5);
     c[2] = { ...c[2]!, payload: { n: 3, amount: '99.00' } };
-    expect(verifyAuditChain(c)).toMatchObject({ valid: false, firstBrokenId: '3', reason: 'hash_mismatch' });
+    expect(verifyAuditChain(c)).toMatchObject({
+      valid: false,
+      firstBrokenId: '3',
+      reason: 'hash_mismatch',
+    });
   });
   it('detects a broken link and an id gap', () => {
     const c = chain(4);
@@ -114,9 +120,20 @@ describe('audit hash spec (IRTC R6-01)', () => {
   ];
   for (const [field, patch] of variants) {
     it(`changing ${field} changes the hash and breaks verification`, () => {
-      expect(computeAuditHash({ ...KAT_EVENT, ...patch } as typeof KAT_EVENT, GENESIS_HASH)).not.toBe(KAT_HASH);
-      const forged = { ...KAT_EVENT, ...patch, prevHash: GENESIS_HASH, hash: KAT_HASH } as AuditEvent;
-      expect(verifyAuditChain([forged])).toMatchObject({ valid: false, firstBrokenId: forged.id, reason: 'hash_mismatch' });
+      expect(
+        computeAuditHash({ ...KAT_EVENT, ...patch } as typeof KAT_EVENT, GENESIS_HASH),
+      ).not.toBe(KAT_HASH);
+      const forged = {
+        ...KAT_EVENT,
+        ...patch,
+        prevHash: GENESIS_HASH,
+        hash: KAT_HASH,
+      } as AuditEvent;
+      expect(verifyAuditChain([forged])).toMatchObject({
+        valid: false,
+        firstBrokenId: forged.id,
+        reason: 'hash_mismatch',
+      });
     });
   }
 
@@ -125,11 +142,17 @@ describe('audit hash spec (IRTC R6-01)', () => {
     const c = chain(3);
     const forgedPrev = 'a'.repeat(64);
     c[1] = { ...c[1]!, prevHash: forgedPrev, hash: computeAuditHash(c[1]!, forgedPrev) };
-    expect(verifyAuditChain(c)).toMatchObject({ valid: false, firstBrokenId: '2', reason: 'prev_hash_mismatch' });
+    expect(verifyAuditChain(c)).toMatchObject({
+      valid: false,
+      firstBrokenId: '2',
+      reason: 'prev_hash_mismatch',
+    });
   });
 
   it('the untampered KAT event verifies', () => {
-    expect(verifyAuditChain([{ ...KAT_EVENT, prevHash: GENESIS_HASH, hash: KAT_HASH }])).toMatchObject({
+    expect(
+      verifyAuditChain([{ ...KAT_EVENT, prevHash: GENESIS_HASH, hash: KAT_HASH }]),
+    ).toMatchObject({
       valid: true,
       headHash: KAT_HASH,
     });

@@ -1,4 +1,10 @@
-import { Injectable, Logger, Optional, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { dec } from '@kora/domain';
 import type { Redis } from 'ioredis';
 
@@ -45,7 +51,8 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
     const ms = supervisorMs();
     if (ms > 0) {
       this.timer = setInterval(
-        () => void this.tick().catch((e: Error) => this.log.warn(`supervision failed: ${e.message}`)),
+        () =>
+          void this.tick().catch((e: Error) => this.log.warn(`supervision failed: ${e.message}`)),
         ms,
       );
       this.timer.unref();
@@ -55,8 +62,12 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
       void this.sub
         .subscribe(robotControlChannel())
         .catch((e: Error) => this.log.warn(`subscribe failed: ${e.message}`));
-      this.sub.on('message', (_ch: string, raw: string) =>
-        void this.onControl(raw).catch((e: Error) => this.log.warn(`control message failed: ${e.message}`)),
+      this.sub.on(
+        'message',
+        (_ch: string, raw: string) =>
+          void this.onControl(raw).catch((e: Error) =>
+            this.log.warn(`control message failed: ${e.message}`),
+          ),
       );
     }
   }
@@ -106,7 +117,10 @@ export class RobotSupervisorService implements OnModuleInit, OnModuleDestroy {
       const hb = heartbeatMs();
       // Goal 10: oldest heartbeat among running robots (alert: runner lost).
       this.metrics?.robotHeartbeatMaxAge.set(
-        Math.max(...running.map((r) => (now - (beats.get(r.id) ?? r.started_at?.getTime() ?? now)) / 1000), 0),
+        Math.max(
+          ...running.map((r) => (now - (beats.get(r.id) ?? r.started_at?.getTime() ?? now)) / 1000),
+          0,
+        ),
       );
       for (const r of running) {
         try {

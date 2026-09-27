@@ -24,7 +24,9 @@ interface Action {
   terminalOnly?: boolean;
 }
 
-type Item = { kind: 'instrument'; symbol: string; id: string } | { kind: 'action'; action: Action; id: string };
+type Item =
+  | { kind: 'instrument'; symbol: string; id: string }
+  | { kind: 'action'; action: Action; id: string };
 
 /**
  * ⌘K command palette (B-009): search the whole instrument registry (every venue and asset class,
@@ -51,7 +53,10 @@ export function CommandPalette() {
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (matchHotkey(e, spec, isMacPlatform()) || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey)) {
+      if (
+        matchHotkey(e, spec, isMacPlatform()) ||
+        (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey)
+      ) {
         e.preventDefault();
         setMode('go');
         setOpen(true);
@@ -89,38 +94,157 @@ export function CommandPalette() {
 
   const actions: Action[] = useMemo(
     () => [
-      { id: 'go-terminal', label: 'Go to Terminal', keywords: 'terminal trade pro', run: () => router.push('/terminal') },
-      { id: 'go-simulator', label: 'Go to Gain simulator', keywords: 'simulator monte carlo projection', run: () => router.push('/simulator') },
-      { id: 'go-robots', label: 'Go to Robots', keywords: 'robots bots strategy', run: () => router.push('/robots') },
-      { id: 'go-portfolio', label: 'Go to Portfolio', keywords: 'portfolio', run: () => router.push('/portfolio') },
-      { id: 'go-audit', label: 'Open audit log', keywords: 'audit log history', run: () => router.push('/audit') },
-      { id: 'go-settings', label: 'Open settings', keywords: 'settings preferences hotkeys', run: () => router.push('/settings') },
-      { id: 'layout-save', label: 'Save or load a layout…', keywords: 'layout save load workspace', run: () => window.dispatchEvent(new CustomEvent('kora:layout', { detail: { action: 'open' } })), terminalOnly: true },
-      { id: 'layout-reset', label: 'Reset layout to default', keywords: 'layout reset default', run: () => window.dispatchEvent(new CustomEvent('kora:layout', { detail: { action: 'reset' } })), terminalOnly: true },
-      { id: 'alert', label: `New price alert on ${symbol}`, keywords: 'alert price rsi notify', run: () => window.dispatchEvent(new CustomEvent('kora:focus-panel', { detail: { id: 'alerts' } })), terminalOnly: true },
-      { id: 'hotkeys', label: 'Show keyboard shortcuts', keywords: 'hotkeys shortcuts keyboard help', run: () => setCheatSheet(true), terminalOnly: true },
-      { id: 'colours-bo', label: 'Colours: blue up / orange down', keywords: 'colour color blind', run: () => void savePrefs({ colourConvention: 'blue_orange' }, 'Colours: blue / orange') },
-      { id: 'colours-gr', label: 'Colours: green up / red down', keywords: 'colour color green red', run: () => void savePrefs({ colourConvention: 'green_red' }, 'Colours: green / red') },
-      { id: 'colours-asia', label: 'Colours: red up / green down (Asia)', keywords: 'colour color asia red', run: () => void savePrefs({ colourConvention: 'red_up_asia' }, 'Colours: red up (Asia)') },
-      { id: 'density', label: `Density: ${me.preferences.terminal?.density === 'comfortable' ? 'compact' : 'comfortable'}`, keywords: 'density compact comfortable rows', run: () => void savePrefs({ terminal: { density: me.preferences.terminal?.density === 'comfortable' ? 'compact' : 'comfortable' } }, 'Density updated') },
-      { id: 'time', label: `Show times in ${me.preferences.terminal?.timeDisplay === 'local' ? 'UTC' : 'local time'}`, keywords: 'time utc local clock', run: () => void savePrefs({ terminal: { timeDisplay: me.preferences.terminal?.timeDisplay === 'local' ? 'utc' : 'local' } }, 'Time display updated') },
-      { id: 'kill', label: 'Kill switch (focus it, then hold 1.5 s)', keywords: 'kill switch halt stop flatten', run: () => document.querySelector<HTMLElement>('[data-testid="kill-switch"]')?.focus() },
+      {
+        id: 'go-terminal',
+        label: 'Go to Terminal',
+        keywords: 'terminal trade pro',
+        run: () => router.push('/terminal'),
+      },
+      {
+        id: 'go-simulator',
+        label: 'Go to Gain simulator',
+        keywords: 'simulator monte carlo projection',
+        run: () => router.push('/simulator'),
+      },
+      {
+        id: 'go-robots',
+        label: 'Go to Robots',
+        keywords: 'robots bots strategy',
+        run: () => router.push('/robots'),
+      },
+      {
+        id: 'go-portfolio',
+        label: 'Go to Portfolio',
+        keywords: 'portfolio',
+        run: () => router.push('/portfolio'),
+      },
+      {
+        id: 'go-audit',
+        label: 'Open audit log',
+        keywords: 'audit log history',
+        run: () => router.push('/audit'),
+      },
+      {
+        id: 'go-settings',
+        label: 'Open settings',
+        keywords: 'settings preferences hotkeys',
+        run: () => router.push('/settings'),
+      },
+      {
+        id: 'layout-save',
+        label: 'Save or load a layout…',
+        keywords: 'layout save load workspace',
+        run: () =>
+          window.dispatchEvent(new CustomEvent('kora:layout', { detail: { action: 'open' } })),
+        terminalOnly: true,
+      },
+      {
+        id: 'layout-reset',
+        label: 'Reset layout to default',
+        keywords: 'layout reset default',
+        run: () =>
+          window.dispatchEvent(new CustomEvent('kora:layout', { detail: { action: 'reset' } })),
+        terminalOnly: true,
+      },
+      {
+        id: 'alert',
+        label: `New price alert on ${symbol}`,
+        keywords: 'alert price rsi notify',
+        run: () =>
+          window.dispatchEvent(new CustomEvent('kora:focus-panel', { detail: { id: 'alerts' } })),
+        terminalOnly: true,
+      },
+      {
+        id: 'hotkeys',
+        label: 'Show keyboard shortcuts',
+        keywords: 'hotkeys shortcuts keyboard help',
+        run: () => setCheatSheet(true),
+        terminalOnly: true,
+      },
+      {
+        id: 'colours-bo',
+        label: 'Colours: blue up / orange down',
+        keywords: 'colour color blind',
+        run: () => void savePrefs({ colourConvention: 'blue_orange' }, 'Colours: blue / orange'),
+      },
+      {
+        id: 'colours-gr',
+        label: 'Colours: green up / red down',
+        keywords: 'colour color green red',
+        run: () => void savePrefs({ colourConvention: 'green_red' }, 'Colours: green / red'),
+      },
+      {
+        id: 'colours-asia',
+        label: 'Colours: red up / green down (Asia)',
+        keywords: 'colour color asia red',
+        run: () => void savePrefs({ colourConvention: 'red_up_asia' }, 'Colours: red up (Asia)'),
+      },
+      {
+        id: 'density',
+        label: `Density: ${me.preferences.terminal?.density === 'comfortable' ? 'compact' : 'comfortable'}`,
+        keywords: 'density compact comfortable rows',
+        run: () =>
+          void savePrefs(
+            {
+              terminal: {
+                density:
+                  me.preferences.terminal?.density === 'comfortable' ? 'compact' : 'comfortable',
+              },
+            },
+            'Density updated',
+          ),
+      },
+      {
+        id: 'time',
+        label: `Show times in ${me.preferences.terminal?.timeDisplay === 'local' ? 'UTC' : 'local time'}`,
+        keywords: 'time utc local clock',
+        run: () =>
+          void savePrefs(
+            {
+              terminal: {
+                timeDisplay: me.preferences.terminal?.timeDisplay === 'local' ? 'utc' : 'local',
+              },
+            },
+            'Time display updated',
+          ),
+      },
+      {
+        id: 'kill',
+        label: 'Kill switch (focus it, then hold 1.5 s)',
+        keywords: 'kill switch halt stop flatten',
+        run: () => document.querySelector<HTMLElement>('[data-testid="kill-switch"]')?.focus(),
+      },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [router, symbol, me.preferences.terminal, setCheatSheet],
   );
 
-  const hits = useMemo(() => (loaded ? searchInstruments(q, instruments.values(), venues, q ? 40 : 30) : []), [q, instruments, venues, loaded]);
+  const hits = useMemo(
+    () => (loaded ? searchInstruments(q, instruments.values(), venues, q ? 40 : 30) : []),
+    [q, instruments, venues, loaded],
+  );
   const groups = useMemo(() => groupHits(hits), [hits]);
   const shownActions = useMemo(() => {
     if (mode === 'add') return [];
     const t = q.trim().toLowerCase();
-    return actions.filter((a) => (!a.terminalOnly || onTerminal) && (!t || a.label.toLowerCase().includes(t) || a.keywords.includes(t)));
+    return actions.filter(
+      (a) =>
+        (!a.terminalOnly || onTerminal) &&
+        (!t || a.label.toLowerCase().includes(t) || a.keywords.includes(t)),
+    );
   }, [actions, q, mode, onTerminal]);
 
   const items: Item[] = useMemo(
     () => [
-      ...groups.flatMap((g) => g.hits.map((h): Item => ({ kind: 'instrument', symbol: h.instrument.symbol, id: `pi-${h.instrument.symbol}` }))),
+      ...groups.flatMap((g) =>
+        g.hits.map(
+          (h): Item => ({
+            kind: 'instrument',
+            symbol: h.instrument.symbol,
+            id: `pi-${h.instrument.symbol}`,
+          }),
+        ),
+      ),
       ...shownActions.map((a): Item => ({ kind: 'action', action: a, id: `pa-${a.id}` })),
     ],
     [groups, shownActions],
@@ -175,7 +299,9 @@ export function CommandPalette() {
         className={`pal-opt ${current?.id === it.id ? 'is-active' : ''}`}
         onMouseMove={() => setActive(i)}
         onClick={() => runItem(it)}
-        data-testid={it.kind === 'instrument' ? `palette-${it.symbol}` : `palette-action-${it.action.id}`}
+        data-testid={
+          it.kind === 'instrument' ? `palette-${it.symbol}` : `palette-action-${it.action.id}`
+        }
       >
         {content}
       </div>
@@ -199,7 +325,13 @@ export function CommandPalette() {
         <span className="flex-1">Symbol, action, screen…</span>
         <Kbd>{hotkeyParts(spec, mac).join('')}</Kbd>
       </button>
-      <Dialog open={open} onOpenChange={setOpen} title={mode === 'add' ? 'Add to watchlist' : 'Symbol or action'} description="Type a symbol, name, ISIN or venue MIC. Enter opens; Alt+Enter adds to the watchlist; Esc closes." data-testid="palette">
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={mode === 'add' ? 'Add to watchlist' : 'Symbol or action'}
+        description="Type a symbol, name, ISIN or venue MIC. Enter opens; Alt+Enter adds to the watchlist; Esc closes."
+        data-testid="palette"
+      >
         <input
           className="k-input w-full"
           role="combobox"
@@ -217,22 +349,40 @@ export function CommandPalette() {
           autoFocus
           data-testid="palette-input"
         />
-        <div id="palette-list" ref={listRef} role="listbox" aria-label="Results" className="pal-list">
+        <div
+          id="palette-list"
+          ref={listRef}
+          role="listbox"
+          aria-label="Results"
+          className="pal-list"
+        >
           {!loaded ? <p className="text-muted text-xs">Loading instruments…</p> : null}
           {groups.map((g) => (
-            <div key={`${g.region}-${g.assetClass}`} role="group" aria-label={`${REGION_LABEL[g.region]} · ${assetClassLabel(g.assetClass)}`}>
+            <div
+              key={`${g.region}-${g.assetClass}`}
+              role="group"
+              aria-label={`${REGION_LABEL[g.region]} · ${assetClassLabel(g.assetClass)}`}
+            >
               <div className="pal-group" aria-hidden="true">
                 {REGION_LABEL[g.region]} · {assetClassLabel(g.assetClass)}
               </div>
               {g.hits.map((h) =>
                 option(
-                  { kind: 'instrument', symbol: h.instrument.symbol, id: `pi-${h.instrument.symbol}` },
+                  {
+                    kind: 'instrument',
+                    symbol: h.instrument.symbol,
+                    id: `pi-${h.instrument.symbol}`,
+                  },
                   <>
                     <span className="pal-sym">{h.instrument.displayName}</span>
                     <span className="pal-sub">
                       {h.instrument.symbol} · {h.instrument.quoteCcy}
                     </span>
-                    <SessionBadge mic={h.instrument.venue} state={h.instrument.session?.state} className="ml-auto" />
+                    <SessionBadge
+                      mic={h.instrument.venue}
+                      state={h.instrument.session?.state}
+                      className="ml-auto"
+                    />
                   </>,
                 ),
               )}
@@ -243,7 +393,9 @@ export function CommandPalette() {
               <div className="pal-group" aria-hidden="true">
                 Actions
               </div>
-              {shownActions.map((a) => option({ kind: 'action', action: a, id: `pa-${a.id}` }, <span>{a.label}</span>))}
+              {shownActions.map((a) =>
+                option({ kind: 'action', action: a, id: `pa-${a.id}` }, <span>{a.label}</span>),
+              )}
             </div>
           ) : null}
           {loaded && items.length === 0 ? <p className="text-muted text-xs">No match.</p> : null}

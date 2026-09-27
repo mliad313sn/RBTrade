@@ -29,8 +29,13 @@ describe('sign-in rate limits per IP + account at default limits (IRTC R1-05)', 
   });
 
   const login = (email: string, ip: string) =>
-    request(http).post('/auth/login').set(CSRF).set('X-Forwarded-For', ip).send({ email, password: 'junk-password-123' });
-  const throttled = (r: request.Response) => r.status === 429 && r.body.error !== 'too_many_attempts';
+    request(http)
+      .post('/auth/login')
+      .set(CSRF)
+      .set('X-Forwarded-For', ip)
+      .send({ email, password: 'junk-password-123' });
+  const throttled = (r: request.Response) =>
+    r.status === 429 && r.body.error !== 'too_many_attempts';
 
   it('20 junk sign-ins against one account from one IP do not block a different account from that IP', async () => {
     const victimOfJunk = uniqueEmail('target');

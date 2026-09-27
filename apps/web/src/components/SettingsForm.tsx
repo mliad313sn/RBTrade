@@ -1,6 +1,13 @@
 'use client';
 
-import { COLOUR_CONVENTIONS, DEFAULT_HOTKEYS, DEFAULT_TERMINAL_SETTINGS, HOTKEY_LABELS, THEMES, type UpdatePreferences } from '@kora/domain';
+import {
+  COLOUR_CONVENTIONS,
+  DEFAULT_HOTKEYS,
+  DEFAULT_TERMINAL_SETTINGS,
+  HOTKEY_LABELS,
+  THEMES,
+  type UpdatePreferences,
+} from '@kora/domain';
 import { Button, Kbd, Panel, Select, useToast } from '@kora/ui';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -59,7 +66,11 @@ export function SettingsForm() {
             hint="Direction is always shown with ▲▼ and +/− as well as colour."
             value={me.preferences.colourConvention}
             options={COLOUR_CONVENTIONS.map((c) => ({ value: c, label: COLOUR_LABEL[c] }))}
-            onChange={(e) => void save({ colourConvention: e.target.value as UpdatePreferences['colourConvention'] })}
+            onChange={(e) =>
+              void save({
+                colourConvention: e.target.value as UpdatePreferences['colourConvention'],
+              })
+            }
           />
         </div>
       </Panel>
@@ -72,7 +83,9 @@ export function SettingsForm() {
               { value: 'compact', label: 'Compact (default)' },
               { value: 'comfortable', label: 'Comfortable' },
             ]}
-            onChange={(e) => void save({ terminal: { density: e.target.value as 'compact' | 'comfortable' } })}
+            onChange={(e) =>
+              void save({ terminal: { density: e.target.value as 'compact' | 'comfortable' } })
+            }
             data-testid="settings-density"
           />
           <Select
@@ -82,11 +95,18 @@ export function SettingsForm() {
               { value: 'utc', label: 'UTC (default)' },
               { value: 'local', label: 'My local time' },
             ]}
-            onChange={(e) => void save({ terminal: { timeDisplay: e.target.value as 'utc' | 'local' } })}
+            onChange={(e) =>
+              void save({ terminal: { timeDisplay: e.target.value as 'utc' | 'local' } })
+            }
             data-testid="settings-time"
           />
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={terminal.soundOnFills} onChange={(e) => void save({ terminal: { soundOnFills: e.target.checked } })} data-testid="settings-sound" />
+            <input
+              type="checkbox"
+              checked={terminal.soundOnFills}
+              onChange={(e) => void save({ terminal: { soundOnFills: e.target.checked } })}
+              data-testid="settings-sound"
+            />
             Sound on fills (off by default)
           </label>
           <form
@@ -98,17 +118,28 @@ export function SettingsForm() {
           >
             <label className="flex flex-col gap-1 text-sm">
               <span className="k-label">Per-trade risk rule (% of equity)</span>
-              <input className="k-input w-28" inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} data-testid="settings-risk-pct" />
+              <input
+                className="k-input w-28"
+                inputMode="decimal"
+                value={riskPct}
+                onChange={(e) => setRiskPct(e.target.value)}
+                data-testid="settings-risk-pct"
+              />
             </label>
             <Button type="submit" size="sm">
               Save
             </Button>
-            <span className="text-xs text-muted">The ticket warns when the loss at your stop is above this.</span>
+            <span className="text-xs text-muted">
+              The ticket warns when the loss at your stop is above this.
+            </span>
           </form>
         </div>
       </Panel>
       <Panel title="Hotkeys">
-        <p className="m-0 mb-2 text-xs text-muted">Type a combination such as Ctrl+Shift+K, Alt+1, B or Mod+K (⌘ on macOS, Ctrl elsewhere). Single keys do nothing while you type in a field.</p>
+        <p className="m-0 mb-2 text-xs text-muted">
+          Type a combination such as Ctrl+Shift+K, Alt+1, B or Mod+K (⌘ on macOS, Ctrl elsewhere).
+          Single keys do nothing while you type in a field.
+        </p>
         <dl className="grid grid-cols-[1fr_auto] gap-2 m-0 items-center">
           {Object.entries({ ...DEFAULT_HOTKEYS, ...me.preferences.hotkeys }).map(([k, v]) => (
             <div key={k} className="contents">
@@ -125,7 +156,8 @@ export function SettingsForm() {
                     if (e.key !== 'Enter') return;
                     e.preventDefault();
                     const val = (e.target as HTMLInputElement).value.trim();
-                    if (!isValidHotkey(val)) return toast.push(`"${val}" is not a valid shortcut`, 'critical');
+                    if (!isValidHotkey(val))
+                      return toast.push(`"${val}" is not a valid shortcut`, 'critical');
                     void save({ hotkeys: { [k]: val } });
                     (e.target as HTMLInputElement).value = '';
                   }}
@@ -134,13 +166,19 @@ export function SettingsForm() {
             </div>
           ))}
         </dl>
-        <Button size="sm" className="mt-3" onClick={() => void save({ hotkeys: { ...DEFAULT_HOTKEYS } })} data-testid="hotkeys-reset">
+        <Button
+          size="sm"
+          className="mt-3"
+          onClick={() => void save({ hotkeys: { ...DEFAULT_HOTKEYS } })}
+          data-testid="hotkeys-reset"
+        >
           Reset shortcuts
         </Button>
       </Panel>
       <Panel title="Security">
         <p className="m-0">
-          Two-factor authentication: <strong>{me.mfa ? 'on for this session' : 'not used for this session'}</strong>. Roles:{' '}
+          Two-factor authentication:{' '}
+          <strong>{me.mfa ? 'on for this session' : 'not used for this session'}</strong>. Roles:{' '}
           {me.roles.join(', ')}.
         </p>
       </Panel>

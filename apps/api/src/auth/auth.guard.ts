@@ -49,20 +49,30 @@ export class AuthGuard implements CanActivate {
     }
 
     if (isPublic) return true;
-    if (!token) throw new UnauthorizedException({ error: 'unauthenticated', message: 'Sign in required' });
+    if (!token)
+      throw new UnauthorizedException({ error: 'unauthenticated', message: 'Sign in required' });
 
     let principal;
     try {
       principal = await this.tokens.verifyAccessToken(token);
     } catch {
-      throw new UnauthorizedException({ error: 'invalid_token', message: 'Session expired or invalid. Sign in again.' });
+      throw new UnauthorizedException({
+        error: 'invalid_token',
+        message: 'Session expired or invalid. Sign in again.',
+      });
     }
     // Goal 10: logout, role changes, MFA resets and disabled users end sessions server side.
     if (!(await this.sessions.isActive(principal))) {
-      throw new UnauthorizedException({ error: 'session_revoked', message: 'This session has ended. Sign in again.' });
+      throw new UnauthorizedException({
+        error: 'session_revoked',
+        message: 'This session has ended. Sign in again.',
+      });
     }
     if (requiresMfa(principal.roles) && !principal.mfa) {
-      throw new ForbiddenException({ error: 'mfa_required', message: 'This account needs two-factor authentication.' });
+      throw new ForbiddenException({
+        error: 'mfa_required',
+        message: 'This account needs two-factor authentication.',
+      });
     }
     await this.provisioner.ensure(principal);
     req.principal = principal;

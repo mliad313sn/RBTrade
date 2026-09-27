@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { RISK_ALERTS_CHANNEL } from '@kora/domain';
 import { Redis } from 'ioredis';
 import { Client } from 'pg';
@@ -44,14 +51,18 @@ export class AlertsBridgeService implements OnApplicationBootstrap, OnModuleDest
 
   private async connect(): Promise<void> {
     if (this.stopped) return;
-    const c = new Client({ connectionString: this.app.databaseUrl, application_name: 'kora-alerts-bridge' });
+    const c = new Client({
+      connectionString: this.app.databaseUrl,
+      application_name: 'kora-alerts-bridge',
+    });
     c.on('error', (e) => {
       this.log.warn(`listener: ${e.message}`);
       this.reconnect();
     });
     c.on('end', () => this.reconnect());
     c.on('notification', (n) => {
-      if (n.channel === 'kora_alerts' && n.payload) void this.relay(n.payload).catch((e: Error) => this.log.warn(e.message));
+      if (n.channel === 'kora_alerts' && n.payload)
+        void this.relay(n.payload).catch((e: Error) => this.log.warn(e.message));
     });
     try {
       await c.connect();

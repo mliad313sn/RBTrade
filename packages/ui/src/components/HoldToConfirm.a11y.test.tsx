@@ -87,7 +87,8 @@ describe('HoldToConfirmButton accessible alternative (IRTC R5-04)', () => {
         onConfirm={onConfirm}
         locale="fr"
         labels={{
-          instruction: (s) => `Maintenez ${s} s pour confirmer, ou activez une fois pour confirmer dans une fenêtre.`,
+          instruction: (s) =>
+            `Maintenez ${s} s pour confirmer, ou activez une fois pour confirmer dans une fenêtre.`,
           holding: 'Maintien…',
           confirmed: 'Confirmé',
           confirmTitle: 'Confirmer ?',
@@ -100,7 +101,9 @@ describe('HoldToConfirmButton accessible alternative (IRTC R5-04)', () => {
       </HoldToConfirmButton>,
     );
     const btn = screen.getByRole('button', { name: 'Tout arrêter' });
-    expect(btn).toHaveAccessibleDescription('Maintenez 1,5 s pour confirmer, ou activez une fois pour confirmer dans une fenêtre.');
+    expect(btn).toHaveAccessibleDescription(
+      'Maintenez 1,5 s pour confirmer, ou activez une fois pour confirmer dans une fenêtre.',
+    );
     act(() => btn.click());
     expect(screen.getByRole('alertdialog', { name: 'Confirmer ?' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));

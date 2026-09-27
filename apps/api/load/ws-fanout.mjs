@@ -78,7 +78,17 @@ if (!isMainThread && workerData.role === 'publisher') {
     if (m === 'stop') stop = true;
   });
   const status = setInterval(() => {
-    r.publish(`${prefix}status`, JSON.stringify({ type: 'status', state: 'ok', ts: Date.now(), feeds: [], staleSymbols: [], reason: 'LOADTEST' }));
+    r.publish(
+      `${prefix}status`,
+      JSON.stringify({
+        type: 'status',
+        state: 'ok',
+        ts: Date.now(),
+        feeds: [],
+        staleSymbols: [],
+        reason: 'LOADTEST',
+      }),
+    );
   }, 500);
   const start = now();
   let tick = 0;
@@ -126,7 +136,9 @@ if (!isMainThread && workerData.role === 'clients') {
       sockets.push(ws);
       ws.on('open', () => {
         ws.send(JSON.stringify({ op: 'auth', token }));
-        ws.send(JSON.stringify({ op: 'subscribe', channels: [...chosen].map((s) => `quotes:${s}`) }));
+        ws.send(
+          JSON.stringify({ op: 'subscribe', channels: [...chosen].map((s) => `quotes:${s}`) }),
+        );
       });
       ws.on('message', (buf) => {
         const t = now();
@@ -150,7 +162,10 @@ if (!isMainThread && workerData.role === 'clients') {
         res(false);
       });
     });
-  for (let i = 0; i < clients; i += 25) await Promise.all(Array.from({ length: Math.min(25, clients - i) }, (_, j) => connectOne(i + j)));
+  for (let i = 0; i < clients; i += 25)
+    await Promise.all(
+      Array.from({ length: Math.min(25, clients - i) }, (_, j) => connectOne(i + j)),
+    );
   parentPort.postMessage({ type: 'ready' });
   let elu0 = null;
   parentPort.on('message', (m) => {
@@ -161,7 +176,15 @@ if (!isMainThread && workerData.role === 'clients') {
     if (m === 'report') {
       measuring = false;
       const elu = performance.eventLoopUtilization(elu0).utilization;
-      parentPort.postMessage({ type: 'report', hist: { counts: hist.counts, n: hist.n, max: hist.max, sum: hist.sum }, received, snapshots, closed, errors, elu });
+      parentPort.postMessage({
+        type: 'report',
+        hist: { counts: hist.counts, n: hist.n, max: hist.max, sum: hist.sum },
+        received,
+        snapshots,
+        closed,
+        errors,
+        elu,
+      });
       for (const s of sockets) s.terminate();
     }
   });
@@ -173,7 +196,10 @@ if (isMainThread) {
     process.argv
       .slice(2)
       .filter((a) => a !== '--')
-      .reduce((acc, a, i, arr) => (a.startsWith('--') ? [...acc, [a.slice(2), arr[i + 1]]] : acc), []),
+      .reduce(
+        (acc, a, i, arr) => (a.startsWith('--') ? [...acc, [a.slice(2), arr[i + 1]]] : acc),
+        [],
+      ),
   );
   const cfg = {
     clients: Number(args.clients ?? 500),
@@ -189,7 +215,10 @@ if (isMainThread) {
   const envFile = resolve(root, '.env');
   if (existsSync(envFile)) process.loadEnvFile(envFile);
   const prefix = 'kora:load:md:';
-  const symbols = Array.from({ length: cfg.symbols }, (_, i) => `LOADTEST${String(i + 1).padStart(3, '0')}`);
+  const symbols = Array.from(
+    { length: cfg.symbols },
+    (_, i) => `LOADTEST${String(i + 1).padStart(3, '0')}`,
+  );
 
   // Seed SIMULATED load-test instruments into kora_test.
   const { default: pg } = await import('pg');
@@ -238,18 +267,36 @@ if (isMainThread) {
   // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_password -- test-only password for throwaway local accounts, reviewed goal 10
   const password = 'correct-horse-battery-staple';
   const headers = { 'content-type': 'application/json', 'x-kora-csrf': '1' };
-  await fetch(`${base}/auth/signup`, { method: 'POST', headers, body: JSON.stringify({ email, password, displayName: 'Load test', accountType: 'novice' }) });
-  const login = await (await fetch(`${base}/auth/login`, { method: 'POST', headers, body: JSON.stringify({ email, password }) })).json();
+  await fetch(`${base}/auth/signup`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ email, password, displayName: 'Load test', accountType: 'novice' }),
+  });
+  const login = await (
+    await fetch(`${base}/auth/login`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, password }),
+    })
+  ).json();
   const token = login.accessToken;
 
   const cpuTicks = () => {
     const f = readFileSync(`/proc/${api.pid}/stat`, 'utf8').split(') ')[1].split(' ');
     return Number(f[11]) + Number(f[12]);
   };
-  const rssMb = () => Number(readFileSync(`/proc/${api.pid}/status`, 'utf8').match(/VmRSS:\s+(\d+)/)[1]) / 1024;
+  const rssMb = () =>
+    Number(readFileSync(`/proc/${api.pid}/status`, 'utf8').match(/VmRSS:\s+(\d+)/)[1]) / 1024;
 
   const publisher = new Worker(fileURLToPath(import.meta.url), {
-    workerData: { role: 'publisher', redisUrl: process.env.REDIS_URL, prefix, symbols, rate: cfg.rate, tickMs: 5 },
+    workerData: {
+      role: 'publisher',
+      redisUrl: process.env.REDIS_URL,
+      prefix,
+      symbols,
+      rate: cfg.rate,
+      tickMs: 5,
+    },
   });
   if (cfg.clients === 0) {
     // Publisher-only mode for external generators (k6): api + publisher, token printed for the client tool.
@@ -263,21 +310,35 @@ if (isMainThread) {
   const workers = Array.from({ length: cfg.workers }, (_, w) => {
     const n = Math.max(0, Math.min(per, cfg.clients - w * per));
     return new Worker(fileURLToPath(import.meta.url), {
-      workerData: { role: 'clients', url: `ws://127.0.0.1:${cfg.port}/ws`, token, clients: n, symbols, perClient: cfg.perClient, seedBase: w * 100_000 },
+      workerData: {
+        role: 'clients',
+        url: `ws://127.0.0.1:${cfg.port}/ws`,
+        token,
+        clients: n,
+        symbols,
+        perClient: cfg.perClient,
+        seedBase: w * 100_000,
+      },
     });
   }).filter((_, w) => Math.min(per, cfg.clients - w * per) > 0);
   const once = (w, type) => new Promise((res) => w.on('message', (m) => m.type === type && res(m)));
   const t0 = Date.now();
   await Promise.all(workers.map((w) => once(w, 'ready')));
   const connectSec = (Date.now() - t0) / 1000;
-  console.warn(`[load] ${cfg.clients} clients connected and subscribed in ${connectSec.toFixed(1)} s; warming up ${cfg.warmup} s`);
+  console.warn(
+    `[load] ${cfg.clients} clients connected and subscribed in ${connectSec.toFixed(1)} s; warming up ${cfg.warmup} s`,
+  );
   await new Promise((r) => setTimeout(r, cfg.warmup * 1000));
   const cpu0 = cpuTicks();
   const m0 = Date.now();
   for (const w of workers) w.postMessage('measure');
   await new Promise((r) => setTimeout(r, cfg.duration * 1000));
-  const status = await (await fetch(`${base}/market-data/status`, { headers: { authorization: `Bearer ${token}` } })).json();
-  const reports = await Promise.all(workers.map((w) => (w.postMessage('report'), once(w, 'report'))));
+  const status = await (
+    await fetch(`${base}/market-data/status`, { headers: { authorization: `Bearer ${token}` } })
+  ).json();
+  const reports = await Promise.all(
+    workers.map((w) => (w.postMessage('report'), once(w, 'report'))),
+  );
   const measuredSec = (Date.now() - m0) / 1000;
   const cpuPct = ((cpuTicks() - cpu0) / 100 / measuredSec) * 100;
   const rss = rssMb();
@@ -300,25 +361,45 @@ if (isMainThread) {
   const result = {
     date: new Date().toISOString(),
     host: { cpus: (await import('node:os')).cpus().length, node: process.version },
-    scenario: { ...cfg, wsFlushMs: Number(process.env.KORA_MD_WS_FLUSH_MS ?? 0), conflation: '10/s token bucket, burst 2', ingressPerSec: cfg.symbols * cfg.rate, egressPerSecTarget: cfg.clients * cfg.perClient * cfg.rate },
+    scenario: {
+      ...cfg,
+      wsFlushMs: Number(process.env.KORA_MD_WS_FLUSH_MS ?? 0),
+      conflation: '10/s token bucket, burst 2',
+      ingressPerSec: cfg.symbols * cfg.rate,
+      egressPerSecTarget: cfg.clients * cfg.perClient * cfg.rate,
+    },
     connectSeconds: +connectSec.toFixed(2),
     measuredSeconds: +measuredSec.toFixed(2),
     published: pubDone.published,
     received,
     deliveredRatio: +(received / expected).toFixed(4),
     egressPerSec: Math.round(received / measuredSec),
-    latencyMs: { mean: +(hist.sum / hist.n).toFixed(2), p50: +pct(hist, 0.5).toFixed(2), p95: +pct(hist, 0.95).toFixed(2), p99: +pct(hist, 0.99).toFixed(2), max: +hist.max.toFixed(2) },
+    latencyMs: {
+      mean: +(hist.sum / hist.n).toFixed(2),
+      p50: +pct(hist, 0.5).toFixed(2),
+      p95: +pct(hist, 0.95).toFixed(2),
+      p99: +pct(hist, 0.99).toFixed(2),
+      max: +hist.max.toFixed(2),
+    },
     gateway: { cpuPercent: +cpuPct.toFixed(1), rssMb: +rss.toFixed(0), ...status.gateway },
-    loadGenerator: { clientWorkerEventLoopUtilization: clientElu, hostLoadAvg1m: +(await import('node:os')).loadavg()[0].toFixed(2) },
+    loadGenerator: {
+      clientWorkerEventLoopUtilization: clientElu,
+      hostLoadAvg1m: +(await import('node:os')).loadavg()[0].toFixed(2),
+    },
     clientErrors: errors,
     clientClosesDuringRun: closed,
     pass: pct(hist, 0.99) < 50,
   };
   const outDir = resolve(here, 'results');
   mkdirSync(outDir, { recursive: true });
-  const out = resolve(outDir, `ws-fanout-${cfg.clients}c-${cfg.symbols}s-${cfg.perClient}k-flush${Number(process.env.KORA_MD_WS_FLUSH_MS ?? 0)}.json`);
+  const out = resolve(
+    outDir,
+    `ws-fanout-${cfg.clients}c-${cfg.symbols}s-${cfg.perClient}k-flush${Number(process.env.KORA_MD_WS_FLUSH_MS ?? 0)}.json`,
+  );
   writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  console.warn(`[load] p99 fan-out latency ${result.latencyMs.p99} ms → ${result.pass ? 'PASS' : 'FAIL'} (< 50 ms). Wrote ${out}`);
+  console.warn(
+    `[load] p99 fan-out latency ${result.latencyMs.p99} ms → ${result.pass ? 'PASS' : 'FAIL'} (< 50 ms). Wrote ${out}`,
+  );
   process.exit(result.pass ? 0 : 1);
 }

@@ -26,13 +26,22 @@ interface Fixture {
   frames: unknown[];
   responses: Record<string, unknown>;
 }
-const load = (name: string): Fixture => JSON.parse(readFileSync(new URL(`../../fixtures/${name}.json`, import.meta.url), 'utf8')) as Fixture;
+const load = (name: string): Fixture =>
+  JSON.parse(
+    readFileSync(new URL(`../../fixtures/${name}.json`, import.meta.url), 'utf8'),
+  ) as Fixture;
 const spec = (s: string) => SEED_INSTRUMENTS.find((i) => i.symbol === s)!;
 const ENABLED = Object.fromEntries(Object.values(STUB_FLAGS).map((f) => [f, 'true']));
 
 function make(source: StubSource, fixture: Fixture) {
   const transport = new RecordedTransport(fixture.frames, fixture.responses);
-  const adapter = createStubAdapter(source, { env: ENABLED, instruments: SEED_INSTRUMENTS, symbolMap: aliasMap(source), transport, clock: () => 1_790_330_401_000 });
+  const adapter = createStubAdapter(source, {
+    env: ENABLED,
+    instruments: SEED_INSTRUMENTS,
+    symbolMap: aliasMap(source),
+    transport,
+    clock: () => 1_790_330_401_000,
+  });
   return { adapter, transport };
 }
 
@@ -93,11 +102,19 @@ function contract(source: StubSource, symbol: string) {
 
     it('refuses unknown symbols and the live transport', async () => {
       const { adapter } = make(source, fixture);
-      expect(() => adapter.subscribeQuotes(['NOPE'], () => undefined)).toThrow(AdapterNotConfiguredError);
-      const live = createStubAdapter(source, { env: ENABLED, instruments: SEED_INSTRUMENTS, symbolMap: aliasMap(source) });
+      expect(() => adapter.subscribeQuotes(['NOPE'], () => undefined)).toThrow(
+        AdapterNotConfiguredError,
+      );
+      const live = createStubAdapter(source, {
+        env: ENABLED,
+        instruments: SEED_INSTRUMENTS,
+        symbolMap: aliasMap(source),
+      });
       await expect(live.connect()).rejects.toThrow(/live transport not implemented/);
       expect(live.health().state).toBe('error');
-      await expect(live.getCandles(symbol, '15m', 0, 1)).rejects.toBeInstanceOf(AdapterNotConfiguredError);
+      await expect(live.getCandles(symbol, '15m', 0, 1)).rejects.toBeInstanceOf(
+        AdapterNotConfiguredError,
+      );
     });
   });
 }
@@ -110,7 +127,9 @@ describe('feature flags', () => {
   it('every stub is off unless its flag is exactly "true"', () => {
     for (const source of ['broker-fxcfd', 'crypto-testnet', 'equities-provider'] as const) {
       for (const env of [{}, { [STUB_FLAGS[source]]: '1' }, { [STUB_FLAGS[source]]: 'TRUE' }]) {
-        expect(() => createStubAdapter(source, { env, instruments: SEED_INSTRUMENTS, symbolMap: {} })).toThrow(/disabled by feature flag/);
+        expect(() =>
+          createStubAdapter(source, { env, instruments: SEED_INSTRUMENTS, symbolMap: {} }),
+        ).toThrow(/disabled by feature flag/);
       }
     }
   });
@@ -131,11 +150,21 @@ describe('venue-specific decoding', () => {
     ]);
     expect(q[0]!.exchangeTs).toBe(Date.parse('2026-09-25T10:00:00.125Z'));
     expect((adapter as StubAdapterBase).contiguousSeq).toEqual({ quotes: false, trades: false });
-    expect(adapter.encodeSubscription(['EURUSD', 'XAUUSD'])).toEqual({ instruments: 'EUR_USD,XAU_USD' });
-    expect(() => adapter.subscribeTrades(['EURUSD'], () => undefined)).toThrow(/trades not offered/);
-    expect(() => adapter.subscribeDepth(['EURUSD'], 5, () => undefined)).toThrow(/depth not offered/);
+    expect(adapter.encodeSubscription(['EURUSD', 'XAUUSD'])).toEqual({
+      instruments: 'EUR_USD,XAU_USD',
+    });
+    expect(() => adapter.subscribeTrades(['EURUSD'], () => undefined)).toThrow(
+      /trades not offered/,
+    );
+    expect(() => adapter.subscribeDepth(['EURUSD'], 5, () => undefined)).toThrow(
+      /depth not offered/,
+    );
     const candles = await adapter.getCandles('EURUSD', '15m', 0, Number.MAX_SAFE_INTEGER);
-    expect(candles.map((c) => [c.open, c.close, c.closed])).toEqual([['1.08390', '1.08410', true], ['1.08410', '1.08419', true], ['1.08419', '1.08420', false]]);
+    expect(candles.map((c) => [c.open, c.close, c.closed])).toEqual([
+      ['1.08390', '1.08410', true],
+      ['1.08410', '1.08419', true],
+      ['1.08419', '1.08420', false],
+    ]);
   });
 
   it('crypto-testnet: ranged depth ids build a book, the trade id gap and the depth gap are detected', async () => {
@@ -145,18 +174,30 @@ describe('venue-specific decoding', () => {
     const trades = new SeqGapDetector();
     const tradeResults: string[] = [];
     adapter.subscribeDepth(['BTCUSD'], 10, (d) => results.push(book.applyDelta(d as DepthDelta)));
-    adapter.subscribeTrades(['BTCUSD'], (t: Trade) => tradeResults.push(trades.check('BTCUSD', t.seq).status));
+    adapter.subscribeTrades(['BTCUSD'], (t: Trade) =>
+      tradeResults.push(trades.check('BTCUSD', t.seq).status),
+    );
     const snap = await adapter.snapshot('BTCUSD', 10);
     book.applySnapshot(snap.depth!);
     await adapter.connect();
     transport.play();
     expect(results).toEqual(['ok', 'ok', 'gap']);
     expect(tradeResults).toEqual(['first', 'ok', 'gap']);
-    expect(book.top(2).bids).toEqual([['64812.4', '1.3000'], ['64811.5', '2.0000']]);
+    expect(book.top(2).bids).toEqual([
+      ['64812.4', '1.3000'],
+      ['64811.5', '2.0000'],
+    ]);
     expect(snap.quote).toMatchObject({ bid: '64812.4', ask: '64812.5', seq: 1002 });
-    expect(adapter.encodeSubscription(['BTCUSD'])).toEqual({ method: 'SUBSCRIBE', params: ['btcusdt@depth', 'btcusdt@trade', 'btcusdt@bookTicker'], id: 1 });
+    expect(adapter.encodeSubscription(['BTCUSD'])).toEqual({
+      method: 'SUBSCRIBE',
+      params: ['btcusdt@depth', 'btcusdt@trade', 'btcusdt@bookTicker'],
+      id: 1,
+    });
     const k = await adapter.getCandles('BTCUSD', '15m', 0, Number.MAX_SAFE_INTEGER);
-    expect(k.map((c) => [c.bucket, c.close, c.trades])).toEqual([[1790328600000, '64801.2', 542], [1790329500000, '64812.5', 431]]);
+    expect(k.map((c) => [c.bucket, c.close, c.trades])).toEqual([
+      [1790328600000, '64801.2', 542],
+      [1790329500000, '64812.5', 431],
+    ]);
   });
 
   it('equities-provider: JSON-number prices go through registry rounding; quote seq gap detected', async () => {
@@ -172,10 +213,18 @@ describe('venue-specific decoding', () => {
     adapter.subscribeTrades(['AAPL'], (x) => t.push(x));
     await adapter.connect();
     transport.play();
-    expect(q.map((x) => [x.symbol, x.bid, x.ask])).toEqual([['AAPL', '221.36', '221.38'], ['NVDA', '118.92', '118.94'], ['AAPL', '221.37', '221.39'], ['AAPL', '221.35', '221.40']]);
+    expect(q.map((x) => [x.symbol, x.bid, x.ask])).toEqual([
+      ['AAPL', '221.36', '221.38'],
+      ['NVDA', '118.92', '118.94'],
+      ['AAPL', '221.37', '221.39'],
+      ['AAPL', '221.35', '221.40'],
+    ]);
     expect(status).toEqual(['first', 'first', 'ok', 'gap']);
     expect(t).toMatchObject([{ price: '221.37', qty: '100', tradeId: 't-1', side: 'buy' }]);
-    expect(adapter.encodeSubscription(['AAPL'])).toEqual({ action: 'subscribe', params: 'Q.AAPL,T.AAPL' });
+    expect(adapter.encodeSubscription(['AAPL'])).toEqual({
+      action: 'subscribe',
+      params: 'Q.AAPL,T.AAPL',
+    });
     expect(() => adapter.subscribeDepth(['AAPL'], 5, () => undefined)).toThrow(/depth not offered/);
   });
 

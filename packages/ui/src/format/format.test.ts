@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { direction, formatDecimal, formatMoney, formatPercent, formatPrice, spokenDirection } from './format';
+import {
+  direction,
+  formatDecimal,
+  formatMoney,
+  formatPercent,
+  formatPrice,
+  spokenDirection,
+} from './format';
 
 describe('formatters (decimal-safe)', () => {
   it('formats prices at instrument precision', () => {

@@ -227,9 +227,13 @@ describe('config: model only from env, fail closed', () => {
     expect(c.model).toBeNull();
     expect(unavailableReason(c)).toMatch(/KORA_AI_MODEL/);
     expect(selectProvider(c).provider).toBeNull();
-    expect(unavailableReason(loadAiConfig({ KORA_ENV: 'dev', KORA_AI_MODEL: 'm' }))).toMatch(/API key/);
+    expect(unavailableReason(loadAiConfig({ KORA_ENV: 'dev', KORA_AI_MODEL: 'm' }))).toMatch(
+      /API key/,
+    );
     expect(
-      unavailableReason(loadAiConfig({ KORA_ENV: 'dev', KORA_AI_MODEL: 'm', ANTHROPIC_API_KEY: 'k' })),
+      unavailableReason(
+        loadAiConfig({ KORA_ENV: 'dev', KORA_AI_MODEL: 'm', ANTHROPIC_API_KEY: 'k' }),
+      ),
     ).toBeNull();
   });
   it('refuses the scripted provider outside dev/test', () => {
@@ -245,10 +249,16 @@ describe('config: model only from env, fail closed', () => {
   });
   it('IRTC R6-12: test providers need KORA_ENV explicitly dev or test (unset or misspelt is production)', () => {
     expect(loadAiConfig({ KORA_AI_PROVIDER: 'scripted' }).provider).toBe('anthropic');
-    expect(loadAiConfig({ KORA_AI_PROVIDER: 'replay', KORA_AI_REPLAY_DIR: '/tmp' }).provider).toBe('anthropic');
-    expect(loadAiConfig({ KORA_ENV: 'Test', KORA_AI_PROVIDER: 'scripted' }).provider).toBe('anthropic');
+    expect(loadAiConfig({ KORA_AI_PROVIDER: 'replay', KORA_AI_REPLAY_DIR: '/tmp' }).provider).toBe(
+      'anthropic',
+    );
+    expect(loadAiConfig({ KORA_ENV: 'Test', KORA_AI_PROVIDER: 'scripted' }).provider).toBe(
+      'anthropic',
+    );
     expect(loadAiConfig({ KORA_ENV: '', KORA_AI_PROVIDER: 'scripted' }).provider).toBe('anthropic');
-    expect(loadAiConfig({ KORA_ENV: 'dev', KORA_AI_PROVIDER: 'scripted' }).provider).toBe('scripted');
+    expect(loadAiConfig({ KORA_ENV: 'dev', KORA_AI_PROVIDER: 'scripted' }).provider).toBe(
+      'scripted',
+    );
     // The public pseudonym salt is refused too when KORA_ENV is unset.
     expect(loadAiConfig({}).pseudonymSaltMissing).toBe(true);
   });

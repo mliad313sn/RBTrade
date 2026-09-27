@@ -4,7 +4,14 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 import { cx } from '../lib/cx';
 
-export type ButtonVariant = 'secondary' | 'primary' | 'buy' | 'sell' | 'ghost' | 'danger' | 'danger-solid';
+export type ButtonVariant =
+  | 'secondary'
+  | 'primary'
+  | 'buy'
+  | 'sell'
+  | 'ghost'
+  | 'danger'
+  | 'danger-solid';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -21,7 +28,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={cx('k-btn', `k-btn--${variant}`, size !== 'md' && `k-btn--${size}`, block && 'k-btn--block', className)}
+      className={cx(
+        'k-btn',
+        `k-btn--${variant}`,
+        size !== 'md' && `k-btn--${size}`,
+        block && 'k-btn--block',
+        className,
+      )}
       {...rest}
     />
   );
@@ -38,7 +51,14 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref,
 ) {
   return (
-    <Button ref={ref} aria-label={label} title={label} variant={variant} className={cx('k-icon-btn', className)} {...rest}>
+    <Button
+      ref={ref}
+      aria-label={label}
+      title={label}
+      variant={variant}
+      className={cx('k-icon-btn', className)}
+      {...rest}
+    >
       <span aria-hidden="true">{icon}</span>
     </Button>
   );

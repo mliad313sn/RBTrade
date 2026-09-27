@@ -84,8 +84,12 @@ export function HoldingsCard({
                     {h.value !== null ? money(h.value, ccy) : '—'}
                   </span>
                   {pnl !== null ? (
-                    <span className={`block text-sm k-num ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-muted'}`}>
-                      <span aria-hidden="true">{dir === 'up' ? '▲ ' : dir === 'down' ? '▼ ' : ''}</span>
+                    <span
+                      className={`block text-sm k-num ${dir === 'up' ? 'text-up' : dir === 'down' ? 'text-down' : 'text-muted'}`}
+                    >
+                      <span aria-hidden="true">
+                        {dir === 'up' ? '▲ ' : dir === 'down' ? '▼ ' : ''}
+                      </span>
                       {money(pnl, ccy, { signed: true })}
                     </span>
                   ) : (

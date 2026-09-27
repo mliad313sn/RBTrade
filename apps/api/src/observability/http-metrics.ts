@@ -16,7 +16,10 @@ export function httpMetrics(metrics: OpsMetrics) {
       const route = routePath ? `${req.baseUrl}${routePath}` : 'unmatched';
       const status = `${Math.floor(res.statusCode / 100)}xx`;
       metrics.http.inc({ method: req.method, route, status });
-      metrics.httpDuration.observe({ method: req.method, route }, Number(process.hrtime.bigint() - t0) / 1e9);
+      metrics.httpDuration.observe(
+        { method: req.method, route },
+        Number(process.hrtime.bigint() - t0) / 1e9,
+      );
     });
     next();
   };

@@ -168,13 +168,22 @@ describe('CSV export', () => {
   });
 
   it('IRTC R1-11: neutralises spreadsheet formulas in text cells, keeps numbers numeric', () => {
-    for (const label of ['=HYPERLINK("http://evil.example","x")', '+cmd|calc', '-2+3', '@SUM(A1)', '\tx', '\rx']) {
+    for (const label of [
+      '=HYPERLINK("http://evil.example","x")',
+      '+cmd|calc',
+      '-2+3',
+      '@SUM(A1)',
+      '\tx',
+      '\rx',
+    ]) {
       const csv = buildCsv([{ ...a, label }]);
       const header = csv.split('\n').find((l) => l.startsWith('section,metric,'))!;
       const cell = header.slice('section,metric,'.length).replace(/^"|"$/g, '');
       expect(cell.startsWith("'"), label).toBe(true);
     }
-    const lines = buildCsv([{ ...a, label: 'Plain' }], new Date('2026-09-26T00:00:00Z')).trim().split('\n');
+    const lines = buildCsv([{ ...a, label: 'Plain' }], new Date('2026-09-26T00:00:00Z'))
+      .trim()
+      .split('\n');
     expect(lines).toContain('kpi,final_equity_p50,10300.5');
     // negative numbers (numbers or numeric strings) are data, not formulas
     const neg = buildCsv([{ ...a, label: '-12.50' }]);

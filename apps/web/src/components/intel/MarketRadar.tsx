@@ -38,7 +38,22 @@ const REGIONS = [
   ['oceania', 'Oceania'],
   ['global', 'Global OTC'],
 ] as const;
-const CLASSES = ['', 'equity', 'etf', 'bond', 'future', 'option', 'fx', 'metal', 'energy', 'agri', 'crypto', 'index', 'cfd', 'fund'];
+const CLASSES = [
+  '',
+  'equity',
+  'etf',
+  'bond',
+  'future',
+  'option',
+  'fx',
+  'metal',
+  'energy',
+  'agri',
+  'crypto',
+  'index',
+  'cfd',
+  'fund',
+];
 const SECTORS = [
   '',
   'technology',
@@ -156,13 +171,25 @@ export function MarketRadar() {
           <h1 className="m-0 font-display text-xl">Market Radar</h1>
           <p className="m-0 text-xs text-muted">
             Scanner over the SIMULATED global universe · {data?.timeframe ?? '1h'} bars · last scan{' '}
-            {data?.scannedAt ? `${data.scannedAt.slice(0, 16).replace('T', ' ')} UTC` : 'not run yet'} · {data?.instruments ?? 0} instruments
+            {data?.scannedAt
+              ? `${data.scannedAt.slice(0, 16).replace('T', ' ')} UTC`
+              : 'not run yet'}{' '}
+            · {data?.instruments ?? 0} instruments
           </p>
         </div>
-        <form className="flex flex-wrap items-end gap-2 text-xs" aria-label="Radar filters" onSubmit={(e) => e.preventDefault()}>
+        <form
+          className="flex flex-wrap items-end gap-2 text-xs"
+          aria-label="Radar filters"
+          onSubmit={(e) => e.preventDefault()}
+        >
           <label className="flex flex-col gap-0.5">
             Region
-            <select value={region} onChange={(e) => setRegion(e.target.value)} data-testid="radar-region" className="rounded border border-border bg-panel px-2 py-1">
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              data-testid="radar-region"
+              className="rounded border border-border bg-panel px-2 py-1"
+            >
               {REGIONS.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
@@ -172,7 +199,12 @@ export function MarketRadar() {
           </label>
           <label className="flex flex-col gap-0.5">
             Asset class
-            <select value={assetClass} onChange={(e) => setAssetClass(e.target.value)} data-testid="radar-asset-class" className="rounded border border-border bg-panel px-2 py-1">
+            <select
+              value={assetClass}
+              onChange={(e) => setAssetClass(e.target.value)}
+              data-testid="radar-asset-class"
+              className="rounded border border-border bg-panel px-2 py-1"
+            >
               {CLASSES.map((c) => (
                 <option key={c} value={c}>
                   {c || 'All asset classes'}
@@ -182,7 +214,12 @@ export function MarketRadar() {
           </label>
           <label className="flex flex-col gap-0.5">
             Sector
-            <select value={sector} onChange={(e) => setSector(e.target.value)} data-testid="radar-sector" className="rounded border border-border bg-panel px-2 py-1">
+            <select
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              data-testid="radar-sector"
+              className="rounded border border-border bg-panel px-2 py-1"
+            >
               {SECTORS.map((c) => (
                 <option key={c} value={c}>
                   {c ? c.replace(/_/g, ' ') : 'All sectors'}
@@ -192,7 +229,12 @@ export function MarketRadar() {
           </label>
           <label className="flex flex-col gap-0.5">
             Window
-            <select value={win} onChange={(e) => setWin(e.target.value as 'day' | 'week')} data-testid="radar-window" className="rounded border border-border bg-panel px-2 py-1">
+            <select
+              value={win}
+              onChange={(e) => setWin(e.target.value as 'day' | 'week')}
+              data-testid="radar-window"
+              className="rounded border border-border bg-panel px-2 py-1"
+            >
               <option value="day">Past day</option>
               <option value="week">Past week</option>
             </select>
@@ -225,7 +267,10 @@ export function MarketRadar() {
             <h2 id="heat-h" className="m-0 mb-2 text-xs font-semibold uppercase text-muted">
               Heat map · mean momentum z by {groupBy === 'assetClass' ? 'asset class' : groupBy}
             </h2>
-            <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0 md:grid-cols-3" data-testid="radar-heatmap">
+            <ul
+              className="m-0 grid list-none grid-cols-2 gap-2 p-0 md:grid-cols-3"
+              data-testid="radar-heatmap"
+            >
               {(data?.heatMap ?? []).map((c) => (
                 <li
                   key={c.key}
@@ -242,13 +287,19 @@ export function MarketRadar() {
                     ▲ {c.up} / ▼ {c.down} · trending {c.trending}
                   </div>
                   {c.top && (
-                    <button type="button" className="mt-1 underline" onClick={() => setSelected(c.top!.symbol)}>
+                    <button
+                      type="button"
+                      className="mt-1 underline"
+                      onClick={() => setSelected(c.top!.symbol)}
+                    >
                       Top: {c.top.symbol} ({signed(c.top.momentumZ)})
                     </button>
                   )}
                 </li>
               ))}
-              {data && !data.heatMap.length && <li className="text-xs text-muted">Nothing scanned for these filters yet.</li>}
+              {data && !data.heatMap.length && (
+                <li className="text-xs text-muted">Nothing scanned for these filters yet.</li>
+              )}
             </ul>
           </section>
 
@@ -257,7 +308,10 @@ export function MarketRadar() {
               Emerging trends ({win === 'day' ? 'past day' : 'past week'})
             </h2>
             {data?.trends.length ? (
-              <ol className="m-0 flex list-none flex-col gap-1 p-0 text-sm" data-testid="radar-trends">
+              <ol
+                className="m-0 flex list-none flex-col gap-1 p-0 text-sm"
+                data-testid="radar-trends"
+              >
                 {data.trends.map((t) => (
                   <li key={t.symbol}>
                     <button
@@ -273,21 +327,27 @@ export function MarketRadar() {
                         <strong>{t.symbol}</strong> <span className="text-muted">{t.name}</span>
                       </span>
                       <span className="k-num text-xs">
-                        {trendArrow(t.kind)} {TREND_LABELS[t.kind]} · score {t.score.toFixed(2)} · mom z {signed(t.momentumZ)}
+                        {trendArrow(t.kind)} {TREND_LABELS[t.kind]} · score {t.score.toFixed(2)} ·
+                        mom z {signed(t.momentumZ)}
                       </span>
                     </button>
                   </li>
                 ))}
               </ol>
             ) : data && data.movers.length > 0 ? (
-              <p className="m-0 text-xs text-muted">No emerging trend labels for these filters. Biggest movers:</p>
+              <p className="m-0 text-xs text-muted">
+                No emerging trend labels for these filters. Biggest movers:
+              </p>
             ) : (
               // IRTC R5-22: one clear sentence instead of dangling "Biggest movers:" / "Movers:" labels.
               <p className="m-0 text-xs text-muted" data-testid="radar-empty">
                 {data?.scannedAt
                   ? 'No emerging trends or movers for these filters. Widen the filters, or wait for the next scan'
                   : 'No scan has run yet. The scanner runs on the server after each bar closes'}
-                {nextScanUtc(data?.timeframe ?? '1h') ? ` (next around ${nextScanUtc(data?.timeframe ?? '1h')} UTC)` : ''}; this page updates on its own.
+                {nextScanUtc(data?.timeframe ?? '1h')
+                  ? ` (next around ${nextScanUtc(data?.timeframe ?? '1h')} UTC)`
+                  : ''}
+                ; this page updates on its own.
               </p>
             )}
             {data && data.movers.length > 0 && (
@@ -296,7 +356,11 @@ export function MarketRadar() {
                 {data.movers.map((m, i) => (
                   <span key={m.symbol}>
                     {i ? ', ' : ''}
-                    <button type="button" className="underline" onClick={() => setSelected(m.symbol)}>
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => setSelected(m.symbol)}
+                    >
                       {m.symbol}
                     </button>{' '}
                     {arrow(m.momentumZ)} {signed(m.momentumZ)}
@@ -318,12 +382,22 @@ export function MarketRadar() {
                   <input
                     type="checkbox"
                     checked={alertKinds.includes(k)}
-                    onChange={(e) => setAlertKinds((xs) => (e.target.checked ? [...xs, k] : xs.filter((x) => x !== k)))}
+                    onChange={(e) =>
+                      setAlertKinds((xs) =>
+                        e.target.checked ? [...xs, k] : xs.filter((x) => x !== k),
+                      )
+                    }
                   />
                   {TREND_LABELS[k]}
                 </label>
               ))}
-              <button type="button" className="ai-strip__btn" disabled={!alertKinds.length} onClick={() => void addAlert()} data-testid="radar-add-alert">
+              <button
+                type="button"
+                className="ai-strip__btn"
+                disabled={!alertKinds.length}
+                onClick={() => void addAlert()}
+                data-testid="radar-add-alert"
+              >
                 Alert me for the current filters
               </button>
             </fieldset>
@@ -332,7 +406,10 @@ export function MarketRadar() {
                 {alertMsg}
               </p>
             )}
-            <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0 text-xs" data-testid="radar-alerts">
+            <ul
+              className="m-0 mt-2 flex list-none flex-col gap-1 p-0 text-xs"
+              data-testid="radar-alerts"
+            >
               {(alerts?.alerts ?? []).map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-2">
                   <span>
@@ -350,20 +427,33 @@ export function MarketRadar() {
               ))}
               {(alerts?.events ?? []).slice(0, 10).map((e) => (
                 <li key={e.id} className="text-muted" data-testid="radar-alert-event">
-                  {e.createdAt.slice(0, 16).replace('T', ' ')} UTC · {e.symbol} · {String(e.detail.kind ?? '')}
+                  {e.createdAt.slice(0, 16).replace('T', ' ')} UTC · {e.symbol} ·{' '}
+                  {String(e.detail.kind ?? '')}
                 </li>
               ))}
             </ul>
           </section>
         </div>
 
-        <aside aria-label="Trend card" className="min-w-0 rounded border border-border bg-panel p-3">
-          {!selected && <p className="m-0 text-sm text-muted">Select a trend, a heat-map leader or a mover to open its card.</p>}
+        <aside
+          aria-label="Trend card"
+          className="min-w-0 rounded border border-border bg-panel p-3"
+        >
+          {!selected && (
+            <p className="m-0 text-sm text-muted">
+              Select a trend, a heat-map leader or a mover to open its card.
+            </p>
+          )}
           {selected && (
             <div className="mb-2 flex items-center gap-2 text-xs">
               <label className="flex items-center gap-1">
                 Horizon
-                <select value={horizon} onChange={(e) => setHorizon(e.target.value)} data-testid="trend-horizon" className="rounded border border-border bg-panel px-2 py-1">
+                <select
+                  value={horizon}
+                  onChange={(e) => setHorizon(e.target.value)}
+                  data-testid="trend-horizon"
+                  className="rounded border border-border bg-panel px-2 py-1"
+                >
                   {HORIZONS.map((h) => (
                     <option key={h} value={h}>
                       {h}
@@ -378,12 +468,23 @@ export function MarketRadar() {
               {cardError}
             </p>
           )}
-          {selected && !card && !cardError && <p className="m-0 text-sm text-muted">Loading the trend card…</p>}
-          {card && <TrendCardView key={`${card.symbol}-${card.horizon}`} card={card} canDraft={canDraft} canBuild={canBuild} onDraft={onDraft} />}
+          {selected && !card && !cardError && (
+            <p className="m-0 text-sm text-muted">Loading the trend card…</p>
+          )}
+          {card && (
+            <TrendCardView
+              key={`${card.symbol}-${card.horizon}`}
+              card={card}
+              canDraft={canDraft}
+              canBuild={canBuild}
+              onDraft={onDraft}
+            />
+          )}
         </aside>
       </div>
       <p className="m-0 text-xs text-muted">
-        Patterns and forecasts on SIMULATED data. A probability appears only when the calibration table shows skill after costs.{' '}
+        Patterns and forecasts on SIMULATED data. A probability appears only when the calibration
+        table shows skill after costs.{' '}
         <a href="/reliability" className="underline">
           Track record
         </a>

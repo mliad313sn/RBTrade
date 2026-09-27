@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Money, Price } from './Money';
 
-const meta = { title: 'Primitives/Money', component: Money, args: { amount: '250000', currency: 'USD' } } satisfies Meta<typeof Money>;
+const meta = {
+  title: 'Primitives/Money',
+  component: Money,
+  args: { amount: '250000', currency: 'USD' },
+} satisfies Meta<typeof Money>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Pro: Story = {};

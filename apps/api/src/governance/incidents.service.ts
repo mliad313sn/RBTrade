@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   canTransitionIncident,
   incidentPriority,
@@ -81,12 +86,22 @@ export class IncidentsService {
   }
 
   private async row(c: Queryable, id: string, lock = false): Promise<IncidentRow> {
-    const r = await c.query<IncidentRow>(`SELECT * FROM incidents WHERE id = $1 ${lock ? 'FOR UPDATE' : ''}`, [id]);
-    if (!r.rows[0]) throw new NotFoundException({ error: 'not_found', message: 'No such incident.' });
+    const r = await c.query<IncidentRow>(
+      `SELECT * FROM incidents WHERE id = $1 ${lock ? 'FOR UPDATE' : ''}`,
+      [id],
+    );
+    if (!r.rows[0])
+      throw new NotFoundException({ error: 'not_found', message: 'No such incident.' });
     return r.rows[0];
   }
 
-  private async record(c: Queryable, userId: string, action: string, r: IncidentRow, extra: Record<string, string | boolean | null> = {}) {
+  private async record(
+    c: Queryable,
+    userId: string,
+    action: string,
+    r: IncidentRow,
+    extra: Record<string, string | boolean | null> = {},
+  ) {
     await this.audit.record(
       {
         actorId: userId,
@@ -94,7 +109,15 @@ export class IncidentsService {
         action,
         entity: 'incident',
         entityId: r.id,
-        payload: { incidentId: r.id, ref: r.ref, status: r.status, priority: r.priority, category: r.category, exercise: r.exercise, ...extra },
+        payload: {
+          incidentId: r.id,
+          ref: r.ref,
+          status: r.status,
+          priority: r.priority,
+          category: r.category,
+          exercise: r.exercise,
+          ...extra,
+        },
       },
       c,
     );
@@ -102,21 +125,40 @@ export class IncidentsService {
 
   async create(
     userId: string,
-    body: { title: string; description: string; category: IncidentCategory; detectedAt?: string; alertId?: string; exercise: boolean },
+    body: {
+      title: string;
+      description: string;
+      category: IncidentCategory;
+      detectedAt?: string;
+      alertId?: string;
+      exercise: boolean;
+    },
   ) {
     return this.db.tx(async (c) => {
       if (body.alertId) {
         const a = await c.query('SELECT 1 FROM alerts WHERE id = $1', [body.alertId]);
-        if (!a.rowCount) throw new BadRequestException({ error: 'unknown_alert', message: 'No such alert.' });
+        if (!a.rowCount)
+          throw new BadRequestException({ error: 'unknown_alert', message: 'No such alert.' });
       }
       const r = (
         await c.query<IncidentRow>(
           `INSERT INTO incidents (title, description, category, exercise, alert_id, detected_at, logged_by)
            VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, clock_timestamp()), $7) RETURNING *`,
-          [body.title, body.description, body.category, body.exercise, body.alertId ?? null, body.detectedAt ?? null, userId],
+          [
+            body.title,
+            body.description,
+            body.category,
+            body.exercise,
+            body.alertId ?? null,
+            body.detectedAt ?? null,
+            userId,
+          ],
         )
       ).rows[0]!;
-      await this.record(c, userId, 'incident.logged', r, { alertId: body.alertId ?? null, detectedAt: r.detected_at.toISOString() });
+      await this.record(c, userId, 'incident.logged', r, {
+        alertId: body.alertId ?? null,
+        detectedAt: r.detected_at.toISOString(),
+      });
       return incidentView(r);
     });
   }
@@ -131,14 +173,26 @@ export class IncidentsService {
     return this.db.tx(async (c) => {
       const cur = await this.row(c, id, true);
       if (!canTransitionIncident(cur.status, to))
-        throw new ConflictException({ error: 'invalid_transition', message: `An incident that is ${cur.status} cannot become ${to}.` });
+        throw new ConflictException({
+          error: 'invalid_transition',
+          message: `An incident that is ${cur.status} cannot become ${to}.`,
+        });
       const r = await apply(cur, c);
       await this.record(c, userId, `incident.${to}`, r, extra(r));
       return incidentView(r);
     });
   }
 
-  classify(userId: string, id: string, body: { impact: IncidentLevel; urgency: IncidentLevel; category?: IncidentCategory; note?: string }) {
+  classify(
+    userId: string,
+    id: string,
+    body: {
+      impact: IncidentLevel;
+      urgency: IncidentLevel;
+      category?: IncidentCategory;
+      note?: string;
+    },
+  ) {
     const priority = incidentPriority(body.impact, body.urgency);
     return this.transition(
       userId,

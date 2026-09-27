@@ -28,9 +28,18 @@ const Schema = z.object({
    * IRTC R4-02: an approver role younger than this cannot approve anything (cooling period after a
    * grant). Empty = 24 h outside dev/test, 0 in dev/test.
    */
-  KORA_APPROVER_COOLING_HOURS: optionalNumber(z.number().min(0).max(24 * 90)),
+  KORA_APPROVER_COOLING_HOURS: optionalNumber(
+    z
+      .number()
+      .min(0)
+      .max(24 * 90),
+  ),
   /** Pending four-eyes requests expire after this many hours. */
-  KORA_FOUR_EYES_TTL_HOURS: z.coerce.number().min(1).max(24 * 30).default(72),
+  KORA_FOUR_EYES_TTL_HOURS: z.coerce
+    .number()
+    .min(1)
+    .max(24 * 30)
+    .default(72),
   /** A running robot is "near auto-pause" at this % of any of its loss/drawdown limits. */
   KORA_RISK_NEAR_PAUSE_PCT: z.coerce.number().min(1).max(100).default(70),
   /** An account is "near its limit" at this % of its daily/weekly loss limit or leverage cap. */
@@ -45,7 +54,13 @@ const Schema = z.object({
    */
   KORA_AUDIT_ANCHOR_TRUSTED_JWKS: z.string().default(''),
   /** Interval of the in-process anchoring job (0 = off). Empty = daily, except in tests (off). */
-  KORA_AUDIT_ANCHOR_INTERVAL_MS: optionalNumber(z.number().int().min(0).max(7 * 86_400_000)),
+  KORA_AUDIT_ANCHOR_INTERVAL_MS: optionalNumber(
+    z
+      .number()
+      .int()
+      .min(0)
+      .max(7 * 86_400_000),
+  ),
   /** Deployment jurisdiction whose disclosures are served (placeholder until OQ-R2). */
   KORA_JURISDICTION: z
     .string()
@@ -67,13 +82,17 @@ export function loadGovernanceConfig(env: NodeJS.ProcessEnv = process.env) {
   // IRTC R6-12: KORA_ENV must say dev or test explicitly (unset is production).
   const devLike = isExplicitDevOrTest(env);
   if (!devLike && !e.KORA_AUDIT_ANCHOR_JWK) {
-    throw new Error('KORA_AUDIT_ANCHOR_JWK must be set outside dev/test (signed audit anchors, B-007)');
+    throw new Error(
+      'KORA_AUDIT_ANCHOR_JWK must be set outside dev/test (signed audit anchors, B-007)',
+    );
   }
   return {
     env: e.KORA_ENV,
     resumePolicy: e.KORA_FOUR_EYES_RESUME,
     fourEyesTtlMs: Math.round(e.KORA_FOUR_EYES_TTL_HOURS * 3_600_000),
-    approverCoolingMs: Math.round((e.KORA_APPROVER_COOLING_HOURS ?? (devLike ? 0 : 24)) * 3_600_000),
+    approverCoolingMs: Math.round(
+      (e.KORA_APPROVER_COOLING_HOURS ?? (devLike ? 0 : 24)) * 3_600_000,
+    ),
     nearPausePct: e.KORA_RISK_NEAR_PAUSE_PCT,
     nearLimitPct: e.KORA_RISK_NEAR_LIMIT_PCT,
     anchorJwk: e.KORA_AUDIT_ANCHOR_JWK,

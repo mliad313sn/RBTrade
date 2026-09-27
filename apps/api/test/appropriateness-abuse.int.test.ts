@@ -2,12 +2,25 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { bearer, CSRF, failingAnswers, ownerQuery, passingAnswers, PASSWORD, riskWarningAck, startApp, uniqueEmail } from './helpers';
+import {
+  bearer,
+  CSRF,
+  failingAnswers,
+  ownerQuery,
+  passingAnswers,
+  PASSWORD,
+  riskWarningAck,
+  startApp,
+  uniqueEmail,
+} from './helpers';
 
 describe('appropriateness: segregation of duties and sybil limits (IRTC R1-09, R1-11)', () => {
   let app: INestApplication;
   let http: ReturnType<INestApplication['getHttpServer']>;
-  const saved = { signup: process.env.KORA_SIGNUP_RATE_LIMIT_PER_HOUR, attempts: process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY };
+  const saved = {
+    signup: process.env.KORA_SIGNUP_RATE_LIMIT_PER_HOUR,
+    attempts: process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY,
+  };
   beforeAll(async () => {
     process.env.KORA_ENGINE_ENABLED = 'false';
     process.env.KORA_RECONCILIATION_INTERVAL_MS = '0';
@@ -31,29 +44,49 @@ describe('appropriateness: segregation of duties and sybil limits (IRTC R1-09, R
 
   async function novice(ip: string) {
     const email = uniqueEmail('abuse');
-    await request(http).post('/auth/signup').set(CSRF).set('X-Forwarded-For', ip).send({ email, password: PASSWORD, displayName: 'A' }).expect(201);
-    const l = await request(http).post('/auth/login').set(CSRF).set('X-Forwarded-For', ip).send({ email, password: PASSWORD }).expect(200);
+    await request(http)
+      .post('/auth/signup')
+      .set(CSRF)
+      .set('X-Forwarded-For', ip)
+      .send({ email, password: PASSWORD, displayName: 'A' })
+      .expect(201);
+    const l = await request(http)
+      .post('/auth/login')
+      .set(CSRF)
+      .set('X-Forwarded-For', ip)
+      .send({ email, password: PASSWORD })
+      .expect(200);
     return { id: l.body.user.id as string, token: l.body.accessToken as string };
   }
-  const questionnaire = async (token: string) => (await request(http).get('/appropriateness/questionnaire').set(bearer(token)).expect(200)).body;
+  const questionnaire = async (token: string) =>
+    (await request(http).get('/appropriateness/questionnaire').set(bearer(token)).expect(200)).body;
 
   it('R1-09: an auditor passing the assessment gets a clean, audited 409 and keeps their roles', async () => {
     const u = await novice('192.0.2.140');
     await ownerQuery(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'auditor')`, [u.id]);
     const q = await questionnaire(u.token);
     expect(q.status.eligible).toBe(false);
-    const res = await request(http)
-      .post('/appropriateness/attempts')
-      .set(bearer(u.token))
-      .send({ questionnaireId: q.questionnaire.id, version: q.questionnaire.version, answers: passingAnswers() });
+    const res = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({
+      questionnaireId: q.questionnaire.id,
+      version: q.questionnaire.version,
+      answers: passingAnswers(),
+    });
     expect(res.status).toBe(409);
     expect(res.body).toMatchObject({ error: 'segregation_of_duties' });
     expect(res.body.message).toMatch(/auditor/);
-    const roles = await ownerQuery<{ role: string }>('SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role', [u.id]);
+    const roles = await ownerQuery<{ role: string }>(
+      'SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role',
+      [u.id],
+    );
     expect(roles.map((r) => r.role)).toEqual(['auditor', 'novice']);
-    const attempts = await ownerQuery('SELECT 1 FROM questionnaire_attempts WHERE user_id = $1', [u.id]);
+    const attempts = await ownerQuery('SELECT 1 FROM questionnaire_attempts WHERE user_id = $1', [
+      u.id,
+    ]);
     expect(attempts).toHaveLength(0);
-    const events = await ownerQuery<{ action: string }>("SELECT action FROM audit_events WHERE actor_id = $1 AND action LIKE 'appropriateness.%'", [u.id]);
+    const events = await ownerQuery<{ action: string }>(
+      "SELECT action FROM audit_events WHERE actor_id = $1 AND action LIKE 'appropriateness.%'",
+      [u.id],
+    );
     expect(events.map((e) => e.action)).toEqual(['appropriateness.refused']);
   });
 
@@ -62,7 +95,15 @@ describe('appropriateness: segregation of duties and sybil limits (IRTC R1-09, R
     try {
       const codes: number[] = [];
       for (let i = 0; i < 11; i++)
-        codes.push((await request(http).post('/auth/signup').set(CSRF).set('X-Forwarded-For', '198.51.100.150').send({ email: uniqueEmail('sybil'), password: PASSWORD, displayName: 'S' })).status);
+        codes.push(
+          (
+            await request(http)
+              .post('/auth/signup')
+              .set(CSRF)
+              .set('X-Forwarded-For', '198.51.100.150')
+              .send({ email: uniqueEmail('sybil'), password: PASSWORD, displayName: 'S' })
+          ).status,
+        );
       expect(codes.slice(0, 10).every((c) => c === 201)).toBe(true);
       expect(codes[10]).toBe(429);
     } finally {
@@ -81,7 +122,12 @@ describe('appropriateness: segregation of duties and sybil limits (IRTC R1-09, R
         .post('/appropriateness/attempts')
         .set(bearer(token))
         .set('X-Forwarded-For', ip)
-        .send({ questionnaireId: q.questionnaire.id, version: q.questionnaire.version, answers: failingAnswers(), ...extra });
+        .send({
+          questionnaireId: q.questionnaire.id,
+          version: q.questionnaire.version,
+          answers: failingAnswers(),
+          ...extra,
+        });
     delete process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY;
     try {
       // The per-IP ceiling is a guard: it runs before body validation, so an invalid probe (here the

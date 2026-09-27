@@ -38,7 +38,9 @@ export function ProRouteNotice() {
     <div className="max-w-xl" data-testid="pro-route-in-simple-view">
       <Panel>
         <h1 className="k-panel__title m-0">{t('mode.proRoute.title')}</h1>
-        <p className="mt-2 mb-4">{noviceOnly ? t('mode.proRoute.bodyNovice') : t('mode.proRoute.bodyTrader')}</p>
+        <p className="mt-2 mb-4">
+          {noviceOnly ? t('mode.proRoute.bodyNovice') : t('mode.proRoute.bodyTrader')}
+        </p>
         <div className="flex flex-wrap gap-3">
           <Button variant="primary" onClick={switchToPro} disabled={pending}>
             {t('mode.proRoute.switch')}

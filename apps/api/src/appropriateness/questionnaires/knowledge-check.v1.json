@@ -26,7 +26,11 @@
       "prompt": "Your safety net is set 3% below your buy price. The market opens 8% lower after the weekend. What is most likely?",
       "options": [
         { "id": "a", "label": "The trade closes at exactly 3% down.", "points": 0 },
-        { "id": "b", "label": "The trade closes near 8% down, because the price jumped past the safety net.", "points": 1 },
+        {
+          "id": "b",
+          "label": "The trade closes near 8% down, because the price jumped past the safety net.",
+          "points": 1
+        },
         { "id": "c", "label": "The trade stays open until the price comes back.", "points": 0 }
       ]
     },
@@ -36,7 +40,11 @@
       "prompt": "You buy and sell straight away at the same market price. What happens?",
       "options": [
         { "id": "a", "label": "I end up with the same money.", "points": 0 },
-        { "id": "b", "label": "I end up with a bit less, because of the spread and fees.", "points": 1 },
+        {
+          "id": "b",
+          "label": "I end up with a bit less, because of the spread and fees.",
+          "points": 1
+        },
         { "id": "c", "label": "I end up with a bit more.", "points": 0 }
       ]
     },
@@ -46,7 +54,11 @@
       "prompt": "A robot made money in a test on past prices. What does that tell you?",
       "options": [
         { "id": "a", "label": "It will make money from now on.", "points": 0 },
-        { "id": "b", "label": "It worked on those past prices. It can still lose money in the future.", "points": 1 },
+        {
+          "id": "b",
+          "label": "It worked on those past prices. It can still lose money in the future.",
+          "points": 1
+        },
         { "id": "c", "label": "It cannot lose more than it made in the test.", "points": 0 }
       ]
     },

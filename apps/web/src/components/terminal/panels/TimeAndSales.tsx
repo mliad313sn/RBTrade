@@ -23,17 +23,29 @@ export function TimeAndSalesPanel() {
 
   useEffect(() => {
     setPrints([]);
-    return store.onTrades(symbol, (b) => setPrints((p) => [...[...b.trades].reverse(), ...p].slice(0, KEEP)));
+    return store.onTrades(symbol, (b) =>
+      setPrints((p) => [...[...b.trades].reverse(), ...p].slice(0, KEEP)),
+    );
   }, [store, symbol]);
 
   return (
-    <div className="h-full overflow-auto" data-testid="time-and-sales" data-panel-root="trades" tabIndex={0} aria-label="Time and sales">
+    <div
+      className="h-full overflow-auto"
+      data-testid="time-and-sales"
+      data-panel-root="trades"
+      tabIndex={0}
+      aria-label="Time and sales"
+    >
       <table className="k-grid">
         <thead>
           <tr>
             <th scope="col">Time</th>
-            <th scope="col" className="num">Price</th>
-            <th scope="col" className="num">Size</th>
+            <th scope="col" className="num">
+              Price
+            </th>
+            <th scope="col" className="num">
+              Size
+            </th>
             <th scope="col">Side</th>
           </tr>
         </thead>
@@ -41,9 +53,13 @@ export function TimeAndSalesPanel() {
           {prints.map((p) => (
             <tr key={`${p.tradeId}-${p.seq}`}>
               <td className="k-num">{formatClock(p.exchangeTs, timeDisplay)}</td>
-              <td className={`num k-num k-dir--${p.side === 'buy' ? 'up' : 'down'}`}>{formatPrice(p.price, spec?.pricePrecision ?? 5)}</td>
+              <td className={`num k-num k-dir--${p.side === 'buy' ? 'up' : 'down'}`}>
+                {formatPrice(p.price, spec?.pricePrecision ?? 5)}
+              </td>
               <td className="num k-num">{formatQty(p.qty, spec?.qtyPrecision ?? 2)}</td>
-              <td className={`k-dir--${p.side === 'buy' ? 'up' : 'down'}`}>{p.side === 'buy' ? '▲ Buy' : '▼ Sell'}</td>
+              <td className={`k-dir--${p.side === 'buy' ? 'up' : 'down'}`}>
+                {p.side === 'buy' ? '▲ Buy' : '▼ Sell'}
+              </td>
             </tr>
           ))}
         </tbody>

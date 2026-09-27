@@ -27,10 +27,15 @@ export function buildOpenApi(app: INestApplication): OpenAPIObject {
   // Goal 10: response contracts (B-004/B-209/B-312) from the same zod schemas the contract test uses.
   for (const [key, c] of Object.entries(CONTRACTS)) {
     const [method, path] = key.split(' ') as [string, string];
-    const op = (document.paths[path] as Record<string, { responses?: Record<string, unknown> }> | undefined)?.[method.toLowerCase()];
+    const op = (
+      document.paths[path] as Record<string, { responses?: Record<string, unknown> }> | undefined
+    )?.[method.toLowerCase()];
     if (!op) throw new Error(`Contract for an unknown operation: ${key}`);
     const schema = openApiSchema(c.schema, 'output');
-    op.responses = { ...(op.responses ?? {}), [String(c.status)]: { description: 'Success', content: { 'application/json': { schema } } } };
+    op.responses = {
+      ...(op.responses ?? {}),
+      [String(c.status)]: { description: 'Success', content: { 'application/json': { schema } } },
+    };
   }
   return document;
 }
@@ -47,7 +52,14 @@ export async function createApp(opts: { logger?: boolean } = {}): Promise<NestEx
   app.use(
     helmet({
       contentSecurityPolicy: {
-        directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], scriptSrc: ["'self'", "'unsafe-inline'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"] },
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:'],
+          connectSrc: ["'self'"],
+        },
       },
     }),
   );

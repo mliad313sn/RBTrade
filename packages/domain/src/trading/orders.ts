@@ -188,7 +188,10 @@ export function orderShapeIssues(o: Base): Array<{ path: string; message: string
   if (o.tif === 'gtd') need('expireAt', 'Good-till-date needs an expiry time');
   else forbid('expireAt', 'Only good-till-date orders take an expiry time');
   // IRTC R2-16: stop orders rest until triggered, so immediate-or-cancel / fill-or-kill cannot apply.
-  if ((o.type === 'stop' || o.type === 'stop_limit' || o.type === 'trailing') && (o.tif === 'ioc' || o.tif === 'fok'))
+  if (
+    (o.type === 'stop' || o.type === 'stop_limit' || o.type === 'trailing') &&
+    (o.tif === 'ioc' || o.tif === 'fok')
+  )
     issues.push({
       path: 'tif',
       message: 'Stop orders wait for their trigger; use GTC, Day or GTD instead of IOC or FOK',

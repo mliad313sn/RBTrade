@@ -43,7 +43,11 @@ export class MeController {
     const user = await this.users.findById(p.sub);
     const preferences = await this.prefs.get(p.sub, p.roles);
     return {
-      user: { id: p.sub, email: user?.email ?? p.email, displayName: user?.display_name ?? p.email ?? 'KORA user' },
+      user: {
+        id: p.sub,
+        email: user?.email ?? p.email,
+        displayName: user?.display_name ?? p.email ?? 'KORA user',
+      },
       roles: p.roles,
       mfa: p.mfa,
       preferences,
@@ -66,7 +70,19 @@ export class MeController {
     const { after } = await this.db.tx(async (c) => {
       const r = await this.prefs.update(c, p.sub, p.roles, patch);
       await this.audit.record(
-        { actorId: p.sub, actorType: 'user', action: 'preferences.updated', entity: 'user_preferences', entityId: p.sub, payload: { changed: patch, previous: Object.fromEntries(Object.keys(patch).map((k) => [k, r.before[k as keyof UserPreferences]])) } },
+        {
+          actorId: p.sub,
+          actorType: 'user',
+          action: 'preferences.updated',
+          entity: 'user_preferences',
+          entityId: p.sub,
+          payload: {
+            changed: patch,
+            previous: Object.fromEntries(
+              Object.keys(patch).map((k) => [k, r.before[k as keyof UserPreferences]]),
+            ),
+          },
+        },
         c,
       );
       return r;

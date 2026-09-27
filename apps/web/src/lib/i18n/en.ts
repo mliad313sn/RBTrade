@@ -127,7 +127,8 @@ export const en = {
   'appr.riskWarning.loadError': 'The risk warning could not be loaded. Try again later.',
   'appr.riskWarning.version': 'Version {version}',
   'appr.notEligible.title': 'Pro trading cannot be unlocked for this account.',
-  'appr.notEligible.body': 'One of your roles cannot be mixed with trading. If this looks wrong, ask an admin.',
+  'appr.notEligible.body':
+    'One of your roles cannot be mixed with trading. If this looks wrong, ask an admin.',
   'user.menu': 'Account menu for {name}',
   'user.unlockPro': 'Unlock Pro trading',
   'user.settings': 'Settings',

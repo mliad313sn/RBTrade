@@ -14,12 +14,22 @@ async function scan(page: Page, name: string): Promise<void> {
   await page.waitForLoadState('networkidle').catch(() => undefined);
   const res = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   const serious = res.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-  const report = serious.map((v) => `${name}: ${v.id} (${v.impact}) ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
+  const report = serious.map(
+    (v) => `${name}: ${v.id} (${v.impact}) ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`,
+  );
   expect(report, report.join('\n')).toEqual([]);
-  expect(res.violations.filter((v) => v.id === 'color-contrast').map((v) => `${name}: ${v.nodes.length} contrast`)).toEqual([]);
+  expect(
+    res.violations
+      .filter((v) => v.id === 'color-contrast')
+      .map((v) => `${name}: ${v.nodes.length} contrast`),
+  ).toEqual([]);
 }
 
-async function visit(page: Page, path: string, ready: (p: Page) => Promise<void> = async () => undefined): Promise<void> {
+async function visit(
+  page: Page,
+  path: string,
+  ready: (p: Page) => Promise<void> = async () => undefined,
+): Promise<void> {
   const res = await page.goto(path);
   expect(res?.status() ?? 200, `${path} answers`).toBeLessThan(500);
   await ready(page);
@@ -32,36 +42,79 @@ async function grant(req: APIRequestContext, email: string, role: string): Promi
   const c = new pg.Client({ connectionString: url });
   await c.connect();
   try {
-    await c.query(`INSERT INTO user_roles (user_id, role) SELECT id, $2 FROM users WHERE email = $1 ON CONFLICT DO NOTHING`, [email, role]);
+    await c.query(
+      `INSERT INTO user_roles (user_id, role) SELECT id, $2 FROM users WHERE email = $1 ON CONFLICT DO NOTHING`,
+      [email, role],
+    );
   } finally {
     await c.end();
   }
-  const login = await (await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
-  const enr = await (await req.post('/api/auth/mfa/enroll', { headers: CSRF, data: { mfaToken: login.mfaToken } })).json();
-  expect((await req.post('/api/auth/mfa/verify', { headers: CSRF, data: { mfaToken: login.mfaToken, code: totp(enr.secret) } })).status()).toBe(200);
+  const login = await (
+    await req.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })
+  ).json();
+  const enr = await (
+    await req.post('/api/auth/mfa/enroll', { headers: CSRF, data: { mfaToken: login.mfaToken } })
+  ).json();
+  expect(
+    (
+      await req.post('/api/auth/mfa/verify', {
+        headers: CSRF,
+        data: { mfaToken: login.mfaToken, code: totp(enr.secret) },
+      })
+    ).status(),
+  ).toBe(200);
 }
 
 test('public routes pass axe: login, sign-up, reliability, offline', async ({ page }) => {
   for (const path of ['/login', '/signup', '/reliability', '/offline']) await visit(page, path);
 });
 
-test('every novice route passes axe (novice-light): onboarding, home, practice, learn, lesson, check, auto-invest, portfolio, settings, appropriateness, forbidden', async ({ page }) => {
+test('every novice route passes axe (novice-light): onboarding, home, practice, learn, lesson, check, auto-invest, portfolio, settings, appropriateness, forbidden', async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await apiSignIn(page, 'novice', { onboarded: false });
   await visit(page, '/onboarding');
   await apiOnboard(page.request);
-  for (const path of ['/home', '/practice', '/learn', '/learn/trading', '/learn/check', '/auto-invest', '/portfolio', '/settings', '/appropriateness']) await visit(page, path);
+  for (const path of [
+    '/home',
+    '/practice',
+    '/learn',
+    '/learn/trading',
+    '/learn/check',
+    '/auto-invest',
+    '/portfolio',
+    '/settings',
+    '/appropriateness',
+  ])
+    await visit(page, path);
   await visit(page, '/robots/builder'); // friendly 403 page
 });
 
-test('every Pro route passes axe (pro-dark): terminal, robots, builder, simulator, radar, audit, portfolio, settings', async ({ page }) => {
+test('every Pro route passes axe (pro-dark): terminal, robots, builder, simulator, radar, audit, portfolio, settings', async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await apiSignIn(page, 'trader');
-  await visit(page, '/terminal', async (p) => expect(p.getByTestId('status-bar')).toContainText('Connected'));
-  for (const path of ['/robots', '/robots/builder', '/simulator', '/radar', '/audit', '/portfolio', '/settings']) await visit(page, path);
+  await visit(page, '/terminal', async (p) =>
+    expect(p.getByTestId('status-bar')).toContainText('Connected'),
+  );
+  for (const path of [
+    '/robots',
+    '/robots/builder',
+    '/simulator',
+    '/radar',
+    '/audit',
+    '/portfolio',
+    '/settings',
+  ])
+    await visit(page, path);
 });
 
-test('second- and third-line routes pass axe: risk console (risk officer) and internal audit (auditor)', async ({ page, browser }) => {
+test('second- and third-line routes pass axe: risk console (risk officer) and internal audit (auditor)', async ({
+  page,
+  browser,
+}) => {
   test.setTimeout(120_000);
   const ro = await apiSignIn(page, 'novice');
   await grant(page.request, ro.email, 'risk_officer');
@@ -74,7 +127,9 @@ test('second- and third-line routes pass axe: risk console (risk officer) and in
   await ctx.close();
 });
 
-test('keyboard-only walkthrough: skip link, visible focus, kill switch and palette open and close from the keyboard with focus returned', async ({ page }) => {
+test('keyboard-only walkthrough: skip link, visible focus, kill switch and palette open and close from the keyboard with focus returned', async ({
+  page,
+}) => {
   await apiSignIn(page, 'trader');
   await page.goto('/terminal');
   await expect(page.getByTestId('status-bar')).toContainText('Connected');
@@ -96,7 +151,10 @@ test('keyboard-only walkthrough: skip link, visible focus, kill switch and palet
       const s = getComputedStyle(e);
       return (s.outlineStyle !== 'none' && s.outlineWidth !== '0px') || s.boxShadow !== 'none';
     });
-    expect(ring, `focus ring on ${await el.getAttribute('data-testid') ?? await el.textContent()}`).toBe(true);
+    expect(
+      ring,
+      `focus ring on ${(await el.getAttribute('data-testid')) ?? (await el.textContent())}`,
+    ).toBe(true);
   }
   // 3. the kill switch opens with a 1.5 s Space hold and Escape closes it, focus back on the button
   const ks = page.getByTestId('kill-switch');
@@ -118,22 +176,45 @@ test('keyboard-only walkthrough: skip link, visible focus, kill switch and palet
   await expect(dialog).toBeHidden();
 });
 
-test('colour convention: blue/orange by default, the setting switches the tokens, and ▲▼ always accompany direction', async ({ page }) => {
+test('colour convention: blue/orange by default, the setting switches the tokens, and ▲▼ always accompany direction', async ({
+  page,
+}) => {
   await apiSignIn(page, 'trader');
   await page.goto('/terminal');
   await expect(page.getByTestId('status-bar')).toContainText('Connected');
-  const up = () => page.evaluate(() => getComputedStyle(document.querySelector('[data-colors]')!).getPropertyValue('--k-up').trim().toUpperCase());
-  const down = () => page.evaluate(() => getComputedStyle(document.querySelector('[data-colors]')!).getPropertyValue('--k-down').trim().toUpperCase());
+  const up = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.querySelector('[data-colors]')!)
+        .getPropertyValue('--k-up')
+        .trim()
+        .toUpperCase(),
+    );
+  const down = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.querySelector('[data-colors]')!)
+        .getPropertyValue('--k-down')
+        .trim()
+        .toUpperCase(),
+    );
   expect(await up()).toBe('#4DA3FF');
   expect(await down()).toBe('#FF9F40');
   // direction is never colour alone: the watchlist change column carries ▲ or ▼
-  await expect(page.getByTestId('watchlist').getByText(/[▲▼]/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('watchlist').getByText(/[▲▼]/).first()).toBeVisible({
+    timeout: 15_000,
+  });
   for (const [conv, u, d] of [
     ['green_red', '#3FB950', '#FF6B6B'],
     ['red_up_asia', '#FF6B6B', '#3FB950'],
     ['blue_orange', '#4DA3FF', '#FF9F40'],
   ] as const) {
-    expect((await page.request.put('/api/me/preferences', { headers: CSRF, data: { colourConvention: conv } })).status()).toBe(200);
+    expect(
+      (
+        await page.request.put('/api/me/preferences', {
+          headers: CSRF,
+          data: { colourConvention: conv },
+        })
+      ).status(),
+    ).toBe(200);
     await page.reload();
     await expect(page.locator(`[data-colors="${conv}"]`).first()).toBeAttached();
     expect(await up()).toBe(u);
@@ -141,7 +222,10 @@ test('colour convention: blue/orange by default, the setting switches the tokens
   }
 });
 
-test('screen-reader spot checks: landmarks, names and live regions on the terminal and the novice home', async ({ page, browser }) => {
+test('screen-reader spot checks: landmarks, names and live regions on the terminal and the novice home', async ({
+  page,
+  browser,
+}) => {
   // What a screen reader announces comes from the accessibility tree: check it, not pixels.
   await apiSignIn(page, 'trader');
   await page.goto('/terminal');
@@ -152,13 +236,26 @@ test('screen-reader spot checks: landmarks, names and live regions on the termin
   await expect(page.getByTestId('kill-switch')).toHaveAccessibleName(/kill switch/i);
   // connection state is announced politely; the ticket preview is summarised in its own polite status,
   // once per settled edit (IRTC R5-05: the figures themselves are not a live region, they change every tick)
-  await expect(page.getByTestId('status-bar').locator('[role="status"][aria-live="polite"]')).toHaveCount(1);
+  await expect(
+    page.getByTestId('status-bar').locator('[role="status"][aria-live="polite"]'),
+  ).toHaveCount(1);
   await expect(page.getByTestId('ticket-announce')).toHaveAttribute('aria-live', 'polite');
   await expect(page.getByTestId('ticket-preview')).not.toHaveAttribute('aria-live', /.+/);
   // every button in the top bar has an accessible name
-  const unnamed = await page.getByTestId('pro-topbar').getByRole('button').evaluateAll((els) =>
-    els.filter((e) => !(e.getAttribute('aria-label') || e.textContent?.trim() || e.getAttribute('aria-labelledby'))).length,
-  );
+  const unnamed = await page
+    .getByTestId('pro-topbar')
+    .getByRole('button')
+    .evaluateAll(
+      (els) =>
+        els.filter(
+          (e) =>
+            !(
+              e.getAttribute('aria-label') ||
+              e.textContent?.trim() ||
+              e.getAttribute('aria-labelledby')
+            ),
+        ).length,
+    );
   expect(unnamed).toBe(0);
 
   const ctx = await browser.newContext();

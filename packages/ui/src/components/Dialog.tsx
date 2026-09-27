@@ -20,10 +20,20 @@ export interface DialogProps {
  * element that had focus when the dialog opened is remembered and gets focus back on close
  * (WCAG 2.4.3; goal 10 keyboard walkthrough finding).
  */
-export function Dialog({ open, onOpenChange, title, description, children, actions, alert, ...rest }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  actions,
+  alert,
+  ...rest
+}: DialogProps) {
   const opener = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
-    if (open && typeof document !== 'undefined') opener.current = document.activeElement as HTMLElement | null;
+    if (open && typeof document !== 'undefined')
+      opener.current = document.activeElement as HTMLElement | null;
   }, [open]);
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>

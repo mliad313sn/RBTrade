@@ -17,7 +17,12 @@ import { apiSignIn } from './helpers';
  * 3. the ≥ 1280 px breakpoint: no horizontal scroll, every panel visible and usable.
  */
 
-const REGIONS = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/prototype-regions.json', import.meta.url)), 'utf8')) as {
+const REGIONS = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL('./fixtures/prototype-regions.json', import.meta.url)),
+    'utf8',
+  ),
+) as {
   regions: Record<string, [number, number, number, number]>;
 };
 const PROTOTYPE = fileURLToPath(new URL('../../../design/prototype/Main.png', import.meta.url));
@@ -40,7 +45,15 @@ async function openFixtureTerminal(page: Page) {
   await page.waitForTimeout(500);
   // IRTC R6-16: the bodies behind these pixels match the published API contract.
   expect(fixtures.violations, 'fixture bodies vs packages/sdk/openapi.json').toEqual([]);
-  for (const t of ['/accounts/me', '/positions', '/orders', '/quotes', '/candles', '/calendar', '/me/watchlists'])
+  for (const t of [
+    '/accounts/me',
+    '/positions',
+    '/orders',
+    '/quotes',
+    '/candles',
+    '/calendar',
+    '/me/watchlists',
+  ])
     expect(fixtures.served, `fixture served ${t}`).toContain(t);
 }
 
@@ -52,7 +65,8 @@ async function measure(page: Page): Promise<Record<string, [number, number, numb
       const r = el.getBoundingClientRect();
       return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)];
     };
-    const group = (id: string) => document.querySelector(`[data-panel-root="${id}"]`)?.closest('.dv-groupview');
+    const group = (id: string) =>
+      document.querySelector(`[data-panel-root="${id}"]`)?.closest('.dv-groupview');
     const hazard = document.querySelector('.k-hazard');
     const top = document.querySelector('[data-testid="pro-topbar"]');
     const t = rect(top)!;
@@ -91,7 +105,8 @@ function lumaGrid(png: PNG, f: number): { w: number; h: number; v: Float64Array 
       for (let dy = 0; dy < f; dy++)
         for (let dx = 0; dx < f; dx++) {
           const i = ((y * f + dy) * png.width + (x * f + dx)) * 4;
-          s += (0.2126 * png.data[i]! + 0.7152 * png.data[i + 1]! + 0.0722 * png.data[i + 2]!) / 255;
+          s +=
+            (0.2126 * png.data[i]! + 0.7152 * png.data[i + 1]! + 0.0722 * png.data[i + 2]!) / 255;
         }
       raw[y * w + x] = s / (f * f);
     }
@@ -113,7 +128,9 @@ function lumaGrid(png: PNG, f: number): { w: number; h: number; v: Float64Array 
   return { w, h, v };
 }
 
-test('visual regression at 1440×900: own baseline, structure and perception vs the prototype', async ({ page }) => {
+test('visual regression at 1440×900: own baseline, structure and perception vs the prototype', async ({
+  page,
+}) => {
   test.setTimeout(60_000);
   await openFixtureTerminal(page);
 
@@ -134,8 +151,13 @@ test('visual regression at 1440×900: own baseline, structure and perception vs 
     const edges = proto.map((p, i) => Math.abs(p - got![i]!));
     const u = iou(proto, got!);
     ious.push(u);
-    rows.push(`${name.padEnd(10)} proto ${JSON.stringify(proto)} ours ${JSON.stringify(got)} max edge Δ ${Math.max(...edges)} px IoU ${u.toFixed(3)}`);
-    expect(Math.max(...edges), `${name}: every edge within ${EDGE_TOLERANCE_PX} px (${rows.at(-1)})`).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    rows.push(
+      `${name.padEnd(10)} proto ${JSON.stringify(proto)} ours ${JSON.stringify(got)} max edge Δ ${Math.max(...edges)} px IoU ${u.toFixed(3)}`,
+    );
+    expect(
+      Math.max(...edges),
+      `${name}: every edge within ${EDGE_TOLERANCE_PX} px (${rows.at(-1)})`,
+    ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
   }
   const meanIou = ious.reduce((a, b) => a + b, 0) / ious.length;
 
@@ -169,17 +191,25 @@ test('visual regression at 1440×900: own baseline, structure and perception vs 
   PNG.bitblt(proto, side, 0, 0, proto.width, proto.height, 0, 0);
   PNG.bitblt(shot, side, 0, 0, shot.width, shot.height, proto.width, 0);
   writeFileSync(`${OUT}prototype-vs-ours.png`, PNG.sync.write(side));
-  const report = [...rows, `mean IoU ${meanIou.toFixed(3)} (≥ ${MIN_MEAN_IOU})`, `perceptual mean |Δluma| ${meanDiff.toFixed(4)} (≤ ${MAX_PERCEPTUAL_DIFF})`].join('\n');
+  const report = [
+    ...rows,
+    `mean IoU ${meanIou.toFixed(3)} (≥ ${MIN_MEAN_IOU})`,
+    `perceptual mean |Δluma| ${meanDiff.toFixed(4)} (≤ ${MAX_PERCEPTUAL_DIFF})`,
+  ].join('\n');
   writeFileSync(`${OUT}report.txt`, `${report}\n`);
   process.stdout.write(`[visual]\n${report}\n`);
   expect(meanIou).toBeGreaterThanOrEqual(MIN_MEAN_IOU);
   expect(meanDiff).toBeLessThanOrEqual(MAX_PERCEPTUAL_DIFF);
 });
 
-test('≥ 1280 px breakpoint: no horizontal scroll, every panel visible and at least 160 px wide', async ({ page }) => {
+test('≥ 1280 px breakpoint: no horizontal scroll, every panel visible and at least 160 px wide', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openFixtureTerminal(page);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   const r = await measure(page);
   for (const name of ['watchlist', 'chart', 'orderbook', 'ticket', 'blotter', 'calendar']) {
     const box = r[name]!;
@@ -192,6 +222,10 @@ test('≥ 1280 px breakpoint: no horizontal scroll, every panel visible and at l
 });
 
 test('the fixture contract check rejects a drifted body (IRTC R6-16 self-check)', () => {
-  expect(contractViolations('/accounts/me', { id: 'not-a-uuid', equity: 1234.5 }).length).toBeGreaterThan(0);
-  expect(contractViolations('/no/such/path', {})).toEqual(['get /no/such/path: no 200 JSON response schema in openapi.json']);
+  expect(
+    contractViolations('/accounts/me', { id: 'not-a-uuid', equity: 1234.5 }).length,
+  ).toBeGreaterThan(0);
+  expect(contractViolations('/no/such/path', {})).toEqual([
+    'get /no/such/path: no 200 JSON response schema in openapi.json',
+  ]);
 });

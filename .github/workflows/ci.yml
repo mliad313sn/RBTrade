@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LIVE_TRADING_ENABLED: "false"
-  TURBO_TELEMETRY_DISABLED: "1"
-  NEXT_TELEMETRY_DISABLED: "1"
+  LIVE_TRADING_ENABLED: 'false'
+  TURBO_TELEMETRY_DISABLED: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
   node:
@@ -29,12 +29,12 @@ jobs:
         image: timescale/timescaledb:2.17.2-pg16
         env:
           POSTGRES_PASSWORD: postgres_ci_only
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
       redis:
         image: redis:7.4-alpine
-        ports: ["6379:6379"]
+        ports: ['6379:6379']
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
@@ -48,7 +48,7 @@ jobs:
           cache: pnpm
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: CI env (service-container ports)
@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        python: ["3.11", "3.12"]
+        python: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -160,7 +160,7 @@ jobs:
         run: pnpm audit --prod --audit-level high
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - name: Install Semgrep and detect-secrets
         run: pip install semgrep==1.178.0 detect-secrets==1.5.0
       - name: SAST (Semgrep registry rulesets + KORA rules, fail on any finding)
@@ -175,7 +175,7 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: '1'
           skip-dirs: design,docs
 
   images:
@@ -208,4 +208,4 @@ jobs:
           image-ref: kora-${{ matrix.image }}:ci
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: '1'

@@ -13,7 +13,11 @@ export interface PanelProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
 export function Panel({ title, actions, children, className, bodyClassName, ...rest }: PanelProps) {
   const id = useId();
   return (
-    <section className={cx('k-panel', className)} aria-labelledby={title ? id : undefined} {...rest}>
+    <section
+      className={cx('k-panel', className)}
+      aria-labelledby={title ? id : undefined}
+      {...rest}
+    >
       {title || actions ? (
         <header className="k-panel__head">
           {title ? (

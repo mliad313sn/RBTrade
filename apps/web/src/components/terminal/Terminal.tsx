@@ -4,18 +4,43 @@ import 'dockview-react/dist/styles/dockview.css';
 import './terminal.css';
 
 import { useToast } from '@kora/ui';
-import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type IDockviewHeaderActionsProps, type IDockviewPanelProps, type SerializedDockview } from 'dockview-react';
+import {
+  DockviewReact,
+  type DockviewApi,
+  type DockviewReadyEvent,
+  type IDockviewHeaderActionsProps,
+  type IDockviewPanelProps,
+  type SerializedDockview,
+} from 'dockview-react';
 import { LayoutGrid } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api as client } from '@/lib/api-browser';
 import type { AiStripMode } from '@/lib/terminal/ai-strip';
 import { isTypingTarget, isMacPlatform, matchHotkey } from '@/lib/terminal/hotkeys';
-import { buildDefaultLayout, clearLocalLayout, FOCUS_PANELS, isCompleteLayout, loadLocalLayout, LOCAL_ACTIVE_KEY, PANEL_IDS, PANEL_TITLES, saveLocalLayout, type PanelId } from '@/lib/terminal/layout';
+import {
+  buildDefaultLayout,
+  clearLocalLayout,
+  FOCUS_PANELS,
+  isCompleteLayout,
+  loadLocalLayout,
+  LOCAL_ACTIVE_KEY,
+  PANEL_IDS,
+  PANEL_TITLES,
+  saveLocalLayout,
+  type PanelId,
+} from '@/lib/terminal/layout';
 import { useTerminal, type PanelTarget } from '@/lib/terminal/store';
 import { useTrading } from '@/lib/terminal/trading';
 
-import { BlotterSummary, AlertsPanel, FillsPanel, OrdersPanel, PositionsPanel, RiskPanel } from './panels/Blotter';
+import {
+  BlotterSummary,
+  AlertsPanel,
+  FillsPanel,
+  OrdersPanel,
+  PositionsPanel,
+  RiskPanel,
+} from './panels/Blotter';
 import { CalendarPanel } from './panels/Calendar';
 import { ChartPanel } from './panels/Chart';
 import { OrderBookPanel } from './panels/OrderBook';
@@ -25,12 +50,21 @@ import { WatchlistPanel } from './panels/Watchlist';
 import { HotkeyCheatSheet } from './HotkeyCheatSheet';
 import { TerminalProvider, useHotkeys, useTerminalSettings } from './TerminalContext';
 
-const DOCK_THEME = { name: 'kora', className: 'dockview-theme-kora', gap: 8, colorScheme: 'dark' as const, dndOverlayMounting: 'absolute' as const, dndTabIndicator: 'line' as const };
+const DOCK_THEME = {
+  name: 'kora',
+  className: 'dockview-theme-kora',
+  gap: 8,
+  colorScheme: 'dark' as const,
+  dndOverlayMounting: 'absolute' as const,
+  dndTabIndicator: 'line' as const,
+};
 
 /** Spread text for the order book tab bar (set by the panel). */
 let setBookSpread: ((t: string) => void) | null = null;
 
-function panelComponents(aiStrip: AiStripMode): Record<string, React.FunctionComponent<IDockviewPanelProps>> {
+function panelComponents(
+  aiStrip: AiStripMode,
+): Record<string, React.FunctionComponent<IDockviewPanelProps>> {
   return {
     watchlist: (p) => <WatchlistPanel onTitle={(t) => p.api.setTitle(t)} />,
     calendar: (p) => <CalendarPanel onTitle={(t) => p.api.setTitle(t)} />,
@@ -63,7 +97,14 @@ function BookSpread() {
 
 function LayoutMenu() {
   return (
-    <button type="button" className="dv-action" onClick={() => window.dispatchEvent(new CustomEvent('kora:layout-menu'))} aria-label="Layouts: save, load or reset" title="Layouts" data-testid="layout-menu">
+    <button
+      type="button"
+      className="dv-action"
+      onClick={() => window.dispatchEvent(new CustomEvent('kora:layout-menu'))}
+      aria-label="Layouts: save, load or reset"
+      title="Layouts"
+      data-testid="layout-menu"
+    >
       <LayoutGrid size={13} aria-hidden="true" /> Layout
     </button>
   );
@@ -106,7 +147,11 @@ function LayoutDialog({ dock, onClose }: { dock: DockviewApi; onClose: () => voi
     }
   };
   const apply = (l: { name: string; layout: Record<string, unknown> }) => {
-    if (!isCompleteLayout(l.layout)) return toast.push('That layout is from an older version; reset and save it again.', 'critical');
+    if (!isCompleteLayout(l.layout))
+      return toast.push(
+        'That layout is from an older version; reset and save it again.',
+        'critical',
+      );
     try {
       dock.fromJSON(l.layout as unknown as SerializedDockview);
       const now = dock.toJSON();
@@ -118,7 +163,13 @@ function LayoutDialog({ dock, onClose }: { dock: DockviewApi; onClose: () => voi
     }
   };
   return (
-    <div className="lay-pop" role="dialog" aria-label="Layouts" data-testid="layout-dialog" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+    <div
+      className="lay-pop"
+      role="dialog"
+      aria-label="Layouts"
+      data-testid="layout-dialog"
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+    >
       <div className="flex items-center justify-between">
         <strong className="text-xs uppercase tracking-wider">Layouts</strong>
         <button type="button" className="bl-btn" onClick={onClose} aria-label="Close layouts">
@@ -135,7 +186,16 @@ function LayoutDialog({ dock, onClose }: { dock: DockviewApi; onClose: () => voi
         <label className="k-sr-only" htmlFor="lay-name">
           Layout name
         </label>
-        <input id="lay-name" className="k-input flex-1" placeholder="Name, e.g. Scalping" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} data-testid="layout-name" autoFocus />
+        <input
+          id="lay-name"
+          className="k-input flex-1"
+          placeholder="Name, e.g. Scalping"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={40}
+          data-testid="layout-name"
+          autoFocus
+        />
         <button type="submit" className="bl-btn" data-testid="layout-save">
           Save
         </button>
@@ -143,10 +203,20 @@ function LayoutDialog({ dock, onClose }: { dock: DockviewApi; onClose: () => voi
       <ul className="m-0 p-0 list-none flex flex-col gap-1">
         {saved.map((l) => (
           <li key={l.name} className="flex items-center gap-1">
-            <button type="button" className="bl-btn flex-1 text-left" onClick={() => apply(l)} data-testid={`layout-load-${l.name}`}>
+            <button
+              type="button"
+              className="bl-btn flex-1 text-left"
+              onClick={() => apply(l)}
+              data-testid={`layout-load-${l.name}`}
+            >
               {l.name}
             </button>
-            <button type="button" className="bl-btn" aria-label={`Delete layout ${l.name}`} onClick={() => void client.deleteLayout(l.name).then(load)}>
+            <button
+              type="button"
+              className="bl-btn"
+              aria-label={`Delete layout ${l.name}`}
+              onClick={() => void client.deleteLayout(l.name).then(load)}
+            >
               ✕
             </button>
           </li>
@@ -176,7 +246,9 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
   const hotkeys = useHotkeys();
   const requestFocus = useTerminal((s) => s.requestFocus);
   const setCheatSheet = useTerminal((s) => s.setCheatSheet);
-  const openOrders = useTrading((s) => s.orders.filter((o) => o.execType !== 'none' || o.type === 'oco').length);
+  const openOrders = useTrading(
+    (s) => s.orders.filter((o) => o.execType !== 'none' || o.type === 'oco').length,
+  );
   const positionsCount = useTrading((s) => s.positions.length);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disposed = useRef(false);
@@ -228,7 +300,9 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
       panel.api.setActive();
       if (!focusRoot) return;
       if (target === 'ticket') return requestFocus('ticket');
-      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-panel-root="${id}"]`)?.focus());
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>(`[data-panel-root="${id}"]`)?.focus(),
+      );
     },
     [dock, requestFocus],
   );
@@ -286,7 +360,9 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
       const panel = id ? dock?.getPanel(id) : undefined;
       if (!panel) return;
       panel.api.setActive();
-      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-panel-root="${id}"]`)?.focus());
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>(`[data-panel-root="${id}"]`)?.focus(),
+      );
     };
     window.addEventListener('kora:layout-menu', open);
     window.addEventListener('kora:layout', onLayout);
@@ -299,9 +375,21 @@ function Dock({ aiStrip }: { aiStrip: AiStripMode }) {
   }, [dock]);
 
   return (
-    <div className="dockview-theme-dark k-dock h-full" data-testid="terminal-dock" data-density={density}>
-      <DockviewReact components={components} onReady={onReady} theme={DOCK_THEME} rightHeaderActionsComponent={RightActions} disableFloatingGroups={false} />
-      {layoutOpen && dock ? <LayoutDialog dock={dock} onClose={() => setLayoutOpen(false)} /> : null}
+    <div
+      className="dockview-theme-dark k-dock h-full"
+      data-testid="terminal-dock"
+      data-density={density}
+    >
+      <DockviewReact
+        components={components}
+        onReady={onReady}
+        theme={DOCK_THEME}
+        rightHeaderActionsComponent={RightActions}
+        disableFloatingGroups={false}
+      />
+      {layoutOpen && dock ? (
+        <LayoutDialog dock={dock} onClose={() => setLayoutOpen(false)} />
+      ) : null}
     </div>
   );
 }
@@ -329,7 +417,15 @@ function SymbolUrlSync({ initialSymbol }: { initialSymbol: string }) {
   return null;
 }
 
-export default function ProTerminal({ initialSymbol, wsPort, aiStrip }: { initialSymbol: string; wsPort: string; aiStrip: AiStripMode }) {
+export default function ProTerminal({
+  initialSymbol,
+  wsPort,
+  aiStrip,
+}: {
+  initialSymbol: string;
+  wsPort: string;
+  aiStrip: AiStripMode;
+}) {
   return (
     <TerminalProvider wsPort={wsPort}>
       <SymbolUrlSync initialSymbol={initialSymbol} />

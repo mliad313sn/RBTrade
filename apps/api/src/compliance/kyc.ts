@@ -23,7 +23,14 @@ export interface KycProvider {
   readonly id: string;
   readonly flagged: boolean;
   readonly licensed: boolean;
-  describe(): { id: string; name: string; flagged: boolean; licensed: boolean; capabilities: string[]; note: string };
+  describe(): {
+    id: string;
+    name: string;
+    flagged: boolean;
+    licensed: boolean;
+    capabilities: string[];
+    note: string;
+  };
   start(req: KycCheckRequest): Promise<KycCheckResult>;
   status(userId: string): Promise<KycCheckResult>;
 }
@@ -52,7 +59,13 @@ export class StubKycProvider implements KycProvider {
   }
 
   async status(_userId: string): Promise<KycCheckResult> {
-    return { status: 'not_configured', provider: this.id, reference: null, checkedAt: null, reason: 'No KYC provider is contracted yet (OQ-K1).' };
+    return {
+      status: 'not_configured',
+      provider: this.id,
+      reference: null,
+      checkedAt: null,
+      reason: 'No KYC provider is contracted yet (OQ-K1).',
+    };
   }
 }
 

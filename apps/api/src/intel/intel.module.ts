@@ -13,13 +13,7 @@ import { ScanService } from './scan.service';
 /** Goal 07B: market intelligence (scanner, forecasts, news, Market Radar). ADR 0007B. */
 @Module({
   imports: [MarketDataModule, AiModule],
-  providers: [
-    IntelReadService,
-    ScanService,
-    NewsService,
-    AlertsService,
-    QuantClient,
-  ],
+  providers: [IntelReadService, ScanService, NewsService, AlertsService, QuantClient],
   controllers: [IntelController],
   exports: [IntelReadService],
 })

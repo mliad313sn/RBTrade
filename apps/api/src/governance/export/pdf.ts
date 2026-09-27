@@ -16,7 +16,23 @@ const PAGE_H = 595;
 const MARGIN = 36;
 
 function latin1(s: string): string {
-  const map: Record<string, string> = { '\u2013': '-', '\u2014': '-', '\u2019': "'", '\u2018': "'", '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u2265': '>=', '\u2264': '<=', '\u2260': '!=', '\u2192': '->', '\u2022': '*', '\u2715': 'x', '\u25b2': '^', '\u25bc': 'v' };
+  const map: Record<string, string> = {
+    '\u2013': '-',
+    '\u2014': '-',
+    '\u2019': "'",
+    '\u2018': "'",
+    '\u201c': '"',
+    '\u201d': '"',
+    '\u2026': '...',
+    '\u2265': '>=',
+    '\u2264': '<=',
+    '\u2260': '!=',
+    '\u2192': '->',
+    '\u2022': '*',
+    '\u2715': 'x',
+    '\u25b2': '^',
+    '\u25bc': 'v',
+  };
   let out = '';
   for (const ch of s) {
     const m = map[ch];
@@ -27,7 +43,11 @@ function latin1(s: string): string {
 }
 
 function escape(s: string): string {
-  return latin1(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[\r\n]/g, ' ');
+  return latin1(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .replace(/[\r\n]/g, ' ');
 }
 
 /** Width of a Courier line in characters at a font size (Courier is 0.6 em). */
@@ -50,11 +70,17 @@ export function renderPdf(lines: PdfLine[], meta: { title: string; footer: strin
     const lead = size * 1.25 + (l.gap ?? 0);
     if (y - lead < MARGIN + 18) newPage();
     y -= lead;
-    ops.push(`BT /${l.font ?? 'F1'} ${size} Tf ${MARGIN} ${y.toFixed(2)} Td (${escape(l.text)}) Tj ET`);
+    ops.push(
+      `BT /${l.font ?? 'F1'} ${size} Tf ${MARGIN} ${y.toFixed(2)} Td (${escape(l.text)}) Tj ET`,
+    );
   }
   newPage();
   const n = pages.length;
-  pages.forEach((p, i) => p.push(`BT /F1 7 Tf ${MARGIN} 20 Td (${escape(`${meta.footer} - page ${i + 1} of ${n}`)}) Tj ET`));
+  pages.forEach((p, i) =>
+    p.push(
+      `BT /F1 7 Tf ${MARGIN} 20 Td (${escape(`${meta.footer} - page ${i + 1} of ${n}`)}) Tj ET`,
+    ),
+  );
 
   // Objects: 1 catalog, 2 pages, 3-5 fonts, 6 info, then per page: page + content.
   const objs: string[] = [];
@@ -62,7 +88,9 @@ export function renderPdf(lines: PdfLine[], meta: { title: string; footer: strin
   objs.push('<< /Type /Catalog /Pages 2 0 R >>');
   objs.push(`<< /Type /Pages /Kids [${kids}] /Count ${n} >>`);
   objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
-  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  objs.push(
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+  );
   objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>');
   objs.push(`<< /Title (${escape(meta.title)}) /Producer (KORA evidence export) >>`);
   for (let i = 0; i < n; i++) {
@@ -70,7 +98,9 @@ export function renderPdf(lines: PdfLine[], meta: { title: string; footer: strin
     objs.push(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${8 + i * 2} 0 R >>`,
     );
-    objs.push(`<< /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`);
+    objs.push(
+      `<< /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`,
+    );
   }
   let body = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';
   const offsets: number[] = [];
@@ -86,10 +116,16 @@ export function renderPdf(lines: PdfLine[], meta: { title: string; footer: strin
 }
 
 /** Lays out a table as fixed-width Courier lines (columns truncated to fit the page). */
-export function tableLines(columns: string[], rows: Array<Array<string | number | boolean | null>>, size = 7): PdfLine[] {
+export function tableLines(
+  columns: string[],
+  rows: Array<Array<string | number | boolean | null>>,
+  size = 7,
+): PdfLine[] {
   const max = courierChars(size);
   const str = (v: string | number | boolean | null) => (v === null ? '' : String(v));
-  const widths = columns.map((c, i) => Math.max(c.length, ...rows.map((r) => str(r[i] ?? null).length)));
+  const widths = columns.map((c, i) =>
+    Math.max(c.length, ...rows.map((r) => str(r[i] ?? null).length)),
+  );
   // Shrink the widest columns until the line fits.
   const total = () => widths.reduce((s, w) => s + w, 0) + (widths.length - 1) * 2;
   while (total() > max) {
@@ -98,10 +134,24 @@ export function tableLines(columns: string[], rows: Array<Array<string | number 
     widths[i] = widths[i]! - 1;
   }
   const fmt = (cells: string[]) =>
-    cells.map((c, i) => (c.length > widths[i]! ? `${c.slice(0, Math.max(1, widths[i]! - 1))}~` : c.padEnd(widths[i]!))).join('  ').slice(0, max);
+    cells
+      .map((c, i) =>
+        c.length > widths[i]!
+          ? `${c.slice(0, Math.max(1, widths[i]! - 1))}~`
+          : c.padEnd(widths[i]!),
+      )
+      .join('  ')
+      .slice(0, max);
   return [
     { text: fmt(columns), font: 'F3', size, gap: 4 },
-    { text: widths.map((w) => '-'.repeat(w)).join('  ').slice(0, max), font: 'F3', size },
+    {
+      text: widths
+        .map((w) => '-'.repeat(w))
+        .join('  ')
+        .slice(0, max),
+      font: 'F3',
+      size,
+    },
     ...rows.map((r) => ({ text: fmt(r.map(str)), font: 'F3' as const, size })),
   ];
 }

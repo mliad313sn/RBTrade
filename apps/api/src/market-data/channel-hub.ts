@@ -51,14 +51,19 @@ export class ChannelHub implements OnModuleDestroy {
     @Inject(APP_CONFIG) private readonly app: AppConfig,
     @Inject(MD_CONFIG) private readonly cfg: MdConfig,
   ) {
-    this.conflator = new Conflator<string>((ch, payload) => this.fanOut(ch, payload), cfg.conflatePerSec, cfg.conflateBurst);
+    this.conflator = new Conflator<string>(
+      (ch, payload) => this.fanOut(ch, payload),
+      cfg.conflatePerSec,
+      cfg.conflateBurst,
+    );
   }
 
   async init(): Promise<void> {
     if (this.sub) return;
     this.sub = new Redis(this.app.redisUrl, { maxRetriesPerRequest: null });
     this.cmd = new Redis(this.app.redisUrl, { maxRetriesPerRequest: 2 });
-    for (const r of [this.sub, this.cmd]) r.on('error', (e) => this.log.warn(`redis: ${e.message}`));
+    for (const r of [this.sub, this.cmd])
+      r.on('error', (e) => this.log.warn(`redis: ${e.message}`));
     this.sub.on('message', (ch: string, payload: string) => this.onBusMessage(ch, payload));
     await this.sub.subscribe(busChannel(this.cfg, STATUS_CHANNEL));
     this.lastStatusAt = Date.now();
@@ -117,7 +122,13 @@ export class ChannelHub implements OnModuleDestroy {
   stats(): HubStats {
     let subscriptions = 0;
     for (const s of this.subscribers.values()) subscriptions += s.size;
-    return { channels: this.subscribers.size, subscriptions, ...this.counters, conflated: this.conflator.conflated, feedLost: this.feedLost };
+    return {
+      channels: this.subscribers.size,
+      subscriptions,
+      ...this.counters,
+      conflated: this.conflator.conflated,
+      feedLost: this.feedLost,
+    };
   }
 
   lastStatus(): FeedStatus | null {
@@ -160,7 +171,11 @@ export class ChannelHub implements OnModuleDestroy {
       type: 'status',
       state: 'down',
       ts: now,
-      feeds: this.lastStatus()?.feeds.map((f) => ({ ...f, state: f.state === 'disabled' ? 'disabled' : 'down' })) ?? [],
+      feeds:
+        this.lastStatus()?.feeds.map((f) => ({
+          ...f,
+          state: f.state === 'disabled' ? 'disabled' : 'down',
+        })) ?? [],
       staleSymbols: quotes.map((c) => parseChannel(c)!.symbol!).sort(),
       reason: 'feed_heartbeat_lost',
     };
@@ -196,7 +211,9 @@ export class ChannelHub implements OnModuleDestroy {
 
 /** Channel names are validated (no quotes), payloads are JSON produced by the feed. */
 export function frame(channel: string, payload: string, snapshot: boolean): Buffer {
-  return wsTextFrame(Buffer.from(`{"ch":"${channel}"${snapshot ? ',"snapshot":true' : ''},"data":${payload}}`));
+  return wsTextFrame(
+    Buffer.from(`{"ch":"${channel}"${snapshot ? ',"snapshot":true' : ''},"data":${payload}}`),
+  );
 }
 
 /**

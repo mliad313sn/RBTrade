@@ -310,9 +310,14 @@ export function TradeCard({
                 amount: money(ticket.amountUsed, currency),
               })}
             </p>
-            {isDecimalString(amount) && isDecimalString(ticket.amountUsed) && !dec(amount).eq(dec(ticket.amountUsed)) ? (
+            {isDecimalString(amount) &&
+            isDecimalString(ticket.amountUsed) &&
+            !dec(amount).eq(dec(ticket.amountUsed)) ? (
               <p className="m-0 text-sm" data-testid="review-rounded">
-                {t('review.rounded', { entered: money(amount, currency), used: money(ticket.amountUsed, currency) })}
+                {t('review.rounded', {
+                  entered: money(amount, currency),
+                  used: money(ticket.amountUsed, currency),
+                })}
               </p>
             ) : null}
             <ul className="m-0 pl-5 flex flex-col gap-1">

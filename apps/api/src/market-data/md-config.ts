@@ -36,18 +36,26 @@ const Schema = z.object({
   /** IRTC R1-03: how often open sockets are re-checked against server-side session state (ms). */
   KORA_WS_SESSION_SWEEP_MS: z.coerce.number().int().min(200).max(300_000).default(15_000),
   /** Redis namespace (tests use their own so they never cross-talk with a dev api). */
-  KORA_MD_REDIS_PREFIX: z.string().regex(/^[a-z0-9:_-]{1,64}:$/).default('kora:md:'),
+  KORA_MD_REDIS_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9:_-]{1,64}:$/)
+    .default('kora:md:'),
 });
 
 export type MdConfig = ReturnType<typeof loadMdConfig>;
 
-export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = 'http://localhost:3000') {
+export function loadMdConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  webOrigin = 'http://localhost:3000',
+) {
   const e = Schema.parse(env);
   return {
     feed: e.KORA_MD_FEED,
     seed: e.KORA_MD_SEED,
     stepMs: e.KORA_MD_STEP_MS,
-    symbols: e.KORA_MD_SYMBOLS.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
+    symbols: e.KORA_MD_SYMBOLS.split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean),
     backfill: e.KORA_MD_BACKFILL,
     historyDays: e.KORA_MD_HISTORY_DAYS,
     respectSessions:
@@ -60,7 +68,12 @@ export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = '
     staleCheckMs: e.KORA_MD_STALE_CHECK_MS,
     rollupMs: e.KORA_MD_ROLLUP_MS,
     wsMaxChannels: e.KORA_MD_WS_MAX_CHANNELS,
-    wsOrigins: [webOrigin, ...e.KORA_MD_WS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)],
+    wsOrigins: [
+      webOrigin,
+      ...e.KORA_MD_WS_ORIGINS.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ],
     conflatePerSec: e.KORA_MD_CONFLATE_PER_SEC,
     conflateBurst: e.KORA_MD_CONFLATE_BURST,
     prefix: e.KORA_MD_REDIS_PREFIX,
@@ -74,5 +87,7 @@ export function loadMdConfig(env: NodeJS.ProcessEnv = process.env, webOrigin = '
 export const MD_CONFIG = Symbol('MD_CONFIG');
 
 /** Redis naming. Client channel names (quotes:EURUSD) are prefixed on the bus. */
-export const busChannel = (cfg: Pick<MdConfig, 'prefix'>, clientChannel: string): string => `${cfg.prefix}${clientChannel}`;
-export const lastKey = (cfg: Pick<MdConfig, 'prefix'>, clientChannel: string): string => `${cfg.prefix}last:${clientChannel}`;
+export const busChannel = (cfg: Pick<MdConfig, 'prefix'>, clientChannel: string): string =>
+  `${cfg.prefix}${clientChannel}`;
+export const lastKey = (cfg: Pick<MdConfig, 'prefix'>, clientChannel: string): string =>
+  `${cfg.prefix}last:${clientChannel}`;

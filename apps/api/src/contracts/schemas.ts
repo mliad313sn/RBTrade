@@ -7,7 +7,15 @@
  * Objects are open (extra fields allowed): a contract lists the fields a consumer may depend on;
  * adding a field is compatible, removing or retyping one breaks the test.
  */
-import { ASSET_CLASSES, ORDER_STATUSES, ORDER_TYPES, RISK_CODES, SIDES, TIME_IN_FORCE, TIMEFRAMES } from '@kora/domain';
+import {
+  ASSET_CLASSES,
+  ORDER_STATUSES,
+  ORDER_TYPES,
+  RISK_CODES,
+  SIDES,
+  TIME_IN_FORCE,
+  TIMEFRAMES,
+} from '@kora/domain';
 import { z } from 'zod';
 
 const dec = z.string().regex(/^-?\d+(\.\d+)?$/, 'decimal string');
@@ -19,10 +27,18 @@ const Role = z.enum(['novice', 'trader', 'quant', 'risk_officer', 'admin', 'audi
 const KillSwitchScope = z.enum(['robots', 'robots_cancel', 'robots_cancel_flatten']);
 const SessionState = z.enum(['open', 'break', 'closed', 'holiday']);
 const AssetClass = z.enum(ASSET_CLASSES);
-const OrderSource = z.union([z.enum(['manual', 'ai-draft-accepted', 'kill-switch']), z.string().regex(/^robot:[0-9a-f-]{36}$/)]);
+const OrderSource = z.union([
+  z.enum(['manual', 'ai-draft-accepted', 'kill-switch']),
+  z.string().regex(/^robot:[0-9a-f-]{36}$/),
+]);
 const HealthStatus = z.looseObject({ status: z.enum(['up', 'down', 'skipped']) });
 
-export const PublicUserSchema = z.looseObject({ id: uuid, email: z.string(), displayName: z.string(), roles: z.array(Role) });
+export const PublicUserSchema = z.looseObject({
+  id: uuid,
+  email: z.string(),
+  displayName: z.string(),
+  roles: z.array(Role),
+});
 
 export const HealthSchema = z.looseObject({
   status: z.enum(['ok', 'degraded']),
@@ -36,7 +52,10 @@ export const HealthSchema = z.looseObject({
 
 export const LoginResponseSchema = z.union([
   z.looseObject({ status: z.literal('ok'), accessToken: z.string(), user: PublicUserSchema }),
-  z.looseObject({ status: z.enum(['mfa_required', 'mfa_enrollment_required']), mfaToken: z.string() }),
+  z.looseObject({
+    status: z.enum(['mfa_required', 'mfa_enrollment_required']),
+    mfaToken: z.string(),
+  }),
 ]);
 
 export const MeSchema = z.looseObject({
@@ -64,7 +83,10 @@ export const AuditEventSchema = z.looseObject({
   prevHash: z.string().regex(/^[0-9a-f]{64}$/),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
 });
-export const AuditListSchema = z.looseObject({ events: z.array(AuditEventSchema), nextBeforeId: z.string().nullable() });
+export const AuditListSchema = z.looseObject({
+  events: z.array(AuditEventSchema),
+  nextBeforeId: z.string().nullable(),
+});
 export const ChainVerificationSchema = z.looseObject({
   valid: z.boolean(),
   count: z.number().int(),
@@ -74,7 +96,12 @@ export const ChainVerificationSchema = z.looseObject({
 });
 
 // ---- Market data -------------------------------------------------------------------------------
-const SessionInfoSchema = z.looseObject({ state: SessionState, localDate: z.string(), localTime: z.string(), nextChange: z.string().nullable() });
+const SessionInfoSchema = z.looseObject({
+  state: SessionState,
+  localDate: z.string(),
+  localTime: z.string(),
+  nextChange: z.string().nullable(),
+});
 export const InstrumentSchema = z.looseObject({
   symbol: z.string(),
   assetClass: AssetClass,
@@ -88,20 +115,54 @@ export const InstrumentSchema = z.looseObject({
   session: SessionInfoSchema.nullable(),
 });
 export const InstrumentsSchema = z.looseObject({ instruments: z.array(InstrumentSchema) });
-export const InstrumentDetailSchema = InstrumentSchema.extend({ staleAfterMs: z.number().nullable() });
-export const VenuesSchema = z.looseObject({ venues: z.array(z.looseObject({ mic: z.string(), timezone: z.string(), session: SessionInfoSchema })) });
+export const InstrumentDetailSchema = InstrumentSchema.extend({
+  staleAfterMs: z.number().nullable(),
+});
+export const VenuesSchema = z.looseObject({
+  venues: z.array(
+    z.looseObject({ mic: z.string(), timezone: z.string(), session: SessionInfoSchema }),
+  ),
+});
 export const CandlesSchema = z.looseObject({
   symbol: z.string(),
   tf: z.enum(TIMEFRAMES),
   simulated: z.boolean(),
   source: z.string(),
-  candles: z.array(z.looseObject({ t: z.number(), open: dec, high: dec, low: dec, close: dec, volume: dec, trades: z.number().int() })),
+  candles: z.array(
+    z.looseObject({
+      t: z.number(),
+      open: dec,
+      high: dec,
+      low: dec,
+      close: dec,
+      volume: dec,
+      trades: z.number().int(),
+    }),
+  ),
 });
-const QuoteSchema = z.looseObject({ symbol: z.string(), bid: dec, ask: dec, stale: z.boolean(), source: z.string(), seq: z.number(), exchangeTs: z.number(), receivedTs: z.number() });
-export const QuotesSchema = z.looseObject({ quotes: z.array(z.looseObject({ symbol: z.string(), quote: QuoteSchema.nullable(), dayOpen: decOrNull })) });
+const QuoteSchema = z.looseObject({
+  symbol: z.string(),
+  bid: dec,
+  ask: dec,
+  stale: z.boolean(),
+  source: z.string(),
+  seq: z.number(),
+  exchangeTs: z.number(),
+  receivedTs: z.number(),
+});
+export const QuotesSchema = z.looseObject({
+  quotes: z.array(
+    z.looseObject({ symbol: z.string(), quote: QuoteSchema.nullable(), dayOpen: decOrNull }),
+  ),
+});
 export const MarketStatusSchema = z.looseObject({
   status: z.looseObject({ state: z.string(), ts: z.number() }).nullable(),
-  gateway: z.looseObject({ channels: z.number(), subscriptions: z.number(), connections: z.number(), feedLost: z.boolean() }),
+  gateway: z.looseObject({
+    channels: z.number(),
+    subscriptions: z.number(),
+    connections: z.number(),
+    feedLost: z.boolean(),
+  }),
   feedMode: z.enum(['inprocess', 'off']),
 });
 
@@ -130,21 +191,46 @@ export const OrderSchema = z.looseObject({
 });
 export const OrderListSchema = z.looseObject({ orders: z.array(OrderSchema) });
 export const OrderDetailSchema = OrderSchema.extend({ children: z.array(OrderSchema) });
-export const PlaceOrderSchema = z.looseObject({ order: OrderSchema, idempotentReplay: z.boolean(), legs: z.array(OrderSchema).optional() });
+export const PlaceOrderSchema = z.looseObject({
+  order: OrderSchema,
+  idempotentReplay: z.boolean(),
+  legs: z.array(OrderSchema).optional(),
+});
 export const RiskViolationSchema = z.looseObject({ code: z.enum(RISK_CODES), message: z.string() });
 export const PreviewSchema = z.looseObject({
   symbol: z.string(),
   simulated: z.literal(true),
   environment: z.literal('PAPER'),
-  instrument: z.looseObject({ assetClass: AssetClass, quoteCcy: z.string(), pricePrecision: z.number().int(), tickSize: dec, qtyStep: dec, minQty: dec, multiplier: dec, feesSimulated: z.boolean() }),
-  market: z.looseObject({ bid: decOrNull, ask: decOrNull, session: SessionState, dataState: z.enum(['ok', 'no_quote', 'stale', 'feed_not_ok']), dataReason: z.string().nullable() }),
+  instrument: z.looseObject({
+    assetClass: AssetClass,
+    quoteCcy: z.string(),
+    pricePrecision: z.number().int(),
+    tickSize: dec,
+    qtyStep: dec,
+    minQty: dec,
+    multiplier: dec,
+    feesSimulated: z.boolean(),
+  }),
+  market: z.looseObject({
+    bid: decOrNull,
+    ask: decOrNull,
+    session: SessionState,
+    dataState: z.enum(['ok', 'no_quote', 'stale', 'feed_not_ok']),
+    dataReason: z.string().nullable(),
+  }),
   novice: z.boolean(),
   preview: z
     .looseObject({
       estimatedPrice: dec,
       currency: z.string(),
       fees: z.looseObject({ commission: dec, spread: dec, fxConversion: dec, total: dec }),
-      margin: z.looseObject({ rate: dec, required: dec, usedAfter: dec, freeAfter: dec, equity: dec }),
+      margin: z.looseObject({
+        rate: dec,
+        required: dec,
+        usedAfter: dec,
+        freeAfter: dec,
+        equity: dec,
+      }),
       lossIfStopHit: z.looseObject({ stopPrice: dec, total: dec }).nullable(),
       confirmation: z.looseObject({ required: z.boolean(), reasons: z.array(z.string()) }),
     })
@@ -179,7 +265,12 @@ export const FillSchema = z.looseObject({
   ts: iso,
 });
 export const FillsSchema = z.looseObject({ fills: z.array(FillSchema) });
-const HaltSchema = z.looseObject({ halted: z.boolean(), scope: KillSwitchScope.nullable(), haltedAt: z.string().nullable(), reason: z.string().nullable() });
+const HaltSchema = z.looseObject({
+  halted: z.boolean(),
+  scope: KillSwitchScope.nullable(),
+  haltedAt: z.string().nullable(),
+  reason: z.string().nullable(),
+});
 export const AccountSchema = z.looseObject({
   id: uuid,
   environment: z.enum(['PAPER', 'LIVE']),
@@ -220,22 +311,50 @@ export const ResumeSchema = z.looseObject({ accountId: uuid });
 
 // ---- Appropriateness, strategies, robots, governance ---------------------------------------------
 export const QuestionnaireSchema = z.looseObject({
-  questionnaire: z.looseObject({ id: z.string(), version: z.number().int(), questions: z.array(z.looseObject({ id: z.string() })) }),
-  status: z.looseObject({ hasTraderRole: z.boolean(), eligible: z.boolean(), cooldownUntil: z.string().nullable() }),
+  questionnaire: z.looseObject({
+    id: z.string(),
+    version: z.number().int(),
+    questions: z.array(z.looseObject({ id: z.string() })),
+  }),
+  status: z.looseObject({
+    hasTraderRole: z.boolean(),
+    eligible: z.boolean(),
+    cooldownUntil: z.string().nullable(),
+  }),
 });
 export const TemplatesSchema = z.looseObject({
-  templates: z.array(z.looseObject({ id: z.string(), name: z.string(), riskLevel: z.enum(['lower', 'medium', 'higher']), definition: z.looseObject({}) })),
+  templates: z.array(
+    z.looseObject({
+      id: z.string(),
+      name: z.string(),
+      riskLevel: z.enum(['lower', 'medium', 'higher']),
+      definition: z.looseObject({}),
+    }),
+  ),
   disclaimer: z.string(),
 });
-export const StrategiesSchema = z.looseObject({ strategies: z.array(z.looseObject({ id: uuid, name: z.string() })) });
-export const RobotsSchema = z.looseObject({ robots: z.array(z.looseObject({ id: uuid, status: z.string() })) });
+export const StrategiesSchema = z.looseObject({
+  strategies: z.array(z.looseObject({ id: uuid, name: z.string() })),
+});
+export const RobotsSchema = z.looseObject({
+  robots: z.array(z.looseObject({ id: uuid, status: z.string() })),
+});
 export const ValidateStrategySchema = z.looseObject({
   valid: z.boolean(),
   issues: z.array(z.looseObject({ path: z.string(), message: z.string(), severity: z.string() })),
   contentHash: z.string(),
 });
-export const AlertsSchema = z.looseObject({ alerts: z.array(z.looseObject({ id: z.string(), kind: z.string(), severity: z.string() })) });
+export const AlertsSchema = z.looseObject({
+  alerts: z.array(z.looseObject({ id: z.string(), kind: z.string(), severity: z.string() })),
+});
 export const DisclosureSchema = z.looseObject({
-  document: z.looseObject({ id: z.string(), version: z.string(), locale: z.string(), title: z.string(), contentHash: z.string(), placeholder: z.boolean() }),
+  document: z.looseObject({
+    id: z.string(),
+    version: z.string(),
+    locale: z.string(),
+    title: z.string(),
+    contentHash: z.string(),
+    placeholder: z.boolean(),
+  }),
 });
 export const AiStatusSchema = z.looseObject({ available: z.boolean() });

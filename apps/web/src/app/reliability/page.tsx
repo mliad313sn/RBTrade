@@ -8,7 +8,10 @@ export const dynamic = 'force-dynamic';
 
 async function load(): Promise<ReliabilityData | null> {
   try {
-    const res = await fetch(`${API_INTERNAL_URL()}/intel/reliability`, { cache: 'no-store', headers: { accept: 'application/json' } });
+    const res = await fetch(`${API_INTERNAL_URL()}/intel/reliability`, {
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    });
     return res.ok ? ((await res.json()) as ReliabilityData) : null;
   } catch {
     return null;
@@ -32,14 +35,25 @@ export default async function ReliabilityPage() {
         </p>
       </header>
       {!data && <p role="alert">The track record is not available right now.</p>}
-      {data && !data.models.length && <p className="text-sm text-muted">No forecasts have been recorded yet.</p>}
+      {data && !data.models.length && (
+        <p className="text-sm text-muted">No forecasts have been recorded yet.</p>
+      )}
       {data?.models.map((m) => (
-        <section key={m.modelKey} className="rounded border border-border bg-panel p-3" data-testid="reliability-model" aria-labelledby={`h-${m.modelKey}`}>
+        <section
+          key={m.modelKey}
+          className="rounded border border-border bg-panel p-3"
+          data-testid="reliability-model"
+          aria-labelledby={`h-${m.modelKey}`}
+        >
           <h2 id={`h-${m.modelKey}`} className="m-0 text-base font-semibold">
             {m.regionLabel} · {m.horizon} · model {m.model}
           </h2>
           <p className="m-0 text-sm" data-testid="reliability-edge">
-            {m.edge === 'positive' ? 'Skill after costs on past forecasts.' : m.edge === 'none' ? 'No edge after costs.' : m.edgeStatement}
+            {m.edge === 'positive'
+              ? 'Skill after costs on past forecasts.'
+              : m.edge === 'none'
+                ? 'No edge after costs.'
+                : m.edgeStatement}
           </p>
           <table className="mt-2 w-full text-sm">
             <caption className="sr-only">Forecast counts and hit rates</caption>
@@ -72,7 +86,10 @@ export default async function ReliabilityPage() {
           </table>
           {m.bins.length > 0 && (
             <table className="mt-2 w-full text-sm" data-testid="reliability-bins">
-              <caption className="text-left text-xs text-muted">When we said… it happened… (bins with at least one forecast; a figure is shown in the app only with n ≥ {m.minN} and an edge after costs)</caption>
+              <caption className="text-left text-xs text-muted">
+                When we said… it happened… (bins with at least one forecast; a figure is shown in
+                the app only with n ≥ {m.minN} and an edge after costs)
+              </caption>
               <thead>
                 <tr className="text-left text-muted">
                   <th scope="col">Stated</th>
@@ -87,7 +104,9 @@ export default async function ReliabilityPage() {
                     <td className="k-num">
                       {b.lo.toFixed(1)}–{b.hi.toFixed(1)}
                     </td>
-                    <td className="k-num">{b.meanPredicted === null ? '—' : b.meanPredicted.toFixed(2)}</td>
+                    <td className="k-num">
+                      {b.meanPredicted === null ? '—' : b.meanPredicted.toFixed(2)}
+                    </td>
                     <td className="k-num">{pct(b.observed)}</td>
                     <td className="k-num">{b.n}</td>
                   </tr>
@@ -98,7 +117,8 @@ export default async function ReliabilityPage() {
         </section>
       ))}
       <p className="m-0 text-xs text-muted">
-        All market data and news are SIMULATED until licensed data contracts exist. {data?.disclaimer ?? 'Not investment advice.'}{' '}
+        All market data and news are SIMULATED until licensed data contracts exist.{' '}
+        {data?.disclaimer ?? 'Not investment advice.'}{' '}
         <Link href="/login" className="underline">
           Sign in
         </Link>

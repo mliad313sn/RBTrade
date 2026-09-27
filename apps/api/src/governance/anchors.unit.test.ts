@@ -92,7 +92,7 @@ describe('audit anchors (IRTC R4-07)', () => {
       const chain = new Map([['5', 'd'.repeat(64)]]);
       const db = {
         query: async (sql: string, params: unknown[] = []) => {
-          if (/INSERT INTO audit_anchors/.test(sql)) {
+          if (sql.includes('INSERT INTO audit_anchors')) {
             const row = {
               id: String(anchors.length + 1),
               head_id: params[0],
@@ -108,9 +108,10 @@ describe('audit anchors (IRTC R4-07)', () => {
             anchors.push(row);
             return [row];
           }
-          if (/FROM \(SELECT 1\) one/.test(sql)) return [{ id: '5', hash: 'd'.repeat(64), n: '5' }];
-          if (/FROM audit_anchors/.test(sql)) return anchors;
-          if (/FROM audit_events WHERE id = ANY/.test(sql))
+          if (sql.includes('FROM (SELECT 1) one'))
+            return [{ id: '5', hash: 'd'.repeat(64), n: '5' }];
+          if (sql.includes('FROM audit_anchors')) return anchors;
+          if (sql.includes('FROM audit_events WHERE id = ANY'))
             return [...chain]
               .filter(([id]) => (params[0] as string[]).includes(id))
               .map(([id, hash]) => ({ id, hash }));

@@ -25,7 +25,12 @@ import { WhatChangedNote } from './WhatChangedNote';
 // Goal 07's novice copilot fills goal 08's "Explain this to me" slot (shown when KORA_EXPLAIN_THIS=on).
 registerExplainThis(NoviceExplainThis);
 
-const ICONS: Record<string, typeof Home> = { '/home': Home, '/practice': Sprout, '/auto-invest': Bot, '/learn': BookOpen };
+const ICONS: Record<string, typeof Home> = {
+  '/home': Home,
+  '/practice': Sprout,
+  '/auto-invest': Bot,
+  '/learn': BookOpen,
+};
 const LABELS: Record<string, MessageKey> = {
   '/home': 'nav.home',
   '/practice': 'nav.practice',
@@ -43,7 +48,13 @@ function useActive() {
  * on phones, 44 px targets, the regulatory banner from the disclosures registry, and the
  * "prices paused" offline state. No streaks, badges, confetti or trading nudges.
  */
-export function NoviceShell({ children, disclosure }: { children: ReactNode; disclosure: DisclosureDocument | null }) {
+export function NoviceShell({
+  children,
+  disclosure,
+}: {
+  children: ReactNode;
+  disclosure: DisclosureDocument | null;
+}) {
   const active = useActive();
   const pathname = usePathname();
   const { t } = useI18n();
@@ -57,7 +68,11 @@ export function NoviceShell({ children, disclosure }: { children: ReactNode; dis
         className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-10 py-2 md:py-3 md:min-h-18 border-b border-border bg-panel"
         data-testid="novice-topbar"
       >
-        <Link href="/home" className="flex items-center gap-2 no-underline min-h-11" aria-label={t('shell.homeLink')}>
+        <Link
+          href="/home"
+          className="flex items-center gap-2 no-underline min-h-11"
+          aria-label={t('shell.homeLink')}
+        >
           <span className="text-accent text-xl" aria-hidden="true">
             ↗
           </span>
@@ -99,7 +114,10 @@ export function NoviceShell({ children, disclosure }: { children: ReactNode; dis
           tone="warn"
           title={t('shell.banner.title')}
           action={
-            <Link href="/learn#risks" className="text-accent font-semibold whitespace-nowrap inline-flex items-center min-h-11">
+            <Link
+              href="/learn#risks"
+              className="text-accent font-semibold whitespace-nowrap inline-flex items-center min-h-11"
+            >
               {t('shell.banner.read')}
             </Link>
           }

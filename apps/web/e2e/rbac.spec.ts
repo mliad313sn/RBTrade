@@ -7,7 +7,9 @@ test('a novice cannot reach /robots/* builder routes: 403 + friendly page', asyn
   for (const path of ['/robots/builder', '/robots']) {
     const res = await page.goto(path);
     expect(res?.status()).toBe(403);
-    await expect(page.getByRole('heading', { name: /Robot builder isn.t part of your account/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Robot builder isn.t part of your account/ }),
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: 'Back to my home' })).toBeVisible();
   }
   const api = await page.request.get('/api/robots/builder');

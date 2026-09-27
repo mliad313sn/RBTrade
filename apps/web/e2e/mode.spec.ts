@@ -4,7 +4,9 @@ import { apiSignIn } from './helpers';
 
 const ADVANCED = ['Stop-limit', 'Trailing', 'Bracket', 'OCO'];
 
-test('Pro/Novice toggle persists per user, survives reload, and Novice hides advanced order types', async ({ page }) => {
+test('Pro/Novice toggle persists per user, survives reload, and Novice hides advanced order types', async ({
+  page,
+}) => {
   await apiSignIn(page, 'trader');
   await page.goto('/terminal?symbol=XAUUSD');
   const types = page.getByTestId('order-types');
@@ -13,7 +15,9 @@ test('Pro/Novice toggle persists per user, survives reload, and Novice hides adv
   await page.getByTestId('mode-toggle').getByRole('radio', { name: 'Novice' }).click();
   await expect(page).toHaveURL(/\/home\?symbol=XAUUSD&switched=novice/);
   await expect(page.getByTestId('what-changed')).toContainText('same account and instrument');
-  await expect(page.getByTestId('novice-trade').getByRole('button', { name: 'Gold', pressed: true })).toBeVisible();
+  await expect(
+    page.getByTestId('novice-trade').getByRole('button', { name: 'Gold', pressed: true }),
+  ).toBeVisible();
   await expect(page.getByTestId('order-types')).toHaveCount(0);
   for (const t of ADVANCED) await expect(page.getByText(t, { exact: true })).toHaveCount(0);
 
@@ -29,5 +33,6 @@ test('Pro/Novice toggle persists per user, survives reload, and Novice hides adv
   await expect(page).toHaveURL(/\/terminal\?switched=pro/);
   await page.reload();
   await expect(page.getByTestId('pro-topbar')).toBeVisible();
-  for (const t of ADVANCED) await expect(page.getByTestId('order-types').getByRole('radio', { name: t })).toBeVisible();
+  for (const t of ADVANCED)
+    await expect(page.getByTestId('order-types').getByRole('radio', { name: t })).toBeVisible();
 });

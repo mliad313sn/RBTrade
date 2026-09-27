@@ -163,20 +163,31 @@ export function GainSimulator({ retailLossPct }: { retailLossPct?: string | null
       const wanted = new URLSearchParams(window.location.search).get('backtest');
       let runId = wanted;
       if (!runId) {
-        const list = await fetch('/api/backtests?kind=backtest&limit=1', { credentials: 'include', cache: 'no-store' });
+        const list = await fetch('/api/backtests?kind=backtest&limit=1', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
         if (list.status === 403) {
-          setNote('Backtests come from the robot builder, which needs a trader, quant or admin account.');
+          setNote(
+            'Backtests come from the robot builder, which needs a trader, quant or admin account.',
+          );
           return;
         }
         const runs = ((await list.json()) as { runs?: Array<{ id: string }> }).runs ?? [];
         runId = runs[0]?.id ?? null;
       }
       if (!runId) {
-        setNote('No backtest yet: build a robot and run a backtest first, then import its out-of-sample trades here.');
+        setNote(
+          'No backtest yet: build a robot and run a backtest first, then import its out-of-sample trades here.',
+        );
         return;
       }
-      const tr = await fetch(`/api/backtests/${runId}/trades?segment=oos`, { credentials: 'include', cache: 'no-store' });
-      if (!tr.ok) throw new SimApiError(tr.status, 'import_failed', 'That backtest could not be loaded.');
+      const tr = await fetch(`/api/backtests/${runId}/trades?segment=oos`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!tr.ok)
+        throw new SimApiError(tr.status, 'import_failed', 'That backtest could not be loaded.');
       const body = (await tr.json()) as { trades: number[]; source: string };
       if (body.trades.length < 2) {
         setNote('That backtest has fewer than two out-of-sample trades: too few to project.');
@@ -198,7 +209,9 @@ export function GainSimulator({ retailLossPct }: { retailLossPct?: string | null
       setCurrent({ label: label(), origin: 'backtest', request: r, result });
       setPaper(null);
       setStale(false);
-      setNote(`Imported ${body.trades.length} out-of-sample backtest trades (R multiples), block-bootstrapped at ${r.riskPct.toFixed(2)}% risk per trade.`);
+      setNote(
+        `Imported ${body.trades.length} out-of-sample backtest trades (R multiples), block-bootstrapped at ${r.riskPct.toFixed(2)}% risk per trade.`,
+      );
     } catch (e) {
       setError(e instanceof SimApiError ? e.message : 'The backtest import failed.');
     } finally {
@@ -254,7 +267,7 @@ export function GainSimulator({ retailLossPct }: { retailLossPct?: string | null
       ? `Paper results · block bootstrap (${r?.effective.blockSize ?? '—'}-trade blocks)`
       : current?.origin === 'backtest'
         ? `Backtest out-of-sample trades · block bootstrap (${r?.effective.blockSize ?? '—'}-trade blocks)`
-      : 'Equity projection · percentile fan';
+        : 'Equity projection · percentile fan';
 
   return (
     <div className="flex flex-col gap-2 xl:h-full xl:min-h-0">

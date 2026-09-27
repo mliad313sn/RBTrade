@@ -19,17 +19,53 @@ const time = (iso: string) => iso.replace('T', ' ').slice(0, 19);
 
 const eventCols: Column<AuditEventView>[] = [
   { key: 'id', header: '#', width: '72px', numeric: true, cell: (e) => e.id },
-  { key: 'ts', header: 'Time (UTC)', width: '170px', cell: (e) => <span className="k-num">{time(e.ts)}</span> },
+  {
+    key: 'ts',
+    header: 'Time (UTC)',
+    width: '170px',
+    cell: (e) => <span className="k-num">{time(e.ts)}</span>,
+  },
   { key: 'action', header: 'Action', cell: (e) => e.action },
-  { key: 'actor', header: 'Actor', width: '150px', cell: (e) => `${e.actorType} · ${e.actorId.slice(0, 8)}` },
-  { key: 'entity', header: 'Entity', cell: (e) => `${e.entity}${e.entityId ? ` · ${e.entityId.slice(0, 12)}` : ''}` },
-  { key: 'hash', header: 'Hash', width: '110px', cell: (e) => <span className="k-num" title={e.hash}>{e.hash.slice(0, 10)}…</span> },
+  {
+    key: 'actor',
+    header: 'Actor',
+    width: '150px',
+    cell: (e) => `${e.actorType} · ${e.actorId.slice(0, 8)}`,
+  },
+  {
+    key: 'entity',
+    header: 'Entity',
+    cell: (e) => `${e.entity}${e.entityId ? ` · ${e.entityId.slice(0, 12)}` : ''}`,
+  },
+  {
+    key: 'hash',
+    header: 'Hash',
+    width: '110px',
+    cell: (e) => (
+      <span className="k-num" title={e.hash}>
+        {e.hash.slice(0, 10)}…
+      </span>
+    ),
+  },
 ];
 
 const anchorCols: Column<AnchorView>[] = [
-  { key: 'at', header: 'Anchored (UTC)', width: '170px', cell: (a) => <span className="k-num">{time(a.anchoredAt)}</span> },
+  {
+    key: 'at',
+    header: 'Anchored (UTC)',
+    width: '170px',
+    cell: (a) => <span className="k-num">{time(a.anchoredAt)}</span>,
+  },
   { key: 'head', header: 'Head id', numeric: true, width: '90px', cell: (a) => a.headId },
-  { key: 'hash', header: 'Head hash', cell: (a) => <span className="k-num" title={a.headHash}>{a.headHash.slice(0, 16)}…</span> },
+  {
+    key: 'hash',
+    header: 'Head hash',
+    cell: (a) => (
+      <span className="k-num" title={a.headHash}>
+        {a.headHash.slice(0, 16)}…
+      </span>
+    ),
+  },
   { key: 'key', header: 'Key', width: '140px', cell: (a) => a.keyId },
   {
     key: 'ok',
@@ -37,8 +73,12 @@ const anchorCols: Column<AnchorView>[] = [
     width: '200px',
     cell: (a) => (
       <span className="flex gap-1">
-        <Chip tone={a.signatureValid ? 'ai' : 'live'}>{a.signatureValid ? 'signature ok' : 'bad signature'}</Chip>
-        <Chip tone={a.matchesChain ? 'ai' : 'live'}>{a.matchesChain ? 'in chain' : 'not in chain'}</Chip>
+        <Chip tone={a.signatureValid ? 'ai' : 'live'}>
+          {a.signatureValid ? 'signature ok' : 'bad signature'}
+        </Chip>
+        <Chip tone={a.matchesChain ? 'ai' : 'live'}>
+          {a.matchesChain ? 'in chain' : 'not in chain'}
+        </Chip>
       </span>
     ),
   },
@@ -73,8 +113,14 @@ export function InternalAudit() {
 
   useEffect(() => {
     void loadEvents();
-    governanceApi.anchors().then((r) => setAnchors(r.anchors)).catch(() => undefined);
-    governanceApi.controls().then((r) => setControls(r.controls)).catch(() => undefined);
+    governanceApi
+      .anchors()
+      .then((r) => setAnchors(r.anchors))
+      .catch(() => undefined);
+    governanceApi
+      .controls()
+      .then((r) => setControls(r.controls))
+      .catch(() => undefined);
     // Filters apply on demand (button), not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -101,7 +147,9 @@ export function InternalAudit() {
   };
 
   const exportEventsUrl = `/api/internal-audit/events/export${action.trim() ? `?action=${encodeURIComponent(action.trim())}` : ''}`;
-  const sampleCsvUrl = sample ? `/api/internal-audit/sample?${new URLSearchParams({ controlId: sample.controlId, n: String(sample.requested), seed: sample.seed, format: 'csv' }).toString()}` : undefined;
+  const sampleCsvUrl = sample
+    ? `/api/internal-audit/sample?${new URLSearchParams({ controlId: sample.controlId, n: String(sample.requested), seed: sample.seed, format: 'csv' }).toString()}`
+    : undefined;
 
   return (
     <div className="grid gap-3 p-3" data-testid="internal-audit">
@@ -115,30 +163,60 @@ export function InternalAudit() {
       <Panel
         title="Audit-log integrity"
         actions={
-          <Button size="sm" variant="primary" onClick={() => void runVerify()} data-testid="ia-verify">
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => void runVerify()}
+            data-testid="ia-verify"
+          >
             Verify chain and anchors
           </Button>
         }
       >
         {verify ? (
           <div data-testid="ia-verify-result">
-            <Banner tone={verify.chain.valid && !verify.anchors.invalidSignatures && !verify.anchors.notMatchingChain ? 'info' : 'critical'} title={verify.chain.valid ? 'Chain valid.' : 'Chain broken.'}>
+            <Banner
+              tone={
+                verify.chain.valid &&
+                !verify.anchors.invalidSignatures &&
+                !verify.anchors.notMatchingChain
+                  ? 'info'
+                  : 'critical'
+              }
+              title={verify.chain.valid ? 'Chain valid.' : 'Chain broken.'}
+            >
               {verify.chain.valid
                 ? `${verify.chain.count} events recomputed; head ${verify.chain.headHash.slice(0, 16)}…`
                 : `First broken event #${verify.chain.firstBrokenId} (${verify.chain.reason}).`}{' '}
-              {verify.anchors.count} signed anchor(s): {verify.anchors.invalidSignatures} bad signature(s), {verify.anchors.notMatchingChain} not matching the chain.
+              {verify.anchors.count} signed anchor(s): {verify.anchors.invalidSignatures} bad
+              signature(s), {verify.anchors.notMatchingChain} not matching the chain.
             </Banner>
           </div>
         ) : (
-          <p className="text-sm text-muted m-0">Recomputes every hash and checks each signed anchor against the chain. The run is recorded.</p>
+          <p className="text-sm text-muted m-0">
+            Recomputes every hash and checks each signed anchor against the chain. The run is
+            recorded.
+          </p>
         )}
-        <Table label="Signed anchors" columns={anchorCols} rows={anchors} rowKey={(a) => a.id} height={140} empty="No anchors yet" />
+        <Table
+          label="Signed anchors"
+          columns={anchorCols}
+          rows={anchors}
+          rowKey={(a) => a.id}
+          height={140}
+          empty="No anchors yet"
+        />
       </Panel>
 
       <Panel
         title="Audit events"
         actions={
-          <a className="k-btn k-btn--secondary k-btn--sm" href={exportEventsUrl} download data-testid="ia-events-csv">
+          <a
+            className="k-btn k-btn--secondary k-btn--sm"
+            href={exportEventsUrl}
+            download
+            data-testid="ia-events-csv"
+          >
             Export CSV
           </a>
         }
@@ -146,13 +224,26 @@ export function InternalAudit() {
         <div className="flex gap-2 items-end mb-2">
           <label className="grid gap-1 text-sm">
             <span className="k-label">Action (exact or prefix.*)</span>
-            <input className="k-input" value={action} onChange={(e) => setAction(e.target.value)} placeholder="e.g. kill_switch.*" data-testid="ia-action" />
+            <input
+              className="k-input"
+              value={action}
+              onChange={(e) => setAction(e.target.value)}
+              placeholder="e.g. kill_switch.*"
+              data-testid="ia-action"
+            />
           </label>
           <Button size="sm" onClick={() => void loadEvents()} data-testid="ia-filter">
             Filter
           </Button>
         </div>
-        <Table label="Audit events" columns={eventCols} rows={events} rowKey={(e) => e.id} height={320} empty="No events" />
+        <Table
+          label="Audit events"
+          columns={eventCols}
+          rows={events}
+          rowKey={(e) => e.id}
+          height={320}
+          empty="No events"
+        />
       </Panel>
 
       <Panel title="Sampling per control" data-testid="ia-sampling">
@@ -161,25 +252,48 @@ export function InternalAudit() {
             label="Control"
             value={controlId}
             onChange={(e) => setControlId(e.target.value)}
-            options={(controls.length ? controls : [{ id: 'KC-06', title: 'Four-eyes on loosening limits' } as ControlSummary]).map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` }))}
+            options={(controls.length
+              ? controls
+              : [{ id: 'KC-06', title: 'Four-eyes on loosening limits' } as ControlSummary]
+            ).map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` }))}
             data-testid="ia-sample-control"
           />
           <label className="grid gap-1 text-sm">
             <span className="k-label">N</span>
-            <input className="k-input" inputMode="numeric" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, '').slice(0, 3))} data-testid="ia-sample-n" />
+            <input
+              className="k-input"
+              inputMode="numeric"
+              value={n}
+              onChange={(e) => setN(e.target.value.replace(/\D/g, '').slice(0, 3))}
+              data-testid="ia-sample-n"
+            />
           </label>
           <label className="grid gap-1 text-sm">
             <span className="k-label">Seed (optional)</span>
-            <input className="k-input" value={seed} onChange={(e) => setSeed(e.target.value)} data-testid="ia-sample-seed" />
+            <input
+              className="k-input"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value)}
+              data-testid="ia-sample-seed"
+            />
           </label>
-          <Button size="sm" variant="primary" disabled={!n} onClick={() => void draw()} data-testid="ia-sample-draw">
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!n}
+            onClick={() => void draw()}
+            data-testid="ia-sample-draw"
+          >
             Draw sample
           </Button>
         </div>
         {sample ? (
           <div className="mt-2" data-testid="ia-sample-result">
             <p className="text-sm m-0">
-              {sample.drawn} of {sample.population} {sample.kind === 'audit_events' ? 'audit events' : 'evidence rows'} for {sample.controlId} · seed <span className="k-num">{sample.seed}</span> (same seed, same sample){' '}
+              {sample.drawn} of {sample.population}{' '}
+              {sample.kind === 'audit_events' ? 'audit events' : 'evidence rows'} for{' '}
+              {sample.controlId} · seed <span className="k-num">{sample.seed}</span> (same seed,
+              same sample){' '}
               {sampleCsvUrl ? (
                 <a href={sampleCsvUrl} download data-testid="ia-sample-csv">
                   CSV
@@ -187,9 +301,18 @@ export function InternalAudit() {
               ) : null}
             </p>
             {sample.events ? (
-              <Table label="Sampled events" columns={eventCols} rows={sample.events} rowKey={(e) => e.id} height={200} empty="Nothing in the period" />
+              <Table
+                label="Sampled events"
+                columns={eventCols}
+                rows={sample.events}
+                rowKey={(e) => e.id}
+                height={200}
+                empty="Nothing in the period"
+              />
             ) : (
-              <pre className="text-xs overflow-auto max-h-48">{JSON.stringify(sample.rows, null, 1)}</pre>
+              <pre className="text-xs overflow-auto max-h-48">
+                {JSON.stringify(sample.rows, null, 1)}
+              </pre>
             )}
           </div>
         ) : null}

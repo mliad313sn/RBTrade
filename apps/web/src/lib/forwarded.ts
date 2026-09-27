@@ -43,6 +43,7 @@ export function peerStampActive(): boolean {
 export function clientAddress(h: Headers, hops: number = trustedProxyHops()): string {
   if (Number.isInteger(hops) && hops > 0) return forwardedClient(h.get('x-forwarded-for'), hops);
   if (!peerStampActive()) return '127.0.0.1';
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- anchored character class, at most 45 characters: linear time
   const peer = (h.get(PEER_HEADER) ?? '').trim();
   return IP_RE.test(peer) ? peer : '127.0.0.1';
 }

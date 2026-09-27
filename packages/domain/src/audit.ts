@@ -68,7 +68,13 @@ export interface ChainVerification {
    * `truncated_after_anchor`: events the latest trusted anchor covers are missing (tail deleted);
    * `anchor_mismatch`: the hash at the anchored head differs (IRTC R4-07).
    */
-  reason: 'hash_mismatch' | 'prev_hash_mismatch' | 'id_gap' | 'truncated_after_anchor' | 'anchor_mismatch' | null;
+  reason:
+    | 'hash_mismatch'
+    | 'prev_hash_mismatch'
+    | 'id_gap'
+    | 'truncated_after_anchor'
+    | 'anchor_mismatch'
+    | null;
   headHash: string;
   /** The latest trusted signed anchor, compared with the chain (absent when there is none). */
   anchor?: AnchorWitness | null;

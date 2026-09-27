@@ -33,7 +33,9 @@ export const ROUTE_RULES: Rule[] = [
   { pattern: /^\/admin(\/.*)?$/, roles: ['admin'], feature: 'Administration' },
 ];
 
-export type RouteDecision = { allow: true } | { allow: false; feature: string; requiredRoles: readonly Role[] };
+export type RouteDecision =
+  | { allow: true }
+  | { allow: false; feature: string; requiredRoles: readonly Role[] };
 
 export function checkRoute(pathname: string, roles: readonly Role[]): RouteDecision {
   // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10

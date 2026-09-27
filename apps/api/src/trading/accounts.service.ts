@@ -228,7 +228,8 @@ export class AccountsService {
   platformLimits(a: AccountRow): TradingConfig['riskDefaults'] {
     const d = this.platformDefaults(a);
     const o = a.limit_overrides ?? {};
-    const higher = (p: string, v: string | undefined) => (v !== undefined && dec(v).gt(dec(p)) ? v : p);
+    const higher = (p: string, v: string | undefined) =>
+      v !== undefined && dec(v).gt(dec(p)) ? v : p;
     return {
       ...d,
       maxOrderNotional: higher(d.maxOrderNotional, o.maxOrderNotional),
@@ -251,7 +252,8 @@ export class AccountsService {
   private platformDefaults(a: AccountRow): TradingConfig['riskDefaults'] {
     const d = this.cfg.riskDefaults;
     const fx = (a.settings as { limitFx?: { to?: string; rate?: string } }).limitFx;
-    if (a.base_currency === this.cfg.baseCurrency || !fx?.rate || fx.to !== a.base_currency) return d;
+    if (a.base_currency === this.cfg.baseCurrency || !fx?.rate || fx.to !== a.base_currency)
+      return d;
     const rate = dec(fx.rate);
     const conv = (v: string) => roundMoney(dec(v).mul(rate), a.base_currency).toFixed();
     return {
@@ -455,7 +457,11 @@ export class AccountsService {
   }
 
   /** Positions with marks and base-currency P&L for GET /positions and `positions:{id}`. */
-  async positionsView(a: AccountRow, c?: Queryable, valued?: Awaited<ReturnType<AccountsService['value']>>): Promise<PositionDto[]> {
+  async positionsView(
+    a: AccountRow,
+    c?: Queryable,
+    valued?: Awaited<ReturnType<AccountsService['value']>>,
+  ): Promise<PositionDto[]> {
     const v = valued ?? (await this.value(a, c));
     const ccy = a.base_currency;
     return v.positions.map((p) => {
@@ -533,7 +539,9 @@ export class AccountsService {
         // own limits are converted with it; the platform limits follow via `settings.limitFx`.
         const rate = await this.fx.rate(a.base_currency, base, now);
         const platformRate =
-          base === this.cfg.baseCurrency ? null : await this.fx.rate(this.cfg.baseCurrency, base, now);
+          base === this.cfg.baseCurrency
+            ? null
+            : await this.fx.rate(this.cfg.baseCurrency, base, now);
         if (!rate || (base !== this.cfg.baseCurrency && !platformRate))
           throw new ConflictException({
             error: 'fx_unavailable',
@@ -545,11 +553,18 @@ export class AccountsService {
           type: 'account',
           id: a.id,
         });
-        await this.ledger.post(c, a.id, depositJournal(cashAfter, base), { type: 'account', id: a.id });
+        await this.ledger.post(c, a.id, depositJournal(cashAfter, base), {
+          type: 'account',
+          id: a.id,
+        });
         startingCash = roundMoney(dec(a.starting_cash).mul(rate.rate), base).toFixed();
         storedLimits = convertOwnLimits(storedLimits, rate.rate, base);
         if (platformRate)
-          settings.limitFx = { from: this.cfg.baseCurrency, to: base, rate: platformRate.rate.toFixed() };
+          settings.limitFx = {
+            from: this.cfg.baseCurrency,
+            to: base,
+            rate: platformRate.rate.toFixed(),
+          };
         else delete settings.limitFx;
         conversion = {
           from: a.base_currency,
@@ -560,7 +575,12 @@ export class AccountsService {
           cashAfter: cashAfter.toFixed(),
         };
       }
-      const converted: AccountRow = { ...a, base_currency: base, settings, risk_limits: storedLimits };
+      const converted: AccountRow = {
+        ...a,
+        base_currency: base,
+        settings,
+        risk_limits: storedLimits,
+      };
       const eff = this.limits(converted, now);
       const requested = { ...(patch.riskLimits ?? {}), ...(opts.extraLimits ?? {}) };
       const change = applyLimitChanges(

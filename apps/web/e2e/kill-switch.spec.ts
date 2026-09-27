@@ -4,7 +4,10 @@ import { apiSignIn } from './helpers';
 
 async function killEvents(page: Page) {
   const r = await page.request.get('/api/audit?action=kill_switch.requested');
-  return (await r.json()).events as Array<{ entityId: string; payload: { scope: string; source: string } }>;
+  return (await r.json()).events as Array<{
+    entityId: string;
+    payload: { scope: string; source: string };
+  }>;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -13,7 +16,9 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('kill-switch')).toHaveAttribute('data-ready', 'true');
 });
 
-test('a short press does not open the menu; a 1.5 s mouse hold does, and a scope writes an audit event', async ({ page }) => {
+test('a short press does not open the menu; a 1.5 s mouse hold does, and a scope writes an audit event', async ({
+  page,
+}) => {
   const btn = page.getByTestId('kill-switch');
   const box = (await btn.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -30,10 +35,19 @@ test('a short press does not open the menu; a 1.5 s mouse hold does, and a scope
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('button')).toHaveCount(4); // 3 scopes + cancel
   await menu.getByTestId('kill-scope-robots_cancel_flatten').click();
-  await expect(page.getByText(/Kill switch: Halt, cancel \+ flatten\. Robots halted\. 0 orders cancelled\. 0 positions closed\. Audit event #\d+/)).toBeVisible();
-  await expect(page.getByTestId('halt-banner')).toContainText('Trading halted: Halt, cancel + flatten');
+  await expect(
+    page.getByText(
+      /Kill switch: Halt, cancel \+ flatten\. Robots halted\. 0 orders cancelled\. 0 positions closed\. Audit event #\d+/,
+    ),
+  ).toBeVisible();
+  await expect(page.getByTestId('halt-banner')).toContainText(
+    'Trading halted: Halt, cancel + flatten',
+  );
   const events = await killEvents(page);
-  expect(events[0]).toMatchObject({ entityId: 'robots_cancel_flatten', payload: { scope: 'robots_cancel_flatten', source: 'ui_button' } });
+  expect(events[0]).toMatchObject({
+    entityId: 'robots_cancel_flatten',
+    payload: { scope: 'robots_cancel_flatten', source: 'ui_button' },
+  });
 });
 
 test('keyboard Space-hold opens the menu', async ({ page }) => {
@@ -48,9 +62,19 @@ test('keyboard Space-hold opens the menu', async ({ page }) => {
 
 test('touch hold opens the menu', async ({ page }) => {
   const btn = page.getByTestId('kill-switch');
-  await btn.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0, isPrimary: true, pointerId: 7 });
+  await btn.dispatchEvent('pointerdown', {
+    pointerType: 'touch',
+    button: 0,
+    isPrimary: true,
+    pointerId: 7,
+  });
   await page.waitForTimeout(1650);
-  await btn.dispatchEvent('pointerup', { pointerType: 'touch', button: 0, isPrimary: true, pointerId: 7 });
+  await btn.dispatchEvent('pointerup', {
+    pointerType: 'touch',
+    button: 0,
+    isPrimary: true,
+    pointerId: 7,
+  });
   await expect(page.getByTestId('kill-switch-menu')).toBeVisible();
   await page.getByTestId('kill-scope-robots_cancel').click();
   await expect.poll(async () => (await killEvents(page))[0]?.entityId).toBe('robots_cancel');

@@ -5,7 +5,14 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { CONTROLS } from '../src/governance/controls/catalogue';
-import { acknowledgeRiskWarning, bearer, createUser, ownerQuery, startApp, type TestUser } from './helpers';
+import {
+  acknowledgeRiskWarning,
+  bearer,
+  createUser,
+  ownerQuery,
+  startApp,
+  type TestUser,
+} from './helpers';
 import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
 
 let n = 0;
@@ -53,17 +60,34 @@ describe('control evidence export', () => {
     // Activity the sample controls evidence: a fill, a limit rejection, a four-eyes approval,
     // a reconciliation run and a disclosure acknowledgement.
     await md.touch();
-    await request(http).post('/orders').set(bearer(trader.token)).send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.1' }).expect(201);
-    const rej = await request(http).post('/orders').set(bearer(trader.token)).send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '50' });
+    await request(http)
+      .post('/orders')
+      .set(bearer(trader.token))
+      .send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.1' })
+      .expect(201);
+    const rej = await request(http)
+      .post('/orders')
+      .set(bearer(trader.token))
+      .send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '50' });
     expect(rej.status).toBe(422);
     expect(rej.body.code).toBe('MAX_ORDER_NOTIONAL');
-    const acct = (await request(http).get('/accounts/me').set(bearer(trader.token))).body.id as string;
+    const acct = (await request(http).get('/accounts/me').set(bearer(trader.token))).body
+      .id as string;
     const fe = await request(http)
       .post('/governance/approvals')
       .set(bearer(risk.token))
-      .send({ kind: 'limit_override', accountId: acct, limits: { dailyLossLimit: '7500' }, reason: 'Evidence test (SIMULATED)' })
+      .send({
+        kind: 'limit_override',
+        accountId: acct,
+        limits: { dailyLossLimit: '7500' },
+        reason: 'Evidence test (SIMULATED)',
+      })
       .expect(201);
-    await request(http).post(`/governance/approvals/${fe.body.id}/approve`).set(bearer(risk2.token)).send({ note: 'approved' }).expect(200);
+    await request(http)
+      .post(`/governance/approvals/${fe.body.id}/approve`)
+      .set(bearer(risk2.token))
+      .send({ note: 'approved' })
+      .expect(200);
     await request(http).post('/reconciliation/run').set(bearer(risk.token)).expect(200);
     await acknowledgeRiskWarning(app, novice.token);
   });
@@ -79,8 +103,19 @@ describe('control evidence export', () => {
     request(http).get(`/governance/controls/${id}/evidence`).query(q).set(bearer(u.token));
 
   it('the catalogue covers every required area, and every control has COBIT refs, an owner line, a frequency, a test procedure and an implemented evidence query', async () => {
-    const res = await request(http).get('/governance/controls').set(bearer(auditor.token)).expect(200);
-    const controls = res.body.controls as Array<{ id: string; area: string; cobit: string[]; ownerLine: number; frequency: string; testProcedure: string[]; evidenceImplemented: boolean }>;
+    const res = await request(http)
+      .get('/governance/controls')
+      .set(bearer(auditor.token))
+      .expect(200);
+    const controls = res.body.controls as Array<{
+      id: string;
+      area: string;
+      cobit: string[];
+      ownerLine: number;
+      frequency: string;
+      testProcedure: string[];
+      evidenceImplemented: boolean;
+    }>;
     expect(controls).toHaveLength(CONTROLS.length);
     for (const c of controls) {
       expect(c.cobit.length, c.id).toBeGreaterThan(0);
@@ -90,7 +125,18 @@ describe('control evidence export', () => {
       expect(c.evidenceImplemented, c.id).toBe(true);
     }
     const areas = new Set(controls.map((c) => c.area));
-    for (const a of ['access_mfa', 'segregation_of_duties', 'change_management', 'audit_log_integrity', 'pre_trade_risk', 'reconciliation', 'ai_oversight', 'data_retention', 'incident_management', 'backup_restore'])
+    for (const a of [
+      'access_mfa',
+      'segregation_of_duties',
+      'change_management',
+      'audit_log_integrity',
+      'pre_trade_risk',
+      'reconciliation',
+      'ai_oversight',
+      'data_retention',
+      'incident_management',
+      'backup_restore',
+    ])
       expect(areas.has(a), a).toBe(true);
     expect(new Set(controls.map((c) => c.ownerLine))).toEqual(new Set([1, 2, 3]));
   });
@@ -103,22 +149,34 @@ describe('control evidence export', () => {
       expect(res.body.control.id).toBe(c.id);
       expect(Array.isArray(res.body.evidence.columns)).toBe(true);
       expect(res.body.evidence.columns.length).toBeGreaterThan(0);
-      for (const row of res.body.evidence.rows) expect(row).toHaveLength(res.body.evidence.columns.length);
-      expect(res.body.range).toEqual({ from: new Date(q.from).toISOString(), to: new Date(q.to).toISOString() });
+      for (const row of res.body.evidence.rows)
+        expect(row).toHaveLength(res.body.evidence.columns.length);
+      expect(res.body.range).toEqual({
+        from: new Date(q.from).toISOString(),
+        to: new Date(q.to).toISOString(),
+      });
     }
   });
 
   it('5 sample controls: CSV and PDF for a chosen period contain the period’s evidence and nothing outside it', async () => {
     const inRange = { from: t0, to: new Date((await dbNow()).getTime() + 60_000).toISOString() };
-    const before = { from: new Date(Date.parse(t0) - 3 * 86_400_000).toISOString(), to: new Date(Date.parse(t0) - 2 * 86_400_000).toISOString() };
+    const before = {
+      from: new Date(Date.parse(t0) - 3 * 86_400_000).toISOString(),
+      to: new Date(Date.parse(t0) - 2 * 86_400_000).toISOString(),
+    };
 
     // KC-06 four-eyes limit loosening: the approved request is in the period, requester ≠ approver.
     const kc06 = await evidence(auditor, 'KC-06', { ...inRange, format: 'json' }).expect(200);
-    expect(kc06.body.evidence.summary).toMatchObject({ approved: expect.any(Number), requester_equals_approver: 0 });
+    expect(kc06.body.evidence.summary).toMatchObject({
+      approved: expect.any(Number),
+      requester_equals_approver: 0,
+    });
     expect(kc06.body.evidence.summary.approved).toBeGreaterThanOrEqual(1);
     const kc06csv = await evidence(auditor, 'KC-06', { ...inRange, format: 'csv' }).expect(200);
     expect(kc06csv.headers['content-type']).toMatch(/text\/csv/);
-    expect(kc06csv.text.split('\r\n')[0]).toBe('id,kind,subject_type,subject_id,requested_by,requested_at,status,decided_by,decided_at,reason,decision_note,approver_granted_by_requester');
+    expect(kc06csv.text.split('\r\n')[0]).toBe(
+      'id,kind,subject_type,subject_id,requested_by,requested_at,status,decided_by,decided_at,reason,decision_note,approver_granted_by_requester',
+    );
     expect(kc06csv.text).toContain(risk.id);
     expect(kc06csv.text).toContain(risk2.id);
     const kc06old = await evidence(auditor, 'KC-06', { ...before, format: 'csv' }).expect(200);
@@ -140,7 +198,10 @@ describe('control evidence export', () => {
 
     // KC-20 reconciliation: the manual run is in the period.
     // Reconciliation runs are stamped with the application clock (faked to market hours here).
-    const appRange = { from: new Date(Date.now() - 3_600_000).toISOString(), to: new Date(Date.now() + 60_000).toISOString() };
+    const appRange = {
+      from: new Date(Date.now() - 3_600_000).toISOString(),
+      to: new Date(Date.now() + 60_000).toISOString(),
+    };
     const kc20 = await evidence(risk, 'KC-20', { ...appRange, format: 'json' }).expect(200);
     expect(kc20.body.evidence.summary.runs).toBeGreaterThanOrEqual(1);
     expect(kc20.body.evidence.rows.some((r: unknown[]) => r[1] === 'manual')).toBe(true);
@@ -152,7 +213,10 @@ describe('control evidence export', () => {
 
     // PDF for each of the five: a real PDF, audited with the file's SHA-256.
     for (const id of ['KC-06', 'KC-12', 'KC-15', 'KC-20', 'KC-27']) {
-      const pdf = await evidence(auditor, id, { ...inRange, format: 'pdf' }).buffer(true).parse(binary).expect(200);
+      const pdf = await evidence(auditor, id, { ...inRange, format: 'pdf' })
+        .buffer(true)
+        .parse(binary)
+        .expect(200);
       const body = pdf.body as Buffer;
       expect(pdf.headers['content-type']).toBe('application/pdf');
       expect(pdf.headers['content-disposition']).toContain(`kora-evidence_${id}_`);
@@ -165,7 +229,10 @@ describe('control evidence export', () => {
         `SELECT actor_id, payload FROM audit_events WHERE action = 'governance.evidence_exported' AND payload->>'sha256' = $1`,
         [sha],
       );
-      expect(audit[0]).toMatchObject({ actor_id: auditor.id, payload: { controlId: id, format: 'pdf' } });
+      expect(audit[0]).toMatchObject({
+        actor_id: auditor.id,
+        payload: { controlId: id, format: 'pdf' },
+      });
     }
   });
 
@@ -173,10 +240,25 @@ describe('control evidence export', () => {
     await evidence(trader, 'KC-01', {}).expect(403);
     await evidence(novice, 'KC-01', {}).expect(403);
     await evidence(risk, 'KC-99', {}).expect(404);
-    await evidence(risk, 'KC-01', { from: '2026-09-02T00:00:00Z', to: '2026-09-01T00:00:00Z' }).expect(400);
-    await evidence(risk, 'KC-01', { from: '2024-01-01T00:00:00Z', to: '2026-01-01T00:00:00Z' }).expect(400);
-    const res = await request(http).get('/governance/retention').set(bearer(auditor.token)).expect(200);
-    expect(res.body.policy.find((p: { id: string }) => p.id === 'audit_events')).toMatchObject({ periodDays: null, openQuestion: 'OQ-R4' });
-    expect(res.body.report.find((p: { id: string }) => p.id === 'md_trades')).toMatchObject({ periodDays: 7, placeholder: false });
+    await evidence(risk, 'KC-01', {
+      from: '2026-09-02T00:00:00Z',
+      to: '2026-09-01T00:00:00Z',
+    }).expect(400);
+    await evidence(risk, 'KC-01', {
+      from: '2024-01-01T00:00:00Z',
+      to: '2026-01-01T00:00:00Z',
+    }).expect(400);
+    const res = await request(http)
+      .get('/governance/retention')
+      .set(bearer(auditor.token))
+      .expect(200);
+    expect(res.body.policy.find((p: { id: string }) => p.id === 'audit_events')).toMatchObject({
+      periodDays: null,
+      openQuestion: 'OQ-R4',
+    });
+    expect(res.body.report.find((p: { id: string }) => p.id === 'md_trades')).toMatchObject({
+      periodDays: 7,
+      placeholder: false,
+    });
   });
 });

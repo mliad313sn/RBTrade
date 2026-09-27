@@ -79,13 +79,24 @@ export class ComplianceController {
       'A user’s acknowledgements, each with the disclosure version in force when it was given, re-rendered from the registry and verified by content hash.',
   })
   async acknowledgements(@Query(new ZodValidationPipe(AckQuery)) q: z.infer<typeof AckQuery>) {
-    return { userId: q.userId, acknowledgements: await this.acks.history(q.userId, q.disclosureId) };
+    return {
+      userId: q.userId,
+      acknowledgements: await this.acks.history(q.userId, q.disclosureId),
+    };
   }
 
   @Get('disclosures/:id/versions')
-  @ApiOperation({ summary: 'Every published version of a disclosure (per jurisdiction, with effective dates) and pending drafts.' })
+  @ApiOperation({
+    summary:
+      'Every published version of a disclosure (per jurisdiction, with effective dates) and pending drafts.',
+  })
   async versions(@Param('id', new ZodValidationPipe(DisclosureId)) id: string) {
-    const drafts = await this.db.query<{ version: string; jurisdiction: string; drafted_by: string; drafted_at: Date }>(
+    const drafts = await this.db.query<{
+      version: string;
+      jurisdiction: string;
+      drafted_by: string;
+      drafted_at: Date;
+    }>(
       `SELECT version, jurisdiction, drafted_by, drafted_at FROM disclosure_documents WHERE id = $1 AND status = 'draft' ORDER BY drafted_at DESC`,
       [id],
     );
@@ -93,16 +104,30 @@ export class ComplianceController {
       id,
       deploymentJurisdiction: this.cfg.jurisdiction,
       published: this.registry.history(id),
-      drafts: drafts.map((d) => ({ version: d.version, jurisdiction: d.jurisdiction, draftedBy: d.drafted_by, draftedAt: d.drafted_at.toISOString() })),
+      drafts: drafts.map((d) => ({
+        version: d.version,
+        jurisdiction: d.jurisdiction,
+        draftedBy: d.drafted_by,
+        draftedAt: d.drafted_at.toISOString(),
+      })),
     };
   }
 
   @Get('disclosures/:id/at')
-  @ApiOperation({ summary: 'The disclosure text and values in force at a point in time (default now).' })
-  at(@Param('id', new ZodValidationPipe(DisclosureId)) id: string, @Query(new ZodValidationPipe(AtQuery)) q: z.infer<typeof AtQuery>) {
+  @ApiOperation({
+    summary: 'The disclosure text and values in force at a point in time (default now).',
+  })
+  at(
+    @Param('id', new ZodValidationPipe(DisclosureId)) id: string,
+    @Query(new ZodValidationPipe(AtQuery)) q: z.infer<typeof AtQuery>,
+  ) {
     const when = q.at ? Date.parse(q.at) : Date.now();
     const doc = this.registry.at(id, (q.locale ?? 'en') as DisclosureLocale, when, q.jurisdiction);
-    if (!doc) throw new NotFoundException({ error: 'not_found', message: 'No version of this disclosure was in force then.' });
+    if (!doc)
+      throw new NotFoundException({
+        error: 'not_found',
+        message: 'No version of this disclosure was in force then.',
+      });
     return { at: new Date(when).toISOString(), document: doc };
   }
 
@@ -114,19 +139,35 @@ export class ComplianceController {
       'Draft a new disclosure version (text in EN and FR, value keys). Publishing needs a four-eyes request (kind disclosure_publish) approved by someone else.',
   })
   @ApiBody({ schema: openApiSchema(DraftSchema) })
-  async draft(@CurrentPrincipal() p: Principal, @Body(new ZodValidationPipe(DraftSchema)) body: z.infer<typeof DraftSchema>) {
+  async draft(
+    @CurrentPrincipal() p: Principal,
+    @Body(new ZodValidationPipe(DraftSchema)) body: z.infer<typeof DraftSchema>,
+  ) {
     const d = body.definition;
-    const exists = await this.db.query('SELECT 1 FROM disclosure_documents WHERE id = $1 AND version = $2 AND jurisdiction = $3', [
-      d.id,
-      d.version,
-      body.jurisdiction,
-    ]);
-    if (exists.length) throw new ConflictException({ error: 'version_exists', message: 'This version already exists; use a new version number.' });
+    const exists = await this.db.query(
+      'SELECT 1 FROM disclosure_documents WHERE id = $1 AND version = $2 AND jurisdiction = $3',
+      [d.id, d.version, body.jurisdiction],
+    );
+    if (exists.length)
+      throw new ConflictException({
+        error: 'version_exists',
+        message: 'This version already exists; use a new version number.',
+      });
     return this.db.tx(async (c) => {
       await c.query(
         `INSERT INTO disclosure_documents (id, version, jurisdiction, locales, value_keys, simulated, review_status, checksum, status, drafted_by)
          VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, 'draft', $9)`,
-        [d.id, d.version, body.jurisdiction, JSON.stringify(d.locales), d.values, d.simulated, d.reviewStatus, definitionChecksum(d), p.sub],
+        [
+          d.id,
+          d.version,
+          body.jurisdiction,
+          JSON.stringify(d.locales),
+          d.values,
+          d.simulated,
+          d.reviewStatus,
+          definitionChecksum(d),
+          p.sub,
+        ],
       );
       await this.audit.record(
         {
@@ -135,16 +176,31 @@ export class ComplianceController {
           action: 'disclosure.drafted',
           entity: 'disclosure',
           entityId: d.id,
-          payload: { disclosureId: d.id, version: d.version, jurisdiction: body.jurisdiction, checksum: definitionChecksum(d), values: d.values },
+          payload: {
+            disclosureId: d.id,
+            version: d.version,
+            jurisdiction: body.jurisdiction,
+            checksum: definitionChecksum(d),
+            values: d.values,
+          },
         },
         c,
       );
-      return { id: d.id, version: d.version, jurisdiction: body.jurisdiction, status: 'draft', checksum: definitionChecksum(d) };
+      return {
+        id: d.id,
+        version: d.version,
+        jurisdiction: body.jurisdiction,
+        status: 'draft',
+        checksum: definitionChecksum(d),
+      };
     });
   }
 
   @Get('suitability/:userId')
-  @ApiOperation({ summary: 'A user’s appropriateness / knowledge / suitability profile (scores only; not advice).' })
+  @ApiOperation({
+    summary:
+      'A user’s appropriateness / knowledge / suitability profile (scores only; not advice).',
+  })
   suitabilityProfile(@Param('userId', new ParseUUIDPipe()) userId: string) {
     return this.suitability.profile(userId);
   }
@@ -156,7 +212,10 @@ export class ComplianceController {
   }
 
   @Get('best-execution')
-  @ApiOperation({ summary: 'Best-execution report data: slippage vs the reference price by instrument or UTC hour.' })
+  @ApiOperation({
+    summary:
+      'Best-execution report data: slippage vs the reference price by instrument or UTC hour.',
+  })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @ApiQuery({ name: 'groupBy', required: false, enum: ['instrument', 'hour'] })
@@ -167,7 +226,8 @@ export class ComplianceController {
       to: r.to.toISOString(),
       groupBy: q.groupBy,
       simulated: true,
-      definition: 'slippage = (fill price − reference price at decision) × side sign; positive = adverse; bps vs the reference price',
+      definition:
+        'slippage = (fill price − reference price at decision) × side sign; positive = adverse; bps vs the reference price',
       rows: await bestExecution(this.db, r.from, r.to, q.groupBy),
     };
   }
@@ -175,7 +235,10 @@ export class ComplianceController {
   @Get('subject-access/:userId')
   @Roles('risk_officer', 'admin')
   @ApiOperation({ summary: 'Subject-access export on behalf of a user (audited).' })
-  subjectAccessExport(@CurrentPrincipal() p: Principal, @Param('userId', new ParseUUIDPipe()) userId: string) {
+  subjectAccessExport(
+    @CurrentPrincipal() p: Principal,
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+  ) {
     return this.subjectAccess.export(userId, p.sub);
   }
 }
@@ -192,13 +255,18 @@ export class MeComplianceController {
   ) {}
 
   @Get('acknowledgements')
-  @ApiOperation({ summary: 'Your acknowledgements, each with the exact text you acknowledged (verified).' })
+  @ApiOperation({
+    summary: 'Your acknowledgements, each with the exact text you acknowledged (verified).',
+  })
   async acknowledgements(@CurrentPrincipal() p: Principal) {
     return { acknowledgements: await this.acks.history(p.sub) };
   }
 
   @Get('suitability')
-  @ApiOperation({ summary: 'Your profile from the appropriateness, knowledge and suitability questionnaires (not advice).' })
+  @ApiOperation({
+    summary:
+      'Your profile from the appropriateness, knowledge and suitability questionnaires (not advice).',
+  })
   profile(@CurrentPrincipal() p: Principal) {
     return this.suitability.profile(p.sub);
   }
@@ -216,13 +284,16 @@ export class MeComplianceController {
     try {
       return await this.kyc.start({ userId: p.sub, jurisdiction: 'GLOBAL' });
     } catch (e) {
-      if (e instanceof KycNotConfiguredError) throw new ServiceUnavailableException({ error: 'kyc_not_configured', message: e.message });
+      if (e instanceof KycNotConfiguredError)
+        throw new ServiceUnavailableException({ error: 'kyc_not_configured', message: e.message });
       throw e;
     }
   }
 
   @Get('data-export')
-  @ApiOperation({ summary: 'Download everything KORA holds about you (subject access, JSON; audited).' })
+  @ApiOperation({
+    summary: 'Download everything KORA holds about you (subject access, JSON; audited).',
+  })
   dataExport(@CurrentPrincipal() p: Principal) {
     return this.subjectAccess.export(p.sub, p.sub);
   }
@@ -235,16 +306,25 @@ export class SuitabilityController {
   constructor(private readonly suitability: SuitabilityService) {}
 
   @Get('questionnaire')
-  @ApiOperation({ summary: 'The suitability questionnaire (SIMULATED placeholder content, OQ-C2; no answer weights).' })
+  @ApiOperation({
+    summary:
+      'The suitability questionnaire (SIMULATED placeholder content, OQ-C2; no answer weights).',
+  })
   questionnaire() {
     return this.suitability.questionnaire();
   }
 
   @Post('attempts')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Submit answers; only the score and band are kept. The result is a profile, not a recommendation.' })
+  @ApiOperation({
+    summary:
+      'Submit answers; only the score and band are kept. The result is a profile, not a recommendation.',
+  })
   @ApiBody({ schema: openApiSchema(AttemptSchema) })
-  submit(@CurrentPrincipal() p: Principal, @Body(new ZodValidationPipe(AttemptSchema)) body: AttemptRequest) {
+  submit(
+    @CurrentPrincipal() p: Principal,
+    @Body(new ZodValidationPipe(AttemptSchema)) body: AttemptRequest,
+  ) {
     return this.suitability.submit(p.sub, body);
   }
 }

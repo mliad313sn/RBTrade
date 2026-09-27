@@ -34,16 +34,22 @@ function colName(i: number): string {
 }
 
 function sheetXml(sheet: Sheet): string {
-  const cols = sheet.columns.map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${c.width ?? 18}" customWidth="1"/>`).join('');
+  const cols = sheet.columns
+    .map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${c.width ?? 18}" customWidth="1"/>`)
+    .join('');
   const cell = (v: string | number | boolean | null, ref: string, style: number) => {
     if (v === null || v === '') return `<c r="${ref}" s="${style}"/>`;
-    if (typeof v === 'number' && Number.isFinite(v)) return `<c r="${ref}" s="${style}"><v>${v}</v></c>`;
+    if (typeof v === 'number' && Number.isFinite(v))
+      return `<c r="${ref}" s="${style}"><v>${v}</v></c>`;
     if (typeof v === 'boolean') return `<c r="${ref}" s="${style}" t="b"><v>${v ? 1 : 0}</v></c>`;
     return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(String(v))}</t></is></c>`;
   };
   const header = `<row r="1">${sheet.columns.map((c, i) => cell(c.header, `${colName(i)}1`, 1)).join('')}</row>`;
   const body = sheet.rows
-    .map((r, ri) => `<row r="${ri + 2}">${r.map((v, ci) => cell(v, `${colName(ci)}${ri + 2}`, 2)).join('')}</row>`)
+    .map(
+      (r, ri) =>
+        `<row r="${ri + 2}">${r.map((v, ci) => cell(v, `${colName(ci)}${ri + 2}`, 2)).join('')}</row>`,
+    )
     .join('');
   const last = `${colName(Math.max(0, sheet.columns.length - 1))}${sheet.rows.length + 1}`;
   return (
@@ -81,7 +87,10 @@ export function renderXlsx(sheets: Sheet[]): Buffer {
         '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
         '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
         sheets
-          .map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+          .map(
+            (_, i) =>
+              `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+          )
           .join('') +
         '</Types>',
     ],
@@ -104,7 +113,10 @@ export function renderXlsx(sheets: Sheet[]): Buffer {
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
         sheets
-          .map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`)
+          .map(
+            (_, i) =>
+              `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+          )
           .join('') +
         `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
         '</Relationships>',

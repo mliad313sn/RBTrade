@@ -344,7 +344,11 @@ export function RobotsMonitor() {
                     </span>
                     {/* IRTC R5-19: no glyph and no direction colour on a zero P&L. */}
                     <span className={`k-num block text-sm k-dir--${displayDirection(r.pnl, 2)}`}>
-                      {displayDirection(r.pnl, 2) === 'up' ? '▲ ' : displayDirection(r.pnl, 2) === 'down' ? '▼ ' : ''}
+                      {displayDirection(r.pnl, 2) === 'up'
+                        ? '▲ '
+                        : displayDirection(r.pnl, 2) === 'down'
+                          ? '▼ '
+                          : ''}
                       {fmtSigned(Number(r.pnl), 2)}
                     </span>
                   </Link>
@@ -382,7 +386,8 @@ export function RobotsMonitor() {
           </Panel>
           <Panel title="Kill switch" className="border-[var(--k-kill)]">
             <p className="mt-0 text-xs text-muted">
-              Halts every robot, cancels all orders, flattens all positions. Hold 1.5 s, or click and confirm.
+              Halts every robot, cancels all orders, flattens all positions. Hold 1.5 s, or click
+              and confirm.
             </p>
             <HoldToConfirmButton
               holdMs={KILL_SWITCH_HOLD_MS}

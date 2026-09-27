@@ -5,7 +5,14 @@
 import { AiApiError, streamAnswer, type AiAnswer } from '@/lib/ai/client';
 
 export type RadarRegion = 'americas' | 'europe' | 'africa' | 'asia' | 'oceania' | 'global';
-export type TrendKind = 'up' | 'down' | 'range' | 'breakout_up' | 'breakout_down' | 'reversal' | 'vol_regime';
+export type TrendKind =
+  | 'up'
+  | 'down'
+  | 'range'
+  | 'breakout_up'
+  | 'breakout_down'
+  | 'reversal'
+  | 'vol_regime';
 
 export interface HeatCell {
   key: string;
@@ -63,7 +70,14 @@ export interface NewsItem {
 }
 
 export type ProbabilityView =
-  | { status: 'calibrated'; value: number; n: number; saidAs: number; reliabilityLine: string; edgeStatement: string }
+  | {
+      status: 'calibrated';
+      value: number;
+      n: number;
+      saidAs: number;
+      reliabilityLine: string;
+      edgeStatement: string;
+    }
   | { status: 'no_reliable_signal'; label: 'No reliable signal'; reason: string };
 
 export interface TrendCard {
@@ -94,7 +108,12 @@ export interface TrendCard {
     momentumZ: number | null;
     eventMinutes: number | null;
   };
-  invalidation: { side: 'below' | 'above'; level: number; atrMultiple: number; rule: string } | null;
+  invalidation: {
+    side: 'below' | 'above';
+    level: number;
+    atrMultiple: number;
+    rule: string;
+  } | null;
   news: NewsItem[];
   disclaimer: string;
 }
@@ -123,7 +142,13 @@ export interface AlertRule {
 
 export interface AlertsData {
   alerts: Array<{ id: string; name: string; rule: AlertRule; active: boolean; createdAt: string }>;
-  events: Array<{ id: string; alertId: string; symbol: string; detail: Record<string, unknown>; createdAt: string }>;
+  events: Array<{
+    id: string;
+    alertId: string;
+    symbol: string;
+    detail: Record<string, unknown>;
+    createdAt: string;
+  }>;
   evaluatedBy: 'server';
 }
 
@@ -137,11 +162,27 @@ export interface ReliabilityData {
     region: string;
     regionLabel: string;
     horizon: string;
-    live: { forecasts: number; resolved: number; hitRate: number | null; meanNetReturn: number | null };
-    replay: { forecasts: number; resolved: number; hitRate: number | null; meanNetReturn: number | null };
+    live: {
+      forecasts: number;
+      resolved: number;
+      hitRate: number | null;
+      meanNetReturn: number | null;
+    };
+    replay: {
+      forecasts: number;
+      resolved: number;
+      hitRate: number | null;
+      meanNetReturn: number | null;
+    };
     edge: 'positive' | 'none' | 'insufficient_data';
     edgeStatement: string;
-    bins: Array<{ lo: number; hi: number; n: number; meanPredicted: number | null; observed: number }>;
+    bins: Array<{
+      lo: number;
+      hi: number;
+      n: number;
+      meanPredicted: number | null;
+      observed: number;
+    }>;
     minN: number;
   }>;
   disclaimer: string;
@@ -156,7 +197,11 @@ export interface OrderDraftResponse {
 
 const HEADERS = { accept: 'application/json', 'x-kora-csrf': '1' };
 
-async function call<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+async function call<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
     headers: { ...HEADERS, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
@@ -178,17 +223,35 @@ const qs = (o: Record<string, string | undefined>) => {
 };
 
 export const intelApi = {
-  radar: (f: { region?: string; assetClass?: string; sector?: string; window?: string; groupBy?: string }) =>
-    call<RadarData>('GET', `/intel/radar${qs(f)}`),
+  radar: (f: {
+    region?: string;
+    assetClass?: string;
+    sector?: string;
+    window?: string;
+    groupBy?: string;
+  }) => call<RadarData>('GET', `/intel/radar${qs(f)}`),
   card: (symbol: string, horizon = '1d') =>
     call<TrendCard>('GET', `/intel/trends/${encodeURIComponent(symbol)}${qs({ horizon })}`),
-  explain: (symbol: string, horizon: string, onDelta: (t: string) => void, mode?: 'pro' | 'novice') =>
-    streamAnswer(`/intel/trends/${encodeURIComponent(symbol)}/explain`, { horizon, ...(mode ? { mode } : {}) }, onDelta) as Promise<AiAnswer>,
+  explain: (
+    symbol: string,
+    horizon: string,
+    onDelta: (t: string) => void,
+    mode?: 'pro' | 'novice',
+  ) =>
+    streamAnswer(
+      `/intel/trends/${encodeURIComponent(symbol)}/explain`,
+      { horizon, ...(mode ? { mode } : {}) },
+      onDelta,
+    ) as Promise<AiAnswer>,
   draft: (symbol: string, horizon: string) =>
-    call<OrderDraftResponse>('POST', `/intel/trends/${encodeURIComponent(symbol)}/draft`, { horizon }),
-  whatsMoving: () => call<{ items: MovingItem[]; note: string; disclaimer: string }>('GET', '/intel/whats-moving'),
+    call<OrderDraftResponse>('POST', `/intel/trends/${encodeURIComponent(symbol)}/draft`, {
+      horizon,
+    }),
+  whatsMoving: () =>
+    call<{ items: MovingItem[]; note: string; disclaimer: string }>('GET', '/intel/whats-moving'),
   alerts: () => call<AlertsData>('GET', '/intel/alerts'),
-  createAlert: (name: string, rule: AlertRule) => call<{ id: string }>('POST', '/intel/alerts', { name, rule }),
+  createAlert: (name: string, rule: AlertRule) =>
+    call<{ id: string }>('POST', '/intel/alerts', { name, rule }),
   deleteAlert: (id: string) => call<{ deleted: true }>('DELETE', `/intel/alerts/${id}`),
 };
 
@@ -215,5 +278,9 @@ export const TREND_LABELS: Record<TrendKind, string> = {
 };
 
 export function trendArrow(kind: TrendKind): string {
-  return kind === 'up' || kind === 'breakout_up' ? '▲' : kind === 'down' || kind === 'breakout_down' ? '▼' : '◆';
+  return kind === 'up' || kind === 'breakout_up'
+    ? '▲'
+    : kind === 'down' || kind === 'breakout_down'
+      ? '▼'
+      : '◆';
 }

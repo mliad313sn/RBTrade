@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   FOUR_EYES_KINDS,
@@ -35,9 +45,16 @@ export class ApprovalsController {
   @ApiOperation({ summary: 'Four-eyes requests (risk officers/admins: all; others: their own).' })
   @ApiQuery({ name: 'status', required: false, enum: FOUR_EYES_STATUSES })
   @ApiQuery({ name: 'kind', required: false, enum: FOUR_EYES_KINDS })
-  async list(@CurrentPrincipal() p: Principal, @Query(new ZodValidationPipe(ListQuery)) q: z.infer<typeof ListQuery>) {
+  async list(
+    @CurrentPrincipal() p: Principal,
+    @Query(new ZodValidationPipe(ListQuery)) q: z.infer<typeof ListQuery>,
+  ) {
     const all = await this.fourEyes.list(q);
-    return { requests: hasAnyRole(p.roles, APPROVER_ROLES) ? all : all.filter((r) => r.requestedBy === p.sub) };
+    return {
+      requests: hasAnyRole(p.roles, APPROVER_ROLES)
+        ? all
+        : all.filter((r) => r.requestedBy === p.sub),
+    };
   }
 
   @Post()
@@ -47,7 +64,10 @@ export class ApprovalsController {
       'Open a four-eyes request: limit_override (loosen above the platform limit), mfa_reset (admin), disclosure_publish (document version or Compliance value).',
   })
   @ApiBody({ schema: openApiSchema(FourEyesCreateSchema) })
-  create(@CurrentPrincipal() p: Principal, @Body(new ZodValidationPipe(FourEyesCreateSchema)) body: FourEyesCreate) {
+  create(
+    @CurrentPrincipal() p: Principal,
+    @Body(new ZodValidationPipe(FourEyesCreateSchema)) body: FourEyesCreate,
+  ) {
     return this.fourEyes.create(p.sub, p.roles, body);
   }
 
@@ -55,18 +75,23 @@ export class ApprovalsController {
   @ApiOperation({ summary: 'One request (approvers: any; others: their own).' })
   async get(@CurrentPrincipal() p: Principal, @Param('id', new ParseUUIDPipe()) id: string) {
     const r = await this.fourEyes.get(id);
-    if (!hasAnyRole(p.roles, APPROVER_ROLES) && r.requestedBy !== p.sub) throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
+    if (!hasAnyRole(p.roles, APPROVER_ROLES) && r.requestedBy !== p.sub)
+      throw new NotFoundException({ error: 'not_found', message: 'No such request.' });
     return r;
   }
 
   @Post(':id/approve')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Approve and execute (risk officer/admin, not the requester, not the person it is about).' })
+  @ApiOperation({
+    summary:
+      'Approve and execute (risk officer/admin, not the requester, not the person it is about).',
+  })
   @ApiBody({ schema: openApiSchema(FourEyesDecisionSchema) })
   approve(
     @CurrentPrincipal() p: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body(new ZodValidationPipe(FourEyesDecisionSchema)) body: z.infer<typeof FourEyesDecisionSchema>,
+    @Body(new ZodValidationPipe(FourEyesDecisionSchema))
+    body: z.infer<typeof FourEyesDecisionSchema>,
   ) {
     return this.fourEyes.approve(p.sub, p.roles, id, body.note);
   }
@@ -78,7 +103,8 @@ export class ApprovalsController {
   reject(
     @CurrentPrincipal() p: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body(new ZodValidationPipe(FourEyesDecisionSchema)) body: z.infer<typeof FourEyesDecisionSchema>,
+    @Body(new ZodValidationPipe(FourEyesDecisionSchema))
+    body: z.infer<typeof FourEyesDecisionSchema>,
   ) {
     return this.fourEyes.reject(p.sub, p.roles, id, body.note);
   }
@@ -90,7 +116,8 @@ export class ApprovalsController {
   cancel(
     @CurrentPrincipal() p: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body(new ZodValidationPipe(FourEyesDecisionSchema)) body: z.infer<typeof FourEyesDecisionSchema>,
+    @Body(new ZodValidationPipe(FourEyesDecisionSchema))
+    body: z.infer<typeof FourEyesDecisionSchema>,
   ) {
     return this.fourEyes.cancel(p.sub, id, body.note);
   }

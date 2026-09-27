@@ -27,12 +27,19 @@ import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { DisclosureAcknowledgements } from '../disclosures/acknowledgements.service';
-import { DISCLOSURE_LOCALES, RISK_WARNING_DISCLOSURE_ID, type DisclosureLocale } from '../disclosures/disclosure.types';
+import {
+  DISCLOSURE_LOCALES,
+  RISK_WARNING_DISCLOSURE_ID,
+  type DisclosureLocale,
+} from '../disclosures/disclosure.types';
 import { QuestionnaireService } from './questionnaire.service';
 
 const ID = 'appropriateness';
 // Per client IP: 20 per minute, and (IRTC R1-11) a daily ceiling across all accounts.
-const attemptThrottle = () => ({ default: { limit: 20, ttl: 60_000 }, long: { limit: () => appropriatenessIpLimitPerDay(), ttl: 86_400_000 } });
+const attemptThrottle = () => ({
+  default: { limit: 20, ttl: 60_000 },
+  long: { limit: () => appropriatenessIpLimitPerDay(), ttl: 86_400_000 },
+});
 
 function sodBody(conflict: [string, string]) {
   return {
@@ -69,7 +76,10 @@ export class AppropriatenessController {
     return d;
   }
 
-  private async refuseIfConflict(userId: string, def: { id: string; version: number }): Promise<void> {
+  private async refuseIfConflict(
+    userId: string,
+    def: { id: string; version: number },
+  ): Promise<void> {
     const roles = await this.users.roles(userId);
     if (roles.includes('trader')) return; // answered as already_trader below
     const conflict = rolesConflict([...roles, 'trader']);
@@ -80,7 +90,12 @@ export class AppropriatenessController {
       action: 'appropriateness.refused',
       entity: 'user',
       entityId: userId,
-      payload: { questionnaireId: def.id, version: def.version, reason: 'segregation_of_duties', conflict: [conflict[0], conflict[1]] },
+      payload: {
+        questionnaireId: def.id,
+        version: def.version,
+        reason: 'segregation_of_duties',
+        conflict: [conflict[0], conflict[1]],
+      },
     });
     throw new ConflictException(sodBody(conflict));
   }
@@ -148,12 +163,19 @@ export class AppropriatenessController {
       });
     const locale = body.riskWarning.locale as DisclosureLocale;
     if (!(DISCLOSURE_LOCALES as readonly string[]).includes(locale))
-      throw new BadRequestException({ error: 'invalid_locale', message: 'Unknown locale for the risk warning.' });
+      throw new BadRequestException({
+        error: 'invalid_locale',
+        message: 'Unknown locale for the risk warning.',
+      });
     const warning = this.acks.document(RISK_WARNING_DISCLOSURE_ID, locale);
-    if (warning.version !== body.riskWarning.version || warning.contentHash !== body.riskWarning.contentHash)
+    if (
+      warning.version !== body.riskWarning.version ||
+      warning.contentHash !== body.riskWarning.contentHash
+    )
       throw new ConflictException({
         error: 'disclosure_changed',
-        message: 'The risk warning has changed since you opened this page. Read the new version and confirm again.',
+        message:
+          'The risk warning has changed since you opened this page. Read the new version and confirm again.',
         current: { version: warning.version, contentHash: warning.contentHash },
       });
     const g = this.q.grade(def, body.answers);
@@ -223,7 +245,12 @@ export class AppropriatenessController {
       await this.acks.record(
         p.sub,
         RISK_WARNING_DISCLOSURE_ID,
-        { version: warning.version, contentHash: warning.contentHash, locale, context: 'appropriateness' },
+        {
+          version: warning.version,
+          contentHash: warning.contentHash,
+          locale,
+          context: 'appropriateness',
+        },
         c,
       );
       // Unlocking Pro switches the default view to Pro (the user can switch back; guardrails follow the view).

@@ -15,18 +15,29 @@ export function DriversChart({ card }: { card: TrendCard }) {
     );
   const max = Math.max(...card.drivers.map((d) => Math.abs(d.contribution)), 1e-9);
   return (
-    <figure className="m-0" data-testid="drivers-chart" aria-label={`Top drivers of the ${card.horizon} forecast for ${card.symbol}`}>
+    <figure
+      className="m-0"
+      data-testid="drivers-chart"
+      aria-label={`Top drivers of the ${card.horizon} forecast for ${card.symbol}`}
+    >
       <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs">
         {card.drivers.map((d) => {
           const w = Math.round((Math.abs(d.contribution) / max) * 100);
           const pos = d.contribution >= 0;
           return (
-            <li key={d.feature} className="grid grid-cols-[minmax(0,1fr)_90px_72px] items-center gap-2" data-testid="driver-row">
+            <li
+              key={d.feature}
+              className="grid grid-cols-[minmax(0,1fr)_90px_72px] items-center gap-2"
+              data-testid="driver-row"
+            >
               <span className="truncate" title={`${d.label} = ${d.value}`}>
                 {d.label} <span className="text-muted">({d.value})</span>
               </span>
               <span className="h-2 rounded bg-raised" aria-hidden="true">
-                <span className={`block h-2 rounded ${pos ? 'bg-up' : 'bg-down'}`} style={{ width: `${w}%` }} />
+                <span
+                  className={`block h-2 rounded ${pos ? 'bg-up' : 'bg-down'}`}
+                  style={{ width: `${w}%` }}
+                />
               </span>
               <span className="k-num text-right">
                 {pos ? '▲' : '▼'} {signed(d.contribution, 3)}
@@ -35,7 +46,9 @@ export function DriversChart({ card }: { card: TrendCard }) {
           );
         })}
       </ul>
-      <figcaption className="mt-1 text-xs text-muted">Contributions to the log-odds of an up move (linear SHAP, from the stored forecast).</figcaption>
+      <figcaption className="mt-1 text-xs text-muted">
+        Contributions to the log-odds of an up move (linear SHAP, from the stored forecast).
+      </figcaption>
     </figure>
   );
 }

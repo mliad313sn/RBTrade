@@ -12,7 +12,10 @@ import { getT } from './server';
  * `metadata`, so French screen-reader users heard "Home · KORA". Screens shared with Pro (settings,
  * the appropriateness check) follow the viewer's view: French only in the simple view.
  */
-export async function localisedTitle(key: MessageKey, opts: { sharedWithPro?: boolean } = {}): Promise<Metadata> {
+export async function localisedTitle(
+  key: MessageKey,
+  opts: { sharedWithPro?: boolean } = {},
+): Promise<Metadata> {
   const { locale, t } = await getT();
   if (locale === 'en') return { title: t(key) };
   if (opts.sharedWithPro) {

@@ -10,7 +10,9 @@ describe('password hashing', () => {
     expect(await verifyPassword('wrong horse battery', h)).toBe(false);
   });
   it('uses a unique salt per hash', async () => {
-    expect(await hashPassword('same-password-123', 16384)).not.toBe(await hashPassword('same-password-123', 16384));
+    expect(await hashPassword('same-password-123', 16384)).not.toBe(
+      await hashPassword('same-password-123', 16384),
+    );
   });
   it('rejects malformed stored hashes', async () => {
     expect(await verifyPassword('x', 'bcrypt$abc')).toBe(false);

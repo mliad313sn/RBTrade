@@ -9,7 +9,15 @@ import { useI18n } from '@/lib/i18n/react';
  * in the green/red or red-up conventions. IRTC R5-16: empty segments have a 3:1 outline, and
  * `showText` prints the level next to the bars.
  */
-export function RiskBars({ level, label, showText = false }: { level: number; label: string; showText?: boolean }) {
+export function RiskBars({
+  level,
+  label,
+  showText = false,
+}: {
+  level: number;
+  label: string;
+  showText?: boolean;
+}) {
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1 shrink-0 max-w-[9rem]">
       <span className="inline-flex gap-0.5" role="img" aria-label={label}>

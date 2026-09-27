@@ -30,7 +30,11 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Pr
   const data = (text ? JSON.parse(text) : {}) as Record<string, unknown>;
   if (!res.ok) {
     const issues = (data.issues as Array<{ message: string }> | undefined) ?? [];
-    throw new GovernanceApiError(res.status, (data.error as string) ?? `http_${res.status}`, (data.message as string) ?? issues[0]?.message ?? res.statusText);
+    throw new GovernanceApiError(
+      res.status,
+      (data.error as string) ?? `http_${res.status}`,
+      (data.message as string) ?? issues[0]?.message ?? res.statusText,
+    );
   }
   return data as T;
 }
@@ -73,9 +77,19 @@ export interface ExposureRow {
   dayPnl: string;
   weekPnl: string;
   openPositions: number;
-  limits: { dailyLossLimit: string; weeklyLossLimit: string; maxLeverage: string; maxOrderNotional: string };
+  limits: {
+    dailyLossLimit: string;
+    weeklyLossLimit: string;
+    maxLeverage: string;
+    maxOrderNotional: string;
+  };
   limitOverrides: Record<string, string>;
-  utilisation: { dailyLossPct: string; weeklyLossPct: string; leveragePct: string; worstPct: string };
+  utilisation: {
+    dailyLossPct: string;
+    weeklyLossPct: string;
+    leveragePct: string;
+    worstPct: string;
+  };
   nearLimit: boolean;
   halted: boolean;
   haltScope: string | null;
@@ -99,29 +113,88 @@ export interface Overview {
   simulated: true;
   exposure: {
     nearLimitPct: number;
-    firm: Array<{ currency: string; accounts: number; equity: string; grossExposure: string; dayPnl: string }>;
+    firm: Array<{
+      currency: string;
+      accounts: number;
+      equity: string;
+      grossExposure: string;
+      dayPnl: string;
+    }>;
     accounts: ExposureRow[];
   };
   limitBreaches: AlertView[];
   robots: { nearPausePct: number; robots: RobotUsage[] };
   approvals: {
     fourEyes: FourEyesView[];
-    robotSignoffs: Array<{ robotId: string; name: string; ownerId: string; requestedAt: string; review: string }>;
+    robotSignoffs: Array<{
+      robotId: string;
+      name: string;
+      ownerId: string;
+      requestedAt: string;
+      review: string;
+    }>;
   };
-  killSwitch: Array<{ auditId: string; ts: string; actorId: string; action: string; accountId: string | null; scope: string | null; reason: string | null; durationMs: number | null; firm: boolean; globalKillSwitchId: string | null }>;
+  killSwitch: Array<{
+    auditId: string;
+    ts: string;
+    actorId: string;
+    action: string;
+    accountId: string | null;
+    scope: string | null;
+    reason: string | null;
+    durationMs: number | null;
+    firm: boolean;
+    globalKillSwitchId: string | null;
+  }>;
   reconciliation: {
-    lastRun: { id: string; trigger: string; startedAt: string; accountsChecked: number; mismatches: number } | null;
-    breaks: Array<{ id: string; trigger: string; startedAt: string; accountsChecked: number; mismatches: number }>;
+    lastRun: {
+      id: string;
+      trigger: string;
+      startedAt: string;
+      accountsChecked: number;
+      mismatches: number;
+    } | null;
+    breaks: Array<{
+      id: string;
+      trigger: string;
+      startedAt: string;
+      accountsChecked: number;
+      mismatches: number;
+    }>;
   };
-  ai: { days: number; requests: number; drafts: number; accepted: number; rejected: number; undecided: number; acceptanceRatePct: string | null; rejectionRatePct: string | null };
+  ai: {
+    days: number;
+    requests: number;
+    drafts: number;
+    accepted: number;
+    rejected: number;
+    undecided: number;
+    acceptanceRatePct: string | null;
+    rejectionRatePct: string | null;
+  };
   noviceGuardrails: {
     days: number;
     rejections: Array<{ code: string; events: number; accounts: number }>;
-    looseningRequests: Array<{ auditId: string; ts: string; userId: string; accountId: string; pending: Record<string, { value: string; effectiveAt: string }> }>;
+    looseningRequests: Array<{
+      auditId: string;
+      ts: string;
+      userId: string;
+      accountId: string;
+      pending: Record<string, { value: string; effectiveAt: string }>;
+    }>;
     repeatedCoolingOff: Array<{ accountId: string; days: number }>;
   };
   alerts: AlertView[];
-  openIncidents: Array<{ id: string; ref: string; title: string; category: string; status: string; priority: string | null; exercise: boolean; detectedAt: string }>;
+  openIncidents: Array<{
+    id: string;
+    ref: string;
+    title: string;
+    category: string;
+    status: string;
+    priority: string | null;
+    exercise: boolean;
+    detectedAt: string;
+  }>;
 }
 
 export interface ControlSummary {
@@ -148,8 +221,19 @@ export interface AuditEventView {
 }
 
 export interface VerifyView {
-  chain: { valid: boolean; count: number; firstBrokenId: string | null; reason: string | null; headHash: string };
-  anchors: { count: number; invalidSignatures: number; notMatchingChain: number; latest: AnchorView | null };
+  chain: {
+    valid: boolean;
+    count: number;
+    firstBrokenId: string | null;
+    reason: string | null;
+    headHash: string;
+  };
+  anchors: {
+    count: number;
+    invalidSignatures: number;
+    notMatchingChain: number;
+    latest: AnchorView | null;
+  };
   verifiedAt: string;
 }
 
@@ -180,22 +264,45 @@ export interface SampleView {
 
 export const governanceApi = {
   overview: () => call<Overview>('GET', '/risk-console/overview'),
-  acknowledge: (id: string, note?: string) => call<AlertView>('POST', `/risk-console/alerts/${id}/ack`, note ? { note } : {}),
+  acknowledge: (id: string, note?: string) =>
+    call<AlertView>('POST', `/risk-console/alerts/${id}/ack`, note ? { note } : {}),
   globalKillSwitch: (scope: string, reason: string) =>
-    call<{ accounts: number; ordersCancelled: number; positionsFlattened: number; durationMs: number }>('POST', '/risk-console/kill-switch', { scope, reason }),
-  approve: (id: string, note: string) => call<FourEyesView>('POST', `/governance/approvals/${id}/approve`, { note }),
-  reject: (id: string, note: string) => call<FourEyesView>('POST', `/governance/approvals/${id}/reject`, { note }),
+    call<{
+      accounts: number;
+      ordersCancelled: number;
+      positionsFlattened: number;
+      durationMs: number;
+    }>('POST', '/risk-console/kill-switch', { scope, reason }),
+  approve: (id: string, note: string) =>
+    call<FourEyesView>('POST', `/governance/approvals/${id}/approve`, { note }),
+  reject: (id: string, note: string) =>
+    call<FourEyesView>('POST', `/governance/approvals/${id}/reject`, { note }),
   controls: () => call<{ controls: ControlSummary[] }>('GET', '/governance/controls'),
-  logIncident: (body: { title: string; description: string; category: string; alertId?: string; exercise?: boolean }) =>
-    call<{ id: string; ref: string }>('POST', '/governance/incidents', body),
-  events: (q: Record<string, string>) => call<{ events: AuditEventView[]; nextBeforeId: string | null }>('GET', `/internal-audit/events?${new URLSearchParams(q).toString()}`),
+  logIncident: (body: {
+    title: string;
+    description: string;
+    category: string;
+    alertId?: string;
+    exercise?: boolean;
+  }) => call<{ id: string; ref: string }>('POST', '/governance/incidents', body),
+  events: (q: Record<string, string>) =>
+    call<{ events: AuditEventView[]; nextBeforeId: string | null }>(
+      'GET',
+      `/internal-audit/events?${new URLSearchParams(q).toString()}`,
+    ),
   verify: () => call<VerifyView>('GET', '/internal-audit/verify'),
   anchors: () => call<{ keyId: string; anchors: AnchorView[] }>('GET', '/internal-audit/anchors'),
-  sample: (q: Record<string, string>) => call<SampleView>('GET', `/internal-audit/sample?${new URLSearchParams(q).toString()}`),
+  sample: (q: Record<string, string>) =>
+    call<SampleView>('GET', `/internal-audit/sample?${new URLSearchParams(q).toString()}`),
 };
 
 /** Evidence download URL for a control and period (the browser sends the session cookie). */
-export function evidenceUrl(controlId: string, format: 'csv' | 'pdf' | 'json', from?: string, to?: string): string {
+export function evidenceUrl(
+  controlId: string,
+  format: 'csv' | 'pdf' | 'json',
+  from?: string,
+  to?: string,
+): string {
   const q = new URLSearchParams({ format });
   if (from) q.set('from', from);
   if (to) q.set('to', to);

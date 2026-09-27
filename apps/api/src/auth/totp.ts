@@ -44,13 +44,23 @@ export interface TotpOptions {
 }
 
 /** HOTP (RFC 4226) with dynamic truncation. */
-export function hotp(secret: Buffer, counter: bigint, digits = 6, algorithm: TotpOptions['algorithm'] = 'sha1'): string {
+export function hotp(
+  secret: Buffer,
+  counter: bigint,
+  digits = 6,
+  algorithm: TotpOptions['algorithm'] = 'sha1',
+): string {
   const msg = Buffer.alloc(8);
   msg.writeBigUInt64BE(counter);
-  const mac = createHmac(algorithm ?? 'sha1', secret).update(msg).digest();
+  const mac = createHmac(algorithm ?? 'sha1', secret)
+    .update(msg)
+    .digest();
   const offset = mac[mac.length - 1]! & 0x0f;
   const bin =
-    ((mac[offset]! & 0x7f) << 24) | (mac[offset + 1]! << 16) | (mac[offset + 2]! << 8) | mac[offset + 3]!;
+    ((mac[offset]! & 0x7f) << 24) |
+    (mac[offset + 1]! << 16) |
+    (mac[offset + 2]! << 8) |
+    mac[offset + 3]!;
   return String(bin % 10 ** digits).padStart(digits, '0');
 }
 
@@ -92,6 +102,12 @@ export function generateTotpSecret(bytes = 20): string {
 
 export function otpauthUrl(secretB32: string, account: string, issuer = 'KORA'): string {
   const label = encodeURIComponent(`${issuer}:${account}`);
-  const params = new URLSearchParams({ secret: secretB32, issuer, algorithm: 'SHA1', digits: '6', period: '30' });
+  const params = new URLSearchParams({
+    secret: secretB32,
+    issuer,
+    algorithm: 'SHA1',
+    digits: '6',
+    period: '30',
+  });
   return `otpauth://totp/${label}?${params.toString()}`;
 }

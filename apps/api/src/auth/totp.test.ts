@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { base32Decode, base32Encode, generateTotpSecret, hotp, otpauthUrl, totp, verifyTotp } from './totp';
+import {
+  base32Decode,
+  base32Encode,
+  generateTotpSecret,
+  hotp,
+  otpauthUrl,
+  totp,
+  verifyTotp,
+} from './totp';
 
 // RFC 6238 Appendix B test vectors (SHA-1, 8 digits, secret "12345678901234567890").
 const RFC_SECRET = Buffer.from('12345678901234567890', 'ascii');

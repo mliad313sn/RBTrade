@@ -17,13 +17,13 @@ services:
       KORA_DB_APP_PASSWORD: ${KORA_DB_APP_PASSWORD:?set in .env}
       KORA_DB_AUDIT_READER_PASSWORD: ${KORA_DB_AUDIT_READER_PASSWORD:?set in .env}
       KORA_DATABASES: kora kora_test kora_e2e keycloak
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ['127.0.0.1:5432:5432']
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
       - ../scripts/db-bootstrap.sh:/kora/db-bootstrap.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -32,14 +32,15 @@ services:
     image: redis:7.4-alpine
     restart: unless-stopped
     # IRTC R1-11: authentication required; clients use REDIS_URL=redis://:<password>@host:6379.
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$KORA_REDIS_PASSWORD\""]
+    command:
+      ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$$KORA_REDIS_PASSWORD"']
     environment:
       KORA_REDIS_PASSWORD: ${KORA_REDIS_PASSWORD:?set KORA_REDIS_PASSWORD (see .env.example)}
       REDISCLI_AUTH: ${KORA_REDIS_PASSWORD:?set KORA_REDIS_PASSWORD (see .env.example)}
-    ports: ["127.0.0.1:6379:6379"]
+    ports: ['127.0.0.1:6379:6379']
     volumes: [redisdata:/data]
     healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
+      test: ['CMD', 'redis-cli', '--no-auth-warning', 'ping']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -47,7 +48,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
     restart: unless-stopped
-    command: ["start-dev", "--import-realm", "--health-enabled=true"]
+    command: ['start-dev', '--import-realm', '--health-enabled=true']
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set in .env}
@@ -58,7 +59,7 @@ services:
       KC_HOSTNAME: http://localhost:8080
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?set in .env}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
-    ports: ["127.0.0.1:8080:8080"]
+    ports: ['127.0.0.1:8080:8080']
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
     depends_on:
@@ -67,20 +68,24 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
     restart: unless-stopped
-    command: ["--config=/etc/otelcol/config.yaml"]
+    command: ['--config=/etc/otelcol/config.yaml']
     volumes: [./otel/collector.yaml:/etc/otelcol/config.yaml:ro]
     ports:
-      - "127.0.0.1:4317:4317" # OTLP gRPC
-      - "127.0.0.1:4318:4318" # OTLP HTTP (set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318)
-      - "127.0.0.1:8889:8889" # Prometheus exporter
+      - '127.0.0.1:4317:4317' # OTLP gRPC
+      - '127.0.0.1:4318:4318' # OTLP HTTP (set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318)
+      - '127.0.0.1:8889:8889' # Prometheus exporter
 
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
-    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
-    volumes: [./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro, ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro]
-    extra_hosts: ["host.docker.internal:host-gateway"]
-    ports: ["127.0.0.1:9090:9090"]
+    command: ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.retention.time=7d']
+    volumes:
+      [
+        ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,
+        ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro,
+      ]
+    extra_hosts: ['host.docker.internal:host-gateway']
+    ports: ['127.0.0.1:9090:9090']
     depends_on: [otel-collector]
 
   grafana:
@@ -88,10 +93,10 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
     volumes: [./grafana/provisioning:/etc/grafana/provisioning:ro]
-    ports: ["127.0.0.1:3001:3000"]
+    ports: ['127.0.0.1:3001:3000']
     depends_on: [prometheus]
 
 volumes:

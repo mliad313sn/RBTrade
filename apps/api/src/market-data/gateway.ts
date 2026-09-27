@@ -3,9 +3,22 @@ import type { IncomingMessage, Server } from 'node:http';
 import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
-import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { AUDIT_READ_ALL_ROLES, hasAnyRole, isPrivateChannelKind, parseChannel, requiresMfa } from '@kora/domain';
+import {
+  AUDIT_READ_ALL_ROLES,
+  hasAnyRole,
+  isPrivateChannelKind,
+  parseChannel,
+  requiresMfa,
+} from '@kora/domain';
 import { Redis } from 'ioredis';
 import { decodeJwt } from 'jose';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
@@ -142,7 +155,9 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
   private readonly origin = randomUUID();
   private readonly onLocalRevocation = (r: SessionRevocation): void => {
     this.applyRevocation(r);
-    this.revocationPub?.publish(this.revocationChannel, JSON.stringify({ ...r, origin: this.origin })).catch(() => undefined);
+    this.revocationPub
+      ?.publish(this.revocationChannel, JSON.stringify({ ...r, origin: this.origin }))
+      .catch(() => undefined);
   };
 
   constructor(
@@ -164,9 +179,17 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
 
   async onApplicationBootstrap(): Promise<void> {
     await this.hub.init();
-    await this.repo.load().catch((e: Error) => this.log.warn(`registry not loaded yet (${e.message}); will load on first subscribe`));
+    await this.repo
+      .load()
+      .catch((e: Error) =>
+        this.log.warn(`registry not loaded yet (${e.message}); will load on first subscribe`),
+      );
     this.server = this.adapterHost.httpAdapter.getHttpServer() as Server;
-    this.wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+    this.wss = new WebSocketServer({
+      noServer: true,
+      maxPayload: 16 * 1024,
+      perMessageDeflate: false,
+    });
     this.server.on('upgrade', this.onUpgrade);
     this.pingTimer = setInterval(() => this.heartbeat(), PING_MS);
     this.pingTimer.unref();
@@ -178,9 +201,14 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       if (this.app) {
         this.revocationPub = new Redis(this.app.redisUrl, { maxRetriesPerRequest: 2 });
         this.revocationSub = new Redis(this.app.redisUrl, { maxRetriesPerRequest: null });
-        for (const r of [this.revocationPub, this.revocationSub]) r.on('error', (e: Error) => this.log.warn(`redis (session revocations): ${e.message}`));
-        this.revocationSub.on('message', (_ch: string, payload: string) => this.onRemoteRevocation(payload));
-        await this.revocationSub.subscribe(this.revocationChannel).catch((e: Error) => this.log.warn(`session revocation channel: ${e.message}`));
+        for (const r of [this.revocationPub, this.revocationSub])
+          r.on('error', (e: Error) => this.log.warn(`redis (session revocations): ${e.message}`));
+        this.revocationSub.on('message', (_ch: string, payload: string) =>
+          this.onRemoteRevocation(payload),
+        );
+        await this.revocationSub
+          .subscribe(this.revocationChannel)
+          .catch((e: Error) => this.log.warn(`session revocation channel: ${e.message}`));
       }
     }
   }
@@ -190,7 +218,11 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       const m = JSON.parse(payload) as SessionRevocation & { origin?: string };
       if (m.origin === this.origin || typeof m.userId !== 'string') return;
       this.sessions?.forget(m.userId);
-      this.applyRevocation({ userId: m.userId, tokenId: typeof m.tokenId === 'string' ? m.tokenId : undefined, validAfterSec: typeof m.validAfterSec === 'number' ? m.validAfterSec : undefined });
+      this.applyRevocation({
+        userId: m.userId,
+        tokenId: typeof m.tokenId === 'string' ? m.tokenId : undefined,
+        validAfterSec: typeof m.validAfterSec === 'number' ? m.validAfterSec : undefined,
+      });
     } catch {
       // ignore malformed bus messages
     }
@@ -202,14 +234,20 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       const p = c.principal;
       if (!p || p.sub !== r.userId) continue;
       if (r.tokenId && p.tokenId === r.tokenId) c.close(4401, 'session revoked');
-      else if (r.validAfterSec !== undefined && p.issuedAt !== undefined && p.issuedAt < r.validAfterSec) c.close(4401, 'session revoked');
+      else if (
+        r.validAfterSec !== undefined &&
+        p.issuedAt !== undefined &&
+        p.issuedAt < r.validAfterSec
+      )
+        c.close(4401, 'session revoked');
       else if (!r.tokenId && r.validAfterSec === undefined) void this.recheck(c);
     }
   }
 
   private async recheck(c: Connection): Promise<void> {
     if (!c.principal || !this.sessions) return;
-    if (!(await this.sessions.isActive(c.principal, { fresh: true }).catch(() => true))) c.close(4401, 'session revoked');
+    if (!(await this.sessions.isActive(c.principal, { fresh: true }).catch(() => true)))
+      c.close(4401, 'session revoked');
   }
 
   /** IRTC R1-03: periodic re-check of every authenticated socket (catches out-of-band changes). */
@@ -218,7 +256,9 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     this.sweeping = true;
     try {
       const open = [...this.conns].filter((c) => c.principal);
-      const dead = await this.sessions.inactive(open.map((c) => Object.assign({}, c.principal!, { conn: c })));
+      const dead = await this.sessions.inactive(
+        open.map((c) => Object.assign({}, c.principal!, { conn: c })),
+      );
       for (const d of dead) d.conn.close(4401, 'session revoked');
     } catch (e) {
       this.log.warn(`session sweep failed: ${(e as Error).message}`);
@@ -275,9 +315,16 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     ws.on('close', () => this.cleanup(conn));
     ws.on('error', () => this.cleanup(conn));
     ws.on('message', (data: RawData, isBinary: boolean) => {
-      conn.chain = conn.chain.then(() => this.onMessage(conn, data, isBinary)).catch((e: Error) => this.log.warn(`ws ${conn.id}: ${e.message}`));
+      conn.chain = conn.chain
+        .then(() => this.onMessage(conn, data, isBinary))
+        .catch((e: Error) => this.log.warn(`ws ${conn.id}: ${e.message}`));
     });
-    conn.json({ type: 'welcome', protocol: 1, simulated: true, conflation: { maxPerSecond: this.cfg.conflatePerSec, burst: this.cfg.conflateBurst } });
+    conn.json({
+      type: 'welcome',
+      protocol: 1,
+      simulated: true,
+      conflation: { maxPerSecond: this.cfg.conflatePerSec, burst: this.cfg.conflateBurst },
+    });
     if (cookieToken) conn.chain = conn.chain.then(() => this.authenticate(conn, cookieToken));
     else {
       const t = setTimeout(() => {
@@ -303,17 +350,29 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       if (!parsed.success) throw new Error('schema');
       op = parsed.data;
     } catch {
-      conn.json({ type: 'error', code: 'bad_request', message: 'Expected a JSON op: auth | subscribe | unsubscribe | ping' });
+      conn.json({
+        type: 'error',
+        code: 'bad_request',
+        message: 'Expected a JSON op: auth | subscribe | unsubscribe | ping',
+      });
       return;
     }
     if (op.op === 'auth') return this.authenticate(conn, op.token);
     if (!conn.principal) {
-      conn.json({ type: 'error', code: 'unauthenticated', message: 'Send {op:"auth", token} first' });
+      conn.json({
+        type: 'error',
+        code: 'unauthenticated',
+        message: 'Send {op:"auth", token} first',
+      });
       return;
     }
     if (op.op === 'ping') return conn.json({ type: 'pong', id: op.id, ts: now });
     // IRTC R1-03: never grant a subscription on cached roles; the session must still be live.
-    if (op.op === 'subscribe' && this.sessions && !(await this.sessions.isActive(conn.principal, { fresh: true }))) {
+    if (
+      op.op === 'subscribe' &&
+      this.sessions &&
+      !(await this.sessions.isActive(conn.principal, { fresh: true }))
+    ) {
       conn.close(4401, 'session revoked');
       return;
     }
@@ -327,10 +386,18 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     for (const ch of op.channels) {
       const p = parseChannel(ch);
       if (!p) rejected.push({ channel: ch, code: 'invalid_channel' });
-      else if (isPrivateChannelKind(p.kind) && !(await this.canReadAccount(conn, p.accountId!))) rejected.push({ channel: ch, code: 'forbidden' });
-      else if (p.kind === 'risk' && !hasAnyRole(conn.principal!.roles, AUDIT_READ_ALL_ROLES)) rejected.push({ channel: ch, code: 'forbidden' });
-      else if (p.symbol && !registry.instruments.has(p.symbol)) rejected.push({ channel: ch, code: 'unknown_symbol' });
-      else if (!conn.channels.has(ch) && !accepted.includes(ch) && conn.channels.size + accepted.length >= this.cfg.wsMaxChannels) rejected.push({ channel: ch, code: 'too_many_channels' });
+      else if (isPrivateChannelKind(p.kind) && !(await this.canReadAccount(conn, p.accountId!)))
+        rejected.push({ channel: ch, code: 'forbidden' });
+      else if (p.kind === 'risk' && !hasAnyRole(conn.principal!.roles, AUDIT_READ_ALL_ROLES))
+        rejected.push({ channel: ch, code: 'forbidden' });
+      else if (p.symbol && !registry.instruments.has(p.symbol))
+        rejected.push({ channel: ch, code: 'unknown_symbol' });
+      else if (
+        !conn.channels.has(ch) &&
+        !accepted.includes(ch) &&
+        conn.channels.size + accepted.length >= this.cfg.wsMaxChannels
+      )
+        rejected.push({ channel: ch, code: 'too_many_channels' });
       else if (!conn.channels.has(ch) && !accepted.includes(ch)) accepted.push(ch);
     }
     for (const ch of accepted) conn.channels.add(ch);
@@ -349,7 +416,10 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
     if (hasAnyRole(p.roles, AUDIT_READ_ALL_ROLES)) return true;
     const cached = conn.accounts.get(accountId);
     if (cached !== undefined) return cached;
-    const rows = await this.db.query<{ ok: boolean }>('SELECT true AS ok FROM accounts WHERE id = $1 AND user_id = $2', [accountId, p.sub]);
+    const rows = await this.db.query<{ ok: boolean }>(
+      'SELECT true AS ok FROM accounts WHERE id = $1 AND user_id = $2',
+      [accountId, p.sub],
+    );
     const ok = rows.length > 0;
     conn.accounts.set(accountId, ok);
     return ok;
@@ -391,10 +461,18 @@ export class MarketDataGateway implements OnApplicationBootstrap, OnModuleDestro
       conn.expiry = null;
       const exp = decodeJwt(token).exp;
       if (exp) {
-        conn.expiry = setTimeout(() => conn.close(4401, 'token expired'), Math.max(0, exp * 1000 - Date.now()));
+        conn.expiry = setTimeout(
+          () => conn.close(4401, 'token expired'),
+          Math.max(0, exp * 1000 - Date.now()),
+        );
         conn.expiry.unref();
       }
-      conn.json({ type: 'authenticated', sub: p.sub, ...(refresh ? { refreshed: true } : {}), exp: exp ?? null });
+      conn.json({
+        type: 'authenticated',
+        sub: p.sub,
+        ...(refresh ? { refreshed: true } : {}),
+        exp: exp ?? null,
+      });
     } catch {
       conn.close(4401, 'invalid token');
     }

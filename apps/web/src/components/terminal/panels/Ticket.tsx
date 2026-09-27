@@ -14,8 +14,23 @@ import {
   type Side,
   type TimeInForce,
 } from '@kora/domain';
-import { KoraApiError, type InstrumentDetail, type OrderInput, type PreviewInput, type PreviewResponse, type RiskRejectionBody } from '@kora/sdk';
-import { Button, Dialog, HoldToConfirmButton, NumberInput, formatMoney, formatPrice, useToast } from '@kora/ui';
+import {
+  KoraApiError,
+  type InstrumentDetail,
+  type OrderInput,
+  type PreviewInput,
+  type PreviewResponse,
+  type RiskRejectionBody,
+} from '@kora/sdk';
+import {
+  Button,
+  Dialog,
+  HoldToConfirmButton,
+  NumberInput,
+  formatMoney,
+  formatPrice,
+  useToast,
+} from '@kora/ui';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useShell } from '@/components/shell/ShellContext';
@@ -23,7 +38,12 @@ import { recordAiDecision } from '@/lib/ai/decision';
 import { api } from '@/lib/api-browser';
 import { formatQty, orderResultText } from '@/lib/terminal/format';
 import { useTerminal } from '@/lib/terminal/store';
-import { inputKey as makeInputKey, previewSummary, requestKey, SettledAnnouncer } from '@/lib/terminal/ticket-preview';
+import {
+  inputKey as makeInputKey,
+  previewSummary,
+  requestKey,
+  SettledAnnouncer,
+} from '@/lib/terminal/ticket-preview';
 import { refreshTrading, useTrading } from '@/lib/terminal/trading';
 
 import { useMarket, useTerminalSettings } from '../TerminalContext';
@@ -37,7 +57,11 @@ const LABEL: Record<OrderType, string> = {
   bracket: 'Bracket',
   oco: 'OCO',
 };
-const QTY_LABEL: Record<QtyMode, string> = { units: 'units', notional: 'notional', pct_equity: '% equity' };
+const QTY_LABEL: Record<QtyMode, string> = {
+  units: 'units',
+  notional: 'notional',
+  pct_equity: '% equity',
+};
 const DIST_LABEL: Record<DistanceMode, string> = { price: 'price', pips: 'pips', percent: '%' };
 export const PREVIEW_DEBOUNCE_MS = 150;
 /** Upper bound between previews while the body keeps changing (market-relative stops move every tick). */
@@ -71,9 +95,27 @@ function newClientOrderId(): string {
 }
 
 /** Small inline unit selector used next to a field label. */
-function ModeSelect<T extends string>({ label, value, options, onChange, testId }: { label: string; value: T; options: Record<T, string>; onChange: (v: T) => void; testId?: string }) {
+function ModeSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  testId,
+}: {
+  label: string;
+  value: T;
+  options: Record<T, string>;
+  onChange: (v: T) => void;
+  testId?: string;
+}) {
   return (
-    <select className="tk-mode" aria-label={label} value={value} onChange={(e) => onChange(e.target.value as T)} data-testid={testId}>
+    <select
+      className="tk-mode"
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value as T)}
+      data-testid={testId}
+    >
       {(Object.keys(options) as T[]).map((k) => (
         <option key={k} value={k}>
           {options[k]}
@@ -112,7 +154,9 @@ export function TicketPanel() {
 
   const [inst, setInst] = useState<InstrumentDetail | null>(null);
   const [side, setSide] = useState<Side>('buy');
-  const [type, setType] = useState<OrderType>(types.includes('limit') ? 'limit' : (types[0] ?? 'market'));
+  const [type, setType] = useState<OrderType>(
+    types.includes('limit') ? 'limit' : (types[0] ?? 'market'),
+  );
   const [qtyMode, setQtyMode] = useState<QtyMode>('units');
   const [qtyInput, setQtyInput] = useState('');
   const [limitPrice, setLimitPrice] = useState('');
@@ -248,20 +292,43 @@ export function TicketPanel() {
   // B-202: minor-unit quotes (GBX, ZAc) scale prices to the quote currency until the preview answers.
   const multiplier =
     preview?.res.instrument.multiplier ??
-    (inst?.priceUnitFactor ? dec(inst.contractSize).mul(dec(inst.priceUnitFactor)).toFixed() : (inst?.contractSize ?? '1'));
-  const needsLimit = type === 'limit' || type === 'stop_limit' || (type === 'bracket' && entryType === 'limit');
+    (inst?.priceUnitFactor
+      ? dec(inst.contractSize).mul(dec(inst.priceUnitFactor)).toFixed()
+      : (inst?.contractSize ?? '1'));
+  const needsLimit =
+    type === 'limit' || type === 'stop_limit' || (type === 'bracket' && entryType === 'limit');
   const needsStop = type === 'stop' || type === 'stop_limit';
   const marketRef = quote ? (side === 'buy' ? quote.ask : quote.bid) : null;
-  const entry = needsLimit && limitPrice ? limitPrice : needsStop && stopPrice ? stopPrice : marketRef;
+  const entry =
+    needsLimit && limitPrice ? limitPrice : needsStop && stopPrice ? stopPrice : marketRef;
 
   const units = useMemo(() => {
     if (!inst) return null;
-    return unitsFromQtyInput({ mode: qtyMode, value: qtyInput, price: entry, multiplier, qtyStep: inst.qtyStep, equity: account?.equity ?? null, fxRate });
+    return unitsFromQtyInput({
+      mode: qtyMode,
+      value: qtyInput,
+      price: entry,
+      multiplier,
+      qtyStep: inst.qtyStep,
+      equity: account?.equity ?? null,
+      fxRate,
+    });
   }, [inst, qtyMode, qtyInput, entry, multiplier, account?.equity, fxRate]);
 
-  const slPrice = inst && type !== 'oco' ? protectivePrice({ kind: 'sl', mode: slMode, value: slInput, side, entry, spec: inst }) : null;
-  const tpPrice = inst && type !== 'oco' ? protectivePrice({ kind: 'tp', mode: tpMode, value: tpInput, side, entry, spec: inst }) : null;
-  const trailAmount = inst && trailInput && isDecimalString(trailInput) && dec(trailInput).gt(0) ? (trailMode === 'pips' ? dec(trailInput).mul(pipSizeOf(inst)).toFixed() : trailInput) : null;
+  const slPrice =
+    inst && type !== 'oco'
+      ? protectivePrice({ kind: 'sl', mode: slMode, value: slInput, side, entry, spec: inst })
+      : null;
+  const tpPrice =
+    inst && type !== 'oco'
+      ? protectivePrice({ kind: 'tp', mode: tpMode, value: tpInput, side, entry, spec: inst })
+      : null;
+  const trailAmount =
+    inst && trailInput && isDecimalString(trailInput) && dec(trailInput).gt(0)
+      ? trailMode === 'pips'
+        ? dec(trailInput).mul(pipSizeOf(inst)).toFixed()
+        : trailInput
+      : null;
 
   const body = useMemo((): Record<string, unknown> | null => {
     if (!inst || !units || units.lte(0)) return null;
@@ -275,8 +342,15 @@ export function TicketPanel() {
     // IRTC R4-06: send the draft id; the server decides the source (ai-draft-accepted only if the order matches the draft).
     if (origin === 'ai' && aiDraftId) b.aiDraftId = aiDraftId;
     if (type === 'oco') {
-      const out = legs.map((l) => ({ type: l.type, ...(l.type !== 'stop' ? { limitPrice: l.limitPrice } : {}), ...(l.type !== 'limit' ? { stopPrice: l.stopPrice } : {}) }));
-      if (out.some((l) => ('limitPrice' in l && !l.limitPrice) || ('stopPrice' in l && !l.stopPrice))) return null;
+      const out = legs.map((l) => ({
+        type: l.type,
+        ...(l.type !== 'stop' ? { limitPrice: l.limitPrice } : {}),
+        ...(l.type !== 'limit' ? { stopPrice: l.stopPrice } : {}),
+      }));
+      if (
+        out.some((l) => ('limitPrice' in l && !l.limitPrice) || ('stopPrice' in l && !l.stopPrice))
+      )
+        return null;
       b.legs = out;
       return b;
     }
@@ -299,12 +373,55 @@ export function TicketPanel() {
     if (slPrice && !reduceOnly) b.stopLossPrice = slPrice.toFixed();
     if (tpPrice && !reduceOnly) b.takeProfitPrice = tpPrice.toFixed();
     return b;
-  }, [inst, units, symbol, side, type, tif, expireAt, reduceOnly, postOnly, origin, aiDraftId, legs, needsLimit, needsStop, limitPrice, stopPrice, trailAmount, entryType, slPrice, tpPrice]);
+  }, [
+    inst,
+    units,
+    symbol,
+    side,
+    type,
+    tif,
+    expireAt,
+    reduceOnly,
+    postOnly,
+    origin,
+    aiDraftId,
+    legs,
+    needsLimit,
+    needsStop,
+    limitPrice,
+    stopPrice,
+    trailAmount,
+    entryType,
+    slPrice,
+    tpPrice,
+  ]);
 
   const bodyKey = requestKey(body);
   // What the user typed or chose. Market-relative stops and notional sizing change `bodyKey` on every
   // tick; this key only changes on a user edit (IRTC R5-01, R5-05).
-  const inputKey = makeInputKey({ symbol, side, type, qtyMode, qtyInput, limitPrice, stopPrice, trailMode, trailInput, slMode, slInput, tpMode, tpInput, tif, expireAt, reduceOnly, postOnly, entryType, legs, origin, aiDraftId });
+  const inputKey = makeInputKey({
+    symbol,
+    side,
+    type,
+    qtyMode,
+    qtyInput,
+    limitPrice,
+    stopPrice,
+    trailMode,
+    trailInput,
+    slMode,
+    slInput,
+    tpMode,
+    tpInput,
+    tif,
+    expireAt,
+    reduceOnly,
+    postOnly,
+    entryType,
+    legs,
+    origin,
+    aiDraftId,
+  });
   const latest = useRef({ bodyKey, inputKey });
   /** The preview request in flight, so Review can wait for it instead of sending a duplicate. */
   const inflight = useRef<{ key: string; promise: Promise<PreviewResponse> } | null>(null);
@@ -318,7 +435,8 @@ export function TicketPanel() {
     const seq = ++previewSeq.current;
     const ik = inputKey;
     // Debounce, but never starve: with a stop in % or pips the body changes on every tick.
-    const delay = Date.now() - lastPreviewAt.current >= PREVIEW_MAX_WAIT_MS ? 0 : PREVIEW_DEBOUNCE_MS;
+    const delay =
+      Date.now() - lastPreviewAt.current >= PREVIEW_MAX_WAIT_MS ? 0 : PREVIEW_DEBOUNCE_MS;
     const t = setTimeout(() => {
       lastPreviewAt.current = Date.now();
       const promise = api.previewOrder(JSON.parse(bodyKey) as PreviewInput);
@@ -354,9 +472,13 @@ export function TicketPanel() {
 
   // IRTC R5-05: one short polite announcement per settled edit, never on tick-driven re-previews.
   const announcer = useRef<SettledAnnouncer | null>(null);
-  if (!announcer.current) announcer.current = new SettledAnnouncer(setAnnouncement, PREVIEW_ANNOUNCE_MS);
+  if (!announcer.current)
+    announcer.current = new SettledAnnouncer(setAnnouncement, PREVIEW_ANNOUNCE_MS);
   useEffect(() => {
-    announcer.current?.offer(previewCurrent ? inputKey : null, previewCurrent ? previewSummary(p, violations.length) : '');
+    announcer.current?.offer(
+      previewCurrent ? inputKey : null,
+      previewCurrent ? previewSummary(p, violations.length) : '',
+    );
   }, [previewCurrent, inputKey, p, violations.length]);
   useEffect(() => () => announcer.current?.clear(), []);
   const warnings = ticketWarnings({
@@ -369,37 +491,55 @@ export function TicketPanel() {
     session: preview?.res.market.session ?? inst?.session?.state ?? null,
     dataState: preview?.res.market.dataState ?? null,
   });
-  const isMarketLikeType = (t: unknown, e: unknown) => t === 'market' || (t === 'bracket' && e === 'market') || t === 'trailing';
+  const isMarketLikeType = (t: unknown, e: unknown) =>
+    t === 'market' || (t === 'bracket' && e === 'market') || t === 'trailing';
   // Review is possible whenever there is an order; it always re-checks against an exact preview.
   const canSubmit = Boolean(body && !busy && !checking && violations.length === 0);
 
   /** Places exactly the body the user confirmed (never the live inputs). */
-  const place = useCallback(async (orderBody: Record<string, unknown>) => {
-    setBusy(true);
-    setResult(null);
-    try {
-      const r = await api.placeOrder({ ...orderBody, clientOrderId: newClientOrderId() } as unknown as OrderInput);
-      const o = r.order;
-      const text = orderResultText(o, { qty: inst?.qtyPrecision ?? 0, price: precision });
-      setResult({ tone: 'ok', text });
-      toast.push(text, 'success', 4000);
-      setConfirm(null);
-      // Goal 07: the user placed the order from an AI draft; record the human decision (audited).
-      // The draft id comes from the frozen body that was reviewed; the server decided `source` (IRTC R4-06).
-      const sentDraftId = typeof orderBody.aiDraftId === 'string' ? orderBody.aiDraftId : null;
-      if (sentDraftId && o.source === 'ai-draft-accepted') void recordAiDecision(sentDraftId, { decision: 'accepted', orderId: o.id });
-      setOrigin('manual');
-      setNote(null);
-      setAiDraftId(null);
-      refreshTrading();
-    } catch (e) {
-      const b = e instanceof KoraApiError ? (e.body as Partial<RiskRejectionBody> | undefined) : undefined;
-      setResult({ tone: 'error', text: b?.code ? `Rejected (${b.code}): ${b.message}` : e instanceof KoraApiError ? e.message : 'The order failed.' });
-      setConfirm(null);
-    } finally {
-      setBusy(false);
-    }
-  }, [inst?.qtyPrecision, precision, toast]);
+  const place = useCallback(
+    async (orderBody: Record<string, unknown>) => {
+      setBusy(true);
+      setResult(null);
+      try {
+        const r = await api.placeOrder({
+          ...orderBody,
+          clientOrderId: newClientOrderId(),
+        } as unknown as OrderInput);
+        const o = r.order;
+        const text = orderResultText(o, { qty: inst?.qtyPrecision ?? 0, price: precision });
+        setResult({ tone: 'ok', text });
+        toast.push(text, 'success', 4000);
+        setConfirm(null);
+        // Goal 07: the user placed the order from an AI draft; record the human decision (audited).
+        // The draft id comes from the frozen body that was reviewed; the server decided `source` (IRTC R4-06).
+        const sentDraftId = typeof orderBody.aiDraftId === 'string' ? orderBody.aiDraftId : null;
+        if (sentDraftId && o.source === 'ai-draft-accepted')
+          void recordAiDecision(sentDraftId, { decision: 'accepted', orderId: o.id });
+        setOrigin('manual');
+        setNote(null);
+        setAiDraftId(null);
+        refreshTrading();
+      } catch (e) {
+        const b =
+          e instanceof KoraApiError
+            ? (e.body as Partial<RiskRejectionBody> | undefined)
+            : undefined;
+        setResult({
+          tone: 'error',
+          text: b?.code
+            ? `Rejected (${b.code}): ${b.message}`
+            : e instanceof KoraApiError
+              ? e.message
+              : 'The order failed.',
+        });
+        setConfirm(null);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [inst?.qtyPrecision, precision, toast],
+  );
 
   /**
    * IRTC R5-01: freeze the order as it is now, get a preview for exactly that request (reusing the
@@ -415,7 +555,9 @@ export function TicketPanel() {
       setChecking(true);
       try {
         const pending = inflight.current?.key === key ? inflight.current.promise : null;
-        res = (pending ? await pending.catch(() => null) : null) ?? (await api.previewOrder(JSON.parse(key) as PreviewInput));
+        res =
+          (pending ? await pending.catch(() => null) : null) ??
+          (await api.previewOrder(JSON.parse(key) as PreviewInput));
       } catch (e) {
         setPreviewError(e instanceof KoraApiError ? e.message : 'Preview unavailable');
         return;
@@ -430,7 +572,12 @@ export function TicketPanel() {
       setPreview({ key, inputKey: ik, res });
       return;
     }
-    const bound: BoundOrder = { key, inputKey: ik, res, body: JSON.parse(key) as Record<string, unknown> };
+    const bound: BoundOrder = {
+      key,
+      inputKey: ik,
+      res,
+      body: JSON.parse(key) as Record<string, unknown>,
+    };
     if (res.preview.confirmation.required) setConfirm(bound);
     else void place(bound.body);
   }, [body, bodyKey, inputKey, busy, checking, preview, place]);
@@ -454,17 +601,27 @@ export function TicketPanel() {
   const distPrecision = (m: DistanceMode) => (m === 'price' ? precision : m === 'pips' ? 1 : 2);
   const displayName = inst?.displayName ?? symbol;
   const qtyLabel = units ? formatQty(units.toFixed(), inst?.qtyPrecision ?? 0) : qtyInput || '';
-  const marginRatio = shown && dec(shown.margin.rate).gt(0) ? `1:${dec(1).div(dec(shown.margin.rate)).toDecimalPlaces(0).toFixed()}` : null;
+  const marginRatio =
+    shown && dec(shown.margin.rate).gt(0)
+      ? `1:${dec(1).div(dec(shown.margin.rate)).toDecimalPlaces(0).toFixed()}`
+      : null;
   const cp = confirm?.res.preview ?? null;
   const cBody = confirm?.body;
-  const cQty = cBody && typeof cBody.qty === 'string' ? formatQty(cBody.qty, inst?.qtyPrecision ?? 0) : '';
+  const cQty =
+    cBody && typeof cBody.qty === 'string' ? formatQty(cBody.qty, inst?.qtyPrecision ?? 0) : '';
   const cMarketLike = cBody ? isMarketLikeType(cBody.type, cBody.entryType) : false;
 
   return (
-    <div className="tk flex flex-col gap-2 h-full overflow-auto" data-testid="order-ticket" data-panel-root="ticket" tabIndex={-1}>
+    <div
+      className="tk flex flex-col gap-2 h-full overflow-auto"
+      data-testid="order-ticket"
+      data-panel-root="ticket"
+      tabIndex={-1}
+    >
       {note ? (
         <p className="tk-note" data-testid="ticket-note">
-          <span className="text-ai">✦ Draft</span> {note} <span className="text-muted">Review before placing.</span>
+          <span className="text-ai">✦ Draft</span> {note}{' '}
+          <span className="text-muted">Review before placing.</span>
           {aiDraftId ? (
             <button
               type="button"
@@ -485,59 +642,199 @@ export function TicketPanel() {
       {quote?.stale ? (
         // Goal 10 chaos finding: the last price stayed on the buttons without a marker while the feed was down.
         <p className="m-0 text-xs text-warn" role="status" data-testid="ticket-stale">
-          ⚠ Stale price: the feed is not live. Orders that need a price are refused until it recovers.
+          ⚠ Stale price: the feed is not live. Orders that need a price are refused until it
+          recovers.
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Side">
-        <button ref={buyRef} type="button" role="radio" aria-checked={side === 'buy'} onClick={() => setSide('buy')} className={`tk-side tk-side--buy ${side === 'buy' ? 'is-on' : ''}`} data-testid="ticket-side-buy">
-          BUY ▲ <span className="k-num">{quote ? formatPrice(quote.ask, precision) : ''}</span>{quote?.stale ? <span className="text-xs"> Stale</span> : null}
+        <button
+          ref={buyRef}
+          type="button"
+          role="radio"
+          aria-checked={side === 'buy'}
+          onClick={() => setSide('buy')}
+          className={`tk-side tk-side--buy ${side === 'buy' ? 'is-on' : ''}`}
+          data-testid="ticket-side-buy"
+        >
+          BUY ▲ <span className="k-num">{quote ? formatPrice(quote.ask, precision) : ''}</span>
+          {quote?.stale ? <span className="text-xs"> Stale</span> : null}
         </button>
-        <button ref={sellRef} type="button" role="radio" aria-checked={side === 'sell'} onClick={() => setSide('sell')} className={`tk-side tk-side--sell ${side === 'sell' ? 'is-on' : ''}`} data-testid="ticket-side-sell">
-          SELL ▼ <span className="k-num">{quote ? formatPrice(quote.bid, precision) : ''}</span>{quote?.stale ? <span className="text-xs"> Stale</span> : null}
+        <button
+          ref={sellRef}
+          type="button"
+          role="radio"
+          aria-checked={side === 'sell'}
+          onClick={() => setSide('sell')}
+          className={`tk-side tk-side--sell ${side === 'sell' ? 'is-on' : ''}`}
+          data-testid="ticket-side-sell"
+        >
+          SELL ▼ <span className="k-num">{quote ? formatPrice(quote.bid, precision) : ''}</span>
+          {quote?.stale ? <span className="text-xs"> Stale</span> : null}
         </button>
       </div>
-      <div role="radiogroup" aria-label="Order type" className="flex flex-wrap gap-1" data-testid="order-types">
+      <div
+        role="radiogroup"
+        aria-label="Order type"
+        className="flex flex-wrap gap-1"
+        data-testid="order-types"
+      >
         {types.map((t) => (
-          <button key={t} type="button" role="radio" aria-checked={type === t} onClick={() => setType(t)} className={`tk-type ${type === t ? 'is-on' : ''}`}>
+          <button
+            key={t}
+            type="button"
+            role="radio"
+            aria-checked={type === t}
+            onClick={() => setType(t)}
+            className={`tk-type ${type === t ? 'is-on' : ''}`}
+          >
             {LABEL[t]}
           </button>
         ))}
       </div>
       <div className="grid grid-cols-2 gap-x-2 gap-y-1">
         <div>
-          <FieldHead mode={<ModeSelect label="Quantity unit" value={qtyMode} options={QTY_LABEL} onChange={(m) => { setQtyMode(m); setQtyInput(''); }} testId="ticket-qty-mode" />}>Qty ({QTY_LABEL[qtyMode]})</FieldHead>
-          <NumberInput ref={qtyRef} label={`Quantity (${QTY_LABEL[qtyMode]})`} hideLabel value={qtyInput} onValueChange={setQtyInput} precision={qtyPrecision} step={qtyMode === 'units' ? (inst?.qtyStep ?? '1') : '1'} min="0" data-testid="ticket-qty" hint={qtyMode !== 'units' && units ? `= ${formatQty(units.toFixed(), inst?.qtyPrecision ?? 0)} units` : undefined} />
+          <FieldHead
+            mode={
+              <ModeSelect
+                label="Quantity unit"
+                value={qtyMode}
+                options={QTY_LABEL}
+                onChange={(m) => {
+                  setQtyMode(m);
+                  setQtyInput('');
+                }}
+                testId="ticket-qty-mode"
+              />
+            }
+          >
+            Qty ({QTY_LABEL[qtyMode]})
+          </FieldHead>
+          <NumberInput
+            ref={qtyRef}
+            label={`Quantity (${QTY_LABEL[qtyMode]})`}
+            hideLabel
+            value={qtyInput}
+            onValueChange={setQtyInput}
+            precision={qtyPrecision}
+            step={qtyMode === 'units' ? (inst?.qtyStep ?? '1') : '1'}
+            min="0"
+            data-testid="ticket-qty"
+            hint={
+              qtyMode !== 'units' && units
+                ? `= ${formatQty(units.toFixed(), inst?.qtyPrecision ?? 0)} units`
+                : undefined
+            }
+          />
         </div>
         {type === 'bracket' ? (
           <div>
-            <FieldHead mode={<ModeSelect label="Bracket entry" value={entryType} options={{ market: 'market', limit: 'limit' }} onChange={setEntryType} />}>Entry</FieldHead>
-            <NumberInput label="Limit price" hideLabel value={limitPrice} onValueChange={setLimitPrice} precision={precision} step={tick} min="0" placeholder={entryType === 'market' ? 'Market' : '—'} disabled={entryType === 'market'} data-testid="ticket-limit" />
+            <FieldHead
+              mode={
+                <ModeSelect
+                  label="Bracket entry"
+                  value={entryType}
+                  options={{ market: 'market', limit: 'limit' }}
+                  onChange={setEntryType}
+                />
+              }
+            >
+              Entry
+            </FieldHead>
+            <NumberInput
+              label="Limit price"
+              hideLabel
+              value={limitPrice}
+              onValueChange={setLimitPrice}
+              precision={precision}
+              step={tick}
+              min="0"
+              placeholder={entryType === 'market' ? 'Market' : '—'}
+              disabled={entryType === 'market'}
+              data-testid="ticket-limit"
+            />
           </div>
         ) : type === 'oco' ? (
-          <div className="text-[11px] text-muted self-end pb-1">Two legs: one cancels the other.</div>
+          <div className="text-[11px] text-muted self-end pb-1">
+            Two legs: one cancels the other.
+          </div>
         ) : (
           <div>
             <FieldHead>
               {needsStop && !needsLimit ? 'Stop price' : 'Limit price'}
-              {inst?.priceUnit ? <span data-testid="ticket-price-unit"> ({inst.priceUnit}, amounts in {inst.quoteCcy})</span> : null}
+              {inst?.priceUnit ? (
+                <span data-testid="ticket-price-unit">
+                  {' '}
+                  ({inst.priceUnit}, amounts in {inst.quoteCcy})
+                </span>
+              ) : null}
             </FieldHead>
             {needsStop && !needsLimit ? (
-              <NumberInput label="Stop price" hideLabel value={stopPrice} onValueChange={setStopPrice} precision={precision} step={tick} min="0" data-testid="ticket-stop" />
+              <NumberInput
+                label="Stop price"
+                hideLabel
+                value={stopPrice}
+                onValueChange={setStopPrice}
+                precision={precision}
+                step={tick}
+                min="0"
+                data-testid="ticket-stop"
+              />
             ) : (
-              <NumberInput label="Limit price" hideLabel value={limitPrice} onValueChange={setLimitPrice} precision={precision} step={tick} min="0" placeholder={needsLimit ? '' : 'Market'} disabled={!needsLimit} data-testid="ticket-limit" />
+              <NumberInput
+                label="Limit price"
+                hideLabel
+                value={limitPrice}
+                onValueChange={setLimitPrice}
+                precision={precision}
+                step={tick}
+                min="0"
+                placeholder={needsLimit ? '' : 'Market'}
+                disabled={!needsLimit}
+                data-testid="ticket-limit"
+              />
             )}
           </div>
         )}
         {type === 'stop_limit' ? (
           <div className="col-span-2">
             <FieldHead>Stop (trigger) price</FieldHead>
-            <NumberInput label="Stop price" hideLabel value={stopPrice} onValueChange={setStopPrice} precision={precision} step={tick} min="0" data-testid="ticket-stop" />
+            <NumberInput
+              label="Stop price"
+              hideLabel
+              value={stopPrice}
+              onValueChange={setStopPrice}
+              precision={precision}
+              step={tick}
+              min="0"
+              data-testid="ticket-stop"
+            />
           </div>
         ) : null}
         {type === 'trailing' ? (
           <div className="col-span-2">
-            <FieldHead mode={<ModeSelect label="Trail unit" value={trailMode} options={{ pips: 'pips', price: 'price' }} onChange={setTrailMode} />}>Trail distance ({trailMode})</FieldHead>
-            <NumberInput label={`Trail distance (${trailMode})`} hideLabel value={trailInput} onValueChange={setTrailInput} precision={trailMode === 'pips' ? 1 : precision} step={trailMode === 'pips' ? '1' : tick} min="0" data-testid="ticket-trail" hint={trailAmount ? `= ${trailAmount} in price` : undefined} />
+            <FieldHead
+              mode={
+                <ModeSelect
+                  label="Trail unit"
+                  value={trailMode}
+                  options={{ pips: 'pips', price: 'price' }}
+                  onChange={setTrailMode}
+                />
+              }
+            >
+              Trail distance ({trailMode})
+            </FieldHead>
+            <NumberInput
+              label={`Trail distance (${trailMode})`}
+              hideLabel
+              value={trailInput}
+              onValueChange={setTrailInput}
+              precision={trailMode === 'pips' ? 1 : precision}
+              step={trailMode === 'pips' ? '1' : tick}
+              min="0"
+              data-testid="ticket-trail"
+              hint={trailAmount ? `= ${trailAmount} in price` : undefined}
+            />
           </div>
         ) : null}
         {type === 'oco'
@@ -549,7 +846,14 @@ export function TicketPanel() {
                     className="tk-mode"
                     aria-label={`Leg ${i + 1} type`}
                     value={leg.type}
-                    onChange={(e) => setLegs((ls) => ls.map((l, j) => (j === i ? { ...l, type: e.target.value as OcoLegInput['type'] } : l)) as [OcoLegInput, OcoLegInput])}
+                    onChange={(e) =>
+                      setLegs(
+                        (ls) =>
+                          ls.map((l, j) =>
+                            j === i ? { ...l, type: e.target.value as OcoLegInput['type'] } : l,
+                          ) as [OcoLegInput, OcoLegInput],
+                      )
+                    }
                   >
                     <option value="limit">limit</option>
                     <option value="stop">stop</option>
@@ -558,10 +862,40 @@ export function TicketPanel() {
                 </legend>
                 <div className="grid grid-cols-2 gap-2">
                   {leg.type !== 'limit' ? (
-                    <NumberInput label={`Leg ${i + 1} stop price`} value={leg.stopPrice} onValueChange={(v) => setLegs((ls) => ls.map((l, j) => (j === i ? { ...l, stopPrice: v } : l)) as [OcoLegInput, OcoLegInput])} precision={precision} step={tick} min="0" />
+                    <NumberInput
+                      label={`Leg ${i + 1} stop price`}
+                      value={leg.stopPrice}
+                      onValueChange={(v) =>
+                        setLegs(
+                          (ls) =>
+                            ls.map((l, j) => (j === i ? { ...l, stopPrice: v } : l)) as [
+                              OcoLegInput,
+                              OcoLegInput,
+                            ],
+                        )
+                      }
+                      precision={precision}
+                      step={tick}
+                      min="0"
+                    />
                   ) : null}
                   {leg.type !== 'stop' ? (
-                    <NumberInput label={`Leg ${i + 1} limit price`} value={leg.limitPrice} onValueChange={(v) => setLegs((ls) => ls.map((l, j) => (j === i ? { ...l, limitPrice: v } : l)) as [OcoLegInput, OcoLegInput])} precision={precision} step={tick} min="0" />
+                    <NumberInput
+                      label={`Leg ${i + 1} limit price`}
+                      value={leg.limitPrice}
+                      onValueChange={(v) =>
+                        setLegs(
+                          (ls) =>
+                            ls.map((l, j) => (j === i ? { ...l, limitPrice: v } : l)) as [
+                              OcoLegInput,
+                              OcoLegInput,
+                            ],
+                        )
+                      }
+                      precision={precision}
+                      step={tick}
+                      min="0"
+                    />
                   ) : null}
                 </div>
               </fieldset>
@@ -570,18 +904,86 @@ export function TicketPanel() {
         {type !== 'oco' ? (
           <>
             <div>
-              <FieldHead mode={<ModeSelect label="Stop loss unit" value={slMode} options={DIST_LABEL} onChange={(m) => { setSlMode(m); setSlInput(''); }} testId="ticket-sl-mode" />}>Stop loss ({DIST_LABEL[slMode]})</FieldHead>
-              <NumberInput label={`Stop loss (${DIST_LABEL[slMode]})`} hideLabel value={slInput} onValueChange={setSlInput} precision={distPrecision(slMode)} step={slMode === 'price' ? tick : '1'} min="0" placeholder="—" disabled={reduceOnly} data-testid="ticket-sl" hint={slPrice && slMode !== 'price' ? `= ${formatPrice(slPrice.toFixed(), precision)}` : undefined} />
+              <FieldHead
+                mode={
+                  <ModeSelect
+                    label="Stop loss unit"
+                    value={slMode}
+                    options={DIST_LABEL}
+                    onChange={(m) => {
+                      setSlMode(m);
+                      setSlInput('');
+                    }}
+                    testId="ticket-sl-mode"
+                  />
+                }
+              >
+                Stop loss ({DIST_LABEL[slMode]})
+              </FieldHead>
+              <NumberInput
+                label={`Stop loss (${DIST_LABEL[slMode]})`}
+                hideLabel
+                value={slInput}
+                onValueChange={setSlInput}
+                precision={distPrecision(slMode)}
+                step={slMode === 'price' ? tick : '1'}
+                min="0"
+                placeholder="—"
+                disabled={reduceOnly}
+                data-testid="ticket-sl"
+                hint={
+                  slPrice && slMode !== 'price'
+                    ? `= ${formatPrice(slPrice.toFixed(), precision)}`
+                    : undefined
+                }
+              />
             </div>
             <div>
-              <FieldHead mode={<ModeSelect label="Take profit unit" value={tpMode} options={DIST_LABEL} onChange={(m) => { setTpMode(m); setTpInput(''); }} testId="ticket-tp-mode" />}>Take profit ({DIST_LABEL[tpMode]})</FieldHead>
-              <NumberInput label={`Take profit (${DIST_LABEL[tpMode]})`} hideLabel value={tpInput} onValueChange={setTpInput} precision={distPrecision(tpMode)} step={tpMode === 'price' ? tick : '1'} min="0" placeholder="—" disabled={reduceOnly} data-testid="ticket-tp" hint={tpPrice && tpMode !== 'price' ? `= ${formatPrice(tpPrice.toFixed(), precision)}` : undefined} />
+              <FieldHead
+                mode={
+                  <ModeSelect
+                    label="Take profit unit"
+                    value={tpMode}
+                    options={DIST_LABEL}
+                    onChange={(m) => {
+                      setTpMode(m);
+                      setTpInput('');
+                    }}
+                    testId="ticket-tp-mode"
+                  />
+                }
+              >
+                Take profit ({DIST_LABEL[tpMode]})
+              </FieldHead>
+              <NumberInput
+                label={`Take profit (${DIST_LABEL[tpMode]})`}
+                hideLabel
+                value={tpInput}
+                onValueChange={setTpInput}
+                precision={distPrecision(tpMode)}
+                step={tpMode === 'price' ? tick : '1'}
+                min="0"
+                placeholder="—"
+                disabled={reduceOnly}
+                data-testid="ticket-tp"
+                hint={
+                  tpPrice && tpMode !== 'price'
+                    ? `= ${formatPrice(tpPrice.toFixed(), precision)}`
+                    : undefined
+                }
+              />
             </div>
           </>
         ) : null}
         <div>
           <FieldHead>Time in force</FieldHead>
-          <select className="k-select w-full" aria-label="Time in force" value={tif} onChange={(e) => setTif(e.target.value as TimeInForce)} data-testid="ticket-tif">
+          <select
+            className="k-select w-full"
+            aria-label="Time in force"
+            value={tif}
+            onChange={(e) => setTif(e.target.value as TimeInForce)}
+            data-testid="ticket-tif"
+          >
             <option value="gtc">GTC</option>
             <option value="day">Day</option>
             <option value="ioc">IOC</option>
@@ -591,24 +993,48 @@ export function TicketPanel() {
         </div>
         <div className="tk-check">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} data-testid="ticket-reduce-only" /> Reduce-only
+            <input
+              type="checkbox"
+              checked={reduceOnly}
+              onChange={(e) => setReduceOnly(e.target.checked)}
+              data-testid="ticket-reduce-only"
+            />{' '}
+            Reduce-only
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} data-testid="ticket-post-only" /> Post-only
+            <input
+              type="checkbox"
+              checked={postOnly}
+              onChange={(e) => setPostOnly(e.target.checked)}
+              data-testid="ticket-post-only"
+            />{' '}
+            Post-only
           </label>
         </div>
         {tif === 'gtd' ? (
           <label className="col-span-2 flex flex-col gap-1 text-xs">
             <span className="k-label">Good till (your local time)</span>
-            <input type="datetime-local" className="k-input" value={expireAt} onChange={(e) => setExpireAt(e.target.value)} />
+            <input
+              type="datetime-local"
+              className="k-input"
+              value={expireAt}
+              onChange={(e) => setExpireAt(e.target.value)}
+            />
           </label>
         ) : null}
       </div>
       {/* IRTC R5-05: no aria-live on the figures (they re-render on every tick); a separate short status
           is announced once per settled edit. IRTC R5-01: figures for an older edit are marked as updating. */}
-      <dl className={`tk-preview ${updating ? 'is-updating' : ''}`} data-testid="ticket-preview" data-state={previewCurrent ? 'current' : updating ? 'updating' : 'empty'} aria-busy={updating || checking}>
+      <dl
+        className={`tk-preview ${updating ? 'is-updating' : ''}`}
+        data-testid="ticket-preview"
+        data-state={previewCurrent ? 'current' : updating ? 'updating' : 'empty'}
+        aria-busy={updating || checking}
+      >
         <dt>Notional</dt>
-        <dd data-testid="preview-notional">{shown ? formatMoney(shown.notional.base, ccy) : '—'}</dd>
+        <dd data-testid="preview-notional">
+          {shown ? formatMoney(shown.notional.base, ccy) : '—'}
+        </dd>
         <dt>Est. fees + spread</dt>
         <dd data-testid="preview-fees">{shown ? formatMoney(shown.fees.total, ccy) : '—'}</dd>
         {shown?.fx ? (
@@ -622,10 +1048,16 @@ export function TicketPanel() {
           </>
         ) : null}
         <dt>Margin impact{marginRatio ? ` (${marginRatio})` : ''}</dt>
-        <dd data-testid="preview-margin">{shown ? formatMoney(shown.margin.required, ccy) : '—'}</dd>
+        <dd data-testid="preview-margin">
+          {shown ? formatMoney(shown.margin.required, ccy) : '—'}
+        </dd>
         <dt>Loss if stop hit</dt>
         <dd data-testid="preview-loss" className={shown?.lossIfStopHit ? 'k-dir--down' : ''}>
-          {shown?.lossIfStopHit ? `−${formatMoney(shown.lossIfStopHit.total, ccy)} · ${shown.lossIfStopHit.pctEquity}% eq.` : shown ? 'No stop: not capped' : '—'}
+          {shown?.lossIfStopHit
+            ? `−${formatMoney(shown.lossIfStopHit.total, ccy)} · ${shown.lossIfStopHit.pctEquity}% eq.`
+            : shown
+              ? 'No stop: not capped'
+              : '—'}
         </dd>
         <dt>Reward : risk</dt>
         <dd data-testid="preview-rr">{shown?.rewardRisk ? `1 : ${shown.rewardRisk}` : '—'}</dd>
@@ -635,7 +1067,13 @@ export function TicketPanel() {
           Updating the preview for your change…
         </p>
       ) : null}
-      <p className="k-sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="ticket-announce">
+      <p
+        className="k-sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="ticket-announce"
+      >
         {announcement}
       </p>
       {warnings.length || violations.length || previewError ? (
@@ -654,14 +1092,29 @@ export function TicketPanel() {
           {previewError ? <li className="k-error">{previewError}</li> : null}
         </ul>
       ) : null}
-      <p className="tk-foot">PAPER · simulated fills. Fees are SIMULATED placeholders{preview?.res.instrument.feesSimulated === false ? '' : ' (pending broker schedule)'}.</p>
+      <p className="tk-foot">
+        PAPER · simulated fills. Fees are SIMULATED placeholders
+        {preview?.res.instrument.feesSimulated === false ? '' : ' (pending broker schedule)'}.
+      </p>
       <div className="tk-submit">
-        <Button variant={side === 'buy' ? 'buy' : 'sell'} block disabled={!canSubmit} onClick={() => void review()} data-testid="place-order" aria-keyshortcuts="Control+Enter" aria-busy={checking}>
+        <Button
+          variant={side === 'buy' ? 'buy' : 'sell'}
+          block
+          disabled={!canSubmit}
+          onClick={() => void review()}
+          data-testid="place-order"
+          aria-keyshortcuts="Control+Enter"
+          aria-busy={checking}
+        >
           {checking ? 'Checking… ' : 'Review '}
           {side === 'buy' ? 'Buy' : 'Sell'} {qtyLabel} {displayName}
         </Button>
         {result ? (
-          <p className={`m-0 text-xs ${result.tone === 'error' ? 'k-error' : ''}`} role="status" data-testid="ticket-result">
+          <p
+            className={`m-0 text-xs ${result.tone === 'error' ? 'k-error' : ''}`}
+            role="status"
+            data-testid="ticket-result"
+          >
             {result.text}
           </p>
         ) : null}
@@ -674,14 +1127,27 @@ export function TicketPanel() {
         data-testid="confirm-order"
       >
         {cp ? (
-          <ul className="m-0 pl-4 text-sm" data-testid="confirm-figures" data-qty={String(cBody?.qty ?? '')}>
+          <ul
+            className="m-0 pl-4 text-sm"
+            data-testid="confirm-figures"
+            data-qty={String(cBody?.qty ?? '')}
+          >
             {cp.confirmation.reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}
             <li>
-              Notional <span data-testid="confirm-notional">{formatMoney(cp.notional.base, cp.currency)}</span>; fees + spread {formatMoney(cp.fees.total, cp.currency)}; margin{' '}
-              <span data-testid="confirm-margin">{formatMoney(cp.margin.required, cp.currency)}</span>
-              {cp.lossIfStopHit ? `; loss if the stop is hit −${formatMoney(cp.lossIfStopHit.total, cp.currency)}` : '; no stop loss'}.
+              Notional{' '}
+              <span data-testid="confirm-notional">
+                {formatMoney(cp.notional.base, cp.currency)}
+              </span>
+              ; fees + spread {formatMoney(cp.fees.total, cp.currency)}; margin{' '}
+              <span data-testid="confirm-margin">
+                {formatMoney(cp.margin.required, cp.currency)}
+              </span>
+              {cp.lossIfStopHit
+                ? `; loss if the stop is hit −${formatMoney(cp.lossIfStopHit.total, cp.currency)}`
+                : '; no stop loss'}
+              .
             </li>
           </ul>
         ) : null}
@@ -700,7 +1166,13 @@ export function TicketPanel() {
               Hold to place
             </HoldToConfirmButton>
           ) : (
-            <Button variant="primary" onClick={() => confirm && void place(confirm.body)} disabled={busy} data-testid="confirm-place" autoFocus>
+            <Button
+              variant="primary"
+              onClick={() => confirm && void place(confirm.body)}
+              disabled={busy}
+              data-testid="confirm-place"
+              autoFocus
+            >
               Place order
             </Button>
           )}

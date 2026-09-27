@@ -8,7 +8,10 @@ import { decimalSeparator, formatForInput, NumberInput, parseLocaleDecimal } fro
 describe('NumberInput separators per language (IRTC R5-08)', () => {
   it('parses English grouping and refuses ambiguous commas', () => {
     expect(parseLocaleDecimal('2,500', 'en')).toEqual({ ok: true, canonical: '2500' });
-    expect(parseLocaleDecimal('1,234,567.89', 'en-GB')).toEqual({ ok: true, canonical: '1234567.89' });
+    expect(parseLocaleDecimal('1,234,567.89', 'en-GB')).toEqual({
+      ok: true,
+      canonical: '1234567.89',
+    });
     expect(parseLocaleDecimal(' 2500.5 ', 'en')).toEqual({ ok: true, canonical: '2500.5' });
     expect(parseLocaleDecimal('2,5', 'en')).toEqual({ ok: false, reason: 'ambiguous' });
     expect(parseLocaleDecimal('2,50', 'en')).toEqual({ ok: false, reason: 'ambiguous' });
@@ -22,7 +25,10 @@ describe('NumberInput separators per language (IRTC R5-08)', () => {
   it('parses French decimal comma and space / no-break-space / dot grouping', () => {
     expect(parseLocaleDecimal('2,5', 'fr')).toEqual({ ok: true, canonical: '2.5' });
     expect(parseLocaleDecimal('2 500,5', 'fr')).toEqual({ ok: true, canonical: '2500.5' });
-    expect(parseLocaleDecimal('2\u202f500,50', 'fr-FR')).toEqual({ ok: true, canonical: '2500.50' });
+    expect(parseLocaleDecimal('2\u202f500,50', 'fr-FR')).toEqual({
+      ok: true,
+      canonical: '2500.50',
+    });
     expect(parseLocaleDecimal('2\u00a0500', 'fr')).toEqual({ ok: true, canonical: '2500' });
     expect(parseLocaleDecimal('2.500,5', 'fr')).toEqual({ ok: true, canonical: '2500.5' });
     expect(parseLocaleDecimal('2.500.000', 'fr')).toEqual({ ok: true, canonical: '2500000' });
@@ -58,7 +64,9 @@ describe('NumberInput separators per language (IRTC R5-08)', () => {
     fireEvent.change(input, { target: { value: '2,50' } });
     fireEvent.blur(input);
     expect(input).toHaveValue('2,50');
-    expect(screen.getByRole('alert')).toHaveTextContent('Use a comma only between thousands (2,500) and a point for decimals (2.5).');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Use a comma only between thousands (2,500) and a point for decimals (2.5).',
+    );
     expect(screen.getByTestId('out')).toBeEmptyDOMElement();
     expect(input).toHaveAttribute('aria-invalid', 'true');
   });

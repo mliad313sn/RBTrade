@@ -18,9 +18,18 @@ export interface DirectionBadgeProps {
 const ARROW = { up: '▲', down: '▼', flat: '–' } as const;
 
 /** Colour is never the only cue: arrow + sign + colour, and a spoken label. */
-export function DirectionBadge({ value, format = 'number', decimals = 2, suffix, className }: DirectionBadgeProps) {
+export function DirectionBadge({
+  value,
+  format = 'number',
+  decimals = 2,
+  suffix,
+  className,
+}: DirectionBadgeProps) {
   const dir = direction(value);
-  const text = format === 'percent' ? formatPercent(value, decimals) : formatDecimal(value, decimals, { signed: true });
+  const text =
+    format === 'percent'
+      ? formatPercent(value, decimals)
+      : formatDecimal(value, decimals, { signed: true });
   const spoken = `${spokenDirection(value)} ${text.replace(/^[+−]/, '')}${suffix ? ` ${suffix}` : ''}`;
   return (
     <span className={cx('k-dir', `k-dir--${dir}`, className)} data-direction={dir}>

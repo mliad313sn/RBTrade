@@ -10,7 +10,9 @@ import { safeNext } from './safe-next';
 describe('safeNext (IRTC R1-06)', () => {
   it('keeps plain same-origin paths, their query and hash', () => {
     expect(safeNext('/terminal')).toBe('/terminal');
-    expect(safeNext('/terminal?symbol=EURUSD&tf=1m#ticket')).toBe('/terminal?symbol=EURUSD&tf=1m#ticket');
+    expect(safeNext('/terminal?symbol=EURUSD&tf=1m#ticket')).toBe(
+      '/terminal?symbol=EURUSD&tf=1m#ticket',
+    );
     expect(safeNext('/novice/home')).toBe('/novice/home');
     // an encoded slash inside the query is data, not a path separator
     expect(safeNext('/terminal?symbol=EUR%2FUSD')).toBe('/terminal?symbol=EUR%2FUSD');
@@ -54,7 +56,17 @@ describe('safeNext (IRTC R1-06)', () => {
 
   it('never returns a value that resolves off-origin', () => {
     const origin = 'https://kora.example';
-    const probes = ['/\\evil', '//evil', '/\t/evil', '/%5Cevil', '/%2F/evil', '/..//evil', '/.//evil', '/a/../\\evil', '\\/evil'];
+    const probes = [
+      '/\\evil',
+      '//evil',
+      '/\t/evil',
+      '/%5Cevil',
+      '/%2F/evil',
+      '/..//evil',
+      '/.//evil',
+      '/a/../\\evil',
+      '\\/evil',
+    ];
     for (const p of probes) {
       const out = safeNext(p);
       expect(new URL(out, origin).origin, p).toBe(origin);

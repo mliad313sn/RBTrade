@@ -19,7 +19,11 @@ function group(intPart: string): string {
  * Formats a decimal to exactly `decimals` places without ever touching binary floating point.
  * Rounding: half-even (banker's), same as the domain `quantize`.
  */
-export function formatDecimal(value: DecimalInput, decimals: number, opts: FormatOptions = {}): string {
+export function formatDecimal(
+  value: DecimalInput,
+  decimals: number,
+  opts: FormatOptions = {},
+): string {
   const d = quantize(value, decimals);
   const negative = d.isNegative() && !d.isZero();
   const [intPart, frac] = d.abs().toFixed(decimals).split('.') as [string, string | undefined];
@@ -49,7 +53,11 @@ export interface MoneyOptions extends FormatOptions {
   decimals?: number;
 }
 
-export function formatMoney(amount: DecimalInput, currency: string, opts: MoneyOptions = {}): string {
+export function formatMoney(
+  amount: DecimalInput,
+  currency: string,
+  opts: MoneyOptions = {},
+): string {
   const decimals = opts.decimals ?? CURRENCY_DECIMALS[currency] ?? 2;
   const s = formatDecimal(amount, decimals, opts);
   if (opts.display === 'symbol' && CURRENCY_SYMBOL[currency]) {
@@ -60,7 +68,11 @@ export function formatMoney(amount: DecimalInput, currency: string, opts: MoneyO
 }
 
 /** Percent from a ratio string: "0.0018" → "+0.18%". */
-export function formatPercent(ratio: DecimalInput, decimals = 2, opts: FormatOptions = { signed: true }): string {
+export function formatPercent(
+  ratio: DecimalInput,
+  decimals = 2,
+  opts: FormatOptions = { signed: true },
+): string {
   return `${formatDecimal(dec(ratio).mul(100), decimals, opts)}%`;
 }
 

@@ -5,7 +5,11 @@ import { ToastProvider, ToastViewport, useToast } from './Toast';
 
 function Trigger() {
   const t = useToast();
-  return <Button onClick={() => t.push('Kill switch recorded in the audit log', 'success')}>Show toast</Button>;
+  return (
+    <Button onClick={() => t.push('Kill switch recorded in the audit log', 'success')}>
+      Show toast
+    </Button>
+  );
 }
 
 function Demo() {

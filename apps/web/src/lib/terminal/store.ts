@@ -35,7 +35,10 @@ interface TerminalState {
   symbol: string;
   timeframe: Timeframe;
   draft: (TicketDraft & { nonce: number }) | null;
-  focus: { target: PanelTarget | 'ticket-buy' | 'ticket-sell' | 'ticket-submit'; nonce: number } | null;
+  focus: {
+    target: PanelTarget | 'ticket-buy' | 'ticket-sell' | 'ticket-submit';
+    nonce: number;
+  } | null;
   cheatSheetOpen: boolean;
   setSymbol: (symbol: string) => void;
   setTimeframe: (tf: Timeframe) => void;
@@ -54,7 +57,8 @@ export const useTerminal = create<TerminalState>((set) => ({
   cheatSheetOpen: false,
   setSymbol: (symbol) => set({ symbol }),
   setTimeframe: (timeframe) => set({ timeframe }),
-  prefillTicket: (draft) => set((s) => ({ draft: { ...draft, nonce: ++nonce }, symbol: draft.symbol ?? s.symbol })),
+  prefillTicket: (draft) =>
+    set((s) => ({ draft: { ...draft, nonce: ++nonce }, symbol: draft.symbol ?? s.symbol })),
   requestFocus: (target) => set({ focus: { target, nonce: ++nonce } }),
   setCheatSheet: (cheatSheetOpen) => set({ cheatSheetOpen }),
 }));

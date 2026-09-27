@@ -34,18 +34,44 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
     delete process.env.KORA_RECONCILIATION_INTERVAL_MS;
   });
 
-  const preview = async (body: object) => (await request(http).post('/orders/preview').set(bearer(token)).send(body).expect(200)).body;
+  const preview = async (body: object) =>
+    (await request(http).post('/orders/preview').set(bearer(token)).send(body).expect(200)).body;
 
   it('EUR/USD buy 100,000: fees 3.17, margin 3,610.42, loss 204.33 (0.20%), 1:2.00', async () => {
-    const r = await preview({ symbol: 'EURUSD', side: 'buy', type: 'market', qty: '100000', stopLossPrice: '1.08221', takeProfitPrice: '1.08821' });
-    expect(r.instrument).toMatchObject({ assetClass: 'fx', quoteCcy: 'USD', multiplier: '1', feeScheduleId: 'sim-fx', feesSimulated: true });
+    const r = await preview({
+      symbol: 'EURUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '100000',
+      stopLossPrice: '1.08221',
+      takeProfitPrice: '1.08821',
+    });
+    expect(r.instrument).toMatchObject({
+      assetClass: 'fx',
+      quoteCcy: 'USD',
+      multiplier: '1',
+      feeScheduleId: 'sim-fx',
+      feesSimulated: true,
+    });
     expect(r.preview).toMatchObject({
       estimatedPrice: '1.08421',
       currency: 'USD',
       notional: { quote: '108421.00', quoteCcy: 'USD', base: '108421.00' },
       fees: { commission: '2.17', spread: '1.00', fxConversion: '0.00', total: '3.17' },
-      margin: { rate: '0.0333', required: '3610.42', usedAfter: '3610.42', freeAfter: '96386.41', equity: '100000.00' },
-      lossIfStopHit: { stopPrice: '1.08221', price: '200.00', costs: '4.33', total: '204.33', pctEquity: '0.20' },
+      margin: {
+        rate: '0.0333',
+        required: '3610.42',
+        usedAfter: '3610.42',
+        freeAfter: '96386.41',
+        equity: '100000.00',
+      },
+      lossIfStopHit: {
+        stopPrice: '1.08221',
+        price: '200.00',
+        costs: '4.33',
+        total: '204.33',
+        pctEquity: '0.20',
+      },
       rewardIfTargetHit: { targetPrice: '1.08821', amount: '400.00' },
       rewardRisk: '2.00',
       fx: null,
@@ -59,7 +85,14 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
   });
 
   it('XAU/USD sell 10 oz', async () => {
-    const r = await preview({ symbol: 'XAUUSD', side: 'sell', type: 'market', qty: '10', stopLossPrice: '2405.30', takeProfitPrice: '2375.30' });
+    const r = await preview({
+      symbol: 'XAUUSD',
+      side: 'sell',
+      type: 'market',
+      qty: '10',
+      stopLossPrice: '2405.30',
+      takeProfitPrice: '2375.30',
+    });
     expect(r.preview).toMatchObject({
       notional: { base: '23953.00' },
       fees: { commission: '2.40', spread: '1.00', total: '3.40' },
@@ -70,7 +103,14 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
   });
 
   it('BTC/USD buy 0.5', async () => {
-    const r = await preview({ symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.5', stopLossPrice: '63813.5', takeProfitPrice: '66813.5' });
+    const r = await preview({
+      symbol: 'BTCUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '0.5',
+      stopLossPrice: '63813.5',
+      takeProfitPrice: '66813.5',
+    });
     expect(r.preview).toMatchObject({
       notional: { base: '32406.75' },
       fees: { commission: '32.41', spread: '0.50', total: '32.91' },
@@ -81,7 +121,14 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
   });
 
   it('equity AAPL buy 100 (per-share commission, 1.00 minimum)', async () => {
-    const r = await preview({ symbol: 'AAPL', side: 'buy', type: 'market', qty: '100', stopLossPrice: '216.38', takeProfitPrice: '231.38' });
+    const r = await preview({
+      symbol: 'AAPL',
+      side: 'buy',
+      type: 'market',
+      qty: '100',
+      stopLossPrice: '216.38',
+      takeProfitPrice: '231.38',
+    });
     expect(r.preview).toMatchObject({
       notional: { base: '22138.00' },
       fees: { commission: '1.00', spread: '1.00', total: '2.00' },
@@ -105,9 +152,19 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
 
   it('a JPY account converts USD instruments through the inverse USD/JPY pair', async () => {
     const jpy = await createUser(app, 'trader');
-    await request(http).put('/accounts/me/settings').set(bearer(jpy.token)).send({ baseCurrency: 'JPY' }).expect(200);
+    await request(http)
+      .put('/accounts/me/settings')
+      .set(bearer(jpy.token))
+      .send({ baseCurrency: 'JPY' })
+      .expect(200);
     await md.standard();
-    const r = (await request(http).post('/orders/preview').set(bearer(jpy.token)).send({ symbol: 'AAPL', side: 'buy', type: 'market', qty: '100' }).expect(200)).body;
+    const r = (
+      await request(http)
+        .post('/orders/preview')
+        .set(bearer(jpy.token))
+        .send({ symbol: 'AAPL', side: 'buy', type: 'market', qty: '100' })
+        .expect(200)
+    ).body;
     // 22,138 USD × 148.215 (USD/JPY mid) = 3,281,183.67 → JPY has no minor unit
     expect(r.preview.notional).toEqual({ quote: '22138.00', quoteCcy: 'USD', base: '3281184' });
     expect(r.preview.fx).toMatchObject({ from: 'USD', to: 'JPY', rate: '148.215' });
@@ -118,19 +175,38 @@ describe('POST /orders/preview (hand-computed fixtures)', () => {
     const total: number[] = [];
     for (let i = 0; i < 200; i++) {
       if (i % 50 === 0) await md.touch();
-      const r = await preview({ symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '100000', limitPrice: '1.08300', stopLossPrice: '1.08100' });
+      const r = await preview({
+        symbol: 'EURUSD',
+        side: 'buy',
+        type: 'limit',
+        qty: '100000',
+        limitPrice: '1.08300',
+        stopLossPrice: '1.08100',
+      });
       risk.push(r.timings.riskMs);
       total.push(r.timings.totalMs);
     }
-    const p = (xs: number[], q: number) => [...xs].sort((a, b) => a - b)[Math.floor(q * (xs.length - 1))]!;
-    process.stdout.write(`[risk timing ms] rules p50 ${p(risk, 0.5)} p95 ${p(risk, 0.95)} max ${Math.max(...risk)}; with context load p50 ${p(total, 0.5)} p95 ${p(total, 0.95)}\n`);
+    const p = (xs: number[], q: number) =>
+      [...xs].sort((a, b) => a - b)[Math.floor(q * (xs.length - 1))]!;
+    process.stdout.write(
+      `[risk timing ms] rules p50 ${p(risk, 0.5)} p95 ${p(risk, 0.95)} max ${Math.max(...risk)}; with context load p50 ${p(total, 0.5)} p95 ${p(total, 0.95)}\n`,
+    );
     expect(p(risk, 0.95)).toBeLessThan(5);
   });
 
   it('reports risk violations without persisting anything', async () => {
-    const r = await preview({ symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '100000', limitPrice: '1.20000' });
+    const r = await preview({
+      symbol: 'EURUSD',
+      side: 'buy',
+      type: 'limit',
+      qty: '100000',
+      limitPrice: '1.20000',
+    });
     expect(r.risk.ok).toBe(false);
-    expect(r.risk.violations[0]).toMatchObject({ code: 'FAT_FINGER', message: expect.stringContaining('away from the market') });
+    expect(r.risk.violations[0]).toMatchObject({
+      code: 'FAT_FINGER',
+      message: expect.stringContaining('away from the market'),
+    });
     const orders = await request(http).get('/orders?status=all').set(bearer(token)).expect(200);
     expect(orders.body.orders).toHaveLength(0);
   });

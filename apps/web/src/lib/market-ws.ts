@@ -12,7 +12,19 @@ export function apiWsPort(env: Record<string, string | undefined> = process.env)
 }
 
 /** Prototype watchlist ("Watchlist · Majors"), in artboard order. */
-export const MAJORS = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD', 'US500', 'NAS100', 'AAPL', 'NVDA', 'WTI'];
+export const MAJORS = [
+  'EURUSD',
+  'GBPUSD',
+  'USDJPY',
+  'XAUUSD',
+  'BTCUSD',
+  'ETHUSD',
+  'US500',
+  'NAS100',
+  'AAPL',
+  'NVDA',
+  'WTI',
+];
 
 export interface WatchlistRowView {
   mid: string | null;
@@ -22,9 +34,14 @@ export interface WatchlistRowView {
 }
 
 /** Mid and change computed with decimals at the registry precision (never floats). */
-export function watchlistRow(quote: Pick<Quote, 'bid' | 'ask' | 'stale'> | null, dayOpen: string | null, pricePrecision: number): WatchlistRowView {
+export function watchlistRow(
+  quote: Pick<Quote, 'bid' | 'ask' | 'stale'> | null,
+  dayOpen: string | null,
+  pricePrecision: number,
+): WatchlistRowView {
   if (!quote) return { mid: null, change: null, stale: false };
   const mid = quantize(dec(quote.bid).add(dec(quote.ask)).div(2), pricePrecision);
-  const change = dayOpen && !dec(dayOpen).isZero() ? mid.sub(dec(dayOpen)).div(dec(dayOpen)).toFixed(6) : null;
+  const change =
+    dayOpen && !dec(dayOpen).isZero() ? mid.sub(dec(dayOpen)).div(dec(dayOpen)).toFixed(6) : null;
   return { mid: mid.toFixed(pricePrecision), change, stale: quote.stale };
 }

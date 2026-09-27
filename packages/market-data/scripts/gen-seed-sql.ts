@@ -11,11 +11,18 @@ const b = (v: boolean): string => (v ? 'true' : 'false');
 
 const out: string[] = [];
 out.push('INSERT INTO asset_classes (asset_class, label, stale_after_ms) VALUES');
-out.push(SEED_ASSET_CLASSES.map((a) => `  (${q(a.assetClass)}, ${q(a.label)}, ${a.staleAfterMs})`).join(',\n') + ';\n');
-out.push('INSERT INTO venues (mic, iso_mic, operating_mic, name, country, region, timezone, currency, calendar, calendar_source, status, simulated) VALUES');
+out.push(
+  SEED_ASSET_CLASSES.map((a) => `  (${q(a.assetClass)}, ${q(a.label)}, ${a.staleAfterMs})`).join(
+    ',\n',
+  ) + ';\n',
+);
+out.push(
+  'INSERT INTO venues (mic, iso_mic, operating_mic, name, country, region, timezone, currency, calendar, calendar_source, status, simulated) VALUES',
+);
 out.push(
   SEED_VENUES.map(
-    (v) => `  (${q(v.mic)}, ${b(v.isoMic)}, ${q(v.operatingMic)}, ${q(v.name)}, ${q(v.country)}, ${q(v.region)}, ${q(v.timezone)}, ${q(v.currency)}, ${j(v.calendar)}, ${q(v.calendarSource)}, ${q(v.status)}, ${b(v.simulated)})`,
+    (v) =>
+      `  (${q(v.mic)}, ${b(v.isoMic)}, ${q(v.operatingMic)}, ${q(v.name)}, ${q(v.country)}, ${q(v.region)}, ${q(v.timezone)}, ${q(v.currency)}, ${j(v.calendar)}, ${q(v.calendarSource)}, ${q(v.status)}, ${b(v.simulated)})`,
   ).join(',\n') + ';\n',
 );
 out.push(
@@ -28,5 +35,8 @@ out.push(
   ).join(',\n') + ';\n',
 );
 out.push('INSERT INTO instrument_aliases (source, vendor_symbol, symbol) VALUES');
-out.push(SEED_ALIASES.map((a) => `  (${q(a.source)}, ${q(a.vendorSymbol)}, ${q(a.symbol)})`).join(',\n') + ';');
+out.push(
+  SEED_ALIASES.map((a) => `  (${q(a.source)}, ${q(a.vendorSymbol)}, ${q(a.symbol)})`).join(',\n') +
+    ';',
+);
 console.log(out.join('\n'));

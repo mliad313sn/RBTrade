@@ -52,7 +52,11 @@ export class SessionsService {
     const key = `${p.sub}:${p.tokenId ?? ''}`;
     let s = opts.fresh ? undefined : this.cache.get(key);
     if (!s || Date.now() - s.at > CACHE_MS) {
-      const { rows } = await this.db.pool.query<{ revoked: boolean; valid_after: number | null; disabled: boolean | null }>(
+      const { rows } = await this.db.pool.query<{
+        revoked: boolean;
+        valid_after: number | null;
+        disabled: boolean | null;
+      }>(
         `SELECT EXISTS (SELECT 1 FROM revoked_tokens WHERE jti = $2) AS revoked,
                 ceil(extract(epoch FROM u.sessions_valid_after))::bigint::float8 AS valid_after,
                 u.status = 'disabled' AS disabled
@@ -60,16 +64,25 @@ export class SessionsService {
         [p.sub, p.tokenId ?? ''],
       );
       const r = rows[0];
-      s = { revoked: !!r?.revoked, validAfterSec: r?.valid_after ?? null, disabled: !!r?.disabled, at: Date.now() };
+      s = {
+        revoked: !!r?.revoked,
+        validAfterSec: r?.valid_after ?? null,
+        disabled: !!r?.disabled,
+        at: Date.now(),
+      };
       if (this.cache.size > 50_000) this.cache.clear();
       this.cache.set(key, s);
     }
     return SessionsService.judge(p, s);
   }
 
-  private static judge(p: Principal, s: Pick<SessionState, 'revoked' | 'validAfterSec' | 'disabled'>): boolean {
+  private static judge(
+    p: Principal,
+    s: Pick<SessionState, 'revoked' | 'validAfterSec' | 'disabled'>,
+  ): boolean {
     if (s.revoked || s.disabled) return false;
-    if (s.validAfterSec !== null && p.issuedAt !== undefined && p.issuedAt < s.validAfterSec) return false;
+    if (s.validAfterSec !== null && p.issuedAt !== undefined && p.issuedAt < s.validAfterSec)
+      return false;
     return true;
   }
 
@@ -81,26 +94,43 @@ export class SessionsService {
     if (principals.length === 0) return [];
     const subs = [...new Set(principals.map((p) => p.sub))];
     const jtis = [...new Set(principals.map((p) => p.tokenId).filter((j): j is string => !!j))];
-    const users = await this.db.pool.query<{ id: string; valid_after: number | null; disabled: boolean }>(
+    const users = await this.db.pool.query<{
+      id: string;
+      valid_after: number | null;
+      disabled: boolean;
+    }>(
       `SELECT id::text AS id, ceil(extract(epoch FROM sessions_valid_after))::bigint::float8 AS valid_after, status = 'disabled' AS disabled
          FROM users WHERE id = ANY($1::uuid[])`,
       [subs],
     );
     const revoked = jtis.length
-      ? new Set((await this.db.pool.query<{ jti: string }>('SELECT jti FROM revoked_tokens WHERE jti = ANY($1::text[])', [jtis])).rows.map((r) => r.jti))
+      ? new Set(
+          (
+            await this.db.pool.query<{ jti: string }>(
+              'SELECT jti FROM revoked_tokens WHERE jti = ANY($1::text[])',
+              [jtis],
+            )
+          ).rows.map((r) => r.jti),
+        )
       : new Set<string>();
     const byId = new Map(users.rows.map((u) => [u.id, u]));
     return principals.filter((p) => {
       const u = byId.get(p.sub);
       if (!u) return true;
-      return !SessionsService.judge(p, { revoked: !!p.tokenId && revoked.has(p.tokenId), validAfterSec: u.valid_after, disabled: u.disabled });
+      return !SessionsService.judge(p, {
+        revoked: !!p.tokenId && revoked.has(p.tokenId),
+        validAfterSec: u.valid_after,
+        disabled: u.disabled,
+      });
     });
   }
 
   /** Logout: the presented token id is refused until it would have expired anyway. */
   async revoke(p: Principal, reason: 'logout' | 'admin' = 'logout'): Promise<void> {
     if (!p.tokenId) return;
-    const expires = new Date(((p.expiresAt ?? Math.floor(Date.now() / 1000) + 86_400) as number) * 1000);
+    const expires = new Date(
+      ((p.expiresAt ?? Math.floor(Date.now() / 1000) + 86_400) as number) * 1000,
+    );
     await this.db.pool.query(
       `INSERT INTO revoked_tokens (jti, user_id, reason, expires_at) VALUES ($1, $2, $3, $4) ON CONFLICT (jti) DO NOTHING`,
       [p.tokenId, p.sub, reason, expires],
@@ -117,7 +147,10 @@ export class SessionsService {
    */
   async invalidateAll(userId: string, c: Queryable = this.db.pool): Promise<void> {
     const at = new Date(Date.now());
-    await c.query('UPDATE users SET sessions_valid_after = $2, updated_at = now() WHERE id = $1', [userId, at]);
+    await c.query('UPDATE users SET sessions_valid_after = $2, updated_at = now() WHERE id = $1', [
+      userId,
+      at,
+    ]);
     this.forget(userId);
     this.emit({ userId, validAfterSec: Math.ceil(at.getTime() / 1000) });
   }

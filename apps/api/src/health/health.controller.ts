@@ -14,11 +14,17 @@ async function timed(fn: () => Promise<boolean>, timeoutMs = 2000): Promise<Chec
   try {
     const ok = await Promise.race([
       fn(),
-      new Promise<boolean>((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs).unref()),
+      new Promise<boolean>((_, rej) =>
+        setTimeout(() => rej(new Error('timeout')), timeoutMs).unref(),
+      ),
     ]);
     return { status: ok ? 'up' : 'down', latencyMs: Math.round(performance.now() - t0) };
   } catch (e) {
-    return { status: 'down', latencyMs: Math.round(performance.now() - t0), reason: (e as Error).message };
+    return {
+      status: 'down',
+      latencyMs: Math.round(performance.now() - t0),
+      reason: (e as Error).message,
+    };
   }
 }
 
@@ -33,14 +39,23 @@ export class HealthController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Liveness + dependency status (db, redis, keycloak). 503 when db or redis is down.' })
+  @ApiOperation({
+    summary: 'Liveness + dependency status (db, redis, keycloak). 503 when db or redis is down.',
+  })
   async health(@Res({ passthrough: true }) res: Response) {
     const [db, redis, keycloak] = await Promise.all([
       timed(async () => (await this.db.query<{ ok: number }>('SELECT 1 AS ok'))[0]?.ok === 1),
       timed(() => this.redis.ping()),
       this.config.auth.provider === 'keycloak'
-        ? timed(async () => (await fetch(`${this.config.auth.keycloak.issuer}/.well-known/openid-configuration`)).ok)
-        : Promise.resolve<Check>({ status: 'skipped', reason: 'AUTH_PROVIDER=dev (built-in OIDC dev IdP in use)' }),
+        ? timed(
+            async () =>
+              (await fetch(`${this.config.auth.keycloak.issuer}/.well-known/openid-configuration`))
+                .ok,
+          )
+        : Promise.resolve<Check>({
+            status: 'skipped',
+            reason: 'AUTH_PROVIDER=dev (built-in OIDC dev IdP in use)',
+          }),
     ]);
     const healthy = db.status === 'up' && redis.status === 'up' && keycloak.status !== 'down';
     res.status(healthy ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE);

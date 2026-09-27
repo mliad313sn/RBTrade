@@ -21,13 +21,22 @@ export const SEED_ALIASES: InstrumentAlias[] = [
     vendorSymbol: `${i.baseCcy}USDT`,
     symbol: i.symbol,
   })),
-  ...SEED_INSTRUMENTS.filter((i) => (i.assetClass === 'equity' || i.assetClass === 'etf') && ['XNAS', 'XNYS', 'ARCX'].includes(i.venue)).map((i) => ({
+  ...SEED_INSTRUMENTS.filter(
+    (i) =>
+      (i.assetClass === 'equity' || i.assetClass === 'etf') &&
+      ['XNAS', 'XNYS', 'ARCX'].includes(i.venue),
+  ).map((i) => ({
     source: 'equities-provider',
     vendorSymbol: i.symbol,
     symbol: i.symbol,
   })),
 ];
 
-export function aliasMap(source: string, aliases: InstrumentAlias[] = SEED_ALIASES): Record<string, string> {
-  return Object.fromEntries(aliases.filter((a) => a.source === source).map((a) => [a.vendorSymbol, a.symbol]));
+export function aliasMap(
+  source: string,
+  aliases: InstrumentAlias[] = SEED_ALIASES,
+): Record<string, string> {
+  return Object.fromEntries(
+    aliases.filter((a) => a.source === source).map((a) => [a.vendorSymbol, a.symbol]),
+  );
 }

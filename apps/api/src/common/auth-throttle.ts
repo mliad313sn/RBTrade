@@ -20,7 +20,8 @@ import { clientIp } from './request';
  * forged value only moves the caller to another bucket under the same per-IP ceiling.
  */
 export const authLimit = (): number => Number(process.env.KORA_AUTH_RATE_LIMIT ?? 20) || 20;
-export const authIpLimit = (): number => Number(process.env.KORA_AUTH_IP_RATE_LIMIT ?? 0) || 5 * authLimit();
+export const authIpLimit = (): number =>
+  Number(process.env.KORA_AUTH_IP_RATE_LIMIT ?? 0) || 5 * authLimit();
 
 function subjectOf(token: unknown): string | null {
   if (typeof token !== 'string' || token.length > 8192) return null;
@@ -32,7 +33,11 @@ function subjectOf(token: unknown): string | null {
   }
 }
 
-export function accountKey(req: { body?: unknown; headers?: Record<string, unknown>; cookies?: Record<string, unknown> }): string {
+export function accountKey(req: {
+  body?: unknown;
+  headers?: Record<string, unknown>;
+  cookies?: Record<string, unknown>;
+}): string {
   const body = (req.body ?? {}) as Record<string, unknown>;
   if (typeof body.email === 'string') return `e:${body.email.trim().toLowerCase()}`;
   const mfaSub = subjectOf(body.mfaToken);
@@ -61,8 +66,10 @@ export const skipUnlessLongThrottled = (ctx: ExecutionContext): boolean =>
  * client IP per day across all accounts (default 10), so a sybil cannot walk the answer key by
  * opening many accounts (the cool-down applies per account).
  */
-export const signupLimitPerHour = (): number => Number(process.env.KORA_SIGNUP_RATE_LIMIT_PER_HOUR ?? 10) || 10;
-export const appropriatenessIpLimitPerDay = (): number => Number(process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY ?? 10) || 10;
+export const signupLimitPerHour = (): number =>
+  Number(process.env.KORA_SIGNUP_RATE_LIMIT_PER_HOUR ?? 10) || 10;
+export const appropriatenessIpLimitPerDay = (): number =>
+  Number(process.env.KORA_APPROPRIATENESS_IP_LIMIT_PER_DAY ?? 10) || 10;
 
 /** Decorator options for sign-in routes (read per request; tests change the env at runtime). */
 export const authThrottle = () => ({

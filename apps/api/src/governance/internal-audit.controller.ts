@@ -24,14 +24,20 @@ const EventsQuery = z.strictObject({
     .optional(),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
-  beforeId: z.string().regex(/^\d{1,19}$/).optional(),
+  beforeId: z
+    .string()
+    .regex(/^\d{1,19}$/)
+    .optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 
 const SampleQuery = z.strictObject({
   controlId: z.string().regex(/^KC-\d{2}$/),
   n: z.coerce.number().int().min(1).max(500).default(25),
-  seed: z.string().regex(/^[A-Za-z0-9_.:-]{1,64}$/).optional(),
+  seed: z
+    .string()
+    .regex(/^[A-Za-z0-9_.:-]{1,64}$/)
+    .optional(),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
   format: z.enum(['json', 'csv']).default('json'),
@@ -71,13 +77,17 @@ export class InternalAuditController {
   }
 
   @Get('verify')
-  @ApiOperation({ summary: 'Recompute the hash chain and check every signed anchor (the run is recorded).' })
+  @ApiOperation({
+    summary: 'Recompute the hash chain and check every signed anchor (the run is recorded).',
+  })
   verify(@CurrentPrincipal() p: Principal) {
     return this.ia.verify(p.sub);
   }
 
   @Get('anchors')
-  @ApiOperation({ summary: 'Signed anchors of the audit head (B-007) with signature and chain checks.' })
+  @ApiOperation({
+    summary: 'Signed anchors of the audit head (B-007) with signature and chain checks.',
+  })
   async listAnchors() {
     return { keyId: this.anchors.keyId, anchors: await this.anchors.list() };
   }
@@ -110,12 +120,35 @@ export class InternalAuditController {
     if (q.format === 'csv') {
       const csv = s.events
         ? toCsv(
-            ['id', 'ts', 'actor_id', 'actor_type', 'action', 'entity', 'entity_id', 'payload', 'hash'],
-            s.events.map((e) => [e.id, e.ts, e.actorId, e.actorType, e.action, e.entity, e.entityId, JSON.stringify(e.payload), e.hash]),
+            [
+              'id',
+              'ts',
+              'actor_id',
+              'actor_type',
+              'action',
+              'entity',
+              'entity_id',
+              'payload',
+              'hash',
+            ],
+            s.events.map((e) => [
+              e.id,
+              e.ts,
+              e.actorId,
+              e.actorType,
+              e.action,
+              e.entity,
+              e.entityId,
+              JSON.stringify(e.payload),
+              e.hash,
+            ]),
           )
         : toCsv(s.columns ?? [], s.rows ?? []);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="kora-sample_${q.controlId}_seed-${s.seed}.csv"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="kora-sample_${q.controlId}_seed-${s.seed}.csv"`,
+      );
       res.setHeader('X-Kora-Sample-Seed', s.seed);
       res.status(200).send(csv);
       return;

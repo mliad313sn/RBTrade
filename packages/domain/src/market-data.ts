@@ -50,7 +50,15 @@ export function assetClassLabel(assetClass: AssetClass, underlying?: AssetClass 
   return ASSET_CLASS_LABELS[assetClass];
 }
 
-export const REGIONS = ['africa', 'asia', 'europe', 'north_america', 'south_america', 'oceania', 'global'] as const;
+export const REGIONS = [
+  'africa',
+  'asia',
+  'europe',
+  'north_america',
+  'south_america',
+  'oceania',
+  'global',
+] as const;
 export type Region = (typeof REGIONS)[number];
 
 export const TIMEFRAMES = ['1s', '1m', '5m', '15m', '1h', '4h', '1D'] as const;
@@ -78,7 +86,10 @@ export const SYMBOL_RE = /^[A-Z0-9][A-Z0-9._-]{0,31}$/;
 export const MIC_RE = /^[A-Z0-9]{4}$/;
 
 const decimalString = z.string().regex(DECIMAL_STRING, 'decimal string');
-const positiveDecimal = decimalString.refine((s) => !s.startsWith('-') && /[1-9]/.test(s), 'must be > 0');
+const positiveDecimal = decimalString.refine(
+  (s) => !s.startsWith('-') && /[1-9]/.test(s),
+  'must be > 0',
+);
 const nonNegDecimal = decimalString.refine((s) => !s.startsWith('-'), 'must be >= 0');
 const epochMs = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const symbol = z.string().regex(SYMBOL_RE);
@@ -164,7 +175,13 @@ export const FeedHealthSchema = z.object({
   gaps: z.number().int().nonnegative(),
   resyncs: z.number().int().nonnegative(),
   lastResync: z
-    .object({ symbol, stream: z.string(), expected: z.number().int(), got: z.number().int(), ts: epochMs })
+    .object({
+      symbol,
+      stream: z.string(),
+      expected: z.number().int(),
+      got: z.number().int(),
+      ts: epochMs,
+    })
     .nullable(),
 });
 export type FeedHealth = z.infer<typeof FeedHealthSchema>;
@@ -262,7 +279,16 @@ export interface Venue {
 
 // ---- Channels -------------------------------------------------------------------------------
 
-export type ChannelKind = 'quotes' | 'depth' | 'candles' | 'trades' | 'status' | 'orders' | 'positions' | 'account' | 'risk';
+export type ChannelKind =
+  | 'quotes'
+  | 'depth'
+  | 'candles'
+  | 'trades'
+  | 'status'
+  | 'orders'
+  | 'positions'
+  | 'account'
+  | 'risk';
 /** Private trading channels (goal 03), keyed by account id; the gateway checks ownership. */
 export const PRIVATE_CHANNEL_KINDS = ['orders', 'positions', 'account'] as const;
 export type PrivateChannelKind = (typeof PRIVATE_CHANNEL_KINDS)[number];
@@ -295,11 +321,18 @@ export function parseChannel(ch: string): ParsedChannel | null {
   if (ch === RISK_ALERTS_CHANNEL) return { kind: 'risk', symbol: null, tf: null, accountId: null };
   const parts = ch.split(':');
   const [kind, sym, tf] = parts;
-  if ((kind === 'orders' || kind === 'positions' || kind === 'account') && parts.length === 2 && sym && UUID_RE.test(sym)) {
+  if (
+    (kind === 'orders' || kind === 'positions' || kind === 'account') &&
+    parts.length === 2 &&
+    sym &&
+    UUID_RE.test(sym)
+  ) {
     return { kind, symbol: null, tf: null, accountId: sym };
   }
   if (!sym || !SYMBOL_RE.test(sym)) return null;
-  if ((kind === 'quotes' || kind === 'depth' || kind === 'trades') && parts.length === 2) return { kind, symbol: sym, tf: null, accountId: null };
-  if (kind === 'candles' && parts.length === 3 && tf && isTimeframe(tf)) return { kind, symbol: sym, tf, accountId: null };
+  if ((kind === 'quotes' || kind === 'depth' || kind === 'trades') && parts.length === 2)
+    return { kind, symbol: sym, tf: null, accountId: null };
+  if (kind === 'candles' && parts.length === 3 && tf && isTimeframe(tf))
+    return { kind, symbol: sym, tf, accountId: null };
   return null;
 }

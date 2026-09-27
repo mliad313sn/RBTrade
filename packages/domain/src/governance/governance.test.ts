@@ -83,7 +83,8 @@ describe('audit sampling', () => {
   });
   it('covers the population roughly uniformly', () => {
     const counts = new Array(10).fill(0);
-    for (let seed = 0; seed < 400; seed++) for (const x of sample(pop, 10, seed)) counts[Math.floor(Number(x.slice(1)) / 100)]++;
+    for (let seed = 0; seed < 400; seed++)
+      for (const x of sample(pop, 10, seed)) counts[Math.floor(Number(x.slice(1)) / 100)]++;
     for (const c of counts) expect(c).toBeGreaterThan(280);
   });
   it('parses numeric seeds as numbers', () => {

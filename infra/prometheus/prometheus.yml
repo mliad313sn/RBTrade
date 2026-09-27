@@ -7,11 +7,11 @@ rule_files:
 scrape_configs:
   - job_name: otel-collector
     static_configs:
-      - targets: ["otel-collector:8889"]
+      - targets: ['otel-collector:8889']
   # Goal 07: the api's own /metrics (copilot tokens, cost, budgets). The api runs on the host in dev;
   # set KORA_METRICS_TOKEN in real deployments and add it here as a bearer token.
   - job_name: kora-api
     metrics_path: /metrics
     # authorization: { type: Bearer, credentials_file: /etc/prometheus/metrics-token }  # outside dev (goal 10: /metrics fails closed)
     static_configs:
-      - targets: ["host.docker.internal:4000"]
+      - targets: ['host.docker.internal:4000']

@@ -36,7 +36,8 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
     centred.current = false;
     return store.onDepth(symbol, (d) => {
       const v = bookView(d, LEVELS);
-      if (v.mid && prevMid.current && v.mid !== prevMid.current) setMidDir(dec(v.mid).gt(dec(prevMid.current)) ? 'up' : 'down');
+      if (v.mid && prevMid.current && v.mid !== prevMid.current)
+        setMidDir(dec(v.mid).gt(dec(prevMid.current)) ? 'up' : 'down');
       prevMid.current = v.mid;
       setView(v);
     });
@@ -58,7 +59,10 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
 
   const precision = spec?.pricePrecision ?? 5;
   const qtyPlaces = Math.min(spec?.qtyPrecision ?? 2, 2);
-  const spreadText = view?.spread && spec && view.asks[0] && view.bids[0] ? formatSpread(view.bids[0].price, view.asks[0].price, spec) : '—';
+  const spreadText =
+    view?.spread && spec && view.asks[0] && view.bids[0]
+      ? formatSpread(view.bids[0].price, view.asks[0].price, spec)
+      : '—';
   useEffect(() => {
     onTitleRight?.(stale ? 'Stale' : `spread ${spreadText}`);
   }, [spreadText, stale, onTitleRight]);
@@ -66,18 +70,36 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
   const fmtSize = (s: string) => {
     // Sizes shown in thousands for large FX books (prototype: 4.0 = 4.0M), otherwise at qty precision.
     const n = dec(s);
-    return n.gte(1_000_000) ? `${formatDecimal(n.div(1_000_000), 1)}M` : n.gte(10_000) ? `${formatDecimal(n.div(1000), 1)}k` : formatDecimal(n, qtyPlaces);
+    return n.gte(1_000_000)
+      ? `${formatDecimal(n.div(1_000_000), 1)}M`
+      : n.gte(10_000)
+        ? `${formatDecimal(n.div(1000), 1)}k`
+        : formatDecimal(n, qtyPlaces);
   };
 
   const asksShown = view ? [...view.asks].reverse() : [];
-  const all = view ? [...asksShown.map((l, i) => ({ side: 'ask' as const, l, i: view.asks.length - 1 - i })), ...view.bids.map((l, i) => ({ side: 'bid' as const, l, i }))] : [];
-  const applyLevel = (side: 'bid' | 'ask', l: BookLevel) => prefill({ symbol, type: 'limit', side: side === 'ask' ? 'buy' : 'sell', limitPrice: l.price, origin: 'order_book' });
+  const all = view
+    ? [
+        ...asksShown.map((l, i) => ({ side: 'ask' as const, l, i: view.asks.length - 1 - i })),
+        ...view.bids.map((l, i) => ({ side: 'bid' as const, l, i })),
+      ]
+    : [];
+  const applyLevel = (side: 'bid' | 'ask', l: BookLevel) =>
+    prefill({
+      symbol,
+      type: 'limit',
+      side: side === 'ask' ? 'buy' : 'sell',
+      limitPrice: l.price,
+      origin: 'order_book',
+    });
   const activeIndex = Math.min(active ?? asksShown.length, Math.max(0, all.length - 1));
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!all.length) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      setActive(Math.max(0, Math.min(all.length - 1, activeIndex + (e.key === 'ArrowDown' ? 1 : -1))));
+      setActive(
+        Math.max(0, Math.min(all.length - 1, activeIndex + (e.key === 'ArrowDown' ? 1 : -1))),
+      );
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       const x = all[activeIndex];
@@ -109,7 +131,13 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
   );
 
   return (
-    <div className="ob h-full flex flex-col min-h-0" data-testid="order-book" data-panel-root="orderbook" data-stale={stale ? 'true' : 'false'} tabIndex={-1}>
+    <div
+      className="ob h-full flex flex-col min-h-0"
+      data-testid="order-book"
+      data-panel-root="orderbook"
+      data-stale={stale ? 'true' : 'false'}
+      tabIndex={-1}
+    >
       {stale ? (
         <p className="m-0 px-2 text-xs text-warn" role="status" data-testid="order-book-stale">
           ⚠ Stale: last depth before the feed stopped
@@ -142,7 +170,13 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
           </ol>
           <div className="ob-mid" data-testid="ob-mid" role="presentation">
             <span className={`k-num ob-mid-price k-dir--${midDir}`}>
-              {view.mid ? formatPrice(dec(view.mid).toDecimalPlaces(precision).toFixed(precision), precision) : '—'} {midDir === 'up' ? '▲' : midDir === 'down' ? '▼' : ''}
+              {view.mid
+                ? formatPrice(
+                    dec(view.mid).toDecimalPlaces(precision).toFixed(precision),
+                    precision,
+                  )
+                : '—'}{' '}
+              {midDir === 'up' ? '▲' : midDir === 'down' ? '▼' : ''}
             </span>
             <span className="text-muted text-[10px] uppercase">Mid</span>
           </div>

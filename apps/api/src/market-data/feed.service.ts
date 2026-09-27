@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, NotFoundException, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import {
   candleChannel,
   depthChannel,
@@ -121,14 +128,20 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.started) return;
     this.started = true;
     this.registry = await this.repo.load(0);
-    this.pub = new Redis(this.app.redisUrl, { enableAutoPipelining: true, maxRetriesPerRequest: 2 });
+    this.pub = new Redis(this.app.redisUrl, {
+      enableAutoPipelining: true,
+      maxRetriesPerRequest: 2,
+    });
     this.pub.on('error', (e) => this.log.warn(`redis publisher: ${e.message}`));
 
     const specs = [...this.registry.instruments.values()].filter(
-      (s) => s.status === 'active' && (this.cfg.symbols.length === 0 || this.cfg.symbols.includes(s.symbol)),
+      (s) =>
+        s.status === 'active' &&
+        (this.cfg.symbols.length === 0 || this.cfg.symbols.includes(s.symbol)),
     );
     const closes = await this.repo.lastCloses();
-    for (const spec of specs) this.startPrices.set(spec.symbol, closes.get(spec.symbol) ?? simProfileFor(spec).refPrice);
+    for (const spec of specs)
+      this.startPrices.set(spec.symbol, closes.get(spec.symbol) ?? simProfileFor(spec).refPrice);
     const sim = new SimulatedAdapter({
       seed: this.cfg.seed,
       stepMs: this.cfg.stepMs,
@@ -147,7 +160,10 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
         };
       }),
     });
-    await this.attach(sim, specs.map((s) => s.symbol));
+    await this.attach(
+      sim,
+      specs.map((s) => s.symbol),
+    );
 
     // Flagged stubs: reported in status; their live transport refuses to connect (OQ-B1/B2).
     for (const source of STUB_SOURCES) {
@@ -155,7 +171,11 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       const stub = createStubAdapter(source, {
         env: process.env,
         instruments: specs,
-        symbolMap: Object.fromEntries(this.registry.aliases.filter((a) => a.source === source).map((a) => [a.vendorSymbol, a.symbol])),
+        symbolMap: Object.fromEntries(
+          this.registry.aliases
+            .filter((a) => a.source === source)
+            .map((a) => [a.vendorSymbol, a.symbol]),
+        ),
       });
       await this.attach(stub, []).catch((e: Error) => this.log.warn(`${source}: ${e.message}`));
     }
@@ -164,7 +184,13 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     this.every(this.cfg.heartbeatMs, () => this.publishStatus());
     this.every(1000, () => void this.pump());
     this.every(TAPE_FLUSH_MS, () => this.flushTape());
-    this.every(3_600_000, () => void this.db.query('SELECT md_apply_retention()').catch((e: Error) => this.log.warn(`retention: ${e.message}`)));
+    this.every(
+      3_600_000,
+      () =>
+        void this.db
+          .query('SELECT md_apply_retention()')
+          .catch((e: Error) => this.log.warn(`retention: ${e.message}`)),
+    );
     this.publishStatus();
     this.log.log(`feed started: ${specs.length} SIMULATED instruments, seed=${this.cfg.seed}`);
     if (this.cfg.backfill) {
@@ -214,7 +240,15 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       };
     });
     for (const source of STUB_SOURCES) {
-      if (!this.adapters.has(source)) feeds.push({ source, state: 'disabled', lastMessageTs: null, gaps: 0, resyncs: 0, lastResync: null });
+      if (!this.adapters.has(source))
+        feeds.push({
+          source,
+          state: 'disabled',
+          lastMessageTs: null,
+          gaps: 0,
+          resyncs: 0,
+          lastResync: null,
+        });
     }
     const live = feeds.filter((f) => f.state !== 'disabled');
     const down = live.filter((f) => f.state === 'down');
@@ -228,7 +262,9 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       reason = `${down.length === live.length ? 'all feeds down' : 'feed down'}: ${down.map((f) => f.source).join(', ')}`;
     } else if (staleSymbols.length > 0 || live.some((f) => f.state === 'resyncing')) {
       state = 'degraded';
-      reason = staleSymbols.length ? `${staleSymbols.length} stale symbol(s)` : 'resync in progress';
+      reason = staleSymbols.length
+        ? `${staleSymbols.length} stale symbol(s)`
+        : 'resync in progress';
     }
     return { type: 'status', state, ts: now, feeds, staleSymbols, reason };
   }
@@ -298,7 +334,14 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       const r = book.applyDelta(d);
       if (r === 'stale') return;
       if (r !== 'ok') {
-        if (r === 'gap') this.recordGap(adapter.source, d.symbol, 'depth', (book.seq ?? 0) + 1, (d.prevSeq ?? d.seq - 1) + 1);
+        if (r === 'gap')
+          this.recordGap(
+            adapter.source,
+            d.symbol,
+            'depth',
+            (book.seq ?? 0) + 1,
+            (d.prevSeq ?? d.seq - 1) + 1,
+          );
         void this.resync(adapter, d.symbol);
         return;
       }
@@ -330,7 +373,13 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  private recordGap(source: string, symbol: string, stream: string, expected: number, got: number): void {
+  private recordGap(
+    source: string,
+    symbol: string,
+    stream: string,
+    expected: number,
+    got: number,
+  ): void {
     const st = this.stats.get(source)!;
     st.gaps += 1;
     st.lastResync = { symbol, stream, expected, got, ts: Date.now() };
@@ -342,10 +391,22 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
     const spec = this.spec(symbol);
     if (!spec) return;
     this.barBuf.push({ symbol, bar });
-    this.refreshFrom = this.refreshFrom === null ? bar.bucket : Math.min(this.refreshFrom, bar.bucket);
-    const oneSec: Candle = { type: 'candle', symbol, tf: '1s', ...bar, closed: true, source: 'simulated', exchangeTs: bar.bucket, receivedTs: Date.now(), seq };
+    this.refreshFrom =
+      this.refreshFrom === null ? bar.bucket : Math.min(this.refreshFrom, bar.bucket);
+    const oneSec: Candle = {
+      type: 'candle',
+      symbol,
+      tf: '1s',
+      ...bar,
+      closed: true,
+      source: 'simulated',
+      exchangeTs: bar.bucket,
+      receivedTs: Date.now(),
+      seq,
+    };
     this.publish(candleChannel(symbol, '1s'), oneSec);
-    for (const c of this.candles.update(symbol, bar, seq, spec.qtyPrecision)) this.publish(candleChannel(symbol, c.tf), c);
+    for (const c of this.candles.update(symbol, bar, seq, spec.qtyPrecision))
+      this.publish(candleChannel(symbol, c.tf), c);
   }
 
   // ---- staleness & status ------------------------------------------------------------------
@@ -451,12 +512,17 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
    */
   private async runBackfill(sim: SimulatedAdapter, specs: InstrumentSpec[]): Promise<number> {
     const t0 = Date.now();
-    const have = new Set((await this.db.query<{ symbol: string }>('SELECT DISTINCT symbol FROM md_candles_history')).map((r) => r.symbol));
+    const have = new Set(
+      (
+        await this.db.query<{ symbol: string }>('SELECT DISTINCT symbol FROM md_candles_history')
+      ).map((r) => r.symbol),
+    );
     const firstLive = new Map(
-      (await this.db.query<{ symbol: string; ts: Date; open: string }>('SELECT DISTINCT ON (symbol) symbol, ts, open FROM md_bars_1s ORDER BY symbol, ts')).map((r) => [
-        r.symbol,
-        { ts: r.ts.getTime(), open: r.open },
-      ]),
+      (
+        await this.db.query<{ symbol: string; ts: Date; open: string }>(
+          'SELECT DISTINCT ON (symbol) symbol, ts, open FROM md_bars_1s ORDER BY symbol, ts',
+        )
+      ).map((r) => [r.symbol, { ts: r.ts.getTime(), open: r.open }]),
     );
     let rows = 0;
     for (const spec of specs) {
@@ -474,14 +540,26 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       for (const tf of HISTORY_TFS) {
         const days = tf === '1m' ? Math.min(2, this.cfg.historyDays) : this.cfg.historyDays;
         const from = Math.floor(end / 60_000) * 60_000 - days * DAY_MS;
-        const bars = (tf === '1m' ? base : aggregateBars(base, tf, spec.qtyPrecision)).filter((b) => b.bucket >= from);
+        const bars = (tf === '1m' ? base : aggregateBars(base, tf, spec.qtyPrecision)).filter(
+          (b) => b.bucket >= from,
+        );
         for (let i = 0; i < bars.length; i += 5000) {
           const c = bars.slice(i, i + 5000);
           await this.db.query(
             `INSERT INTO md_candles_history (symbol, tf, bucket, open, high, low, close, volume, trades, source)
              SELECT $1, $2, *, 'simulated-history' FROM unnest($3::timestamptz[], $4::numeric[], $5::numeric[], $6::numeric[], $7::numeric[], $8::numeric[], $9::int[])
              ON CONFLICT DO NOTHING`,
-            [spec.symbol, tf, c.map((x) => new Date(x.bucket).toISOString()), c.map((x) => x.open), c.map((x) => x.high), c.map((x) => x.low), c.map((x) => x.close), c.map((x) => x.volume), c.map((x) => x.trades)],
+            [
+              spec.symbol,
+              tf,
+              c.map((x) => new Date(x.bucket).toISOString()),
+              c.map((x) => x.open),
+              c.map((x) => x.high),
+              c.map((x) => x.low),
+              c.map((x) => x.close),
+              c.map((x) => x.volume),
+              c.map((x) => x.trades),
+            ],
           );
           rows += c.length;
         }
@@ -503,7 +581,14 @@ export class FeedService implements OnApplicationBootstrap, OnModuleDestroy {
       const batch: TradesBatch = {
         type: 'trades',
         symbol,
-        trades: prints.slice(-TAPE_MAX_BATCH).map((p) => ({ tradeId: p.tradeId, price: p.price, qty: p.qty, side: p.side, exchangeTs: p.exchangeTs, seq: p.seq })),
+        trades: prints.slice(-TAPE_MAX_BATCH).map((p) => ({
+          tradeId: p.tradeId,
+          price: p.price,
+          qty: p.qty,
+          side: p.side,
+          exchangeTs: p.exchangeTs,
+          seq: p.seq,
+        })),
       };
       this.publish(tradesChannel(symbol), batch);
     }

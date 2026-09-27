@@ -18,7 +18,18 @@ function rng(seed: number) {
   };
 }
 
-const SYMBOLS = ['EURUSD', 'XAUUSD', 'AAPL', 'BTCUSD', 'SPY', 'KGEF', 'SAP.XETR', '7203.XTKS', 'BHP.XASX', 'NPN.XJSE'];
+const SYMBOLS = [
+  'EURUSD',
+  'XAUUSD',
+  'AAPL',
+  'BTCUSD',
+  'SPY',
+  'KGEF',
+  'SAP.XETR',
+  '7203.XTKS',
+  'BHP.XASX',
+  'NPN.XJSE',
+];
 
 /**
  * Goal 08 acceptance 2: "Most you could lose" equals the /orders/preview value, fees included, for 20
@@ -68,25 +79,53 @@ describe('novice ticket: most you could lose = preview incl. fees (20 randomised
       const safetyNetPct = String(0.5 + Math.floor(r() * 20) * 0.5); // 0.5 … 10 in 0.5 steps
       await md.touch();
       // Start from the minimum amount for this instrument, then a random multiple up to ~20,000.
-      const probe = await request(http).post('/novice/ticket').set(bearer(nov.token)).send({ symbol, direction, amount: '0.01', safetyNetPct }).expect(200);
+      const probe = await request(http)
+        .post('/novice/ticket')
+        .set(bearer(nov.token))
+        .send({ symbol, direction, amount: '0.01', safetyNetPct })
+        .expect(200);
       expect(probe.body).toMatchObject({ ok: false, reason: 'amount_too_small' });
       const min = Number(probe.body.minAmount);
-      const amount = (Math.max(min * (1 + r() * 3), Math.min(20_000, min * 1.05) + r() * 5_000)).toFixed(2);
+      const amount = Math.max(
+        min * (1 + r() * 3),
+        Math.min(20_000, min * 1.05) + r() * 5_000,
+      ).toFixed(2);
 
-      const t = await request(http).post('/novice/ticket').set(bearer(nov.token)).send({ symbol, direction, amount, safetyNetPct }).expect(200);
+      const t = await request(http)
+        .post('/novice/ticket')
+        .set(bearer(nov.token))
+        .send({ symbol, direction, amount, safetyNetPct })
+        .expect(200);
       expect(t.body.ok, JSON.stringify(t.body)).toBe(true);
       const order = t.body.order as Record<string, string>;
-      expect(order).toMatchObject({ symbol, type: 'market', side: direction === 'up' ? 'buy' : 'sell' });
+      expect(order).toMatchObject({
+        symbol,
+        type: 'market',
+        side: direction === 'up' ? 'buy' : 'sell',
+      });
       expect(dec(t.body.amountUsed).lte(dec(amount))).toBe(true);
 
-      const p = await request(http).post('/orders/preview').set(bearer(nov.token)).send(order).expect(200);
-      const direct = p.body.preview.lossIfStopHit as { price: string; costs: string; total: string };
+      const p = await request(http)
+        .post('/orders/preview')
+        .set(bearer(nov.token))
+        .send(order)
+        .expect(200);
+      const direct = p.body.preview.lossIfStopHit as {
+        price: string;
+        costs: string;
+        total: string;
+      };
       const shown = t.body.preview.preview.lossIfStopHit as typeof direct;
       expect(shown, `case ${i} ${symbol}`).toEqual(direct);
       // Fees are included: total = loss from the price move + costs, and costs are real.
       // (each figure is rounded to the cent on its own, so allow one minor unit of rounding).
-      const gap = dec(direct.total).sub(dec(direct.price).add(dec(direct.costs))).abs();
-      expect(gap.lte(dec('0.01')), `case ${i}: ${direct.total} vs ${direct.price} + ${direct.costs}`).toBe(true);
+      const gap = dec(direct.total)
+        .sub(dec(direct.price).add(dec(direct.costs)))
+        .abs();
+      expect(
+        gap.lte(dec('0.01')),
+        `case ${i}: ${direct.total} vs ${direct.price} + ${direct.costs}`,
+      ).toBe(true);
       // Commission can be zero on some SIMULATED schedules (funds); the spread is always a cost and
       // sits inside the price loss (entry at the ask for a buy, exit at the stop).
       expect(dec(direct.costs).gte(0), `case ${i} costs`).toBe(true);
@@ -112,10 +151,21 @@ describe('novice ticket: most you could lose = preview incl. fees (20 randomised
 
   it('refuses a safety net outside 0.5–10 % and reports the minimum amount in the account currency', async () => {
     await md.touch();
-    await request(http).post('/novice/ticket').set(bearer(nov.token)).send({ symbol: 'EURUSD', direction: 'up', amount: '5000', safetyNetPct: '12' }).expect(400);
-    const small = await request(http).post('/novice/ticket').set(bearer(nov.token)).send({ symbol: 'EURUSD', direction: 'up', amount: '500', safetyNetPct: '3' }).expect(200);
+    await request(http)
+      .post('/novice/ticket')
+      .set(bearer(nov.token))
+      .send({ symbol: 'EURUSD', direction: 'up', amount: '5000', safetyNetPct: '12' })
+      .expect(400);
+    const small = await request(http)
+      .post('/novice/ticket')
+      .set(bearer(nov.token))
+      .send({ symbol: 'EURUSD', direction: 'up', amount: '500', safetyNetPct: '3' })
+      .expect(200);
     expect(small.body).toEqual({ ok: false, reason: 'amount_too_small', minAmount: '1084.21' });
-    const unknown = await request(http).post('/novice/ticket').set(bearer(nov.token)).send({ symbol: 'NOPE', direction: 'up', amount: '500', safetyNetPct: '3' });
+    const unknown = await request(http)
+      .post('/novice/ticket')
+      .set(bearer(nov.token))
+      .send({ symbol: 'NOPE', direction: 'up', amount: '500', safetyNetPct: '3' });
     expect(unknown.status).toBe(404);
   });
 
@@ -124,12 +174,19 @@ describe('novice ticket: most you could lose = preview incl. fees (20 randomised
     const a = await request(http).get('/novice/assets').set(bearer(nov.token)).expect(200);
     expect(a.body.currency).toBe('USD');
     expect(a.body.assets.map((x: { symbol: string }) => x.symbol)).toEqual(SYMBOLS);
-    const regions = new Set(a.body.assets.map((x: { venue: { region: string } }) => x.venue.region));
+    const regions = new Set(
+      a.body.assets.map((x: { venue: { region: string } }) => x.venue.region),
+    );
     expect(regions.size).toBeGreaterThanOrEqual(4);
     for (const x of a.body.assets) {
       expect(x.name.en.length).toBeGreaterThan(0);
       expect(x.name.fr.length).toBeGreaterThan(0);
     }
-    expect(a.body.assets[0]).toMatchObject({ symbol: 'EURUSD', name: { en: 'Euro vs Dollar' }, minAmount: '1084.21', priced: true });
+    expect(a.body.assets[0]).toMatchObject({
+      symbol: 'EURUSD',
+      name: { en: 'Euro vs Dollar' },
+      minAmount: '1084.21',
+      priced: true,
+    });
   });
 });

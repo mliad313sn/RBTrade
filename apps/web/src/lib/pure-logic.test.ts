@@ -5,7 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { forwardedClient, trustedProxyHops } from './forwarded';
 import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, fmtPctNumber, fmtTime } from './i18n/format';
 import { GLOSSARY, isLesson, lessonKeys, LESSONS, termKeys } from './novice/learn';
-import { clockLabel, displayName, formatClock, formatQty, formatSpread, midOf } from './terminal/format';
+import {
+  clockLabel,
+  displayName,
+  formatClock,
+  formatQty,
+  formatSpread,
+  midOf,
+} from './terminal/format';
 import {
   buildDefaultLayout,
   clearLocalLayout,
@@ -56,8 +63,16 @@ describe('terminal formatting', () => {
     expect(formatQty('0.8000', 4)).toBe('0.8');
     expect(formatQty('-2.5', 2)).toBe('2.5');
     expect(formatQty('n/a', 2)).toBe('n/a');
-    expect(formatSpread('1.08410', '1.08422', { pipSize: '0.0001', tickSize: '0.00001', pricePrecision: 5 })).toBe('1.2 pip');
-    expect(formatSpread('64811.5', '64813.5', { pipSize: null, tickSize: '0.5', pricePrecision: 1 })).toBe('2.0');
+    expect(
+      formatSpread('1.08410', '1.08422', {
+        pipSize: '0.0001',
+        tickSize: '0.00001',
+        pricePrecision: 5,
+      }),
+    ).toBe('1.2 pip');
+    expect(
+      formatSpread('64811.5', '64813.5', { pipSize: null, tickSize: '0.5', pricePrecision: 1 }),
+    ).toBe('2.0');
     expect(midOf('1.08410', '1.08422', 5)).toBe('1.08416');
     expect(displayName({ displayName: 'EUR/USD', symbol: 'EURUSD' }, 'EURUSD')).toBe('EUR/USD');
     expect(displayName(null, 'EURUSD')).toBe('EURUSD');
@@ -74,7 +89,10 @@ describe('terminal layout', () => {
         type: 'branch',
         data: [
           { type: 'leaf', data: { views: ['chart', 'watchlist', 'calendar'] } },
-          { type: 'branch', data: [{ type: 'leaf', data: { views: ['orderbook', 'trades', 'ticket'] } }] },
+          {
+            type: 'branch',
+            data: [{ type: 'leaf', data: { views: ['orderbook', 'trades', 'ticket'] } }],
+          },
         ],
       },
     },
@@ -82,7 +100,13 @@ describe('terminal layout', () => {
   });
 
   it('default sizes follow the 2/7/3 grid and the blotter rule', () => {
-    expect(defaultSizes(1440, 900)).toEqual({ left: 237, right: 356, blotter: 203, calendar: 90, orderbook: 270 });
+    expect(defaultSizes(1440, 900)).toEqual({
+      left: 237,
+      right: 356,
+      blotter: 203,
+      calendar: 90,
+      orderbook: 270,
+    });
     expect(defaultSizes(1440, 1100).blotter).toBe(240);
     expect(defaultSizes(0, 100)).toMatchObject({ left: 0, right: 0, blotter: 160, orderbook: 200 });
   });
@@ -170,6 +194,9 @@ describe('proxy address and lessons', () => {
     expect(isLesson('costs')).toBe(true);
     expect(isLesson('crypto-moon')).toBe(false);
     expect(lessonKeys(LESSONS[0]).paragraphs).toHaveLength(4);
-    expect(termKeys(GLOSSARY[0])).toEqual({ name: 'term.spread.name', meaning: 'term.spread.meaning' });
+    expect(termKeys(GLOSSARY[0])).toEqual({
+      name: 'term.spread.name',
+      meaning: 'term.spread.meaning',
+    });
   });
 });

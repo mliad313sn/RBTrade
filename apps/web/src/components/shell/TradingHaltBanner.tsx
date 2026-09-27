@@ -27,7 +27,10 @@ export function TradingHaltBanner({ className }: { className?: string }) {
   const [error, setError] = useState<string | null>(null);
   const { t, novice } = useI18n();
   // Goal 09: a firm halt (set by a risk officer or the global kill switch) needs a second approver.
-  const [approval, setApproval] = useState<{ needed: boolean; pendingId: string | null }>({ needed: false, pendingId: null });
+  const [approval, setApproval] = useState<{ needed: boolean; pendingId: string | null }>({
+    needed: false,
+    pendingId: null,
+  });
   const halted = !!account?.halt.halted;
   const haltedAtKey = account?.halt.haltedAt ?? null;
   useEffect(() => {
@@ -36,7 +39,8 @@ export function TradingHaltBanner({ className }: { className?: string }) {
     api
       .killSwitchState()
       .then((s) => {
-        if (!cancelled) setApproval({ needed: !!s.resumeNeedsApproval, pendingId: s.pendingResume?.id ?? null });
+        if (!cancelled)
+          setApproval({ needed: !!s.resumeNeedsApproval, pendingId: s.pendingResume?.id ?? null });
       })
       .catch(() => undefined);
     return () => {
@@ -45,7 +49,9 @@ export function TradingHaltBanner({ className }: { className?: string }) {
   }, [halted, haltedAtKey]);
   if (!account?.halt.halted || !account.halt.scope) return null;
   const canResume = hasAnyRole(me.roles, RESUME_ROLES);
-  const since = account.halt.haltedAt ? new Date(account.halt.haltedAt).toISOString().slice(11, 16) : null;
+  const since = account.halt.haltedAt
+    ? new Date(account.halt.haltedAt).toISOString().slice(11, 16)
+    : null;
   const scope = account.halt.scope;
   // Goal 08: plain, localised wording in the Novice view for someone who cannot resume.
   const plainNovice = novice && !canResume;
@@ -58,11 +64,19 @@ export function TradingHaltBanner({ className }: { className?: string }) {
       setOpen(false);
       setReason('');
       if (r.resumed) {
-        toast.push('Trading resumed. The resume and your reason are in the audit log.', 'success', 6000);
+        toast.push(
+          'Trading resumed. The resume and your reason are in the audit log.',
+          'success',
+          6000,
+        );
         refreshAccount();
       } else {
         setApproval({ needed: true, pendingId: r.pendingApproval.id });
-        toast.push('Resume requested. A second authorised person must approve it (four-eyes).', 'info', 8000);
+        toast.push(
+          'Resume requested. A second authorised person must approve it (four-eyes).',
+          'info',
+          8000,
+        );
       }
     } catch (e) {
       setError(e instanceof KoraApiError ? e.message : 'Could not resume. Try again.');
@@ -92,12 +106,18 @@ export function TradingHaltBanner({ className }: { className?: string }) {
           <>
             {since ? `${t('halt.since', { time: since })} ` : ''}
             {t('halt.body')}
-            {account.halt.reason ? ` ${t('halt.reason', { reason: account.halt.reason })}` : ''} {t('halt.who')}
+            {account.halt.reason
+              ? ` ${t('halt.reason', { reason: account.halt.reason })}`
+              : ''}{' '}
+            {t('halt.who')}
           </>
         ) : (
           <>
-            Robots are stopped and cannot place orders.{account.halt.reason ? ` Reason: ${account.halt.reason}.` : ''}{' '}
-            {canResume ? 'Resuming needs a written reason and is audited.' : 'A trader, risk officer or admin must resume trading.'}
+            Robots are stopped and cannot place orders.
+            {account.halt.reason ? ` Reason: ${account.halt.reason}.` : ''}{' '}
+            {canResume
+              ? 'Resuming needs a written reason and is audited.'
+              : 'A trader, risk officer or admin must resume trading.'}
             {approval.needed ? (
               <span data-testid="halt-four-eyes">
                 {' '}
@@ -134,7 +154,12 @@ export function TradingHaltBanner({ className }: { className?: string }) {
         ) : null}
         <div className="k-dialog__actions">
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="primary" disabled={busy || reason.trim().length < 3} onClick={() => void resume()} data-testid="confirm-resume">
+          <Button
+            variant="primary"
+            disabled={busy || reason.trim().length < 3}
+            onClick={() => void resume()}
+            data-testid="confirm-resume"
+          >
             Resume trading
           </Button>
         </div>

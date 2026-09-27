@@ -29,7 +29,10 @@ export class UsersRepository {
   constructor(private readonly db: DbService) {}
 
   async findByEmail(email: string): Promise<UserRow | null> {
-    const rows = await this.db.query<UserRow>('SELECT * FROM users WHERE lower(email) = lower($1)', [email]);
+    const rows = await this.db.query<UserRow>(
+      'SELECT * FROM users WHERE lower(email) = lower($1)',
+      [email],
+    );
     return rows[0] ?? null;
   }
 
@@ -39,15 +42,23 @@ export class UsersRepository {
   }
 
   async roles(userId: string, c: Queryable = this.db.pool): Promise<Role[]> {
-    const { rows } = await c.query<{ role: string }>('SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role', [
-      userId,
-    ]);
+    const { rows } = await c.query<{ role: string }>(
+      'SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role',
+      [userId],
+    );
     return rows.map((r) => r.role).filter(isRole);
   }
 
   async create(
     c: Queryable,
-    u: { email: string; displayName: string; passwordHash: string | null; roles: Role[]; id?: string; provider?: 'dev' | 'keycloak' },
+    u: {
+      email: string;
+      displayName: string;
+      passwordHash: string | null;
+      roles: Role[];
+      id?: string;
+      provider?: 'dev' | 'keycloak';
+    },
   ): Promise<UserRow> {
     const { rows } = await c.query<UserRow>(
       `INSERT INTO users (id, email, display_name, password_hash, identity_provider)
@@ -56,10 +67,10 @@ export class UsersRepository {
     );
     const user = rows[0]!;
     await this.setRoles(c, user.id, u.roles, null);
-    await c.query('INSERT INTO user_preferences (user_id, view_mode) VALUES ($1, $2) ON CONFLICT DO NOTHING', [
-      user.id,
-      u.roles.every((r) => r === 'novice') ? 'novice' : 'pro',
-    ]);
+    await c.query(
+      'INSERT INTO user_preferences (user_id, view_mode) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [user.id, u.roles.every((r) => r === 'novice') ? 'novice' : 'pro'],
+    );
     return user;
   }
 
@@ -74,7 +85,10 @@ export class UsersRepository {
     grantedBy: string | null,
     approval: { approvedBy: string; requestId: string } | null = null,
   ): Promise<void> {
-    await c.query('DELETE FROM user_roles WHERE user_id = $1 AND NOT (role = ANY($2::text[]))', [userId, roles]);
+    await c.query('DELETE FROM user_roles WHERE user_id = $1 AND NOT (role = ANY($2::text[]))', [
+      userId,
+      roles,
+    ]);
     for (const role of roles) {
       await c.query(
         'INSERT INTO user_roles (user_id, role, granted_by, approved_by, four_eyes_request_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
@@ -85,7 +99,10 @@ export class UsersRepository {
 
   /** Informational wrong-password count (IRTC R1-04: the password step never hard-locks). */
   async recordPasswordFailure(userId: string): Promise<void> {
-    await this.db.query('UPDATE users SET failed_logins = failed_logins + 1, updated_at = now() WHERE id = $1', [userId]);
+    await this.db.query(
+      'UPDATE users SET failed_logins = failed_logins + 1, updated_at = now() WHERE id = $1',
+      [userId],
+    );
   }
 
   /**
@@ -93,7 +110,10 @@ export class UsersRepository {
    * (`mfa_failed_count`, `locked_until`); only a successful second factor resets those.
    */
   async recordPasswordSuccess(userId: string): Promise<void> {
-    await this.db.query('UPDATE users SET failed_logins = 0, updated_at = now() WHERE id = $1 AND failed_logins <> 0', [userId]);
+    await this.db.query(
+      'UPDATE users SET failed_logins = 0, updated_at = now() WHERE id = $1 AND failed_logins <> 0',
+      [userId],
+    );
   }
 
   /**
@@ -102,7 +122,12 @@ export class UsersRepository {
    * threshold, a failure after the lock expired renews it (doubled). Returns the lock end when this
    * failure (re)locked it. Times use the application clock, the same one the checks use.
    */
-  async recordMfaFailure(userId: string, now: Date, maxFailures: number, lockMinutes: (lockCount: number) => number): Promise<Date | null> {
+  async recordMfaFailure(
+    userId: string,
+    now: Date,
+    maxFailures: number,
+    lockMinutes: (lockCount: number) => number,
+  ): Promise<Date | null> {
     return this.db.tx(async (c) => {
       const { rows } = await c.query<{ mfa_failed_count: number; mfa_lock_count: number }>(
         'SELECT mfa_failed_count, mfa_lock_count FROM users WHERE id = $1 FOR UPDATE',
@@ -111,7 +136,10 @@ export class UsersRepository {
       const row = rows[0];
       if (!row) return null;
       const failures = row.mfa_failed_count + 1;
-      const lock = failures >= maxFailures ? new Date(now.getTime() + lockMinutes(row.mfa_lock_count) * 60_000) : null;
+      const lock =
+        failures >= maxFailures
+          ? new Date(now.getTime() + lockMinutes(row.mfa_lock_count) * 60_000)
+          : null;
       await c.query(
         `UPDATE users SET mfa_failed_count = $2, mfa_lock_count = mfa_lock_count + $3::int,
            locked_until = COALESCE($4::timestamptz, locked_until), updated_at = now()
@@ -133,7 +161,10 @@ export class UsersRepository {
 
   // ---- IRTC R1-04: password back-off, keyed on hashes (never on account existence) ----
 
-  async backoffState(keys: { pair: string; account: string }): Promise<{ pair: Date | null; account: Date | null }> {
+  async backoffState(keys: {
+    pair: string;
+    account: string;
+  }): Promise<{ pair: Date | null; account: Date | null }> {
     const rows = await this.db.query<{ scope: 'pair' | 'account'; blocked_until: Date | null }>(
       `SELECT scope, blocked_until FROM auth_login_backoff WHERE (scope = 'pair' AND key_hash = $1) OR (scope = 'account' AND key_hash = $2)`,
       [keys.pair, keys.account],
@@ -148,7 +179,13 @@ export class UsersRepository {
    * Counts one failure for a key (decaying after `windowHours` without failures) and sets the
    * back-off computed from the new count. Returns the new count.
    */
-  async recordBackoffFailure(scope: 'pair' | 'account', keyHash: string, now: Date, windowHours: number, backoff: (failures: number) => number): Promise<number> {
+  async recordBackoffFailure(
+    scope: 'pair' | 'account',
+    keyHash: string,
+    now: Date,
+    windowHours: number,
+    backoff: (failures: number) => number,
+  ): Promise<number> {
     return this.db.tx(async (c) => {
       const { rows } = await c.query<{ failures: number }>(
         `INSERT INTO auth_login_backoff (scope, key_hash, failures, last_failure_at) VALUES ($1, $2, 0, $3)
@@ -176,10 +213,18 @@ export class UsersRepository {
 
   /** Housekeeping: drops back-off rows idle for longer than the decay window. */
   async pruneBackoff(now: Date, windowHours: number): Promise<void> {
-    await this.db.query(`DELETE FROM auth_login_backoff WHERE last_failure_at < $1::timestamptz - make_interval(hours => $2)`, [now, windowHours]);
+    await this.db.query(
+      `DELETE FROM auth_login_backoff WHERE last_failure_at < $1::timestamptz - make_interval(hours => $2)`,
+      [now, windowHours],
+    );
   }
 
-  async isKnownIp(userId: string | null, ipHash: string, now: Date, days: number): Promise<boolean> {
+  async isKnownIp(
+    userId: string | null,
+    ipHash: string,
+    now: Date,
+    days: number,
+  ): Promise<boolean> {
     const rows = await this.db.query<{ ok: boolean }>(
       `SELECT true AS ok FROM auth_known_ips WHERE user_id = $1::uuid AND ip_hash = $2 AND last_success_at > $3::timestamptz - make_interval(days => $4)`,
       [userId, ipHash, now, days],

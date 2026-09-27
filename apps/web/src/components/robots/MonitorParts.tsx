@@ -135,8 +135,16 @@ export function PromotionChecklist({
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {view.items.map((i) => (
           // IRTC R5-24: a status list, not read-only checkboxes that screen readers announce as operable.
-          <li key={i.id} className="flex items-start gap-2 text-sm" data-testid={`check-${i.id}`} data-pass={i.pass ? 'true' : 'false'}>
-            <span aria-hidden="true" className={`mt-0.5 w-4 text-center font-bold ${i.pass ? 'text-ok' : 'text-kill'}`}>
+          <li
+            key={i.id}
+            className="flex items-start gap-2 text-sm"
+            data-testid={`check-${i.id}`}
+            data-pass={i.pass ? 'true' : 'false'}
+          >
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 w-4 text-center font-bold ${i.pass ? 'text-ok' : 'text-kill'}`}
+            >
               {i.pass ? '✓' : '✗'}
             </span>
             <span>
@@ -149,7 +157,12 @@ export function PromotionChecklist({
         ))}
       </ul>
       {view.blockedReason ? <p className="m-0 text-xs text-muted">{view.blockedReason}</p> : null}
-      <Button variant="primary" onClick={() => setOpen(true)} disabled={!view.complete} data-testid="promote-open">
+      <Button
+        variant="primary"
+        onClick={() => setOpen(true)}
+        disabled={!view.complete}
+        data-testid="promote-open"
+      >
         {view.complete ? 'Promote (2FA)' : 'Complete checklist to promote'}
       </Button>
       {result ? (

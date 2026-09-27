@@ -30,7 +30,10 @@ export const AUTH_POLICY = {
 } as const;
 
 /** Back-off after `failures` counted failures (0 = none yet). */
-export function backoffSeconds(failures: number, rule: { freeFailures: number; baseSeconds: number; maxSeconds: number }): number {
+export function backoffSeconds(
+  failures: number,
+  rule: { freeFailures: number; baseSeconds: number; maxSeconds: number },
+): number {
   if (!Number.isInteger(failures) || failures < rule.freeFailures) return 0;
   const exp = Math.min(failures - rule.freeFailures, 30);
   return Math.min(rule.baseSeconds * 2 ** exp, rule.maxSeconds);

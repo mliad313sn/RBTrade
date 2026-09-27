@@ -71,7 +71,10 @@ const SHOCK_JUMP_SIGMAS: Record<1 | 2 | 3, number> = { 1: 12, 2: 30, 3: 60 };
 const SHOCK_STEPS_PER_IMPACT = 1500; // 2.5 min of high-vol per impact level at 100 ms steps
 
 /** Whether an event in `country`/`currency` moves this instrument. */
-export function isAffected(inst: SimInstrument, shock: Pick<EventShock, 'country' | 'currency'>): boolean {
+export function isAffected(
+  inst: SimInstrument,
+  shock: Pick<EventShock, 'country' | 'currency'>,
+): boolean {
   const s = inst.spec;
   if (s.baseCcy === shock.currency || s.quoteCcy === shock.currency) return true;
   if (inst.countries?.includes(shock.country)) return true;
@@ -152,7 +155,10 @@ class InstrumentSim {
 
     // 4. Spread (ticks), wider in high-vol and just after events.
     const spreadMult = (this.regime === 'high_vol' ? 2 : 1) * (step < this.shockUntil ? 3 : 1);
-    const spreadTicks = Math.max(1, Math.round(p.spreadTicks * spreadMult * (1 + 0.25 * Math.abs(rng.normal()))));
+    const spreadTicks = Math.max(
+      1,
+      Math.round(p.spreadTicks * spreadMult * (1 + 0.25 * Math.abs(rng.normal()))),
+    );
     const bid = floatToPrice(mid - (spreadTicks * this.tickF) / 2, spec, 'down');
     const ask = bid.add(this.tick.mul(spreadTicks));
 
@@ -240,7 +246,9 @@ export class SimulatedMarket {
     this.source = opts.source ?? 'simulated';
     this.shocks = [...(opts.shocks ?? [])].sort((a, b) => a.ts - b.ts);
     const levels = opts.depthLevels ?? DEFAULT_DEPTH_LEVELS;
-    this.sims = opts.instruments.map((i) => new InstrumentSim(i, opts.seed, this.stepMs, levels, this.source));
+    this.sims = opts.instruments.map(
+      (i) => new InstrumentSim(i, opts.seed, this.stepMs, levels, this.source),
+    );
     for (const s of this.sims) this.bySymbol.set(s.spec.symbol, s);
   }
 
@@ -259,7 +267,9 @@ export class SimulatedMarket {
 
   addShocks(shocks: EventShock[]): void {
     const known = new Set(this.shocks.map((s) => s.id));
-    this.shocks = [...this.shocks, ...shocks.filter((s) => !known.has(s.id))].sort((a, b) => a.ts - b.ts);
+    this.shocks = [...this.shocks, ...shocks.filter((s) => !known.has(s.id))].sort(
+      (a, b) => a.ts - b.ts,
+    );
   }
 
   step(): SimStep {

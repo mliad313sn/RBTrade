@@ -170,16 +170,25 @@ export class MarketDataSocket {
   }
 
   /** Private (owner-only) order events: every committed transaction, never conflated. */
-  orders(accountId: string, handler: ChannelHandler<{ type: 'orders'; accountId: string; orders: OrderDto[] }>): () => void {
+  orders(
+    accountId: string,
+    handler: ChannelHandler<{ type: 'orders'; accountId: string; orders: OrderDto[] }>,
+  ): () => void {
     return this.subscribe(ordersChannel(accountId), handler);
   }
 
-  positions(accountId: string, handler: ChannelHandler<{ type: 'positions'; positions: PositionDto[] }>): () => void {
+  positions(
+    accountId: string,
+    handler: ChannelHandler<{ type: 'positions'; positions: PositionDto[] }>,
+  ): () => void {
     return this.subscribe(positionsChannel(accountId), handler);
   }
 
   /** Account snapshots (coalesced 50 ms); the payload is the same view as GET /accounts/me. */
-  account<T = unknown>(accountId: string, handler: ChannelHandler<{ type: 'account'; account: T }>): () => void {
+  account<T = unknown>(
+    accountId: string,
+    handler: ChannelHandler<{ type: 'account'; account: T }>,
+  ): () => void {
     return this.subscribe(accountChannel(accountId), handler);
   }
 
@@ -188,7 +197,9 @@ export class MarketDataSocket {
   }
 
   /** Goal 09: risk console alerts (risk officers and admins only; others get `forbidden`). */
-  riskAlerts<T = unknown>(handler: ChannelHandler<{ type: 'risk_alert'; alert: T; ts: number }>): () => void {
+  riskAlerts<T = unknown>(
+    handler: ChannelHandler<{ type: 'risk_alert'; alert: T; ts: number }>,
+  ): () => void {
     return this.subscribe(RISK_ALERTS_CHANNEL, handler);
   }
 
@@ -250,7 +261,15 @@ export class MarketDataSocket {
 
   private onMessage(raw: unknown): void {
     this.lastMessageAt = this.now();
-    let msg: { ch?: string; data?: unknown; snapshot?: boolean; type?: string; code?: string; message?: string; exp?: number | null };
+    let msg: {
+      ch?: string;
+      data?: unknown;
+      snapshot?: boolean;
+      type?: string;
+      code?: string;
+      message?: string;
+      exp?: number | null;
+    };
     try {
       msg = JSON.parse(typeof raw === 'string' ? raw : String(raw)) as typeof msg;
     } catch {
@@ -264,7 +283,8 @@ export class MarketDataSocket {
     } else if (msg.type === 'authenticated') {
       this.scheduleRefresh(msg.exp ?? null);
     } else if (msg.type === 'error') {
-      for (const l of this.errorListeners) l({ type: 'error', code: msg.code ?? 'error', message: msg.message ?? '' });
+      for (const l of this.errorListeners)
+        l({ type: 'error', code: msg.code ?? 'error', message: msg.message ?? '' });
     }
   }
 
@@ -274,7 +294,8 @@ export class MarketDataSocket {
     this.clearTimers();
     if (this.stopped) return this.setState('closed');
     if (AUTH_CLOSE_CODES.has(code) && typeof this.opts.token !== 'function') {
-      for (const l of this.errorListeners) l({ type: 'error', code: `close_${code}`, message: 'Authentication rejected' });
+      for (const l of this.errorListeners)
+        l({ type: 'error', code: `close_${code}`, message: 'Authentication rejected' });
       return this.setState('closed');
     }
     const delay = this.backoffDelay(this.attempt);
@@ -302,7 +323,8 @@ export class MarketDataSocket {
   }
 
   private sendOp(op: Record<string, unknown>): void {
-    if (this.ws && this.ws.readyState === OPEN && this.stateValue === 'open') this.ws.send(JSON.stringify(op));
+    if (this.ws && this.ws.readyState === OPEN && this.stateValue === 'open')
+      this.ws.send(JSON.stringify(op));
   }
 
   private refreshTimer: unknown = null;

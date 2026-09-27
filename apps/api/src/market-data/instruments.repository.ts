@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { AssetClass, InstrumentSessions, InstrumentSpec, Region, SessionCalendar, Venue } from '@kora/domain';
+import type {
+  AssetClass,
+  InstrumentSessions,
+  InstrumentSpec,
+  Region,
+  SessionCalendar,
+  Venue,
+} from '@kora/domain';
 
 import { DbService } from '../db/db.service';
 
@@ -64,7 +71,9 @@ const toSpec = (r: InstrumentRow): InstrumentSpec => ({
   underlyingClass: r.underlying_class,
   baseCcy: r.base_ccy,
   quoteCcy: r.quote_ccy,
-  ...(r.price_unit ? { priceUnit: r.price_unit, priceUnitFactor: r.price_unit_factor ?? null } : {}),
+  ...(r.price_unit
+    ? { priceUnit: r.price_unit, priceUnitFactor: r.price_unit_factor ?? null }
+    : {}),
   tickSize: r.tick_size,
   pricePrecision: r.price_precision,
   pipSize: r.pip_size,
@@ -106,14 +115,22 @@ export class InstrumentsRepository {
     const [inst, venues, classes, aliases] = await Promise.all([
       this.db.query<InstrumentRow>('SELECT * FROM instruments ORDER BY symbol'),
       this.db.query<VenueRow>('SELECT * FROM venues ORDER BY mic'),
-      this.db.query<{ asset_class: AssetClass; stale_after_ms: number }>('SELECT asset_class, stale_after_ms FROM asset_classes'),
-      this.db.query<{ source: string; vendor_symbol: string; symbol: string }>('SELECT source, vendor_symbol, symbol FROM instrument_aliases'),
+      this.db.query<{ asset_class: AssetClass; stale_after_ms: number }>(
+        'SELECT asset_class, stale_after_ms FROM asset_classes',
+      ),
+      this.db.query<{ source: string; vendor_symbol: string; symbol: string }>(
+        'SELECT source, vendor_symbol, symbol FROM instrument_aliases',
+      ),
     ]);
     this.cache = {
       instruments: new Map(inst.map((r) => [r.symbol, toSpec(r)])),
       venues: new Map(venues.map((r) => [r.mic, toVenue(r)])),
       staleAfterMs: new Map(classes.map((c) => [c.asset_class, c.stale_after_ms])),
-      aliases: aliases.map((a) => ({ source: a.source, vendorSymbol: a.vendor_symbol, symbol: a.symbol })),
+      aliases: aliases.map((a) => ({
+        source: a.source,
+        vendorSymbol: a.vendor_symbol,
+        symbol: a.symbol,
+      })),
       loadedAt: Date.now(),
     };
     return this.cache;

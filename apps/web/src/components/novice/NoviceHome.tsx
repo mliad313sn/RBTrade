@@ -24,7 +24,10 @@ export function NoviceHome({ initial, symbol }: { initial: NoviceData; symbol: s
   const names = useMemo(
     () =>
       Object.fromEntries(
-        (data.assets?.assets ?? []).map((a) => [a.symbol, assetName(a.name, locale, a.displayName)]),
+        (data.assets?.assets ?? []).map((a) => [
+          a.symbol,
+          assetName(a.name, locale, a.displayName),
+        ]),
       ),
     [data.assets, locale],
   );

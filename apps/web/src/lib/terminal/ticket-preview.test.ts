@@ -47,22 +47,46 @@ describe('ticket preview announcements (IRTC R5-05)', () => {
     expect(requestKey({ qty: '1' })).toBe('{"qty":"1"}');
     expect(inputKey({ a: 1 })).toBe('{"a":1}');
     expect(previewSummary(null, 0)).toBe('');
-    expect(previewSummary({ currency: 'USD', margin: { required: '32523' }, fees: { total: '3.2' }, lossIfStopHit: { total: '150' } }, 0)).toBe(
-      'Loss if stop hit 150.00 USD, margin 32,523.00 USD, fees 3.20 USD.',
-    );
-    expect(previewSummary({ currency: 'USD', margin: { required: '1' }, fees: { total: '0' }, lossIfStopHit: null }, 2)).toBe(
-      'No stop: loss not capped, margin 1.00 USD, fees 0.00 USD. 2 risk checks failed.',
-    );
+    expect(
+      previewSummary(
+        {
+          currency: 'USD',
+          margin: { required: '32523' },
+          fees: { total: '3.2' },
+          lossIfStopHit: { total: '150' },
+        },
+        0,
+      ),
+    ).toBe('Loss if stop hit 150.00 USD, margin 32,523.00 USD, fees 3.20 USD.');
+    expect(
+      previewSummary(
+        { currency: 'USD', margin: { required: '1' }, fees: { total: '0' }, lossIfStopHit: null },
+        2,
+      ),
+    ).toBe('No stop: loss not capped, margin 1.00 USD, fees 0.00 USD. 2 risk checks failed.');
   });
 });
 
 describe('order result text (IRTC R5-07)', () => {
   it('shows the average fill price at the instrument precision, not 40 decimals', () => {
-    const o = { status: 'filled', side: 'buy', qty: '900000', symbol: 'EURUSD', avgFillPrice: '1.083490166666666666666666666666666666667' };
-    expect(orderResultText(o, { qty: 0, price: 5 })).toBe('Order filled: buy 900,000 EURUSD at 1.08349.');
-    expect(orderResultText({ ...o, status: 'partially_filled', avgFillPrice: '65214.349999' }, { qty: 0, price: 1 })).toBe(
-      'Order partially filled: buy 900,000 EURUSD at 65,214.3.',
+    const o = {
+      status: 'filled',
+      side: 'buy',
+      qty: '900000',
+      symbol: 'EURUSD',
+      avgFillPrice: '1.083490166666666666666666666666666666667',
+    };
+    expect(orderResultText(o, { qty: 0, price: 5 })).toBe(
+      'Order filled: buy 900,000 EURUSD at 1.08349.',
     );
-    expect(orderResultText({ ...o, status: 'accepted', avgFillPrice: null }, { qty: 0, price: 5 })).toBe('Order accepted: buy 900,000 EURUSD.');
+    expect(
+      orderResultText(
+        { ...o, status: 'partially_filled', avgFillPrice: '65214.349999' },
+        { qty: 0, price: 1 },
+      ),
+    ).toBe('Order partially filled: buy 900,000 EURUSD at 65,214.3.');
+    expect(
+      orderResultText({ ...o, status: 'accepted', avgFillPrice: null }, { qty: 0, price: 5 }),
+    ).toBe('Order accepted: buy 900,000 EURUSD.');
   });
 });

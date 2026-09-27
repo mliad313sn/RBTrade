@@ -9,7 +9,14 @@ import { clientAddress, peerStampActive, trustedProxyHops } from '@/lib/forwarde
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const FORWARD_REQUEST = ['content-type', 'cookie', 'authorization', 'x-kora-csrf', 'accept', 'user-agent'];
+const FORWARD_REQUEST = [
+  'content-type',
+  'cookie',
+  'authorization',
+  'x-kora-csrf',
+  'accept',
+  'user-agent',
+];
 const FORWARD_RESPONSE = [
   'content-type',
   'set-cookie',
@@ -33,10 +40,15 @@ let warned = false;
 function warnOnce(): void {
   if (warned) return;
   warned = true;
-  console.warn('[kora-web] peer-address.cjs is not preloaded and KORA_TRUSTED_PROXY_HOPS=0: every client is reported as 127.0.0.1 (IRTC R1-05).');
+  console.warn(
+    '[kora-web] peer-address.cjs is not preloaded and KORA_TRUSTED_PROXY_HOPS=0: every client is reported as 127.0.0.1 (IRTC R1-05).',
+  );
 }
 
-async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {
+async function proxy(
+  req: NextRequest,
+  ctx: { params: Promise<{ path: string[] }> },
+): Promise<Response> {
   const { path } = await ctx.params;
   const base = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
   const target = new URL(`${base.replace(/\/$/, '')}/${path.map(encodeURIComponent).join('/')}`);
@@ -53,7 +65,12 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
   if (hops === 0 && !peerStampActive()) {
     if (STRICT_ENV) {
       return Response.json(
-        { statusCode: 503, error: 'proxy_misconfigured', message: 'The KORA web proxy cannot attribute client addresses (see the deployment checklist).' },
+        {
+          statusCode: 503,
+          error: 'proxy_misconfigured',
+          message:
+            'The KORA web proxy cannot attribute client addresses (see the deployment checklist).',
+        },
         { status: 503 },
       );
     }
@@ -71,7 +88,10 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       cache: 'no-store',
     });
   } catch {
-    return Response.json({ statusCode: 502, error: 'api_unreachable', message: 'The KORA API is not reachable.' }, { status: 502 });
+    return Response.json(
+      { statusCode: 502, error: 'api_unreachable', message: 'The KORA API is not reachable.' },
+      { status: 502 },
+    );
   }
   const out = new Headers();
   for (const h of FORWARD_RESPONSE) {
@@ -86,12 +106,18 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
     out.set('content-security-policy', "default-src 'none'");
   }
   // Goal 07: Server-Sent Events (copilot streaming) pass through unbuffered.
-  if ((upstream.headers.get('content-type') ?? '').startsWith('text/event-stream') && upstream.body) {
+  if (
+    (upstream.headers.get('content-type') ?? '').startsWith('text/event-stream') &&
+    upstream.body
+  ) {
     out.set('cache-control', 'no-cache, no-transform');
     out.set('x-accel-buffering', 'no');
     return new Response(upstream.body, { status: upstream.status, headers: out });
   }
-  return new Response(upstream.status === 204 ? null : await upstream.arrayBuffer(), { status: upstream.status, headers: out });
+  return new Response(upstream.status === 204 ? null : await upstream.arrayBuffer(), {
+    status: upstream.status,
+    headers: out,
+  });
 }
 
 export { proxy as GET, proxy as POST, proxy as PUT, proxy as PATCH, proxy as DELETE };

@@ -61,17 +61,37 @@ export interface TestUser {
  * The appropriateness answer key, derived from the reviewed questionnaire data (best-scoring option
  * per question). Tests submit it through the real API; nothing bypasses the assessment.
  */
-export function passingAnswers(def: { questions: Array<{ id: string; options: Array<{ id: string; points: number }> }> } = appropriatenessV1): Record<string, string> {
-  return Object.fromEntries(def.questions.map((q) => [q.id, [...q.options].sort((a, b) => b.points - a.points)[0]!.id]));
+export function passingAnswers(
+  def: {
+    questions: Array<{ id: string; options: Array<{ id: string; points: number }> }>;
+  } = appropriatenessV1,
+): Record<string, string> {
+  return Object.fromEntries(
+    def.questions.map((q) => [q.id, [...q.options].sort((a, b) => b.points - a.points)[0]!.id]),
+  );
 }
 
-export function failingAnswers(def: { questions: Array<{ id: string; options: Array<{ id: string; points: number }> }> } = appropriatenessV1): Record<string, string> {
-  return Object.fromEntries(def.questions.map((q) => [q.id, [...q.options].sort((a, b) => a.points - b.points)[0]!.id]));
+export function failingAnswers(
+  def: {
+    questions: Array<{ id: string; options: Array<{ id: string; points: number }> }>;
+  } = appropriatenessV1,
+): Record<string, string> {
+  return Object.fromEntries(
+    def.questions.map((q) => [q.id, [...q.options].sort((a, b) => a.points - b.points)[0]!.id]),
+  );
 }
 
 /** The risk warning in force, as the assessment page confirms it (IRTC R4-09). */
-export async function riskWarningAck(app: INestApplication, token: string): Promise<{ version: string; contentHash: string; locale: 'en' }> {
-  const doc = (await request(app.getHttpServer()).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200)).body.document as {
+export async function riskWarningAck(
+  app: INestApplication,
+  token: string,
+): Promise<{ version: string; contentHash: string; locale: 'en' }> {
+  const doc = (
+    await request(app.getHttpServer())
+      .get('/disclosures/risk-warning?locale=en')
+      .set(bearer(token))
+      .expect(200)
+  ).body.document as {
     version: string;
     contentHash: string;
   };
@@ -81,10 +101,17 @@ export async function riskWarningAck(app: INestApplication, token: string): Prom
 /** Passes the appropriateness assessment through the API with a novice session token (confirming the risk warning). */
 export async function passAppropriateness(app: INestApplication, token: string): Promise<void> {
   const http = app.getHttpServer();
-  const q = await request(http).get('/appropriateness/questionnaire').set(bearer(token)).expect(200);
+  const q = await request(http)
+    .get('/appropriateness/questionnaire')
+    .set(bearer(token))
+    .expect(200);
   const { id, version } = q.body.questionnaire as { id: string; version: number };
   const riskWarning = await riskWarningAck(app, token);
-  const res = await request(http).post('/appropriateness/attempts').set(bearer(token)).send({ questionnaireId: id, version, answers: passingAnswers(), riskWarning }).expect(200);
+  const res = await request(http)
+    .post('/appropriateness/attempts')
+    .set(bearer(token))
+    .send({ questionnaireId: id, version, answers: passingAnswers(), riskWarning })
+    .expect(200);
   if (!res.body.passed) throw new Error(`appropriateness not passed: ${JSON.stringify(res.body)}`);
 }
 
@@ -111,7 +138,8 @@ export async function createUser(
   void signup; // B-014: the answer is generic (no user id); the id comes from the first sign-in.
   let roles: Role[] = ['novice'];
   const first = await login(app, email, undefined, opts);
-  const id = (await request(http).get('/me').set(bearer(first.token)).expect(200)).body.user.id as string;
+  const id = (await request(http).get('/me').set(bearer(first.token)).expect(200)).body.user
+    .id as string;
   if (accountType === 'trader') {
     await passAppropriateness(app, first.token);
     roles = ['novice', 'trader'];
@@ -119,11 +147,16 @@ export async function createUser(
   const admin = extraRoles.filter((r) => r !== 'trader' && r !== 'novice');
   if (admin.length) {
     roles = [...new Set([...roles, ...admin])];
-    await ownerQuery('INSERT INTO user_roles (user_id, role) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING', [id, admin]);
+    await ownerQuery(
+      'INSERT INTO user_roles (user_id, role) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING',
+      [id, admin],
+    );
   }
-  if (extraRoles.includes('trader') && accountType !== 'trader') throw new Error('Use accountType "trader" (passes the assessment)');
+  if (extraRoles.includes('trader') && accountType !== 'trader')
+    throw new Error('Use accountType "trader" (passes the assessment)');
   // A novice with no extra role keeps the first session (same roles); others sign in again.
-  if (accountType === 'novice' && admin.length === 0) return { id, email, roles, token: first.token };
+  if (accountType === 'novice' && admin.length === 0)
+    return { id, email, roles, token: first.token };
   const session = await login(app, email, undefined, opts);
   // IRTC R4-09: staff accounts (admin-granted roles) acknowledge the risk warning on first use, as
   // traders do when they pass the assessment; tests of the gate itself build their users by hand.
@@ -138,17 +171,29 @@ export async function login(
   opts: { realClock?: boolean } = {},
 ): Promise<{ token: string; secret?: string }> {
   const http = app.getHttpServer();
-  const res = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
+  const res = await request(http)
+    .post('/auth/login')
+    .set(CSRF)
+    .send({ email, password: PASSWORD })
+    .expect(200);
   if (res.body.status === 'ok') return { token: res.body.accessToken };
   let s = secret;
   if (res.body.status === 'mfa_enrollment_required') {
-    const enr = await request(http).post('/auth/mfa/enroll').set(CSRF).send({ mfaToken: res.body.mfaToken }).expect(200);
+    const enr = await request(http)
+      .post('/auth/mfa/enroll')
+      .set(CSRF)
+      .send({ mfaToken: res.body.mfaToken })
+      .expect(200);
     s = enr.body.secret as string;
   }
   if (!s) throw new Error('MFA secret needed');
   if (!opts.realClock) nextTotpWindow();
   const code = totp(base32Decode(s));
-  const v = await request(http).post('/auth/mfa/verify').set(CSRF).send({ mfaToken: res.body.mfaToken, code }).expect(200);
+  const v = await request(http)
+    .post('/auth/mfa/verify')
+    .set(CSRF)
+    .send({ mfaToken: res.body.mfaToken, code })
+    .expect(200);
   return { token: v.body.accessToken, secret: s };
 }
 
@@ -172,7 +217,9 @@ export async function awayFromUtcMidnight(marginMs = 120_000): Promise<void> {
  */
 export async function acknowledgeRiskWarning(app: INestApplication, token: string): Promise<void> {
   const http = app.getHttpServer();
-  const doc = (await request(http).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200)).body.document as {
+  const doc = (
+    await request(http).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200)
+  ).body.document as {
     version: string;
     contentHash: string;
   };

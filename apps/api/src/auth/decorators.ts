@@ -11,10 +11,13 @@ export const ROLES = 'kora:roles';
 export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(IS_PUBLIC, true);
 
 /** Route needs any one of the roles. Non-novice roles always imply MFA (global rule). */
-export const Roles = (...roles: Role[]): MethodDecorator & ClassDecorator => SetMetadata(ROLES, roles);
+export const Roles = (...roles: Role[]): MethodDecorator & ClassDecorator =>
+  SetMetadata(ROLES, roles);
 
-export const CurrentPrincipal = createParamDecorator((_: unknown, ctx: ExecutionContext): Principal => {
-  const req = ctx.switchToHttp().getRequest<KoraRequest>();
-  if (!req.principal) throw new Error('CurrentPrincipal used on a public route');
-  return req.principal;
-});
+export const CurrentPrincipal = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): Principal => {
+    const req = ctx.switchToHttp().getRequest<KoraRequest>();
+    if (!req.principal) throw new Error('CurrentPrincipal used on a public route');
+    return req.principal;
+  },
+);

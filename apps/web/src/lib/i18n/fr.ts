@@ -126,8 +126,10 @@ export const fr: Record<MessageKey, string> = {
   'appr.submitError.title': 'Envoi impossible.',
   'appr.submitError.body': 'Un problème est survenu. Réessayez.',
   'appr.submit': 'Envoyer mes réponses',
-  'appr.answerAll': 'Répondez à toutes les questions et confirmez l’avertissement sur les risques pour envoyer.',
-  'appr.riskWarning.loadError': 'L’avertissement sur les risques n’a pas pu être chargé. Réessayez plus tard.',
+  'appr.answerAll':
+    'Répondez à toutes les questions et confirmez l’avertissement sur les risques pour envoyer.',
+  'appr.riskWarning.loadError':
+    'L’avertissement sur les risques n’a pas pu être chargé. Réessayez plus tard.',
   'appr.riskWarning.version': 'Version {version}',
   'appr.notEligible.title': 'Le trading Pro ne peut pas être débloqué pour ce compte.',
   'appr.notEligible.body':
@@ -312,8 +314,10 @@ export const fr: Record<MessageKey, string> = {
   'review.fees': 'Les frais de {fees} sont déjà inclus dans ces chiffres.',
   'review.gap':
     'Sur un marché très rapide, le prix peut sauter au-delà du filet de sécurité, et la perte peut être un peu plus grande.',
-  'review.check': 'Je comprends que je pourrais perdre environ {loss}, ou plus si les prix sautent.',
-  'review.rounded': 'Nous avons arrondi {entered} à {used}, le montant le plus proche permis par ce marché.',
+  'review.check':
+    'Je comprends que je pourrais perdre environ {loss}, ou plus si les prix sautent.',
+  'review.rounded':
+    'Nous avons arrondi {entered} à {used}, le montant le plus proche permis par ce marché.',
   'review.confirm': 'Confirmer le trade',
   'review.back': 'Revenir',
   'review.done': 'C’est fait. Votre trade est ouvert.',

@@ -10,7 +10,15 @@ import { startApp } from './helpers';
  */
 describe('API docs exposure (IRTC R1-11)', () => {
   let app: INestApplication;
-  const keys = ['KORA_ENV', 'AUTH_PROVIDER', 'KORA_ALLOW_DEV_IDP', 'KORA_ALLOW_INSECURE_TRANSPORT', 'REDIS_URL', 'KORA_METRICS_TOKEN', 'KORA_AUDIT_ANCHOR_JWK'] as const;
+  const keys = [
+    'KORA_ENV',
+    'AUTH_PROVIDER',
+    'KORA_ALLOW_DEV_IDP',
+    'KORA_ALLOW_INSECURE_TRANSPORT',
+    'REDIS_URL',
+    'KORA_METRICS_TOKEN',
+    'KORA_AUDIT_ANCHOR_JWK',
+  ] as const;
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   beforeAll(async () => {
     const redis = new URL(process.env.REDIS_URL ?? 'redis://127.0.0.1:56379');

@@ -2,7 +2,17 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
   "globalEnv": ["NODE_ENV", "KORA_ENV", "LIVE_TRADING_ENABLED"],
-  "globalPassThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH", "DATABASE_URL", "DATABASE_URL_MIGRATE", "REDIS_URL", "PG*", "KORA_*", "AUTH_PROVIDER", "API_*", "NEXT_PUBLIC_*"],
+  "globalPassThroughEnv": [
+    "PLAYWRIGHT_BROWSERS_PATH",
+    "DATABASE_URL",
+    "DATABASE_URL_MIGRATE",
+    "REDIS_URL",
+    "PG*",
+    "KORA_*",
+    "AUTH_PROVIDER",
+    "API_*",
+    "NEXT_PUBLIC_*"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

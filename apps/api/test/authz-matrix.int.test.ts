@@ -59,7 +59,10 @@ const SAMPLE_PARAMS: Record<string, string> = {
 };
 
 function samplePath(path: string): string {
-  return path.replace(/:(\w+)/g, (_, name: string) => SAMPLE_PARAMS[name] ?? '00000000-0000-4000-8000-000000000000');
+  return path.replace(
+    /:(\w+)/g,
+    (_, name: string) => SAMPLE_PARAMS[name] ?? '00000000-0000-4000-8000-000000000000',
+  );
 }
 
 function joinPath(a: string, b: string): string {
@@ -83,11 +86,22 @@ function enumerateRoutes(app: INestApplication): Route[] {
         const sub = Reflect.getMetadata(PATH_METADATA, handler) as string | string[] | undefined;
         if (sub === undefined) continue;
         const method = RequestMethod[Reflect.getMetadata(METHOD_METADATA, handler) as number];
-        const isPublic = Boolean(Reflect.getMetadata(IS_PUBLIC, handler) ?? Reflect.getMetadata(IS_PUBLIC, cls));
-        const roles = (Reflect.getMetadata(ROLES_KEY, handler) ?? Reflect.getMetadata(ROLES_KEY, cls) ?? null) as Role[] | null;
+        const isPublic = Boolean(
+          Reflect.getMetadata(IS_PUBLIC, handler) ?? Reflect.getMetadata(IS_PUBLIC, cls),
+        );
+        const roles = (Reflect.getMetadata(ROLES_KEY, handler) ??
+          Reflect.getMetadata(ROLES_KEY, cls) ??
+          null) as Role[] | null;
         for (const s of Array.isArray(sub) ? sub : [sub]) {
           const path = joinPath(base, s);
-          routes.push({ method: method!, path, openapi: path.replace(/:(\w+)/g, '{$1}'), isPublic, roles, controller: cls.name });
+          routes.push({
+            method: method!,
+            path,
+            openapi: path.replace(/:(\w+)/g, '{$1}'),
+            isPublic,
+            roles,
+            controller: cls.name,
+          });
         }
       }
     }
@@ -105,7 +119,11 @@ async function call(app: INestApplication, r: Route, token?: string): Promise<Ou
   if (m !== 'get' && m !== 'delete') req = req.send({});
   const res = await req;
   const body = res.body as { error?: string; requiredRoles?: unknown } | undefined;
-  return { status: res.status, guard403: res.status === 403 && body?.error === 'forbidden' && Array.isArray(body.requiredRoles) };
+  return {
+    status: res.status,
+    guard403:
+      res.status === 403 && body?.error === 'forbidden' && Array.isArray(body.requiredRoles),
+  };
 }
 
 describe('authorisation matrix (every endpoint × role)', () => {
@@ -133,15 +151,28 @@ describe('authorisation matrix (every endpoint × role)', () => {
   it('enumerates the routes and every route is in the OpenAPI document', () => {
     expect(routes.length).toBeGreaterThan(150);
     const doc = buildOpenApi(app);
-    const missing = routes.filter((r) => !NOT_IN_OPENAPI.has(`${r.method} ${r.path}`) && !doc.paths[r.openapi]?.[r.method.toLowerCase() as 'get']).map((r) => `${r.method} ${r.path}`);
+    const missing = routes
+      .filter(
+        (r) =>
+          !NOT_IN_OPENAPI.has(`${r.method} ${r.path}`) &&
+          !doc.paths[r.openapi]?.[r.method.toLowerCase() as 'get'],
+      )
+      .map((r) => `${r.method} ${r.path}`);
     expect(missing).toEqual([]);
-    const documented = Object.entries(doc.paths).flatMap(([p, ops]) => Object.keys(ops as object).map((m) => `${m.toUpperCase()} ${p}`));
+    const documented = Object.entries(doc.paths).flatMap(([p, ops]) =>
+      Object.keys(ops as object).map((m) => `${m.toUpperCase()} ${p}`),
+    );
     const known = new Set(routes.map((r) => `${r.method} ${r.openapi}`));
     expect(documented.filter((d) => !known.has(d))).toEqual([]);
   });
 
   it('every public route is reviewed; service routes refuse anonymous callers', async () => {
-    const unreviewed = routes.filter((r) => r.isPublic && !r.path.startsWith(SERVICE_TOKEN_PREFIX) && !REVIEWED_PUBLIC[`${r.method} ${r.path}`]);
+    const unreviewed = routes.filter(
+      (r) =>
+        r.isPublic &&
+        !r.path.startsWith(SERVICE_TOKEN_PREFIX) &&
+        !REVIEWED_PUBLIC[`${r.method} ${r.path}`],
+    );
     expect(unreviewed.map((r) => `${r.method} ${r.path}`)).toEqual([]);
     for (const r of routes.filter((x) => x.path.startsWith(SERVICE_TOKEN_PREFIX))) {
       expect(r.isPublic, `${r.path} uses its own service-token guard`).toBe(true);
@@ -169,10 +200,14 @@ describe('authorisation matrix (every endpoint × role)', () => {
         const out = await call(app, r, u.token);
         row.byRole[role] = out;
         if (r.isPublic) continue;
-        const allowed = !r.roles || r.roles.length === 0 || u.roles.some((x) => r.roles!.includes(x));
-        if (allowed && (out.status === 401 || out.guard403)) failures.push(`${r.method} ${r.path} as ${role} (allowed) → ${out.status}`);
-        if (!allowed && !out.guard403) failures.push(`${r.method} ${r.path} as ${role} (not allowed) → ${out.status}`);
-        if (out.status >= 500 && out.status !== 502 && out.status !== 503) failures.push(`${r.method} ${r.path} as ${role} → ${out.status} (server error)`);
+        const allowed =
+          !r.roles || r.roles.length === 0 || u.roles.some((x) => r.roles!.includes(x));
+        if (allowed && (out.status === 401 || out.guard403))
+          failures.push(`${r.method} ${r.path} as ${role} (allowed) → ${out.status}`);
+        if (!allowed && !out.guard403)
+          failures.push(`${r.method} ${r.path} as ${role} (not allowed) → ${out.status}`);
+        if (out.status >= 500 && out.status !== 502 && out.status !== 503)
+          failures.push(`${r.method} ${r.path} as ${role} → ${out.status} (server error)`);
       }
       matrix.push(row);
     }
@@ -180,7 +215,9 @@ describe('authorisation matrix (every endpoint × role)', () => {
   }, 600_000);
 });
 
-function writeMatrix(rows: Array<{ route: Route; anon: number; byRole: Partial<Record<Role, Outcome>> }>): void {
+function writeMatrix(
+  rows: Array<{ route: Route; anon: number; byRole: Partial<Record<Role, Outcome>> }>,
+): void {
   const head = `# Authorisation matrix (generated)
 
 Generated by \`apps/api/test/authz-matrix.int.test.ts\` with \`KORA_WRITE_AUTHZ_MATRIX=1\` (goal 10).

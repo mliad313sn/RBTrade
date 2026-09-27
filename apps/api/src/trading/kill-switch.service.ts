@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import {
   AUDIT_READ_ALL_ROLES,
   dec,
@@ -128,9 +135,15 @@ export class KillSwitchService {
       if (KILL_SWITCH_SCOPE_RANK[req.scope] >= KILL_SWITCH_SCOPE_RANK.robots_cancel) {
         // IRTC R2-12: "halt robots + cancel orders" leaves positions open, so it keeps their
         // protective bracket children (stop loss / take profit); flatten cancels everything.
-        cancelled = await this.oms.cancelAllOpen(tx, 'kill_switch', actor, { killSwitchId }, {
-          keepProtective: req.scope === 'robots_cancel',
-        });
+        cancelled = await this.oms.cancelAllOpen(
+          tx,
+          'kill_switch',
+          actor,
+          { killSwitchId },
+          {
+            keepProtective: req.scope === 'robots_cancel',
+          },
+        );
       }
 
       let flattened = 0;
@@ -179,7 +192,10 @@ export class KillSwitchService {
       `SELECT id::text AS id FROM audit_events WHERE action = 'kill_switch.requested' AND payload->>'killSwitchId' = $1 ORDER BY id LIMIT 1`,
       [killSwitchId],
     );
-    this.metrics?.killSwitch.inc({ scope: req.scope, kind: extra.globalKillSwitchId ? 'firm' : 'account' });
+    this.metrics?.killSwitch.inc({
+      scope: req.scope,
+      kind: extra.globalKillSwitchId ? 'firm' : 'account',
+    });
     this.metrics?.killSwitchDuration.observe({ scope: req.scope }, (performance.now() - t0) / 1000);
     this.events.robotControl({
       action: 'halt',
@@ -368,7 +384,11 @@ export class KillSwitchService {
         haltedBy: prev.haltedBy,
         environment: 'PAPER',
         ...(approval
-          ? { fourEyesRequestId: approval.requestId, requestedBy: approval.requestedBy, approvedBy: actorId }
+          ? {
+              fourEyesRequestId: approval.requestId,
+              requestedBy: approval.requestedBy,
+              approvedBy: actorId,
+            }
           : {}),
       });
       this.events.robotControl({
@@ -385,7 +405,14 @@ export class KillSwitchService {
   async state(userId: string) {
     const a = await this.accounts.ensure(userId);
     const pending = a.trading_halted
-      ? (await this.fourEyes.list({ status: 'pending', kind: 'kill_switch_resume', subjectId: a.id, limit: 1 }))[0]
+      ? (
+          await this.fourEyes.list({
+            status: 'pending',
+            kind: 'kill_switch_resume',
+            subjectId: a.id,
+            limit: 1,
+          })
+        )[0]
       : undefined;
     return {
       accountId: a.id,

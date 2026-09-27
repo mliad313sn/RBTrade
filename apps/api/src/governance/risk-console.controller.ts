@@ -66,7 +66,10 @@ export class RiskConsoleController {
   @ApiQuery({ name: 'open', required: false })
   @ApiQuery({ name: 'kind', required: false, description: 'prefix, e.g. risk. or kill_switch.' })
   async alerts(@Query(new ZodValidationPipe(AlertsQuery)) q: z.infer<typeof AlertsQuery>) {
-    return { alerts: await this.console.alerts({ open: q.open === 'true', kind: q.kind, limit: q.limit }), relay: this.bridge.stats };
+    return {
+      alerts: await this.console.alerts({ open: q.open === 'true', kind: q.kind, limit: q.limit }),
+      relay: this.bridge.stats,
+    };
   }
 
   @Post('alerts/:id/ack')
@@ -88,7 +91,10 @@ export class RiskConsoleController {
       'B-314: firm-wide kill switch on every active account (risk officer/admin, MFA). Each account then needs four eyes to resume.',
   })
   @ApiBody({ schema: openApiSchema(GlobalKillSchema) })
-  killAll(@CurrentPrincipal() p: Principal, @Body(new ZodValidationPipe(GlobalKillSchema)) body: z.infer<typeof GlobalKillSchema>) {
+  killAll(
+    @CurrentPrincipal() p: Principal,
+    @Body(new ZodValidationPipe(GlobalKillSchema)) body: z.infer<typeof GlobalKillSchema>,
+  ) {
     return this.console.globalKillSwitch(p.sub, body.scope, body.reason);
   }
 }

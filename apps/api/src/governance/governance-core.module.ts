@@ -10,7 +10,10 @@ import { GOVERNANCE_CONFIG, loadGovernanceConfig } from './governance-config';
  */
 @Global()
 @Module({
-  providers: [{ provide: GOVERNANCE_CONFIG, useFactory: () => loadGovernanceConfig(process.env) }, FourEyesStore],
+  providers: [
+    { provide: GOVERNANCE_CONFIG, useFactory: () => loadGovernanceConfig(process.env) },
+    FourEyesStore,
+  ],
   exports: [GOVERNANCE_CONFIG, FourEyesStore],
 })
 export class GovernanceCoreModule {}

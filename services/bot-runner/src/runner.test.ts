@@ -39,10 +39,18 @@ describe('jobs', () => {
 
 describe('config', () => {
   it('IRTC R1-11: requires Redis authentication in staging and production', () => {
-    expect(() => loadConfig({ KORA_ENV: 'staging', REDIS_URL: 'rediss://redis:6380' })).toThrow(/password/);
-    expect(() => loadConfig({ KORA_ENV: 'production', REDIS_URL: 'redis://redis:6379' })).toThrow(/password/);
-    expect(loadConfig({ KORA_ENV: 'staging', REDIS_URL: 'rediss://:pw@redis:6380' }).redisUrl).toBe('rediss://:pw@redis:6380');
-    expect(loadConfig({ KORA_ENV: 'dev', REDIS_URL: 'redis://127.0.0.1:56379' }).redisUrl).toBe('redis://127.0.0.1:56379');
+    expect(() => loadConfig({ KORA_ENV: 'staging', REDIS_URL: 'rediss://redis:6380' })).toThrow(
+      /password/,
+    );
+    expect(() => loadConfig({ KORA_ENV: 'production', REDIS_URL: 'redis://redis:6379' })).toThrow(
+      /password/,
+    );
+    expect(loadConfig({ KORA_ENV: 'staging', REDIS_URL: 'rediss://:pw@redis:6380' }).redisUrl).toBe(
+      'rediss://:pw@redis:6380',
+    );
+    expect(loadConfig({ KORA_ENV: 'dev', REDIS_URL: 'redis://127.0.0.1:56379' }).redisUrl).toBe(
+      'redis://127.0.0.1:56379',
+    );
   });
   it('refuses LIVE, requires redis and validates the service token', () => {
     expect(() => loadConfig({ LIVE_TRADING_ENABLED: 'true', REDIS_URL: 'redis://x' })).toThrow(
@@ -52,7 +60,9 @@ describe('config', () => {
     expect(() => loadConfig({ REDIS_URL: 'redis://x', KORA_SERVICE_TOKEN: 'short' })).toThrow(
       /32 characters/,
     );
-    expect(loadConfig({ REDIS_URL: 'redis://x', KORA_BOT_RUNNER_CONCURRENCY: '500' }).concurrency).toBe(64);
+    expect(
+      loadConfig({ REDIS_URL: 'redis://x', KORA_BOT_RUNNER_CONCURRENCY: '500' }).concurrency,
+    ).toBe(64);
     expect(loadConfig({ REDIS_URL: 'redis://x' })).toMatchObject({
       healthPort: 4100,
       queueName: 'kora-bots',
@@ -241,7 +251,9 @@ describe.skipIf(!redisUrl)('robot runner against stub api + quant', () => {
 
   it('heartbeats every running robot and syncs with the service token', async () => {
     await new Promise((r) => setTimeout(r, 250));
-    expect(Number(await redis.get(heartbeatKey(ROBOT, cfg.ctlPrefix)))).toBeGreaterThan(Date.now() - 1000);
+    expect(Number(await redis.get(heartbeatKey(ROBOT, cfg.ctlPrefix)))).toBeGreaterThan(
+      Date.now() - 1000,
+    );
     const sync = seen.find((s) => s.path === '/internal/robots/running')!;
     expect(sync.headers['x-kora-service-token']).toBe('x'.repeat(40));
   });

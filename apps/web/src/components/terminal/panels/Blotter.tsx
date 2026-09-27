@@ -1,6 +1,13 @@
 'use client';
 
-import { ALERT_CONDITIONS, dec, type AlertCondition, type OrderDto, type PositionDto, type PriceAlertDto } from '@kora/domain';
+import {
+  ALERT_CONDITIONS,
+  dec,
+  type AlertCondition,
+  type OrderDto,
+  type PositionDto,
+  type PriceAlertDto,
+} from '@kora/domain';
 import { KoraApiError, type RiskSummary } from '@kora/sdk';
 import { Button, Dialog, NumberInput, formatMoney, formatPrice, useToast } from '@kora/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -60,7 +67,8 @@ export function PositionsPanel() {
     seenFill.current = fillSeq;
   }, [fillSeq, settings.soundOnFills]);
 
-  const sourceOf = (symbol: string) => sourceLabel(recent.find((o) => o.symbol === symbol && dec(o.filledQty).gt(0))?.source);
+  const sourceOf = (symbol: string) =>
+    sourceLabel(recent.find((o) => o.symbol === symbol && dec(o.filledQty).gt(0))?.source);
   const equity = account ? dec(account.equity) : null;
 
   const close = async (p: PositionDto) => {
@@ -77,7 +85,13 @@ export function PositionsPanel() {
     const qty = dec(reverse.qty).abs().mul(2).toFixed();
     const side = reverse.qty.startsWith('-') ? 'buy' : 'sell';
     try {
-      const r = await api.placeOrder({ clientOrderId: cid(), symbol: reverse.symbol, side, type: 'market', qty });
+      const r = await api.placeOrder({
+        clientOrderId: cid(),
+        symbol: reverse.symbol,
+        side,
+        type: 'market',
+        qty,
+      });
       toast.push(`Reverse ${reverse.symbol}: order ${r.order.status}`, 'success', 4000);
     } catch (e) {
       toast.push(`Reverse refused: ${errText(e)}`, 'critical');
@@ -96,15 +110,33 @@ export function PositionsPanel() {
             <tr>
               <th scope="col">Symbol</th>
               <th scope="col">Side</th>
-              <th scope="col" className="num">Qty</th>
-              <th scope="col" className="num">Avg price</th>
-              <th scope="col" className="num">Mark</th>
-              <th scope="col" className="num">Stop</th>
-              <th scope="col" className="num">Target</th>
-              <th scope="col" className="num">Unrl. P&amp;L ({currency})</th>
-              <th scope="col" className="num">% Equity</th>
-              <th scope="col" className="num">Source</th>
-              <th scope="col" className="num">Actions</th>
+              <th scope="col" className="num">
+                Qty
+              </th>
+              <th scope="col" className="num">
+                Avg price
+              </th>
+              <th scope="col" className="num">
+                Mark
+              </th>
+              <th scope="col" className="num">
+                Stop
+              </th>
+              <th scope="col" className="num">
+                Target
+              </th>
+              <th scope="col" className="num">
+                Unrl. P&amp;L ({currency})
+              </th>
+              <th scope="col" className="num">
+                % Equity
+              </th>
+              <th scope="col" className="num">
+                Source
+              </th>
+              <th scope="col" className="num">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -114,34 +146,72 @@ export function PositionsPanel() {
               const long = !p.qty.startsWith('-');
               const lv = protectiveLevels(orders, p);
               const pnl = p.unrealizedPnl ? dec(p.unrealizedPnl) : null;
-              const pct = equity && equity.gt(0) && p.notional ? dec(p.notional).div(equity).mul(100).toDecimalPlaces(1).toFixed(1) : null;
+              const pct =
+                equity && equity.gt(0) && p.notional
+                  ? dec(p.notional).div(equity).mul(100).toDecimalPlaces(1).toFixed(1)
+                  : null;
               return (
-                <tr key={p.symbol} data-testid={`pos-${p.symbol}`} data-live={p.live ? 'true' : 'false'}>
+                <tr
+                  key={p.symbol}
+                  data-testid={`pos-${p.symbol}`}
+                  data-live={p.live ? 'true' : 'false'}
+                >
                   <td>
                     <button type="button" className="bl-link" onClick={() => setSymbol(p.symbol)}>
                       {spec?.displayName ?? p.symbol}
                     </button>
                   </td>
-                  <td className={long ? 'k-dir--up' : 'k-dir--down'}>{long ? '▲ Long' : '▼ Short'}</td>
+                  <td className={long ? 'k-dir--up' : 'k-dir--down'}>
+                    {long ? '▲ Long' : '▼ Short'}
+                  </td>
                   <td className="num k-num">{formatQty(p.qty, spec?.qtyPrecision ?? 4)}</td>
                   <td className="num k-num">{formatPrice(p.avgPrice, pp)}</td>
                   <td className="num k-num">{p.markPrice ? formatPrice(p.markPrice, pp) : '—'}</td>
-                  <td className="num k-num">{lv.stop?.stopPrice ? formatPrice(lv.stop.stopPrice, pp) : '—'}</td>
-                  <td className="num k-num">{lv.target?.limitPrice ? formatPrice(lv.target.limitPrice, pp) : '—'}</td>
-                  <td className={`num k-num ${pnl ? (pnl.isNegative() ? 'k-dir--down' : pnl.isZero() ? '' : 'k-dir--up') : ''}`}>
-                    {p.unrealizedPnl ? formatMoney(p.unrealizedPnl, currency, { signed: true }).replace(` ${currency}`, '') : '—'}
+                  <td className="num k-num">
+                    {lv.stop?.stopPrice ? formatPrice(lv.stop.stopPrice, pp) : '—'}
+                  </td>
+                  <td className="num k-num">
+                    {lv.target?.limitPrice ? formatPrice(lv.target.limitPrice, pp) : '—'}
+                  </td>
+                  <td
+                    className={`num k-num ${pnl ? (pnl.isNegative() ? 'k-dir--down' : pnl.isZero() ? '' : 'k-dir--up') : ''}`}
+                  >
+                    {p.unrealizedPnl
+                      ? formatMoney(p.unrealizedPnl, currency, { signed: true }).replace(
+                          ` ${currency}`,
+                          '',
+                        )
+                      : '—'}
                     {p.stale ? <span className="k-qbadge k-qbadge--stale ml-1">Stale</span> : null}
                   </td>
                   <td className="num k-num">{pct ? `${pct}%` : '—'}</td>
                   <td className="num text-ai-soft">{sourceOf(p.symbol)}</td>
                   <td className="num whitespace-nowrap">
-                    <button type="button" className="bl-btn" onClick={() => setProtect(p)} data-testid={`sltp-${p.symbol}`} aria-label={`Set stop loss and take profit for ${p.symbol}`}>
+                    <button
+                      type="button"
+                      className="bl-btn"
+                      onClick={() => setProtect(p)}
+                      data-testid={`sltp-${p.symbol}`}
+                      aria-label={`Set stop loss and take profit for ${p.symbol}`}
+                    >
                       SL/TP
                     </button>
-                    <button type="button" className="bl-btn" onClick={() => setReverse(p)} data-testid={`reverse-${p.symbol}`} aria-label={`Reverse ${p.symbol}`}>
+                    <button
+                      type="button"
+                      className="bl-btn"
+                      onClick={() => setReverse(p)}
+                      data-testid={`reverse-${p.symbol}`}
+                      aria-label={`Reverse ${p.symbol}`}
+                    >
                       Reverse
                     </button>
-                    <button type="button" className="bl-btn" onClick={() => void close(p)} data-testid={`close-${p.symbol}`} aria-label={`Close ${p.symbol}`}>
+                    <button
+                      type="button"
+                      className="bl-btn"
+                      onClick={() => void close(p)}
+                      data-testid={`close-${p.symbol}`}
+                      aria-label={`Close ${p.symbol}`}
+                    >
                       Close
                     </button>
                   </td>
@@ -151,10 +221,21 @@ export function PositionsPanel() {
           </tbody>
         </table>
       )}
-      <Dialog open={reverse !== null} onOpenChange={(o) => !o && setReverse(null)} title={`Reverse ${reverse?.symbol ?? ''}?`} description="Sends a market order for twice the position size in the opposite direction (paper)." data-testid="confirm-reverse">
+      <Dialog
+        open={reverse !== null}
+        onOpenChange={(o) => !o && setReverse(null)}
+        title={`Reverse ${reverse?.symbol ?? ''}?`}
+        description="Sends a market order for twice the position size in the opposite direction (paper)."
+        data-testid="confirm-reverse"
+      >
         <div className="k-dialog__actions">
           <Button onClick={() => setReverse(null)}>Back</Button>
-          <Button variant="primary" onClick={() => void doReverse()} data-testid="confirm-reverse-ok" autoFocus>
+          <Button
+            variant="primary"
+            onClick={() => void doReverse()}
+            data-testid="confirm-reverse-ok"
+            autoFocus
+          >
             Reverse
           </Button>
         </div>
@@ -181,13 +262,43 @@ function ProtectDialog({ position, onClose }: { position: PositionDto; onClose: 
     setBusy(true);
     try {
       const existing = [lv.stop, lv.target].filter((o): o is OrderDto => o !== null);
-      for (const o of existing) await api.cancelOrder(o.ocoGroup && o.parentOrderId ? o.parentOrderId : o.id).catch(() => undefined);
+      for (const o of existing)
+        await api
+          .cancelOrder(o.ocoGroup && o.parentOrderId ? o.parentOrderId : o.id)
+          .catch(() => undefined);
       if (stop && target) {
-        await api.placeOrder({ clientOrderId: cid(), symbol: position.symbol, side: exit, type: 'oco', qty, reduceOnly: true, legs: [{ type: 'stop', stopPrice: stop }, { type: 'limit', limitPrice: target }] });
+        await api.placeOrder({
+          clientOrderId: cid(),
+          symbol: position.symbol,
+          side: exit,
+          type: 'oco',
+          qty,
+          reduceOnly: true,
+          legs: [
+            { type: 'stop', stopPrice: stop },
+            { type: 'limit', limitPrice: target },
+          ],
+        });
       } else if (stop) {
-        await api.placeOrder({ clientOrderId: cid(), symbol: position.symbol, side: exit, type: 'stop', qty, stopPrice: stop, reduceOnly: true });
+        await api.placeOrder({
+          clientOrderId: cid(),
+          symbol: position.symbol,
+          side: exit,
+          type: 'stop',
+          qty,
+          stopPrice: stop,
+          reduceOnly: true,
+        });
       } else if (target) {
-        await api.placeOrder({ clientOrderId: cid(), symbol: position.symbol, side: exit, type: 'limit', qty, limitPrice: target, reduceOnly: true });
+        await api.placeOrder({
+          clientOrderId: cid(),
+          symbol: position.symbol,
+          side: exit,
+          type: 'limit',
+          qty,
+          limitPrice: target,
+          reduceOnly: true,
+        });
       }
       toast.push(`Protection updated for ${position.symbol}`, 'success', 3000);
       onClose();
@@ -200,14 +311,41 @@ function ProtectDialog({ position, onClose }: { position: PositionDto; onClose: 
   };
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title={`Stop loss / take profit · ${spec?.displayName ?? position.symbol}`} description={`Reduce-only ${exit} orders for ${qty} (one cancels the other when both are set). Leave a field empty to remove it.`} data-testid="sltp-dialog">
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Stop loss / take profit · ${spec?.displayName ?? position.symbol}`}
+      description={`Reduce-only ${exit} orders for ${qty} (one cancels the other when both are set). Leave a field empty to remove it.`}
+      data-testid="sltp-dialog"
+    >
       <div className="grid grid-cols-2 gap-3">
-        <NumberInput label="Stop loss (price)" value={stop} onValueChange={setStop} precision={pp} step={spec?.tickSize ?? '0.00001'} min="0" data-testid="sltp-stop" />
-        <NumberInput label="Take profit (price)" value={target} onValueChange={setTarget} precision={pp} step={spec?.tickSize ?? '0.00001'} min="0" data-testid="sltp-target" />
+        <NumberInput
+          label="Stop loss (price)"
+          value={stop}
+          onValueChange={setStop}
+          precision={pp}
+          step={spec?.tickSize ?? '0.00001'}
+          min="0"
+          data-testid="sltp-stop"
+        />
+        <NumberInput
+          label="Take profit (price)"
+          value={target}
+          onValueChange={setTarget}
+          precision={pp}
+          step={spec?.tickSize ?? '0.00001'}
+          min="0"
+          data-testid="sltp-target"
+        />
       </div>
       <div className="k-dialog__actions">
         <Button onClick={onClose}>Back</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={busy} data-testid="sltp-save">
+        <Button
+          variant="primary"
+          onClick={() => void save()}
+          disabled={busy}
+          data-testid="sltp-save"
+        >
           Save
         </Button>
       </div>
@@ -223,10 +361,18 @@ export function OrdersPanel() {
   const symbol = useTerminal((s) => s.symbol);
   const { timeDisplay } = useTerminalSettings();
   const toast = useToast();
-  const [editing, setEditing] = useState<{ id: string; qty: string; price: string; field: 'limitPrice' | 'stopPrice' | null } | null>(null);
+  const [editing, setEditing] = useState<{
+    id: string;
+    qty: string;
+    price: string;
+    field: 'limitPrice' | 'stopPrice' | null;
+  } | null>(null);
   const [onlySymbol, setOnlySymbol] = useState(false);
   const [confirmAll, setConfirmAll] = useState(false);
-  const visible = useMemo(() => orders.filter((o) => o.execType !== 'none' || o.type === 'oco'), [orders]);
+  const visible = useMemo(
+    () => orders.filter((o) => o.execType !== 'none' || o.type === 'oco'),
+    [orders],
+  );
 
   const cancel = async (o: OrderDto) => {
     try {
@@ -252,7 +398,8 @@ export function OrdersPanel() {
     if (!o) return setEditing(null);
     const patch: Record<string, string> = {};
     if (editing.qty && editing.qty !== o.qty) patch.qty = editing.qty;
-    if (editing.field && editing.price && editing.price !== o[editing.field]) patch[editing.field] = editing.price;
+    if (editing.field && editing.price && editing.price !== o[editing.field])
+      patch[editing.field] = editing.price;
     try {
       if (Object.keys(patch).length) await api.amendOrder(o.id, patch);
       setEditing(null);
@@ -266,9 +413,20 @@ export function OrdersPanel() {
     <div className="bl h-full overflow-auto" data-panel-root="orders" tabIndex={-1}>
       <div className="bl-toolbar">
         <label className="flex items-center gap-1 text-xs">
-          <input type="checkbox" checked={onlySymbol} onChange={(e) => setOnlySymbol(e.target.checked)} /> Only {instruments.get(symbol)?.displayName ?? symbol}
+          <input
+            type="checkbox"
+            checked={onlySymbol}
+            onChange={(e) => setOnlySymbol(e.target.checked)}
+          />{' '}
+          Only {instruments.get(symbol)?.displayName ?? symbol}
         </label>
-        <button type="button" className="bl-btn" disabled={visible.length === 0} onClick={() => setConfirmAll(true)} data-testid="cancel-all">
+        <button
+          type="button"
+          className="bl-btn"
+          disabled={visible.length === 0}
+          onClick={() => setConfirmAll(true)}
+          data-testid="cancel-all"
+        >
           Cancel all
         </button>
       </div>
@@ -282,32 +440,56 @@ export function OrdersPanel() {
               <th scope="col">Symbol</th>
               <th scope="col">Side</th>
               <th scope="col">Type</th>
-              <th scope="col" className="num">Qty</th>
-              <th scope="col" className="num">Filled</th>
-              <th scope="col" className="num">Price</th>
+              <th scope="col" className="num">
+                Qty
+              </th>
+              <th scope="col" className="num">
+                Filled
+              </th>
+              <th scope="col" className="num">
+                Price
+              </th>
               <th scope="col">TIF</th>
               <th scope="col">Status</th>
-              <th scope="col" className="num">Actions</th>
+              <th scope="col" className="num">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {visible.map((o) => {
               const spec = instruments.get(o.symbol);
               const pp = spec?.pricePrecision ?? 5;
-              const field: 'limitPrice' | 'stopPrice' | null = o.limitPrice ? 'limitPrice' : o.stopPrice ? 'stopPrice' : null;
+              const field: 'limitPrice' | 'stopPrice' | null = o.limitPrice
+                ? 'limitPrice'
+                : o.stopPrice
+                  ? 'stopPrice'
+                  : null;
               const isEditing = editing?.id === o.id;
               return (
                 <tr key={o.id} data-testid={`order-row-${o.id}`}>
                   <td className="k-num">{formatClock(o.createdAt, timeDisplay)}</td>
                   <td className="font-semibold">{spec?.displayName ?? o.symbol}</td>
-                  <td className={o.side === 'buy' ? 'k-dir--up' : 'k-dir--down'}>{o.side === 'buy' ? '▲ Buy' : '▼ Sell'}</td>
+                  <td className={o.side === 'buy' ? 'k-dir--up' : 'k-dir--down'}>
+                    {o.side === 'buy' ? '▲ Buy' : '▼ Sell'}
+                  </td>
                   <td>
                     {o.role === 'primary' ? o.type.replace('_', '-') : o.role.replace('_', ' ')}
                     {o.reduceOnly ? ' · RO' : ''}
                   </td>
                   <td className="num k-num">
                     {isEditing ? (
-                      <NumberInput label="New quantity" hideLabel value={editing.qty} onValueChange={(v) => setEditing({ ...editing, qty: v })} precision={spec?.qtyPrecision ?? 4} step={spec?.qtyStep ?? '1'} min="0" className="bl-input" data-testid="amend-qty" />
+                      <NumberInput
+                        label="New quantity"
+                        hideLabel
+                        value={editing.qty}
+                        onValueChange={(v) => setEditing({ ...editing, qty: v })}
+                        precision={spec?.qtyPrecision ?? 4}
+                        step={spec?.qtyStep ?? '1'}
+                        min="0"
+                        className="bl-input"
+                        data-testid="amend-qty"
+                      />
                     ) : (
                       formatQty(o.qty, spec?.qtyPrecision ?? 4)
                     )}
@@ -315,7 +497,18 @@ export function OrdersPanel() {
                   <td className="num k-num">{formatQty(o.filledQty, spec?.qtyPrecision ?? 4)}</td>
                   <td className="num k-num">
                     {isEditing && field ? (
-                      <NumberInput label="New price" hideLabel value={editing.price} onValueChange={(v) => setEditing({ ...editing, price: v })} precision={pp} step={spec?.tickSize ?? '0.00001'} min="0" className="bl-input" data-testid="amend-price" onKeyDown={(e) => e.key === 'Enter' && void saveAmend()} />
+                      <NumberInput
+                        label="New price"
+                        hideLabel
+                        value={editing.price}
+                        onValueChange={(v) => setEditing({ ...editing, price: v })}
+                        precision={pp}
+                        step={spec?.tickSize ?? '0.00001'}
+                        min="0"
+                        className="bl-input"
+                        data-testid="amend-price"
+                        onKeyDown={(e) => e.key === 'Enter' && void saveAmend()}
+                      />
                     ) : o.limitPrice ? (
                       formatPrice(o.limitPrice, pp)
                     ) : o.stopPrice ? (
@@ -329,7 +522,12 @@ export function OrdersPanel() {
                   <td className="num whitespace-nowrap">
                     {isEditing ? (
                       <>
-                        <button type="button" className="bl-btn" onClick={() => void saveAmend()} data-testid="amend-save">
+                        <button
+                          type="button"
+                          className="bl-btn"
+                          onClick={() => void saveAmend()}
+                          data-testid="amend-save"
+                        >
                           Save
                         </button>
                         <button type="button" className="bl-btn" onClick={() => setEditing(null)}>
@@ -339,11 +537,30 @@ export function OrdersPanel() {
                     ) : (
                       <>
                         {o.execType !== 'none' ? (
-                          <button type="button" className="bl-btn" onClick={() => setEditing({ id: o.id, qty: o.qty, price: field ? (o[field] ?? '') : '', field })} data-testid={`amend-${o.id}`} aria-label={`Amend ${o.side} ${o.symbol}`}>
+                          <button
+                            type="button"
+                            className="bl-btn"
+                            onClick={() =>
+                              setEditing({
+                                id: o.id,
+                                qty: o.qty,
+                                price: field ? (o[field] ?? '') : '',
+                                field,
+                              })
+                            }
+                            data-testid={`amend-${o.id}`}
+                            aria-label={`Amend ${o.side} ${o.symbol}`}
+                          >
                             Amend
                           </button>
                         ) : null}
-                        <button type="button" className="bl-btn" onClick={() => void cancel(o)} data-testid={`cancel-${o.id}`} aria-label={`Cancel ${o.side} ${o.symbol}`}>
+                        <button
+                          type="button"
+                          className="bl-btn"
+                          onClick={() => void cancel(o)}
+                          data-testid={`cancel-${o.id}`}
+                          aria-label={`Cancel ${o.side} ${o.symbol}`}
+                        >
                           Cancel
                         </button>
                       </>
@@ -355,10 +572,21 @@ export function OrdersPanel() {
           </tbody>
         </table>
       )}
-      <Dialog open={confirmAll} onOpenChange={setConfirmAll} title={`Cancel ${onlySymbol ? `all ${symbol}` : 'all'} working orders?`} description="Each cancel goes through the engine and is recorded in the audit log." data-testid="confirm-cancel-all">
+      <Dialog
+        open={confirmAll}
+        onOpenChange={setConfirmAll}
+        title={`Cancel ${onlySymbol ? `all ${symbol}` : 'all'} working orders?`}
+        description="Each cancel goes through the engine and is recorded in the audit log."
+        data-testid="confirm-cancel-all"
+      >
         <div className="k-dialog__actions">
           <Button onClick={() => setConfirmAll(false)}>Back</Button>
-          <Button variant="danger" onClick={() => void cancelAll()} data-testid="confirm-cancel-all-ok" autoFocus>
+          <Button
+            variant="danger"
+            onClick={() => void cancelAll()}
+            data-testid="confirm-cancel-all-ok"
+            autoFocus
+          >
             Cancel orders
           </Button>
         </div>
@@ -385,13 +613,25 @@ export function FillsPanel() {
               <th scope="col">Time ({clockLabel(timeDisplay)})</th>
               <th scope="col">Symbol</th>
               <th scope="col">Side</th>
-              <th scope="col" className="num">Qty</th>
-              <th scope="col" className="num">Price</th>
-              <th scope="col" className="num">Reference</th>
-              <th scope="col" className="num">Slippage</th>
+              <th scope="col" className="num">
+                Qty
+              </th>
+              <th scope="col" className="num">
+                Price
+              </th>
+              <th scope="col" className="num">
+                Reference
+              </th>
+              <th scope="col" className="num">
+                Slippage
+              </th>
               <th scope="col">Liquidity</th>
-              <th scope="col" className="num">Fees ({currency})</th>
-              <th scope="col" className="num">Realized ({currency})</th>
+              <th scope="col" className="num">
+                Fees ({currency})
+              </th>
+              <th scope="col" className="num">
+                Realized ({currency})
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -404,16 +644,31 @@ export function FillsPanel() {
                 <tr key={f.id} data-testid={`fill-${f.id}`}>
                   <td className="k-num">{formatClock(f.ts, timeDisplay)}</td>
                   <td className="font-semibold">{spec?.displayName ?? f.symbol}</td>
-                  <td className={f.side === 'buy' ? 'k-dir--up' : 'k-dir--down'}>{f.side === 'buy' ? '▲ Buy' : '▼ Sell'}</td>
+                  <td className={f.side === 'buy' ? 'k-dir--up' : 'k-dir--down'}>
+                    {f.side === 'buy' ? '▲ Buy' : '▼ Sell'}
+                  </td>
                   <td className="num k-num">{formatQty(f.qty, spec?.qtyPrecision ?? 4)}</td>
                   <td className="num k-num">{formatPrice(f.price, pp)}</td>
                   <td className="num k-num">{formatPrice(f.referencePrice, pp)}</td>
-                  <td className={`num k-num ${slip.gt(0) ? 'k-dir--down' : slip.lt(0) ? 'k-dir--up' : ''}`} data-testid="fill-slippage" title="Adverse difference vs the reference price (negative = price improvement)">
-                    {slip.isZero() ? '0' : `${slip.gt(0) ? '+' : '−'}${formatPrice(slip.abs().toFixed(), pp)}`}
+                  <td
+                    className={`num k-num ${slip.gt(0) ? 'k-dir--down' : slip.lt(0) ? 'k-dir--up' : ''}`}
+                    data-testid="fill-slippage"
+                    title="Adverse difference vs the reference price (negative = price improvement)"
+                  >
+                    {slip.isZero()
+                      ? '0'
+                      : `${slip.gt(0) ? '+' : '−'}${formatPrice(slip.abs().toFixed(), pp)}`}
                   </td>
                   <td>{f.liquidity}</td>
-                  <td className="num k-num">{formatMoney(fees.toFixed(), currency).replace(` ${currency}`, '')}</td>
-                  <td className="num k-num">{formatMoney(f.realizedPnl, currency, { signed: true }).replace(` ${currency}`, '')}</td>
+                  <td className="num k-num">
+                    {formatMoney(fees.toFixed(), currency).replace(` ${currency}`, '')}
+                  </td>
+                  <td className="num k-num">
+                    {formatMoney(f.realizedPnl, currency, { signed: true }).replace(
+                      ` ${currency}`,
+                      '',
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -453,7 +708,13 @@ export function AlertsPanel() {
           if (cancelled) return;
           const triggered = r.alerts.filter((a) => a.status === 'triggered');
           if (known.current) {
-            for (const a of triggered) if (!known.current.has(a.id)) toast.push(`Alert: ${a.symbol} ${COND_LABEL[a.condition]} ${a.threshold} (at ${a.triggeredValue})`, 'info', 8000);
+            for (const a of triggered)
+              if (!known.current.has(a.id))
+                toast.push(
+                  `Alert: ${a.symbol} ${COND_LABEL[a.condition]} ${a.threshold} (at ${a.triggeredValue})`,
+                  'info',
+                  8000,
+                );
           }
           known.current = new Set(triggered.map((a) => a.id));
           setAlerts(r.alerts);
@@ -469,7 +730,12 @@ export function AlertsPanel() {
 
   const create = async () => {
     try {
-      const a = await api.createPriceAlert({ symbol, condition, threshold, ...(condition.startsWith('rsi') ? { timeframe: timeframe as '15m' } : {}) });
+      const a = await api.createPriceAlert({
+        symbol,
+        condition,
+        threshold,
+        ...(condition.startsWith('rsi') ? { timeframe: timeframe as '15m' } : {}),
+      });
       setAlerts((xs) => [a, ...xs]);
       setThreshold('');
     } catch (e) {
@@ -497,16 +763,37 @@ export function AlertsPanel() {
         aria-label="New alert"
       >
         <span className="text-xs font-semibold">{spec?.displayName ?? symbol}</span>
-        <select className="tk-mode" aria-label="Condition" value={condition} onChange={(e) => setCondition(e.target.value as AlertCondition)} data-testid="alert-condition">
+        <select
+          className="tk-mode"
+          aria-label="Condition"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as AlertCondition)}
+          data-testid="alert-condition"
+        >
           {ALERT_CONDITIONS.map((c) => (
             <option key={c} value={c}>
               {COND_LABEL[c]}
             </option>
           ))}
         </select>
-        <NumberInput label="Threshold" hideLabel value={threshold} onValueChange={setThreshold} precision={rsiMode ? 2 : (spec?.pricePrecision ?? 5)} min="0" className="bl-input" placeholder={rsiMode ? '70' : 'price'} data-testid="alert-threshold" />
+        <NumberInput
+          label="Threshold"
+          hideLabel
+          value={threshold}
+          onValueChange={setThreshold}
+          precision={rsiMode ? 2 : (spec?.pricePrecision ?? 5)}
+          min="0"
+          className="bl-input"
+          placeholder={rsiMode ? '70' : 'price'}
+          data-testid="alert-threshold"
+        />
         {rsiMode ? (
-          <select className="tk-mode" aria-label="Timeframe" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
+          <select
+            className="tk-mode"
+            aria-label="Timeframe"
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value)}
+          >
             {['1m', '5m', '15m', '1h', '4h', '1D'].map((t) => (
               <option key={t}>{t}</option>
             ))}
@@ -515,7 +802,9 @@ export function AlertsPanel() {
         <button type="submit" className="bl-btn" disabled={!threshold} data-testid="alert-create">
           Add alert
         </button>
-        <span className="text-muted text-[11px]">Evaluated on the server, also when this page is closed.</span>
+        <span className="text-muted text-[11px]">
+          Evaluated on the server, also when this page is closed.
+        </span>
       </form>
       {alerts.length === 0 ? (
         <Empty what="No alerts." />
@@ -525,11 +814,17 @@ export function AlertsPanel() {
             <tr>
               <th scope="col">Symbol</th>
               <th scope="col">Condition</th>
-              <th scope="col" className="num">Threshold</th>
+              <th scope="col" className="num">
+                Threshold
+              </th>
               <th scope="col">Status</th>
               <th scope="col">Triggered ({clockLabel(timeDisplay)})</th>
-              <th scope="col" className="num">Value</th>
-              <th scope="col" className="num">Actions</th>
+              <th scope="col" className="num">
+                Value
+              </th>
+              <th scope="col" className="num">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -542,11 +837,18 @@ export function AlertsPanel() {
                 </td>
                 <td className="num k-num">{a.threshold}</td>
                 <td>{a.status}</td>
-                <td className="k-num">{a.triggeredAt ? formatClock(a.triggeredAt, timeDisplay) : '—'}</td>
+                <td className="k-num">
+                  {a.triggeredAt ? formatClock(a.triggeredAt, timeDisplay) : '—'}
+                </td>
                 <td className="num k-num">{a.triggeredValue ?? '—'}</td>
                 <td className="num">
                   {a.status === 'active' ? (
-                    <button type="button" className="bl-btn" onClick={() => void cancel(a.id)} aria-label={`Cancel alert on ${a.symbol}`}>
+                    <button
+                      type="button"
+                      className="bl-btn"
+                      onClick={() => void cancel(a.id)}
+                      aria-label={`Cancel alert on ${a.symbol}`}
+                    >
                       Cancel
                     </button>
                   ) : null}
@@ -591,7 +893,12 @@ export function RiskPanel() {
   const ccy = risk.currency;
   const used = Math.min(100, Math.max(0, Number(risk.dailyLoss.usedPct))); // meter width only
   return (
-    <div className="bl h-full overflow-auto risk-grid" data-panel-root="risk" data-testid="risk-panel" tabIndex={-1}>
+    <div
+      className="bl h-full overflow-auto risk-grid"
+      data-panel-root="risk"
+      data-testid="risk-panel"
+      tabIndex={-1}
+    >
       <section aria-labelledby="risk-exp">
         <h3 id="risk-exp" className="k-label">
           Net exposure by currency
@@ -603,16 +910,24 @@ export function RiskPanel() {
             <thead>
               <tr>
                 <th scope="col">Ccy</th>
-                <th scope="col" className="num">Amount</th>
-                <th scope="col" className="num">In {ccy}</th>
+                <th scope="col" className="num">
+                  Amount
+                </th>
+                <th scope="col" className="num">
+                  In {ccy}
+                </th>
               </tr>
             </thead>
             <tbody>
               {risk.exposure.map((e) => (
                 <tr key={e.currency}>
                   <td>{e.currency}</td>
-                  <td className={`num k-num ${e.amount.startsWith('-') ? 'k-dir--down' : 'k-dir--up'}`}>{`${e.amount.startsWith('-') ? '▼ ' : '▲ '}${formatMoney(e.amount, e.currency, { decimals: 2 }).replace(` ${e.currency}`, '')}`}</td>
-                  <td className="num k-num">{e.amountBase ? formatMoney(e.amountBase, ccy).replace(` ${ccy}`, '') : 'n/a'}</td>
+                  <td
+                    className={`num k-num ${e.amount.startsWith('-') ? 'k-dir--down' : 'k-dir--up'}`}
+                  >{`${e.amount.startsWith('-') ? '▼ ' : '▲ '}${formatMoney(e.amount, e.currency, { decimals: 2 }).replace(` ${e.currency}`, '')}`}</td>
+                  <td className="num k-num">
+                    {e.amountBase ? formatMoney(e.amountBase, ccy).replace(` ${ccy}`, '') : 'n/a'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -624,10 +939,13 @@ export function RiskPanel() {
           VaR 95 % · 1 day · historical
         </h3>
         <p className="k-num text-lg m-0" data-testid="risk-var">
-          {risk.var.value ? `${formatMoney(risk.var.value, ccy)}${risk.var.pctEquity ? ` · ${risk.var.pctEquity}% eq.` : ''}` : '—'}
+          {risk.var.value
+            ? `${formatMoney(risk.var.value, ccy)}${risk.var.pctEquity ? ` · ${risk.var.pctEquity}% eq.` : ''}`
+            : '—'}
         </p>
         <p className="text-muted text-[11px] m-0">
-          {risk.var.note} {risk.var.observations ? `${risk.var.observations} days.` : ''} Source: {risk.source === 'api' ? 'KORA api (quant service endpoint pending)' : 'quant service'}.
+          {risk.var.note} {risk.var.observations ? `${risk.var.observations} days.` : ''} Source:{' '}
+          {risk.source === 'api' ? 'KORA api (quant service endpoint pending)' : 'quant service'}.
         </p>
       </section>
       <section aria-labelledby="risk-corr">
@@ -641,7 +959,13 @@ export function RiskPanel() {
             ))}
           </ul>
         ) : (
-          <Empty what={risk.correlation.symbols.length > 1 ? 'No strongly correlated positions.' : 'Needs two or more positions.'} />
+          <Empty
+            what={
+              risk.correlation.symbols.length > 1
+                ? 'No strongly correlated positions.'
+                : 'Needs two or more positions.'
+            }
+          />
         )}
       </section>
       <section aria-labelledby="risk-loss">
@@ -649,15 +973,25 @@ export function RiskPanel() {
           Daily loss vs limit
         </h3>
         <div className="flex items-center gap-2">
-          <span className="inline-block w-32 h-1.5 rounded bg-raised overflow-hidden" role="meter" aria-label="Daily loss limit used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={used}>
+          <span
+            className="inline-block w-32 h-1.5 rounded bg-raised overflow-hidden"
+            role="meter"
+            aria-label="Daily loss limit used"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={used}
+          >
             <span className="block h-full bg-warn" style={{ width: `${used}%` }} />
           </span>
           <span className="k-num text-xs">
-            {risk.dailyLoss.usedPct}% of {formatMoney(risk.dailyLoss.limit, ccy)} · day P&amp;L {formatMoney(risk.dailyLoss.dayPnl, ccy, { signed: true })}
+            {risk.dailyLoss.usedPct}% of {formatMoney(risk.dailyLoss.limit, ccy)} · day P&amp;L{' '}
+            {formatMoney(risk.dailyLoss.dayPnl, ccy, { signed: true })}
           </span>
         </div>
       </section>
-      <p className="text-muted text-[11px] m-0 col-span-full">Estimates on SIMULATED history; not a guarantee of future losses.</p>
+      <p className="text-muted text-[11px] m-0 col-span-full">
+        Estimates on SIMULATED history; not a guarantee of future losses.
+      </p>
     </div>
   );
 }
@@ -668,14 +1002,23 @@ export function BlotterSummary() {
   const fills = useTrading((s) => s.fills);
   const currency = useTrading((s) => s.currency);
   const today = new Date().toISOString().slice(0, 10);
-  const realized = fills.filter((f) => f.ts.startsWith(today)).reduce((a, f) => a.add(dec(f.realizedPnl)), dec(0));
+  const realized = fills
+    .filter((f) => f.ts.startsWith(today))
+    .reduce((a, f) => a.add(dec(f.realizedPnl)), dec(0));
   if (!account) return null;
   const u = dec(account.unrealizedPnl);
   return (
     <span className="bl-summary k-num" data-testid="blotter-summary">
-      <span className="text-muted">Unrealized</span> <span className={u.isNegative() ? 'k-dir--down' : u.isZero() ? '' : 'k-dir--up'}>{formatMoney(account.unrealizedPnl, currency, { signed: true }).replace(` ${currency}`, '')}</span>
-      <span className="text-muted"> · Realized today</span> <span className={realized.isNegative() ? 'k-dir--down' : realized.isZero() ? '' : 'k-dir--up'}>{formatMoney(realized.toFixed(), currency, { signed: true }).replace(` ${currency}`, '')}</span>
+      <span className="text-muted">Unrealized</span>{' '}
+      <span className={u.isNegative() ? 'k-dir--down' : u.isZero() ? '' : 'k-dir--up'}>
+        {formatMoney(account.unrealizedPnl, currency, { signed: true }).replace(` ${currency}`, '')}
+      </span>
+      <span className="text-muted"> · Realized today</span>{' '}
+      <span
+        className={realized.isNegative() ? 'k-dir--down' : realized.isZero() ? '' : 'k-dir--up'}
+      >
+        {formatMoney(realized.toFixed(), currency, { signed: true }).replace(` ${currency}`, '')}
+      </span>
     </span>
   );
 }
-

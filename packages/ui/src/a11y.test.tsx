@@ -15,13 +15,29 @@ const modules = import.meta.glob<StoryModule>('./components/*.stories.tsx', { ea
 afterEach(cleanup);
 
 const COMPONENTS = [
-  'Button', 'Input', 'NumberInput', 'Select', 'Tabs', 'Panel', 'Table', 'Chip', 'Dialog',
-  'HoldToConfirmButton', 'Toast', 'Banner', 'Kbd', 'DirectionBadge', 'Money', 'SegmentedControl',
+  'Button',
+  'Input',
+  'NumberInput',
+  'Select',
+  'Tabs',
+  'Panel',
+  'Table',
+  'Chip',
+  'Dialog',
+  'HoldToConfirmButton',
+  'Toast',
+  'Banner',
+  'Kbd',
+  'DirectionBadge',
+  'Money',
+  'SegmentedControl',
 ];
 
 describe('storybook coverage', () => {
   it('every primitive has at least one story', () => {
-    const files = Object.keys(modules).map((p) => p.replace('./components/', '').replace('.stories.tsx', ''));
+    const files = Object.keys(modules).map((p) =>
+      p.replace('./components/', '').replace('.stories.tsx', ''),
+    );
     for (const c of COMPONENTS) expect(files).toContain(c);
   });
 });
@@ -32,12 +48,16 @@ for (const [path, mod] of Object.entries(modules)) {
     for (const [name, Story] of Object.entries(stories)) {
       for (const theme of ['pro-dark', 'novice-light'] as const) {
         it(`${name} [${theme}] has no axe violations`, async () => {
-          const { baseElement } = render(<Story />, { container: document.body.appendChild(document.createElement('div')) });
+          const { baseElement } = render(<Story />, {
+            container: document.body.appendChild(document.createElement('div')),
+          });
           document.documentElement.setAttribute('data-theme', theme);
           const res = await axe.run(baseElement, {
             rules: { 'color-contrast': { enabled: false }, region: { enabled: false } },
           });
-          const summary = res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
+          const summary = res.violations.map(
+            (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+          );
           expect(summary).toEqual([]);
         });
       }

@@ -41,14 +41,17 @@ const TS_FORMAT = `'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'`;
  * Checks READ COMMITTED, takes the chain lock and reads the head in one round trip (migration 0102,
  * goal 10 load finding). The lock is held until the caller's transaction ends.
  */
-async function lockHead(c: Queryable): Promise<{ head_id: string | null; head_hash: string | null; ts: string }> {
+async function lockHead(
+  c: Queryable,
+): Promise<{ head_id: string | null; head_hash: string | null; ts: string }> {
   try {
     const r = await c.query<{ head_id: string | null; head_hash: string | null; ts: string }>(
       'SELECT head_id::text AS head_id, head_hash, ts FROM audit_chain_lock_head()',
     );
     return r.rows[0]!;
   } catch (e) {
-    if (/READ COMMITTED/.test((e as Error).message)) throw new Error('AuditService.record requires a READ COMMITTED transaction');
+    if (/READ COMMITTED/.test((e as Error).message))
+      throw new Error('AuditService.record requires a READ COMMITTED transaction');
     throw e;
   }
 }
@@ -112,7 +115,11 @@ export class AuditService {
     return this.db.tx((c) => this.append(c, input, payload));
   }
 
-  private async append(c: Queryable, input: AuditRecordInput, payload: Record<string, JsonValue>): Promise<AuditEvent> {
+  private async append(
+    c: Queryable,
+    input: AuditRecordInput,
+    payload: Record<string, JsonValue>,
+  ): Promise<AuditEvent> {
     const head = await lockHead(c);
     const prevHash = head.head_hash ?? GENESIS_HASH;
     const id = (BigInt(head.head_id ?? '0') + 1n).toString();
@@ -131,7 +138,18 @@ export class AuditService {
     await c.query(
       `INSERT INTO audit_events (id, ts, actor_id, actor_type, action, entity, entity_id, payload, prev_hash, hash)
        VALUES ($1, $2::timestamptz, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
-      [id, ts, fields.actorId, fields.actorType, fields.action, fields.entity, fields.entityId, JSON.stringify(payload), prevHash, hash],
+      [
+        id,
+        ts,
+        fields.actorId,
+        fields.actorType,
+        fields.action,
+        fields.entity,
+        fields.entityId,
+        JSON.stringify(payload),
+        prevHash,
+        hash,
+      ],
     );
     return { ...fields, prevHash, hash };
   }
@@ -211,7 +229,9 @@ export class AuditService {
     if (q.beforeId) add('id < ?::bigint', q.beforeId);
     if (q.visibleTo) {
       params.push(q.visibleTo.userId, q.visibleTo.accountIds);
-      where.push(`(actor_id = $${params.length - 1} OR (payload ? 'accountId' AND payload->>'accountId' = ANY($${params.length}::text[])))`);
+      where.push(
+        `(actor_id = $${params.length - 1} OR (payload ? 'accountId' AND payload->>'accountId' = ANY($${params.length}::text[])))`,
+      );
     }
     const limit = Math.min(Math.max(q.limit ?? 100, 1), 500);
     params.push(limit + 1);
@@ -221,7 +241,10 @@ export class AuditService {
       params,
     );
     const page = rows.slice(0, limit).map(toEvent);
-    return { events: page, nextBeforeId: rows.length > limit ? (page[page.length - 1]?.id ?? null) : null };
+    return {
+      events: page,
+      nextBeforeId: rows.length > limit ? (page[page.length - 1]?.id ?? null) : null,
+    };
   }
 
   /** Events by id, in id order (internal-audit sampling). */
@@ -253,7 +276,10 @@ export class AuditService {
    * caller's visible events (newest `max`) is recomputed from its content and linked to the stored
    * hash of its predecessor. Discloses no platform-wide count or head hash.
    */
-  async verifyOwn(visibleTo: { userId: string; accountIds: string[] }, max = 5000): Promise<ChainVerification & { scope: 'own' }> {
+  async verifyOwn(
+    visibleTo: { userId: string; accountIds: string[] },
+    max = 5000,
+  ): Promise<ChainVerification & { scope: 'own' }> {
     const rows = await this.db.query<AuditRow>(
       `SELECT * FROM (SELECT ${SELECT_COLUMNS} FROM audit_events
          WHERE actor_id = $1 OR (payload ? 'accountId' AND payload->>'accountId' = ANY($2::text[]))
@@ -264,7 +290,10 @@ export class AuditService {
     const prevIds = events.map((e) => (BigInt(e.id) - 1n).toString()).filter((id) => id !== '0');
     const prev = new Map(
       (prevIds.length
-        ? await this.db.query<{ id: string; hash: string }>('SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])', [prevIds])
+        ? await this.db.query<{ id: string; hash: string }>(
+            'SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])',
+            [prevIds],
+          )
         : []
       ).map((r) => [r.id, r.hash]),
     );
@@ -273,7 +302,8 @@ export class AuditService {
       const pid = (BigInt(e.id) - 1n).toString();
       const expectedPrev = pid === '0' ? GENESIS_HASH : prev.get(pid);
       if (expectedPrev === undefined) broken = { firstBrokenId: e.id, reason: 'id_gap' };
-      else if (expectedPrev !== e.prevHash) broken = { firstBrokenId: e.id, reason: 'prev_hash_mismatch' };
+      else if (expectedPrev !== e.prevHash)
+        broken = { firstBrokenId: e.id, reason: 'prev_hash_mismatch' };
       else {
         let expected: string | null;
         try {
@@ -308,7 +338,13 @@ export class AuditService {
       for (const r of rows) {
         const e = toEvent(r);
         if (first && e.id !== '1') {
-          return { ...verifier.result(), valid: false, count: 1, firstBrokenId: e.id, reason: 'id_gap' };
+          return {
+            ...verifier.result(),
+            valid: false,
+            count: 1,
+            firstBrokenId: e.id,
+            reason: 'id_gap',
+          };
         }
         first = false;
         if (!verifier.push(e)) return verifier.result();

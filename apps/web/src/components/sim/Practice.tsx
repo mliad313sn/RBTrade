@@ -29,7 +29,11 @@ const inPage = (id: string) => `#glossary-${id}`;
 /** Simulation estimates are floats (ADR 0005): whole-currency display in the viewer's language. */
 function simMoney(n: number, locale: 'en' | 'fr'): string {
   if (!Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 function Choice<V extends string>({
@@ -55,7 +59,14 @@ function Choice<V extends string>({
             className={`flex flex-col gap-0.5 p-3 rounded-xl border cursor-pointer min-h-11 ${value === o.value ? 'border-accent bg-accent-surface' : 'border-border bg-panel'}`}
           >
             <span className="flex items-center gap-2">
-              <input type="radio" name={name} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} className="accent-[var(--k-accent)] w-5 h-5" />
+              <input
+                type="radio"
+                name={name}
+                value={o.value}
+                checked={value === o.value}
+                onChange={() => onChange(o.value)}
+                className="accent-[var(--k-accent)] w-5 h-5"
+              />
               <span className="font-semibold">{o.label}</span>
             </span>
             <span className="text-sm text-muted pl-7">{o.hint}</span>
@@ -100,7 +111,15 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
     setError(null);
     try {
       const n = Number(inputs.amount);
-      setResult(await simApi.project(practiceRequest({ amount: Number.isFinite(n) ? n : MIN_AMOUNT, often: inputs.often, careful: inputs.careful })));
+      setResult(
+        await simApi.project(
+          practiceRequest({
+            amount: Number.isFinite(n) ? n : MIN_AMOUNT,
+            often: inputs.often,
+            careful: inputs.careful,
+          }),
+        ),
+      );
     } catch (e) {
       setError(e instanceof SimApiError && e.status < 500 ? e.message : t('practice.error'));
     } finally {
@@ -111,12 +130,20 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
   async function save() {
     setSaveError(null);
     try {
-      const s = await simApi.saveScenario({ kind: 'practice', name: planName.trim(), input: { amount, often, careful } });
+      const s = await simApi.saveScenario({
+        kind: 'practice',
+        name: planName.trim(),
+        input: { amount, often, careful },
+      });
       setSaved((list) => [s, ...list.filter((x) => x.id !== s.id)]);
       setPlanName('');
       toast.push(t('practice.saved'), 'success', 4000);
     } catch (e) {
-      setSaveError(e instanceof SimApiError && e.code === 'name_taken' ? t('practice.nameTaken') : t('common.error'));
+      setSaveError(
+        e instanceof SimApiError && e.code === 'name_taken'
+          ? t('practice.nameTaken')
+          : t('common.error'),
+      );
     }
   }
 
@@ -168,17 +195,46 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
                 max={String(MAX_AMOUNT)}
                 data-testid="practice-amount"
               />
-              <div className="flex flex-wrap gap-2 mt-2" role="group" aria-label={t('practice.quick')}>
+              <div
+                className="flex flex-wrap gap-2 mt-2"
+                role="group"
+                aria-label={t('practice.quick')}
+              >
                 {QUICK_AMOUNTS.map((q) => (
-                  <button key={q} type="button" className="k-btn k-btn--sm" aria-pressed={amount === q} onClick={() => setAmount(q)}>
+                  <button
+                    key={q}
+                    type="button"
+                    className="k-btn k-btn--sm"
+                    aria-pressed={amount === q}
+                    onClick={() => setAmount(q)}
+                  >
                     {simMoney(Number(q), locale)}
                   </button>
                 ))}
               </div>
             </div>
-            <Choice legend={t('practice.often')} name="often" value={often} options={oftenOptions} onChange={setOften} />
-            <Choice legend={t('practice.careful')} name="careful" value={careful} options={carefulOptions} onChange={setCareful} />
-            <Button variant="primary" size="lg" block onClick={() => void run()} disabled={busy} data-testid="practice-run">
+            <Choice
+              legend={t('practice.often')}
+              name="often"
+              value={often}
+              options={oftenOptions}
+              onChange={setOften}
+            />
+            <Choice
+              legend={t('practice.careful')}
+              name="careful"
+              value={careful}
+              options={carefulOptions}
+              onChange={setCareful}
+            />
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              onClick={() => void run()}
+              disabled={busy}
+              data-testid="practice-run"
+            >
               {busy ? t('practice.working') : result ? t('practice.again') : t('practice.run')}
             </Button>
             {error ? (
@@ -198,7 +254,13 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
             }}
           >
             <div className="flex-1 min-w-48">
-              <Input label={t('practice.saveName')} value={planName} maxLength={60} onChange={(e) => setPlanName(e.target.value)} data-testid="plan-name" />
+              <Input
+                label={t('practice.saveName')}
+                value={planName}
+                maxLength={60}
+                onChange={(e) => setPlanName(e.target.value)}
+                data-testid="plan-name"
+              />
             </div>
             <Button type="submit" disabled={!planName.trim()} data-testid="save-plan">
               {t('practice.save')}
@@ -212,13 +274,24 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
           {saved.length ? (
             <ul className="list-none m-0 mt-3 p-0 flex flex-col gap-2">
               {saved.map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-2" data-testid="saved-plan">
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2"
+                  data-testid="saved-plan"
+                >
                   <span className="font-semibold truncate">{s.name}</span>
                   <span className="flex gap-2">
-                    <Button onClick={() => load(s)} aria-label={t('practice.loadAria', { name: s.name })}>
+                    <Button
+                      onClick={() => load(s)}
+                      aria-label={t('practice.loadAria', { name: s.name })}
+                    >
                       {t('practice.load')}
                     </Button>
-                    <Button variant="ghost" onClick={() => void remove(s)} aria-label={t('practice.deleteAria', { name: s.name })}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => void remove(s)}
+                      aria-label={t('practice.deleteAria', { name: s.name })}
+                    >
                       {t('practice.delete')}
                     </Button>
                   </span>
@@ -240,13 +313,23 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
                 {outcomes.map((o) => {
                   const up = o.change >= 0;
                   return (
-                    <li key={o.key} className="p-4 rounded-xl border border-border bg-raised" data-testid={`year-${o.key}`} data-value={o.end}>
-                      <p className="m-0 text-sm text-muted">{t(`practice.${o.key}` as MessageKey)}</p>
+                    <li
+                      key={o.key}
+                      className="p-4 rounded-xl border border-border bg-raised"
+                      data-testid={`year-${o.key}`}
+                      data-value={o.end}
+                    >
+                      <p className="m-0 text-sm text-muted">
+                        {t(`practice.${o.key}` as MessageKey)}
+                      </p>
                       <p className="m-0 font-display text-3xl">{simMoney(o.end, locale)}</p>
                       <p className={`m-0 text-sm font-semibold ${up ? 'text-up' : 'text-down'}`}>
-                        {up ? t('practice.up') : t('practice.down')} {simMoney(Math.abs(o.change), locale)}
+                        {up ? t('practice.up') : t('practice.down')}{' '}
+                        {simMoney(Math.abs(o.change), locale)}
                       </p>
-                      <p className="m-0 mt-1 text-sm text-muted">{t(`practice.${o.key}.explain` as MessageKey)}</p>
+                      <p className="m-0 mt-1 text-sm text-muted">
+                        {t(`practice.${o.key}.explain` as MessageKey)}
+                      </p>
                     </li>
                   );
                 })}
@@ -291,7 +374,11 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
               <ExplainThis
                 topic="practice_year"
                 locale={locale}
-                context={{ good: String(Math.round(result.finalEquity.p95)), typical: String(Math.round(result.finalEquity.p50)), bad: String(Math.round(result.finalEquity.p5)) }}
+                context={{
+                  good: String(Math.round(result.finalEquity.p95)),
+                  typical: String(Math.round(result.finalEquity.p50)),
+                  bad: String(Math.round(result.finalEquity.p5)),
+                }}
               />
             </>
           ) : (

@@ -90,12 +90,19 @@ function make(opts: Partial<ConstructorParameters<typeof MarketDataSocket>[0]> =
 describe('MarketDataSocket', () => {
   it('B-203: re-authenticates on the open socket before the token expires (provider tokens), keeps subscriptions', async () => {
     let n = 0;
-    const { s, clock, ws } = make({ token: () => `token-number-${++n}`, refreshBeforeMs: 60_000, heartbeatMs: 1_000_000 });
+    const { s, clock, ws } = make({
+      token: () => `token-number-${++n}`,
+      refreshBeforeMs: 60_000,
+      heartbeatMs: 1_000_000,
+    });
     s.riskAlerts(() => undefined);
     s.connect();
     ws().open();
     await flush();
-    expect(ws().sent).toEqual([{ op: 'auth', token: 'token-number-1' }, { op: 'subscribe', channels: ['risk:alerts'] }]);
+    expect(ws().sent).toEqual([
+      { op: 'auth', token: 'token-number-1' },
+      { op: 'subscribe', channels: ['risk:alerts'] },
+    ]);
     ws().push({ type: 'authenticated', sub: 'u1', exp: Math.floor((clock.t + 300_000) / 1000) });
     clock.advance(239_000);
     await flush();
@@ -117,12 +124,18 @@ describe('MarketDataSocket', () => {
     s.connect();
     ws().open();
     await flush();
-    expect(ws().sent).toEqual([{ op: 'auth', token: 't0ken-abcdef' }, { op: 'subscribe', channels: ['quotes:EURUSD'] }]);
+    expect(ws().sent).toEqual([
+      { op: 'auth', token: 't0ken-abcdef' },
+      { op: 'subscribe', channels: ['quotes:EURUSD'] },
+    ]);
     ws().push({ ch: 'quotes:EURUSD', snapshot: true, data: { bid: '1.08419' } });
     ws().push({ ch: 'quotes:EURUSD', data: { bid: '1.08420' } });
     ws().push({ ch: 'quotes:GBPUSD', data: { bid: 'x' } });
     ws().push('not json');
-    expect(got).toEqual([['1.08419', true], ['1.08420', false]]);
+    expect(got).toEqual([
+      ['1.08419', true],
+      ['1.08420', false],
+    ]);
     expect(states).toEqual(['connecting', 'open']);
     expect(s.state).toBe('open');
   });
@@ -173,7 +186,10 @@ describe('MarketDataSocket', () => {
     expect(FakeWs.all).toHaveLength(3);
     ws().open();
     await flush();
-    expect(ws().sent).toEqual([{ op: 'auth', token: 'fresh-token-123' }, { op: 'subscribe', channels: ['quotes:EURUSD', 'status'] }]);
+    expect(ws().sent).toEqual([
+      { op: 'auth', token: 'fresh-token-123' },
+      { op: 'subscribe', channels: ['quotes:EURUSD', 'status'] },
+    ]);
     expect(s.state).toBe('open');
     expect(s.reconnects).toBe(2);
     ws().drop();
@@ -259,8 +275,16 @@ describe('MarketDataSocket', () => {
     s.orders(id, (m) => got.push(`o${m.orders.length}`));
     s.positions(id, (m) => got.push(`p${m.positions.length}`));
     s.account(id, () => got.push('a'));
-    expect(s.channels()).toEqual(['trades:BTCUSD', `orders:${id}`, `positions:${id}`, `account:${id}`]);
-    ws().push({ ch: 'trades:BTCUSD', data: { type: 'trades', symbol: 'BTCUSD', trades: [{}, {}] } });
+    expect(s.channels()).toEqual([
+      'trades:BTCUSD',
+      `orders:${id}`,
+      `positions:${id}`,
+      `account:${id}`,
+    ]);
+    ws().push({
+      ch: 'trades:BTCUSD',
+      data: { type: 'trades', symbol: 'BTCUSD', trades: [{}, {}] },
+    });
     ws().push({ ch: `orders:${id}`, data: { type: 'orders', accountId: id, orders: [{}] } });
     ws().push({ ch: `positions:${id}`, data: { type: 'positions', positions: [] } });
     ws().push({ ch: `account:${id}`, data: { type: 'account', account: {} } });
@@ -271,7 +295,9 @@ describe('MarketDataSocket', () => {
     const calls: string[] = [];
     const f = (async (url: string, init: RequestInit) => {
       calls.push(`${init.method} ${url}`);
-      return new Response(init.method === 'DELETE' && url.includes('layouts') ? '' : '{}', { status: 200 });
+      return new Response(init.method === 'DELETE' && url.includes('layouts') ? '' : '{}', {
+        status: 200,
+      });
     }) as unknown as typeof fetch;
     const c = new KoraClient({ baseUrl: '/api', fetch: f });
     await c.layouts();

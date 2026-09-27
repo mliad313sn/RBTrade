@@ -21,7 +21,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bearer, createUser, type TestUser } from './helpers';
 import { robotHeartbeatKey } from '../src/robots/robot-channels';
 import { MarketFixture } from './market-fixture';
-import { clearCandles, freePort, seedCandles, startBotRunner, startQuant, TOKEN, wave, type Spawned } from './robot-helpers';
+import {
+  clearCandles,
+  freePort,
+  seedCandles,
+  startBotRunner,
+  startQuant,
+  TOKEN,
+  wave,
+  type Spawned,
+} from './robot-helpers';
 
 interface SpanLine {
   traceId: string;
@@ -60,7 +69,11 @@ const newTraceparent = () => {
 
 describe('distributed traces (goal 10)', () => {
   const dir = join(tmpdir(), `kora-traces-${process.pid}-${Date.now()}`);
-  const files = { api: `${dir}-api.jsonl`, quant: `${dir}-quant.jsonl`, runner: `${dir}-runner.jsonl` };
+  const files = {
+    api: `${dir}-api.jsonl`,
+    quant: `${dir}-quant.jsonl`,
+    runner: `${dir}-runner.jsonl`,
+  };
   const prefix = `kora:test:${process.pid}:trace:md:`;
   let quant: Spawned;
   let runner: Spawned;
@@ -114,7 +127,10 @@ describe('distributed traces (goal 10)', () => {
       // IRTC R6: deterministic export. SIGUSR2 makes the api force-flush its span processor and then
       // append a line to `<file>.flush`; the spans ended before the signal are in the file after it.
       flush: async () => {
-        const marks = () => (existsSync(`${files.api}.flush`) ? readFileSync(`${files.api}.flush`, 'utf8').split('\n').filter(Boolean).length : 0);
+        const marks = () =>
+          existsSync(`${files.api}.flush`)
+            ? readFileSync(`${files.api}.flush`, 'utf8').split('\n').filter(Boolean).length
+            : 0;
         const before = marks();
         process.kill(proc.pid!, 'SIGUSR2');
         const after = await until(marks, (n) => n > before, 10_000);
@@ -163,21 +179,40 @@ describe('distributed traces (goal 10)', () => {
       .post('/orders')
       .set(bearer(trader.token))
       .set('traceparent', tp.header)
-      .send({ clientOrderId: `trace-${process.pid}`, symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.01' });
+      .send({
+        clientOrderId: `trace-${process.pid}`,
+        symbol: 'BTCUSD',
+        side: 'buy',
+        type: 'market',
+        qty: '0.01',
+      });
     expect(placed.status, JSON.stringify(placed.body)).toBe(201);
     // the engine loop fills on the next quote
     await md.quote('BTCUSD', '64812.5', '64814.5');
     const fills = await until(
-      async () => (await request(api.url).get('/fills').set(bearer(trader.token))).body.fills as unknown[],
+      async () =>
+        (await request(api.url).get('/fills').set(bearer(trader.token))).body.fills as unknown[],
       (f) => f.length > 0,
     );
     expect(fills.length).toBeGreaterThan(0);
     // The fill is committed before its span ends: flush (deterministic) until the span is exported.
-    const spans = await untilFlushed(() => readSpans(files.api).filter((s) => s.traceId === tp.traceId), (s) => s.some((x) => x.name === 'engine.fill'));
+    const spans = await untilFlushed(
+      () => readSpans(files.api).filter((s) => s.traceId === tp.traceId),
+      (s) => s.some((x) => x.name === 'engine.fill'),
+    );
     const names = spans.map((s) => s.name);
     expect(names).toEqual(expect.arrayContaining(['oms.submit', 'risk.evaluate', 'engine.fill']));
-    expect(names.some((n) => /^POST( \/orders)?$/.test(n)), names.join(', ')).toBe(true); // http server span
-    expect(spans.some((s) => s.attributes['db.system'] === 'postgresql' || s.attributes['db.system.name'] === 'postgresql')).toBe(true);
+    expect(
+      names.some((n) => /^POST( \/orders)?$/.test(n)),
+      names.join(', '),
+    ).toBe(true); // http server span
+    expect(
+      spans.some(
+        (s) =>
+          s.attributes['db.system'] === 'postgresql' ||
+          s.attributes['db.system.name'] === 'postgresql',
+      ),
+    ).toBe(true);
     const submit = spans.find((s) => s.name === 'oms.submit')!;
     const fill = spans.find((s) => s.name === 'engine.fill')!;
     expect(fill.parentSpanId).toBe(submit.spanId); // the asynchronous fill hangs under the ticket
@@ -186,7 +221,12 @@ describe('distributed traces (goal 10)', () => {
 
   it('api → quant joins the caller’s trace (gain simulator)', async () => {
     const tp = newTraceparent();
-    await request(api.url).post('/sim/project').set(bearer(trader.token)).set('traceparent', tp.header).send({ paths: 500 }).expect(200);
+    await request(api.url)
+      .post('/sim/project')
+      .set(bearer(trader.token))
+      .set('traceparent', tp.header)
+      .send({ paths: 500 })
+      .expect(200);
     const q = await until(
       () => readSpans(files.quant).filter((s) => s.traceId === tp.traceId),
       (s) => s.length > 0,
@@ -222,20 +262,61 @@ describe('distributed traces (goal 10)', () => {
         name: 'Trace probe',
         universe: { symbols: ['BTCUSD'], timeframe: '1m' },
         params: {},
-        entry: { side: 'long', conditions: [{ type: 'compare', left: { kind: 'indicator', name: 'close' }, op: 'lt', right: { kind: 'const', value: 1 } }] },
+        entry: {
+          side: 'long',
+          conditions: [
+            {
+              type: 'compare',
+              left: { kind: 'indicator', name: 'close' },
+              op: 'lt',
+              right: { kind: 'const', value: 1 },
+            },
+          ],
+        },
         filters: [],
         exit: { stop: { kind: 'percent', pct: 4 }, conditions: [] },
         size: { kind: 'fixed', qty: '0.01', maxOpenPositions: 1 },
       };
-      const s = await request(api.url).post('/strategies').set(bearer(trader.token)).send({ definition: def }).expect(201);
-      const r = await request(api.url).post('/robots').set(bearer(trader.token)).send({ name: 'Trace', versionId: s.body.latest.id }).expect(201);
-      await request(api.url).post(`/robots/${r.body.id}/start`).set(bearer(trader.token)).expect(200);
-      await until(async () => !!(await redis.get(robotHeartbeatKey(r.body.id))), (x) => x, 15_000);
+      const s = await request(api.url)
+        .post('/strategies')
+        .set(bearer(trader.token))
+        .send({ definition: def })
+        .expect(201);
+      const r = await request(api.url)
+        .post('/robots')
+        .set(bearer(trader.token))
+        .send({ name: 'Trace', versionId: s.body.latest.id })
+        .expect(201);
+      await request(api.url)
+        .post(`/robots/${r.body.id}/start`)
+        .set(bearer(trader.token))
+        .expect(200);
+      await until(
+        async () => !!(await redis.get(robotHeartbeatKey(r.body.id))),
+        (x) => x,
+        15_000,
+      );
       const last = bars[bars.length - 1]!;
       const publish = () =>
         redis.publish(
           `${prefix}candles:BTCUSD:1m`,
-          JSON.stringify({ type: 'candle', symbol: 'BTCUSD', tf: '1m', bucket: last.t, open: last.o.toFixed(1), high: last.h.toFixed(1), low: last.l.toFixed(1), close: last.c.toFixed(1), volume: '1', trades: 1, closed: true, source: 'simulated', seq: 1, exchangeTs: last.t + M, receivedTs: Date.now() }),
+          JSON.stringify({
+            type: 'candle',
+            symbol: 'BTCUSD',
+            tf: '1m',
+            bucket: last.t,
+            open: last.o.toFixed(1),
+            high: last.h.toFixed(1),
+            low: last.l.toFixed(1),
+            close: last.c.toFixed(1),
+            volume: '1',
+            trades: 1,
+            closed: true,
+            source: 'simulated',
+            seq: 1,
+            exchangeTs: last.t + M,
+            receivedTs: Date.now(),
+          }),
         );
       await publish();
       const barSpan = await until(
@@ -252,10 +333,16 @@ describe('distributed traces (goal 10)', () => {
       const quantSpans = readSpans(files.quant).filter((x) => x.traceId === traceId);
       expect(quantSpans.map((x) => x.name)).toContain('POST /bt/signal');
       expect(apiSpans.length).toBeGreaterThanOrEqual(2); // context + decision requests
-      const runnerSpanIds = readSpans(files.runner).filter((x) => x.traceId === traceId).map((x) => x.spanId);
+      const runnerSpanIds = readSpans(files.runner)
+        .filter((x) => x.traceId === traceId)
+        .map((x) => x.spanId);
       expect(runnerSpanIds).toContain(quantSpans[0]!.parentSpanId);
       // Leave no running robot behind for later files (their robot supervisor would pause it).
-      await request(api.url).post(`/robots/${r.body.id}/pause`).set(bearer(trader.token)).send({ reason: 'tracing test done' }).expect(200);
+      await request(api.url)
+        .post(`/robots/${r.body.id}/pause`)
+        .set(bearer(trader.token))
+        .send({ reason: 'tracing test done' })
+        .expect(200);
     } finally {
       redis.disconnect();
     }

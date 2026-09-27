@@ -33,7 +33,9 @@ type Json<P extends keyof paths, M extends keyof paths[P], S extends number> = p
   ? T
   : never;
 
-type KnownKeys<T> = keyof { [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K] };
+type KnownKeys<T> = keyof {
+  [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
+};
 type Primitive = string | number | boolean | null | undefined;
 
 /**
@@ -57,7 +59,13 @@ type Conforms<S, G> = [G] extends [never]
         ? true
         : G extends object
           ? S extends object
-            ? false extends { [K in KnownKeys<G>]-?: undefined extends G[K] ? true : K extends keyof S ? Conforms<NonNullable<S[K]>, NonNullable<G[K]>> : false }[KnownKeys<G>]
+            ? false extends {
+                [K in KnownKeys<G>]-?: undefined extends G[K]
+                  ? true
+                  : K extends keyof S
+                    ? Conforms<NonNullable<S[K]>, NonNullable<G[K]>>
+                    : false;
+              }[KnownKeys<G>]
               ? false
               : true
             : false
@@ -72,7 +80,12 @@ type Assert<T extends true> = T;
 // One line per contract the SDK types. A `false` here is a compile error.
 export type ContractChecks = [
   Assert<Conforms<HealthResponse, Json<'/health', 'get', 200>>>,
-  Assert<Conforms<Extract<LoginResponse, { status: 'ok' }>, Extract<Json<'/auth/login', 'post', 200>, { status: 'ok' }>>>,
+  Assert<
+    Conforms<
+      Extract<LoginResponse, { status: 'ok' }>,
+      Extract<Json<'/auth/login', 'post', 200>, { status: 'ok' }>
+    >
+  >,
   Assert<Conforms<MeResponse, Json<'/me', 'get', 200>>>,
   Assert<Conforms<AuditListResponse, Json<'/audit', 'get', 200>>>,
   Assert<Conforms<AuditVerifyResponse, Json<'/audit/verify', 'get', 200>>>,
@@ -95,7 +108,9 @@ export type ContractChecks = [
 
 // Negative control: the checker really rejects a drifted type.
 type Drifted = Omit<OrderDto, 'filledQty'>;
-export type NegativeControl = Assert<Conforms<Drifted, Json<'/orders/{id}', 'patch', 200>> extends false ? true : false>;
+export type NegativeControl = Assert<
+  Conforms<Drifted, Json<'/orders/{id}', 'patch', 200>> extends false ? true : false
+>;
 
 describe('SDK types conform to the OpenAPI contracts', () => {
   it('is checked at compile time (pnpm typecheck)', () => {

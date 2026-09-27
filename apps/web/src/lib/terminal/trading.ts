@@ -71,7 +71,9 @@ export function mergeOrders(current: OrderDto[], changed: OrderDto[]): OrderDto[
     if (isOpen(o)) byId.set(o.id, o);
     else byId.delete(o.id);
   }
-  return [...byId.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  return [...byId.values()].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
+  );
 }
 
 export async function reloadTrading(): Promise<void> {
@@ -84,13 +86,20 @@ export async function reloadTrading(): Promise<void> {
   ]);
   const s = useTrading.getState();
   const patch: Partial<TradingState> = { loaded: true };
-  if (acct.status === 'fulfilled') Object.assign(patch, { account: acct.value, accountId: acct.value.id, currency: acct.value.baseCurrency });
+  if (acct.status === 'fulfilled')
+    Object.assign(patch, {
+      account: acct.value,
+      accountId: acct.value.id,
+      currency: acct.value.baseCurrency,
+    });
   if (ords.status === 'fulfilled') patch.orders = ords.value.orders;
   if (recent.status === 'fulfilled') patch.recent = recent.value.orders;
-  if (pos.status === 'fulfilled') Object.assign(patch, { positions: pos.value.positions, positionsAt: Date.now() });
+  if (pos.status === 'fulfilled')
+    Object.assign(patch, { positions: pos.value.positions, positionsAt: Date.now() });
   if (fl.status === 'fulfilled') {
     patch.fills = fl.value.fills;
-    if (s.loaded && fl.value.fills.length && fl.value.fills[0]?.id !== s.fills[0]?.id) patch.fillSeq = s.fillSeq + 1;
+    if (s.loaded && fl.value.fills.length && fl.value.fills[0]?.id !== s.fills[0]?.id)
+      patch.fillSeq = s.fillSeq + 1;
   }
   s.set(patch);
 }
@@ -114,10 +123,18 @@ export function startTradingStream(store: MarketStore): () => void {
           recent: mergeRecent(s.recent, m.orders),
           ...(filledNow ? { fillSeq: s.fillSeq + 1 } : {}),
         });
-        if (filledNow) void api.fills({ limit: 200 }).then((f) => useTrading.getState().set({ fills: f.fills })).catch(() => undefined);
+        if (filledNow)
+          void api
+            .fills({ limit: 200 })
+            .then((f) => useTrading.getState().set({ fills: f.fills }))
+            .catch(() => undefined);
       }),
-      store.subscribe<{ positions: PositionDto[] }>(`positions:${accountId}`, (m) => useTrading.getState().set({ positions: m.positions, positionsAt: Date.now() })),
-      store.subscribe<{ account: AccountView }>(`account:${accountId}`, (m) => useTrading.getState().set({ account: m.account })),
+      store.subscribe<{ positions: PositionDto[] }>(`positions:${accountId}`, (m) =>
+        useTrading.getState().set({ positions: m.positions, positionsAt: Date.now() }),
+      ),
+      store.subscribe<{ account: AccountView }>(`account:${accountId}`, (m) =>
+        useTrading.getState().set({ account: m.account }),
+      ),
     ];
   };
   // Live quotes for every open position (same market store as the watchlist and the ticket).

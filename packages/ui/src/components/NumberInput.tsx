@@ -1,13 +1,25 @@
 'use client';
 
 import { dec, isDecimalString, quantize } from '@kora/domain';
-import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState, type InputHTMLAttributes, type KeyboardEvent } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type InputHTMLAttributes,
+  type KeyboardEvent,
+} from 'react';
 
 import { cx } from '../lib/cx';
 import { describedBy, Field, type FieldProps } from './Input';
 
 export interface NumberInputProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'min' | 'max' | 'step' | 'size'>,
+  extends Omit<
+      InputHTMLAttributes<HTMLInputElement>,
+      'value' | 'onChange' | 'type' | 'min' | 'max' | 'step' | 'size'
+    >,
     FieldProps {
   /** Decimal string. Never a JS number. */
   value: string;
@@ -42,10 +54,19 @@ function clamp(v: string, min?: string, max?: string): string {
 }
 
 /** Normalises a finished value to exactly `precision` places, within [min, max]. */
-export function normaliseDecimal(raw: string, precision: number, min?: string, max?: string): string {
+export function normaliseDecimal(
+  raw: string,
+  precision: number,
+  min?: string,
+  max?: string,
+): string {
   const s = raw.trim();
   if (s === '' || s === '-' || s === '.' || s === '-.') return '';
-  const fixed = s.endsWith('.') ? s.slice(0, -1) : s.startsWith('.') ? `0${s}` : s.replace(/^-\./, '-0.');
+  const fixed = s.endsWith('.')
+    ? s.slice(0, -1)
+    : s.startsWith('.')
+      ? `0${s}`
+      : s.replace(/^-\./, '-0.');
   if (!isDecimalString(fixed)) return '';
   return quantize(clamp(fixed, min, max), precision).toFixed(precision);
 }
@@ -56,7 +77,9 @@ export function decimalSeparator(locale: string | undefined): ',' | '.' {
   return /^(fr|de|es|it|pt|nl|pl|ru|tr|sv|da|fi|nb|no|cs|sk|hu|ro)\b/.test(l) ? ',' : '.';
 }
 
-export type LocaleParse = { ok: true; canonical: string } | { ok: false; reason: 'ambiguous' | 'invalid' };
+export type LocaleParse =
+  | { ok: true; canonical: string }
+  | { ok: false; reason: 'ambiguous' | 'invalid' };
 
 /**
  * Reads what a person typed or pasted as a canonical decimal string ("2500.5"), per language (IRTC R5-08).
@@ -76,11 +99,15 @@ export function parseLocaleDecimal(raw: string, locale: string | undefined): Loc
   const body = neg ? s.slice(1) : s;
   if (decimalSeparator(locale) === '.') {
     const [int = '', ...rest] = body.split('.');
-    if (rest.length > 1 || rest.some((r) => r.includes(','))) return { ok: false, reason: 'invalid' };
+    if (rest.length > 1 || rest.some((r) => r.includes(',')))
+      return { ok: false, reason: 'invalid' };
     if (!int.includes(',')) return { ok: true, canonical: `${neg}${body}` };
     // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern, bounded groups
     if (!/^\d{1,3}(,\d{3})+$/.test(int)) return { ok: false, reason: 'ambiguous' };
-    return { ok: true, canonical: `${neg}${int.replace(/,/g, '')}${rest.length ? `.${rest[0]}` : ''}` };
+    return {
+      ok: true,
+      canonical: `${neg}${int.replace(/,/g, '')}${rest.length ? `.${rest[0]}` : ''}`,
+    };
   }
   const commas = body.split(',').length - 1;
   if (commas > 1) return { ok: false, reason: 'invalid' };
@@ -96,7 +123,8 @@ export function parseLocaleDecimal(raw: string, locale: string | undefined): Loc
   if (body.split('.').length > 2) {
     // "2.500.000": dots as thousands groups.
     // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern, bounded groups
-    if (/^\d{1,3}(\.\d{3})+$/.test(body)) return { ok: true, canonical: `${neg}${body.replace(/\./g, '')}` };
+    if (/^\d{1,3}(\.\d{3})+$/.test(body))
+      return { ok: true, canonical: `${neg}${body.replace(/\./g, '')}` };
     return { ok: false, reason: 'invalid' };
   }
   return { ok: true, canonical: `${neg}${body}` };
@@ -118,7 +146,26 @@ const AMBIGUOUS: Record<',' | '.', string> = {
  * (IRTC R5-08): the text typed is kept while editing, the value passed up is always canonical.
  */
 export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(function NumberInput(
-  { label, hint, error, hideLabel, id, value, onValueChange, precision, min, max, step, allowNegative = false, locale, className, onBlur, onFocus, onKeyDown, ...rest },
+  {
+    label,
+    hint,
+    error,
+    hideLabel,
+    id,
+    value,
+    onValueChange,
+    precision,
+    min,
+    max,
+    step,
+    allowNegative = false,
+    locale,
+    className,
+    onBlur,
+    onFocus,
+    onKeyDown,
+    ...rest
+  },
   ref,
 ) {
   const auto = useId();
@@ -130,7 +177,8 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
   const [problem, setProblem] = useState<string | null>(null);
   const sep = decimalSeparator(locale ?? lang);
 
-  const detect = () => locale ?? inner.current?.closest('[lang]')?.getAttribute('lang') ?? undefined;
+  const detect = () =>
+    locale ?? inner.current?.closest('[lang]')?.getAttribute('lang') ?? undefined;
   useEffect(() => {
     setLang(detect());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +186,8 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
 
   // While editing, keep the person's text unless the value was changed from outside (a draft prefill).
   const textValue = text !== null ? parseLocaleDecimal(text, locale ?? lang) : null;
-  const inSync = text !== null && (problem !== null || (textValue?.ok && textValue.canonical === value));
+  const inSync =
+    text !== null && (problem !== null || (textValue?.ok && textValue.canonical === value));
   const shown = inSync ? text : formatForInput(value, locale ?? lang);
 
   const stepBy = (dir: 1 | -1, e: KeyboardEvent<HTMLInputElement>) => {

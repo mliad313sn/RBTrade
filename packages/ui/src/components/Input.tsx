@@ -44,7 +44,9 @@ export function describedBy(id: string, hint?: ReactNode, error?: ReactNode): st
   return error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 }
 
-export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>, FieldProps {}
+export interface InputProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>,
+    FieldProps {}
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { label, hint, error, hideLabel, id, className, ...rest },

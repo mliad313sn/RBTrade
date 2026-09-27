@@ -1,5 +1,17 @@
-import type { Candle, DepthSnapshot, FeedStatus, Quote, Timeframe, TradesBatch } from '@kora/domain';
-import { MarketDataSocket, type ChannelHandler, type SocketState, type WebSocketCtor } from '@kora/sdk';
+import type {
+  Candle,
+  DepthSnapshot,
+  FeedStatus,
+  Quote,
+  Timeframe,
+  TradesBatch,
+} from '@kora/domain';
+import {
+  MarketDataSocket,
+  type ChannelHandler,
+  type SocketState,
+  type WebSocketCtor,
+} from '@kora/sdk';
 
 /**
  * One market data socket per terminal, with reference-counted subscriptions and a frame-batched
@@ -44,7 +56,10 @@ export class MarketStore {
   private readonly quoteCh = new Map<string, Channel<Quote>>();
   private readonly depthCh = new Map<string, Channel<DepthSnapshot>>();
   private readonly tradeCh = new Map<string, Channel<TradesBatch>>();
-  private readonly pending = new Map<string, { kind: 'q' | 'd' | 't'; symbol: string; value: unknown; at: number }>();
+  private readonly pending = new Map<
+    string,
+    { kind: 'q' | 'd' | 't'; symbol: string; value: unknown; at: number }
+  >();
   private scheduled = false;
   private statusValue: FeedStatus | null = null;
   private readonly statusListeners = new Set<Listener<FeedStatus>>();
@@ -56,8 +71,10 @@ export class MarketStore {
 
   constructor(private readonly opts: MarketStoreOptions) {
     this.schedule = opts.schedule ?? defaultSchedule;
-    this.now = opts.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
-    if (typeof window !== 'undefined') (window as unknown as { __koraPerf?: PerfSink }).__koraPerf = this.perf;
+    this.now =
+      opts.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
+    if (typeof window !== 'undefined')
+      (window as unknown as { __koraPerf?: PerfSink }).__koraPerf = this.perf;
   }
 
   get state(): SocketState {
@@ -78,7 +95,10 @@ export class MarketStore {
 
   private ensure(): MarketDataSocket {
     if (this.socket) return this.socket;
-    const s = new MarketDataSocket({ url: this.opts.url, ...(this.opts.WebSocket ? { WebSocket: this.opts.WebSocket } : {}) });
+    const s = new MarketDataSocket({
+      url: this.opts.url,
+      ...(this.opts.WebSocket ? { WebSocket: this.opts.WebSocket } : {}),
+    });
     s.onState((st) => this.stateListeners.forEach((l) => l(st)));
     this.statusUnsub = s.status((st) => {
       this.statusValue = st;
@@ -123,7 +143,8 @@ export class MarketStore {
     this.schedule(() => {
       const t = this.now();
       for (const at of arrivals) this.perf.ticks.push(t - at);
-      if (this.perf.ticks.length > MAX_SAMPLES) this.perf.ticks.splice(0, this.perf.ticks.length - MAX_SAMPLES);
+      if (this.perf.ticks.length > MAX_SAMPLES)
+        this.perf.ticks.splice(0, this.perf.ticks.length - MAX_SAMPLES);
     });
   }
 
@@ -133,7 +154,12 @@ export class MarketStore {
     for (const l of ch.listeners) l(v);
   }
 
-  private add<T>(map: Map<string, Channel<T>>, symbol: string, listener: Listener<T>, open: () => () => void): () => void {
+  private add<T>(
+    map: Map<string, Channel<T>>,
+    symbol: string,
+    listener: Listener<T>,
+    open: () => () => void,
+  ): () => void {
     let ch = map.get(symbol);
     if (!ch) {
       ch = { listeners: new Set(), unsub: () => undefined, last: null };
@@ -155,15 +181,21 @@ export class MarketStore {
   }
 
   onQuote(symbol: string, listener: Listener<Quote>): () => void {
-    return this.add(this.quoteCh, symbol, listener, () => this.ensure().quotes(symbol, (q) => this.queue('q', symbol, q)));
+    return this.add(this.quoteCh, symbol, listener, () =>
+      this.ensure().quotes(symbol, (q) => this.queue('q', symbol, q)),
+    );
   }
 
   onDepth(symbol: string, listener: Listener<DepthSnapshot>): () => void {
-    return this.add(this.depthCh, symbol, listener, () => this.ensure().depth(symbol, (d) => this.queue('d', symbol, d)));
+    return this.add(this.depthCh, symbol, listener, () =>
+      this.ensure().depth(symbol, (d) => this.queue('d', symbol, d)),
+    );
   }
 
   onTrades(symbol: string, listener: Listener<TradesBatch>): () => void {
-    return this.add(this.tradeCh, symbol, listener, () => this.ensure().trades(symbol, (t) => this.queue('t', symbol, t)));
+    return this.add(this.tradeCh, symbol, listener, () =>
+      this.ensure().trades(symbol, (t) => this.queue('t', symbol, t)),
+    );
   }
 
   /** Candles are low frequency (closed bars + the forming bar); delivered as they arrive. */

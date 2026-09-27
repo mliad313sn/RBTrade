@@ -12,7 +12,9 @@ async function main(): Promise<void> {
     if (!url) throw new Error('DATABASE_URL_MIGRATE (or _TEST) is not set');
     const r = await runMigrations(url);
     const db = new URL(url).pathname.slice(1);
-    console.warn(`[migrate] ${db}: applied ${r.applied.length} (${r.applied.join(', ') || '-'}), up to date ${r.skipped.length}`);
+    console.warn(
+      `[migrate] ${db}: applied ${r.applied.length} (${r.applied.join(', ') || '-'}), up to date ${r.skipped.length}`,
+    );
   }
 }
 

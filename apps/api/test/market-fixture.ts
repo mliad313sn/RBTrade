@@ -1,4 +1,12 @@
-import { depthChannel, quoteChannel, STATUS_CHANNEL, type DepthLevel, type DepthSnapshot, type FeedStatus, type Quote } from '@kora/domain';
+import {
+  depthChannel,
+  quoteChannel,
+  STATUS_CHANNEL,
+  type DepthLevel,
+  type DepthSnapshot,
+  type FeedStatus,
+  type Quote,
+} from '@kora/domain';
 import { Redis } from 'ioredis';
 
 /**
@@ -24,7 +32,9 @@ export class MarketFixture {
   private statusTs: number | null = null;
 
   constructor() {
-    this.redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:56379', { maxRetriesPerRequest: 2 });
+    this.redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:56379', {
+      maxRetriesPerRequest: 2,
+    });
     this.prefix = process.env.KORA_MD_REDIS_PREFIX ?? 'kora:md:';
   }
 
@@ -35,7 +45,14 @@ export class MarketFixture {
   }
 
   /** Feed status; `ts` defaults to now (pass an old ts to simulate a lost heartbeat). */
-  async status(opts: { state?: FeedStatus['state']; feed?: 'up' | 'down'; staleSymbols?: string[]; ts?: number | null } = {}): Promise<void> {
+  async status(
+    opts: {
+      state?: FeedStatus['state'];
+      feed?: 'up' | 'down';
+      staleSymbols?: string[];
+      ts?: number | null;
+    } = {},
+  ): Promise<void> {
     if (opts.state) this.statusState = opts.state;
     if (opts.feed) this.feedState = opts.feed;
     if (opts.staleSymbols) this.staleSymbols = opts.staleSymbols;
@@ -45,14 +62,28 @@ export class MarketFixture {
       type: 'status',
       state: this.statusState,
       ts: this.statusTs ?? now,
-      feeds: [{ source: 'simulated', state: this.feedState, lastMessageTs: now, gaps: 0, resyncs: 0, lastResync: null }],
+      feeds: [
+        {
+          source: 'simulated',
+          state: this.feedState,
+          lastMessageTs: now,
+          gaps: 0,
+          resyncs: 0,
+          lastResync: null,
+        },
+      ],
       staleSymbols: this.staleSymbols,
       reason: this.statusState === 'ok' ? null : 'test',
     };
     await this.put(STATUS_CHANNEL, s);
   }
 
-  async quote(symbol: string, bid: string, ask: string, opts: { bidSize?: string; askSize?: string; stale?: boolean; receivedTs?: number } = {}): Promise<Quote> {
+  async quote(
+    symbol: string,
+    bid: string,
+    ask: string,
+    opts: { bidSize?: string; askSize?: string; stale?: boolean; receivedTs?: number } = {},
+  ): Promise<Quote> {
     const now = Date.now();
     const q: Quote = {
       type: 'quote',
@@ -74,7 +105,16 @@ export class MarketFixture {
 
   async depth(symbol: string, bids: DepthLevel[], asks: DepthLevel[]): Promise<void> {
     const now = Date.now();
-    const d: DepthSnapshot = { type: 'depth_snapshot', symbol, bids, asks, source: 'simulated', exchangeTs: now, receivedTs: now, seq: nextSeq++ };
+    const d: DepthSnapshot = {
+      type: 'depth_snapshot',
+      symbol,
+      bids,
+      asks,
+      source: 'simulated',
+      exchangeTs: now,
+      receivedTs: now,
+      seq: nextSeq++,
+    };
     this.depths.set(symbol, d);
     await this.put(depthChannel(symbol), d);
   }
@@ -87,7 +127,12 @@ export class MarketFixture {
   /** Re-stamps status, quotes and depth with the current clock (new sequence numbers). */
   async touch(): Promise<void> {
     await this.status();
-    for (const q of [...this.quotes.values()]) await this.quote(q.symbol, q.bid, q.ask, { bidSize: q.bidSize, askSize: q.askSize, stale: q.stale });
+    for (const q of [...this.quotes.values()])
+      await this.quote(q.symbol, q.bid, q.ask, {
+        bidSize: q.bidSize,
+        askSize: q.askSize,
+        stale: q.stale,
+      });
     for (const d of [...this.depths.values()]) await this.depth(d.symbol, d.bids, d.asks);
   }
 

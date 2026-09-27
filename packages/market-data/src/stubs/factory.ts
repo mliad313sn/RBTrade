@@ -16,7 +16,10 @@ export const STUB_FLAGS: Record<StubSource, string> = {
   'equities-provider': 'KORA_MD_ADAPTER_EQUITIES',
 };
 
-export function isStubEnabled(source: StubSource, env: Record<string, string | undefined>): boolean {
+export function isStubEnabled(
+  source: StubSource,
+  env: Record<string, string | undefined>,
+): boolean {
   return env[STUB_FLAGS[source]] === 'true';
 }
 
@@ -31,7 +34,10 @@ export function createStubAdapter(
   },
 ): StubAdapterBase {
   if (!isStubEnabled(source, opts.env)) {
-    throw new AdapterNotConfiguredError(source, `disabled by feature flag (set ${STUB_FLAGS[source]}=true to enable the stub)`);
+    throw new AdapterNotConfiguredError(
+      source,
+      `disabled by feature flag (set ${STUB_FLAGS[source]}=true to enable the stub)`,
+    );
   }
   const base = {
     instruments: opts.instruments,

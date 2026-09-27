@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   GOVERNANCE_ROLES,
@@ -43,7 +53,10 @@ export class GovernanceController {
   ) {}
 
   @Get('controls')
-  @ApiOperation({ summary: 'The control matrix (COBIT 2019 refs, owner line, frequency, evidence source, test procedure).' })
+  @ApiOperation({
+    summary:
+      'The control matrix (COBIT 2019 refs, owner line, frequency, evidence source, test procedure).',
+  })
   controls() {
     return { controls: this.evidence.catalogue() };
   }
@@ -71,7 +84,10 @@ export class GovernanceController {
     const range = parseRange(q.from, q.to);
     const out = await this.evidence.export(id, range, q.format as EvidenceFormat, p.sub);
     res.setHeader('Content-Type', out.contentType);
-    res.setHeader('Content-Disposition', `${q.format === 'json' ? 'inline' : 'attachment'}; filename="${out.filename}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `${q.format === 'json' ? 'inline' : 'attachment'}; filename="${out.filename}"`,
+    );
     res.setHeader('X-Kora-Evidence-Sha256', out.sha256);
     res.setHeader('X-Kora-Evidence-Rows', String(out.rows));
     res.setHeader('Cache-Control', 'no-store');
@@ -79,7 +95,10 @@ export class GovernanceController {
   }
 
   @Get('retention')
-  @ApiOperation({ summary: 'Record retention policy and a dry-run report (periods are placeholders until Compliance sets them, OQ-R4).' })
+  @ApiOperation({
+    summary:
+      'Record retention policy and a dry-run report (periods are placeholders until Compliance sets them, OQ-R4).',
+  })
   async retention() {
     return {
       policy: RETENTION_CLASSES.map((c) => ({ ...c, periodDays: retentionDays(c) })),
@@ -89,7 +108,10 @@ export class GovernanceController {
   }
 
   @Get('placeholders')
-  @ApiOperation({ summary: 'Regulatory placeholders still open in the disclosures registry, with their owner and open question.' })
+  @ApiOperation({
+    summary:
+      'Regulatory placeholders still open in the disclosures registry, with their owner and open question.',
+  })
   placeholders() {
     return { placeholders: this.disclosures.placeholders() };
   }
@@ -99,7 +121,9 @@ export class GovernanceController {
   @Get('incidents')
   @ApiOperation({ summary: 'Incident register.' })
   @ApiQuery({ name: 'open', required: false })
-  listIncidents(@Query(new ZodValidationPipe(IncidentListQuery)) q: z.infer<typeof IncidentListQuery>) {
+  listIncidents(
+    @Query(new ZodValidationPipe(IncidentListQuery)) q: z.infer<typeof IncidentListQuery>,
+  ) {
     return this.incidents.list({ open: q.open === 'true' }).then((incidents) => ({ incidents }));
   }
 
@@ -114,7 +138,10 @@ export class GovernanceController {
   @Roles('risk_officer', 'admin')
   @ApiOperation({ summary: 'Log an incident (detect → log).' })
   @ApiBody({ schema: openApiSchema(IncidentCreateSchema) })
-  createIncident(@CurrentPrincipal() p: Principal, @Body(new ZodValidationPipe(IncidentCreateSchema)) body: z.infer<typeof IncidentCreateSchema>) {
+  createIncident(
+    @CurrentPrincipal() p: Principal,
+    @Body(new ZodValidationPipe(IncidentCreateSchema)) body: z.infer<typeof IncidentCreateSchema>,
+  ) {
     return this.incidents.create(p.sub, body);
   }
 
@@ -126,7 +153,8 @@ export class GovernanceController {
   classify(
     @CurrentPrincipal() p: Principal,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body(new ZodValidationPipe(IncidentClassifySchema)) body: z.infer<typeof IncidentClassifySchema>,
+    @Body(new ZodValidationPipe(IncidentClassifySchema))
+    body: z.infer<typeof IncidentClassifySchema>,
   ) {
     return this.incidents.classify(p.sub, id, body);
   }

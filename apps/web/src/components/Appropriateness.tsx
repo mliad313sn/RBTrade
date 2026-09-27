@@ -1,6 +1,11 @@
 'use client';
 
-import { KoraApiError, type AttemptResponse, type DisclosureDocument, type QuestionnaireResponse } from '@kora/sdk';
+import {
+  KoraApiError,
+  type AttemptResponse,
+  type DisclosureDocument,
+  type QuestionnaireResponse,
+} from '@kora/sdk';
 import { Banner, Button, Chip, Panel } from '@kora/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -31,7 +36,8 @@ export function Appropriateness() {
   const [warning, setWarning] = useState<DisclosureDocument | null>(null);
   const [ticked, setTicked] = useState(false);
   /** Translated questionnaire text when a key exists for this exact data (else the data itself). */
-  const tr = (key: string, fallback: string) => (locale !== 'en' && hasKey(key) ? t(key) : fallback);
+  const tr = (key: string, fallback: string) =>
+    locale !== 'en' && hasKey(key) ? t(key) : fallback;
 
   useEffect(() => {
     api
@@ -89,7 +95,9 @@ export function Appropriateness() {
         }, 2500);
       }
     } catch (err) {
-      setError(err instanceof KoraApiError && locale === 'en' ? err.message : t('appr.submitError.body'));
+      setError(
+        err instanceof KoraApiError && locale === 'en' ? err.message : t('appr.submitError.body'),
+      );
     } finally {
       setBusy(false);
     }
@@ -117,7 +125,13 @@ export function Appropriateness() {
         ) : null}
       </div>
       <p className="m-0">{tr('appr.q.intro', q.intro)}</p>
-      <p className="m-0 text-sm text-muted">{t('appr.meta', { version: q.version, pass: q.passMarkPct, hours: Math.round(q.cooldownMinutes / 60) })}</p>
+      <p className="m-0 text-sm text-muted">
+        {t('appr.meta', {
+          version: q.version,
+          pass: q.passMarkPct,
+          hours: Math.round(q.cooldownMinutes / 60),
+        })}
+      </p>
 
       {result ? (
         result.passed ? (
@@ -128,10 +142,21 @@ export function Appropriateness() {
           </div>
         ) : (
           <div data-testid="appropriateness-result">
-            <Banner tone="warn" title={t('appr.failed.title', { score: result.scorePct, pass: result.passMarkPct })}>
+            <Banner
+              tone="warn"
+              title={t('appr.failed.title', { score: result.scorePct, pass: result.passMarkPct })}
+            >
               {locale === 'en' ? result.message : t('appr.failed.body')}
-              {result.topicsToReview.length ? <span className="block mt-1">{t('appr.review', { topics: result.topicsToReview.map(topicName).join(', ') })}</span> : null}
-              {result.cooldownUntil ? <span className="block mt-1">{t('appr.retryAfter', { when: dateTime(result.cooldownUntil) })}</span> : null}
+              {result.topicsToReview.length ? (
+                <span className="block mt-1">
+                  {t('appr.review', { topics: result.topicsToReview.map(topicName).join(', ') })}
+                </span>
+              ) : null}
+              {result.cooldownUntil ? (
+                <span className="block mt-1">
+                  {t('appr.retryAfter', { when: dateTime(result.cooldownUntil) })}
+                </span>
+              ) : null}
             </Banner>
           </div>
         )
@@ -143,7 +168,10 @@ export function Appropriateness() {
           </Banner>
         </div>
       ) : null}
-      {!result && !data.status.eligible && !data.status.cooldownUntil && !data.status.hasTraderRole ? (
+      {!result &&
+      !data.status.eligible &&
+      !data.status.cooldownUntil &&
+      !data.status.hasTraderRole ? (
         <div data-testid="appropriateness-not-eligible">
           <Banner tone="info" title={t('appr.notEligible.title')}>
             {t('appr.notEligible.body')}
@@ -160,13 +188,19 @@ export function Appropriateness() {
         <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
           {q.questions.map((question, i) => (
             <Panel key={question.id}>
-              <fieldset className="border-0 p-0 m-0 flex flex-col gap-1 min-w-0" data-testid={`question-${question.id}`}>
+              <fieldset
+                className="border-0 p-0 m-0 flex flex-col gap-1 min-w-0"
+                data-testid={`question-${question.id}`}
+              >
                 <legend className="font-semibold mb-2">
                   {i + 1}. {tr(`appr.q.${question.id}.prompt`, question.prompt)}
                 </legend>
                 {question.options.map((o) => (
                   // 44 px rows: the whole line is the target, not only the 13 px radio (goal 08 §8).
-                  <label key={o.id} className="flex gap-3 items-center cursor-pointer min-h-11 py-1 px-2 -mx-2 rounded hover:bg-raised">
+                  <label
+                    key={o.id}
+                    className="flex gap-3 items-center cursor-pointer min-h-11 py-1 px-2 -mx-2 rounded hover:bg-raised"
+                  >
                     <input
                       type="radio"
                       className="w-5 h-5 shrink-0"
@@ -190,7 +224,9 @@ export function Appropriateness() {
                     <li key={p}>{p}</li>
                   ))}
                 </ul>
-                <p className="m-0 text-xs text-muted">{t('appr.riskWarning.version', { version: warning.version })}</p>
+                <p className="m-0 text-xs text-muted">
+                  {t('appr.riskWarning.version', { version: warning.version })}
+                </p>
                 <label className="flex gap-3 items-center cursor-pointer min-h-11 py-1 px-2 -mx-2 rounded hover:bg-raised">
                   <input
                     type="checkbox"
@@ -205,7 +241,12 @@ export function Appropriateness() {
             </Panel>
           ) : null}
           <div className="flex items-center gap-3 flex-wrap">
-            <Button type="submit" variant="primary" disabled={!all || busy} data-testid="submit-appropriateness">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!all || busy}
+              data-testid="submit-appropriateness"
+            >
               {t('appr.submit')}
             </Button>
             {!all ? <span className="text-sm text-muted">{t('appr.answerAll')}</span> : null}

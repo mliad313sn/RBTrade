@@ -77,7 +77,9 @@ export const toDefinition = (r: DocRow): DisclosureDefinition => ({
  * read time, so a scheduled version switches on its own).
  */
 @Injectable()
-export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBootstrap, OnModuleDestroy {
+export class DbDisclosureRegistry
+  implements DisclosureRegistry, OnApplicationBootstrap, OnModuleDestroy
+{
   private readonly log = new Logger('Disclosures');
   private versions = new Map<string, PublishedVersion[]>();
   private allVersions = new Map<string, DisclosureDefinition>();
@@ -114,7 +116,9 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
       await this.refresh();
     } catch (e) {
       if ((e as { code?: string }).code !== '42P01') throw e;
-      this.log.warn('disclosure registry tables missing; serving bundled placeholders until migrated');
+      this.log.warn(
+        'disclosure registry tables missing; serving bundled placeholders until migrated',
+      );
     }
     this.timer = setInterval(() => void this.refresh().catch(() => undefined), 60_000);
     this.timer.unref();
@@ -135,7 +139,9 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
       );
       if (existing[0]) {
         if (existing[0].checksum !== sum)
-          throw new Error(`disclosure ${def.id} v${def.version} changed after publication; publish a new version instead`);
+          throw new Error(
+            `disclosure ${def.id} v${def.version} changed after publication; publish a new version instead`,
+          );
         continue;
       }
       await this.db.query(
@@ -143,23 +149,40 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
            effective_from, drafted_by, approved_by, published_at)
          VALUES ($1, $2, 'GLOBAL', $3::jsonb, $4, $5, $6, $7, 'published', $8, 'system', 'system', clock_timestamp())
          ON CONFLICT DO NOTHING`,
-        [def.id, def.version, JSON.stringify(def.locales), def.values, def.simulated, def.reviewStatus, sum, BUNDLED_EFFECTIVE_FROM],
+        [
+          def.id,
+          def.version,
+          JSON.stringify(def.locales),
+          def.values,
+          def.simulated,
+          def.reviewStatus,
+          sum,
+          BUNDLED_EFFECTIVE_FROM,
+        ],
       );
     }
   }
 
   /** Reloads the published versions and values (call after a publication). */
   async refresh(): Promise<void> {
-    const docs = await this.db.query<DocRow>(`SELECT * FROM disclosure_documents WHERE status = 'published'`);
+    const docs = await this.db.query<DocRow>(
+      `SELECT * FROM disclosure_documents WHERE status = 'published'`,
+    );
     const vals = await this.db.query<ValueRow>('SELECT * FROM disclosure_values');
     this.versions = new Map();
     this.allVersions = new Map();
-    for (const r of docs) this.addVersion(toDefinition(r), r.jurisdiction, r.effective_from!.getTime());
+    for (const r of docs)
+      this.addVersion(toDefinition(r), r.jurisdiction, r.effective_from!.getTime());
     const values = new Map<string, ValueVersion[]>();
     for (const v of vals) {
       const key = `${v.key}|${v.jurisdiction}`;
       const list = values.get(key) ?? [];
-      list.push({ value: v.value, effectiveFrom: v.effective_from.getTime(), owner: v.owner, openQuestion: v.open_question });
+      list.push({
+        value: v.value,
+        effectiveFrom: v.effective_from.getTime(),
+        owner: v.owner,
+        openQuestion: v.open_question,
+      });
       values.set(key, list);
     }
     for (const list of values.values()) list.sort((a, b) => b.effectiveFrom - a.effectiveFrom);
@@ -179,7 +202,12 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
   /** Value of a key in force at `at` for a jurisdiction (falls back to GLOBAL); null = placeholder. */
   valueAt(key: string, at: number, jurisdiction?: string): ValueVersion | null {
     if (key === 'retailLossPct' && this.envOverride)
-      return { value: this.envOverride, effectiveFrom: 0, owner: 'env (dev/test)', openQuestion: 'OQ-R1' };
+      return {
+        value: this.envOverride,
+        effectiveFrom: 0,
+        owner: 'env (dev/test)',
+        openQuestion: 'OQ-R1',
+      };
     for (const j of this.jurisdictions(jurisdiction)) {
       const v = this.values.get(`${key}|${j}`)?.find((x) => x.effectiveFrom <= at);
       if (v) return v;
@@ -197,10 +225,17 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
   }
 
   /** The document in force at a point in time, rendered with the values in force then. */
-  at(id: string, locale: DisclosureLocale, at: number, jurisdiction?: string): DisclosureDocument | null {
+  at(
+    id: string,
+    locale: DisclosureLocale,
+    at: number,
+    jurisdiction?: string,
+  ): DisclosureDocument | null {
     const v = this.versionAt(id, at, jurisdiction);
     if (!v) return null;
-    const set = Object.fromEntries(v.def.values.map((k) => [k, this.valueAt(k, at, v.jurisdiction)?.value ?? null]));
+    const set = Object.fromEntries(
+      v.def.values.map((k) => [k, this.valueAt(k, at, v.jurisdiction)?.value ?? null]),
+    );
     return renderDisclosure(v.def, locale, set, {
       jurisdiction: v.jurisdiction,
       effectiveFrom: new Date(v.effectiveFrom).toISOString(),
@@ -223,11 +258,22 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
     // Stored values are the rendered strings (a placeholder is stored as "[XX]"): render them verbatim
     // so the content hash is recomputed exactly, and flag the placeholders.
     const doc = renderDisclosure(def, locale, values, { jurisdiction });
-    return { ...doc, placeholder: def.values.some((k) => values[k] === undefined || values[k] === placeholderFor(k)) };
+    return {
+      ...doc,
+      placeholder: def.values.some(
+        (k) => values[k] === undefined || values[k] === placeholderFor(k),
+      ),
+    };
   }
 
   /** Every published version of a disclosure (history for Compliance). */
-  history(id: string): Array<{ version: string; jurisdiction: string; effectiveFrom: string; simulated: boolean; reviewStatus: string }> {
+  history(id: string): Array<{
+    version: string;
+    jurisdiction: string;
+    effectiveFrom: string;
+    simulated: boolean;
+    reviewStatus: string;
+  }> {
     const out = [];
     for (const [key, list] of this.versions)
       if (key.startsWith(`${id}|`))
@@ -243,7 +289,12 @@ export class DbDisclosureRegistry implements DisclosureRegistry, OnApplicationBo
   }
 
   /** Placeholders still open (value NULL in force now), for the open-questions check. */
-  placeholders(): Array<{ key: string; jurisdiction: string; owner: string; openQuestion: string | null }> {
+  placeholders(): Array<{
+    key: string;
+    jurisdiction: string;
+    owner: string;
+    openQuestion: string | null;
+  }> {
     const now = Date.now();
     const out = [];
     for (const [k, list] of this.values) {

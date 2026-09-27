@@ -61,32 +61,65 @@ describe('risk officer console', () => {
       .send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '40' });
     expect(res.status).toBe(422);
     expect(res.body.code).toBe('MAX_ORDER_NOTIONAL');
-    const got = await ws.waitFor((m) => m.ch === RISK_ALERTS_CHANNEL && m.data?.alert?.kind === 'risk.limit_breach' && m.data.alert.details.orderId === res.body.order.id, 5000);
+    const got = await ws.waitFor(
+      (m) =>
+        m.ch === RISK_ALERTS_CHANNEL &&
+        m.data?.alert?.kind === 'risk.limit_breach' &&
+        m.data.alert.details.orderId === res.body.order.id,
+      5000,
+    );
     const latency = got.at - t0;
-    process.stdout.write(`[risk-console] breach alert on the console channel after ${latency} ms (includes the order round trip)\n`);
+    process.stdout.write(
+      `[risk-console] breach alert on the console channel after ${latency} ms (includes the order round trip)\n`,
+    );
     expect(latency).toBeLessThan(5000);
-    expect(got.msg.data.alert).toMatchObject({ severity: 'warning', kind: 'risk.limit_breach', details: { codes: expect.arrayContaining(['MAX_ORDER_NOTIONAL']), symbol: 'BTCUSD' } });
+    expect(got.msg.data.alert).toMatchObject({
+      severity: 'warning',
+      kind: 'risk.limit_breach',
+      details: { codes: expect.arrayContaining(['MAX_ORDER_NOTIONAL']), symbol: 'BTCUSD' },
+    });
     ws.ws.close();
   });
 
   it('overview shows real goal 03 / 06 data: exposure vs limits, breaches, approvals, kill-switch history, reconciliation, AI rates, novice guardrails', async () => {
     const http = app.getHttpServer();
     await md.touch();
-    await request(http).post('/orders').set(bearer(trader.token)).send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '1' }).expect(201);
+    await request(http)
+      .post('/orders')
+      .set(bearer(trader.token))
+      .send({ clientOrderId: cid(), symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '1' })
+      .expect(201);
     const acct = (await request(http).get('/accounts/me').set(bearer(trader.token))).body;
     await request(http).post('/reconciliation/run').set(bearer(risk.token)).expect(200);
 
     const o = await request(http).get('/risk-console/overview').set(bearer(risk.token)).expect(200);
     expect(o.body).toMatchObject({ environment: 'PAPER', simulated: true });
-    const row = o.body.exposure.accounts.find((a: { accountId: string }) => a.accountId === acct.id);
+    const row = o.body.exposure.accounts.find(
+      (a: { accountId: string }) => a.accountId === acct.id,
+    );
     expect(row).toBeDefined();
     // The same numbers the engine reports to the account holder.
     const fresh = (await request(http).get('/accounts/me').set(bearer(trader.token))).body;
-    expect(row).toMatchObject({ baseCurrency: fresh.baseCurrency, openPositions: 1, limits: { dailyLossLimit: fresh.limits.dailyLossLimit, maxLeverage: fresh.limits.maxLeverage } });
+    expect(row).toMatchObject({
+      baseCurrency: fresh.baseCurrency,
+      openPositions: 1,
+      limits: {
+        dailyLossLimit: fresh.limits.dailyLossLimit,
+        maxLeverage: fresh.limits.maxLeverage,
+      },
+    });
     expect(Number(row.grossExposure)).toBeGreaterThan(0);
     expect(row.utilisation).toHaveProperty('worstPct');
-    expect(o.body.exposure.firm.find((f: { currency: string }) => f.currency === fresh.baseCurrency).accounts).toBeGreaterThanOrEqual(1);
-    expect(o.body.limitBreaches.some((a: { accountId: string; kind: string }) => a.accountId === acct.id && a.kind === 'risk.limit_breach')).toBe(true);
+    expect(
+      o.body.exposure.firm.find((f: { currency: string }) => f.currency === fresh.baseCurrency)
+        .accounts,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      o.body.limitBreaches.some(
+        (a: { accountId: string; kind: string }) =>
+          a.accountId === acct.id && a.kind === 'risk.limit_breach',
+      ),
+    ).toBe(true);
     expect(o.body.reconciliation.lastRun).toMatchObject({ trigger: 'manual' });
     expect(o.body.ai).toMatchObject({ days: 7 });
     expect(o.body.noviceGuardrails).toHaveProperty('rejections');
@@ -100,23 +133,54 @@ describe('risk officer console', () => {
 
   it('acknowledging an alert is audited; the global kill switch appears in the history and halts accounts as a firm halt', async () => {
     const http = app.getHttpServer();
-    const alerts = await request(http).get('/risk-console/alerts?open=true&kind=risk.').set(bearer(risk.token)).expect(200);
+    const alerts = await request(http)
+      .get('/risk-console/alerts?open=true&kind=risk.')
+      .set(bearer(risk.token))
+      .expect(200);
     const a = alerts.body.alerts[0];
-    const ack = await request(http).post(`/risk-console/alerts/${a.id}/ack`).set(bearer(risk.token)).send({ note: 'reviewed with desk' }).expect(200);
+    const ack = await request(http)
+      .post(`/risk-console/alerts/${a.id}/ack`)
+      .set(bearer(risk.token))
+      .send({ note: 'reviewed with desk' })
+      .expect(200);
     expect(ack.body.acknowledgedBy).toBe(risk.id);
-    const ev = await ownerQuery<{ n: string }>(`SELECT count(*)::text AS n FROM audit_events WHERE action = 'risk.alert_acknowledged' AND entity_id = $1`, [a.id]);
+    const ev = await ownerQuery<{ n: string }>(
+      `SELECT count(*)::text AS n FROM audit_events WHERE action = 'risk.alert_acknowledged' AND entity_id = $1`,
+      [a.id],
+    );
     expect(ev[0]!.n).toBe('1');
 
     const ws = await TestWs.authed(urls.ws, risk.token, [RISK_ALERTS_CHANNEL]);
-    const g = await request(http).post('/risk-console/kill-switch').set(bearer(risk.token)).send({ scope: 'robots', reason: 'console test' }).expect(202);
+    const g = await request(http)
+      .post('/risk-console/kill-switch')
+      .set(bearer(risk.token))
+      .send({ scope: 'robots', reason: 'console test' })
+      .expect(202);
     expect(g.body.failures).toEqual([]);
     const fired = await ws.waitFor((m) => m.data?.alert?.kind === 'kill_switch.fired', 5000);
-    expect(fired.msg.data.alert).toMatchObject({ severity: 'critical', details: { firm: true, globalKillSwitchId: g.body.globalKillSwitchId } });
+    expect(fired.msg.data.alert).toMatchObject({
+      severity: 'critical',
+      details: { firm: true, globalKillSwitchId: g.body.globalKillSwitchId },
+    });
     ws.ws.close();
-    const hist = await request(http).get('/risk-console/overview').set(bearer(risk.token)).expect(200);
-    expect(hist.body.killSwitch.some((k: { action: string; globalKillSwitchId: string | null }) => k.action === 'risk.global_kill_switch')).toBe(true);
-    await request(http).post('/risk-console/kill-switch').set(bearer(trader.token)).send({ scope: 'robots', reason: 'x' }).expect(403);
+    const hist = await request(http)
+      .get('/risk-console/overview')
+      .set(bearer(risk.token))
+      .expect(200);
+    expect(
+      hist.body.killSwitch.some(
+        (k: { action: string; globalKillSwitchId: string | null }) =>
+          k.action === 'risk.global_kill_switch',
+      ),
+    ).toBe(true);
+    await request(http)
+      .post('/risk-console/kill-switch')
+      .set(bearer(trader.token))
+      .send({ scope: 'robots', reason: 'x' })
+      .expect(403);
     // Leave the database clean for other suites.
-    await ownerQuery(`UPDATE accounts SET trading_halted = false, halt_scope = NULL, halted_at = NULL, halted_by = NULL, halt_reason = NULL WHERE trading_halted`);
+    await ownerQuery(
+      `UPDATE accounts SET trading_halted = false, halt_scope = NULL, halted_at = NULL, halted_by = NULL, halt_reason = NULL WHERE trading_halted`,
+    );
   });
 });

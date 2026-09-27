@@ -63,7 +63,12 @@ export function StrategyBuilder() {
   const editId = search.get('strategy');
   const template = search.get('template');
   // Goal 07B "Send to Robot builder": the Market Radar passes the instrument to trade.
-  const fromRadar = search.get('symbol')?.toUpperCase().replace(/[^A-Z0-9._-]/g, '').slice(0, 32) || null;
+  const fromRadar =
+    search
+      .get('symbol')
+      ?.toUpperCase()
+      .replace(/[^A-Z0-9._-]/g, '')
+      .slice(0, 32) || null;
   const [def, setDef] = useState<StrategyDefinition>(() => {
     const t = STRATEGY_TEMPLATES.find((x) => x.id === template);
     const d = t ? structuredClone(t.definition) : blankStrategy('New strategy', ['BTCUSD'], '1h');

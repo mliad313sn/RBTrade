@@ -34,7 +34,15 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 
 import { api } from '@/lib/api-browser';
 import { safeLocale } from '@/lib/terminal/format';
@@ -98,7 +106,9 @@ function saveJson(key: string, v: unknown): void {
 
 const toTime = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 const line = (values: Array<number | null>, bars: Bar[]) =>
-  values.flatMap((v, i) => (v === null || !Number.isFinite(v) ? [] : [{ time: toTime(bars[i]!.t), value: v }]));
+  values.flatMap((v, i) =>
+    v === null || !Number.isFinite(v) ? [] : [{ time: toTime(bars[i]!.t), value: v }],
+  );
 
 /**
  * Chart panel (goal 04): lightweight-charts candles on 1m–1D, volume, indicators from the shared
@@ -128,13 +138,22 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
   const readoutRef = useRef<HTMLSpanElement>(null);
   const lastRef = useRef<HTMLSpanElement>(null);
   const chgRef = useRef<HTMLSpanElement>(null);
-  const [indicators, setIndicators] = useState<IndicatorId[]>(() => loadJson<IndicatorId[]>(IND_KEY, ['ema', 'vwap']));
+  const [indicators, setIndicators] = useState<IndicatorId[]>(() =>
+    loadJson<IndicatorId[]>(IND_KEY, ['ema', 'vwap']),
+  );
   const [drawMode, setDrawMode] = useState<'none' | 'hline' | 'trend'>('none');
   const [drawings, setDrawings] = useState<Drawings>({ h: [], t: [] });
   const [pendingTrend, setPendingTrend] = useState<{ t: number; p: number } | null>(null);
-  const [handles, setHandles] = useState<Array<{ id: string; y: number; label: string; side: 'buy' | 'sell'; draggable: boolean }>>([]);
+  const [handles, setHandles] = useState<
+    Array<{ id: string; y: number; label: string; side: 'buy' | 'sell'; draggable: boolean }>
+  >([]);
   const [drag, setDrag] = useState<{ id: string; price: string } | null>(null);
-  const [amend, setAmend] = useState<{ order: OrderDto; field: 'limitPrice' | 'stopPrice'; from: string; to: string } | null>(null);
+  const [amend, setAmend] = useState<{
+    order: OrderDto;
+    field: 'limitPrice' | 'stopPrice';
+    from: string;
+    to: string;
+  } | null>(null);
   const [lastPrice, setLastPrice] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const dayOpen = useRef<string | null>(null);
@@ -143,7 +162,10 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
   const precision = spec?.pricePrecision ?? 5;
   const tick = spec?.tickSize ?? '0.00001';
 
-  const symbolOrders = useMemo(() => orders.filter((o) => o.symbol === symbol && orderLine(o)), [orders, symbol]);
+  const symbolOrders = useMemo(
+    () => orders.filter((o) => o.symbol === symbol && orderLine(o)),
+    [orders, symbol],
+  );
 
   // ---- chart lifecycle ----
   useEffect(() => {
@@ -153,11 +175,27 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     const chart = createChart(host, {
       autoSize: true,
       // IRTC R5-18: never hand an invalid browser tag ("en-US@posix") to the chart's Intl formatters.
-      localization: { locale: safeLocale(typeof navigator === 'undefined' ? undefined : navigator.language) },
-      layout: { background: { color: c.panel }, textColor: c.muted, fontFamily: 'IBM Plex Mono, ui-monospace, monospace', fontSize: 11, panes: { separatorColor: c.border } },
-      grid: { vertLines: { color: 'rgba(38,46,59,0.35)' }, horzLines: { color: 'rgba(38,46,59,0.35)' } },
+      localization: {
+        locale: safeLocale(typeof navigator === 'undefined' ? undefined : navigator.language),
+      },
+      layout: {
+        background: { color: c.panel },
+        textColor: c.muted,
+        fontFamily: 'IBM Plex Mono, ui-monospace, monospace',
+        fontSize: 11,
+        panes: { separatorColor: c.border },
+      },
+      grid: {
+        vertLines: { color: 'rgba(38,46,59,0.35)' },
+        horzLines: { color: 'rgba(38,46,59,0.35)' },
+      },
       rightPriceScale: { borderColor: c.border },
-      timeScale: { borderColor: c.border, timeVisible: true, secondsVisible: false, rightOffset: 4 },
+      timeScale: {
+        borderColor: c.border,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 4,
+      },
       crosshair: { mode: CrosshairMode.Normal },
     });
     const candles = chart.addSeries(CandlestickSeries, {
@@ -169,14 +207,27 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       wickDownColor: c.down,
       priceLineColor: c.accent,
       priceLineStyle: LineStyle.Dotted,
-      autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null } | null) => {
+      autoscaleInfoProvider: (
+        original: () => { priceRange: { minValue: number; maxValue: number } | null } | null,
+      ) => {
         const r = original();
         const extra = keepVisible.current;
         if (!r?.priceRange || extra.length === 0) return r;
-        return { ...r, priceRange: { minValue: Math.min(r.priceRange.minValue, ...extra), maxValue: Math.max(r.priceRange.maxValue, ...extra) } };
+        return {
+          ...r,
+          priceRange: {
+            minValue: Math.min(r.priceRange.minValue, ...extra),
+            maxValue: Math.max(r.priceRange.maxValue, ...extra),
+          },
+        };
       },
     });
-    const vol = chart.addSeries(HistogramSeries, { priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+    const vol = chart.addSeries(HistogramSeries, {
+      priceScaleId: 'vol',
+      priceFormat: { type: 'volume' },
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
     chartRef.current = chart;
     candlesRef.current = candles;
@@ -185,11 +236,21 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
 
     const recolor = () => {
       const p = palette();
-      candles.applyOptions({ upColor: p.up, downColor: p.down, borderUpColor: p.up, borderDownColor: p.down, wickUpColor: p.up, wickDownColor: p.down });
+      candles.applyOptions({
+        upColor: p.up,
+        downColor: p.down,
+        borderUpColor: p.up,
+        borderDownColor: p.down,
+        wickUpColor: p.up,
+        wickDownColor: p.down,
+      });
       setDataVersion((v) => v + 1);
     };
     const mo = new MutationObserver(recolor);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-colors', 'data-theme'] });
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-colors', 'data-theme'],
+    });
     const ind = indRef.current;
     const orderLines = orderLinesRef.current;
     return () => {
@@ -206,7 +267,9 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
   }, []);
 
   useEffect(() => {
-    candlesRef.current?.applyOptions({ priceFormat: { type: 'price', precision, minMove: Number(tick) } });
+    candlesRef.current?.applyOptions({
+      priceFormat: { type: 'price', precision, minMove: Number(tick) },
+    });
   }, [precision, tick]);
 
   // ---- overlay layout (order handles, trendlines) ----
@@ -219,8 +282,25 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       const price = drag?.id === o.id ? drag.price : l.price;
       const y = candles.priceToCoordinate(Number(price));
       if (y === null) return [];
-      const kind = o.role === 'stop_loss' ? 'SL' : o.role === 'take_profit' ? 'TP' : o.execType === 'limit' ? 'LMT' : o.execType === 'trailing' ? 'TRL' : 'STP';
-      return [{ id: o.id, y, label: `${o.side === 'buy' ? 'BUY' : 'SELL'} ${kind} ${formatPrice(price, precision)}`, side: o.side, draggable: l.draggable }];
+      const kind =
+        o.role === 'stop_loss'
+          ? 'SL'
+          : o.role === 'take_profit'
+            ? 'TP'
+            : o.execType === 'limit'
+              ? 'LMT'
+              : o.execType === 'trailing'
+                ? 'TRL'
+                : 'STP';
+      return [
+        {
+          id: o.id,
+          y,
+          label: `${o.side === 'buy' ? 'BUY' : 'SELL'} ${kind} ${formatPrice(price, precision)}`,
+          side: o.side,
+          draggable: l.draggable,
+        },
+      ];
     });
     setHandles(hs);
     const svg = overlayRef.current;
@@ -260,19 +340,58 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     const bars = barsRef.current;
     const closes = bars.map((b) => b.close);
     const p = palette();
-    const want = new Map<string, { data: Array<{ time: UTCTimestamp; value: number }>; color: string; pane: 'price' | 'own'; dashed?: boolean }>();
+    const want = new Map<
+      string,
+      {
+        data: Array<{ time: UTCTimestamp; value: number }>;
+        color: string;
+        pane: 'price' | 'own';
+        dashed?: boolean;
+      }
+    >();
     for (const id of indicators) {
-      if (id === 'ema') want.set('ema', { data: line(ema(closes, INDICATOR_DEFAULTS.ema.period), bars), color: p.ai, pane: 'price' });
-      if (id === 'sma') want.set('sma', { data: line(sma(closes, INDICATOR_DEFAULTS.sma.period), bars), color: p.warn, pane: 'price' });
-      if (id === 'vwap') want.set('vwap', { data: line(vwapSeries(bars), bars), color: p.muted, pane: 'price', dashed: true });
+      if (id === 'ema')
+        want.set('ema', {
+          data: line(ema(closes, INDICATOR_DEFAULTS.ema.period), bars),
+          color: p.ai,
+          pane: 'price',
+        });
+      if (id === 'sma')
+        want.set('sma', {
+          data: line(sma(closes, INDICATOR_DEFAULTS.sma.period), bars),
+          color: p.warn,
+          pane: 'price',
+        });
+      if (id === 'vwap')
+        want.set('vwap', {
+          data: line(vwapSeries(bars), bars),
+          color: p.muted,
+          pane: 'price',
+          dashed: true,
+        });
       if (id === 'bollinger') {
         const bb = bollinger(closes, INDICATOR_DEFAULTS.bollinger.period, 2);
         want.set('bb-u', { data: line(bb.upper, bars), color: p.muted, pane: 'price' });
-        want.set('bb-m', { data: line(bb.middle, bars), color: p.muted, pane: 'price', dashed: true });
+        want.set('bb-m', {
+          data: line(bb.middle, bars),
+          color: p.muted,
+          pane: 'price',
+          dashed: true,
+        });
         want.set('bb-l', { data: line(bb.lower, bars), color: p.muted, pane: 'price' });
       }
-      if (id === 'rsi') want.set('rsi', { data: line(rsi(closes, INDICATOR_DEFAULTS.rsi.period), bars), color: p.ai, pane: 'own' });
-      if (id === 'atr') want.set('atr', { data: line(atr(bars, INDICATOR_DEFAULTS.atr.period), bars), color: p.warn, pane: 'own' });
+      if (id === 'rsi')
+        want.set('rsi', {
+          data: line(rsi(closes, INDICATOR_DEFAULTS.rsi.period), bars),
+          color: p.ai,
+          pane: 'own',
+        });
+      if (id === 'atr')
+        want.set('atr', {
+          data: line(atr(bars, INDICATOR_DEFAULTS.atr.period), bars),
+          color: p.warn,
+          pane: 'own',
+        });
     }
     for (const [key, s] of indRef.current) {
       if (!want.has(key)) {
@@ -281,12 +400,24 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       }
     }
     // Remove empty panes beyond the price pane.
-    for (let i = chart.panes().length - 1; i >= 1; i--) if (chart.panes()[i]!.getSeries().length === 0) chart.removePane(i);
+    for (let i = chart.panes().length - 1; i >= 1; i--)
+      if (chart.panes()[i]!.getSeries().length === 0) chart.removePane(i);
     for (const [key, w] of want) {
       let s = indRef.current.get(key);
       if (!s) {
         const pane = w.pane === 'price' ? 0 : chart.panes().length;
-        s = chart.addSeries(LineSeries, { color: w.color, lineWidth: 1, lineStyle: w.dashed ? LineStyle.Dashed : LineStyle.Solid, priceLineVisible: false, lastValueVisible: w.pane === 'own', crosshairMarkerVisible: false }, pane);
+        s = chart.addSeries(
+          LineSeries,
+          {
+            color: w.color,
+            lineWidth: 1,
+            lineStyle: w.dashed ? LineStyle.Dashed : LineStyle.Solid,
+            priceLineVisible: false,
+            lastValueVisible: w.pane === 'own',
+            crosshairMarkerVisible: false,
+          },
+          pane,
+        );
         indRef.current.set(key, s);
       }
       s.setData(w.data);
@@ -311,7 +442,11 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     vol.setData([]);
     setLastPrice(null);
     const p = palette();
-    const volBar = (b: Bar) => ({ time: toTime(b.t), value: b.volume, color: `${b.close >= b.open ? p.up : p.down}66` });
+    const volBar = (b: Bar) => ({
+      time: toTime(b.t),
+      value: b.volume,
+      color: `${b.close >= b.open ? p.up : p.down}66`,
+    });
     let lastInd = 0;
     const upsert = (b: Bar) => {
       const bars = barsRef.current;
@@ -332,9 +467,24 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       .candles({ symbol, tf, limit: HISTORY_BARS })
       .then((r) => {
         if (cancelled) return;
-        const bars: Bar[] = r.candles.map((c) => ({ t: c.t, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close), volume: Number(c.volume) }));
+        const bars: Bar[] = r.candles.map((c) => ({
+          t: c.t,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
+          volume: Number(c.volume),
+        }));
         barsRef.current = bars;
-        candles.setData(bars.map((b) => ({ time: toTime(b.t), open: b.open, high: b.high, low: b.low, close: b.close })));
+        candles.setData(
+          bars.map((b) => ({
+            time: toTime(b.t),
+            open: b.open,
+            high: b.high,
+            low: b.low,
+            close: b.close,
+          })),
+        );
         vol.setData(bars.map(volBar));
         applyIndRef.current();
         chartRef.current?.timeScale().scrollToRealTime();
@@ -343,7 +493,14 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       .catch(() => undefined);
     const off = store.onCandle(symbol, tf, (c) => {
       if (cancelled) return;
-      upsert({ t: c.bucket, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close), volume: Number(c.volume) });
+      upsert({
+        t: c.bucket,
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        volume: Number(c.volume),
+      });
     });
     return () => {
       cancelled = true;
@@ -382,7 +539,9 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
         : '';
     };
     const onMove = (param: MouseEventParams) => {
-      const d = param.seriesData.get(candles) as { open: number; high: number; low: number; close: number } | undefined;
+      const d = param.seriesData.get(candles) as
+        | { open: number; high: number; low: number; close: number }
+        | undefined;
       show(d ?? barsRef.current.at(-1));
     };
     chart.subscribeCrosshairMove(onMove);
@@ -401,8 +560,20 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       .map((f): SeriesMarker<Time> => {
         const t = Math.floor(Date.parse(f.ts) / 1000 / size) * size;
         return f.side === 'buy'
-          ? { time: t as UTCTimestamp, position: 'belowBar', shape: 'arrowUp', color: p.up, text: 'B' }
-          : { time: t as UTCTimestamp, position: 'aboveBar', shape: 'arrowDown', color: p.down, text: 'S' };
+          ? {
+              time: t as UTCTimestamp,
+              position: 'belowBar',
+              shape: 'arrowUp',
+              color: p.up,
+              text: 'B',
+            }
+          : {
+              time: t as UTCTimestamp,
+              position: 'aboveBar',
+              shape: 'arrowDown',
+              color: p.down,
+              text: 'S',
+            };
       })
       .sort((a, b) => (a.time as number) - (b.time as number));
     m.setMarkers(own);
@@ -420,7 +591,14 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
       const l = orderLine(o)!;
       const price = drag?.id === o.id ? drag.price : l.price;
       seen.add(o.id);
-      const opts = { price: Number(price), color: o.side === 'buy' ? p.up : p.down, lineWidth: 1 as const, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '' };
+      const opts = {
+        price: Number(price),
+        color: o.side === 'buy' ? p.up : p.down,
+        lineWidth: 1 as const,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: '',
+      };
       const existing = lines.get(o.id);
       if (existing) existing.applyOptions(opts);
       else lines.set(o.id, candles.createPriceLine(opts));
@@ -444,7 +622,16 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     if (!candles) return;
     for (const pl of hLinesRef.current) candles.removePriceLine(pl);
     const p = palette();
-    hLinesRef.current = drawings.h.map((price) => candles.createPriceLine({ price, color: p.warn, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: '' }));
+    hLinesRef.current = drawings.h.map((price) =>
+      candles.createPriceLine({
+        price,
+        color: p.warn,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: '',
+      }),
+    );
     layoutOverlay();
   }, [drawings, layoutOverlay, dataVersion]);
 
@@ -465,7 +652,10 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
         const t = (param.time as number) * 1000;
         if (!pendingTrend) setPendingTrend({ t, p: price });
         else {
-          const next = { ...drawings, t: [...drawings.t, { t1: pendingTrend.t, p1: pendingTrend.p, t2: t, p2: price }] };
+          const next = {
+            ...drawings,
+            t: [...drawings.t, { t1: pendingTrend.t, p1: pendingTrend.p, t2: t, p2: price }],
+          };
           setDrawings(next);
           saveJson(DRAW_KEY(symbol), next);
           setPendingTrend(null);
@@ -529,7 +719,11 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     if (!amend) return;
     try {
       await api.amendOrder(amend.order.id, { [amend.field]: amend.to });
-      toast.push(`Order amended: ${amend.field === 'limitPrice' ? 'limit' : 'stop'} ${amend.from} → ${amend.to}.`, 'success', 4000);
+      toast.push(
+        `Order amended: ${amend.field === 'limitPrice' ? 'limit' : 'stop'} ${amend.from} → ${amend.to}.`,
+        'success',
+        4000,
+      );
       refreshTrading();
     } catch (e) {
       toast.push(`Amend refused: ${(e as Error).message}`, 'critical');
@@ -539,7 +733,8 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     }
   };
 
-  const toggleIndicator = (id: IndicatorId) => setIndicators((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]));
+  const toggleIndicator = (id: IndicatorId) =>
+    setIndicators((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]));
   const clearDrawings = () => {
     const empty = { h: [], t: [] };
     setDrawings(empty);
@@ -550,7 +745,12 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
   const legend = indicators.map((id) => INDICATOR_DEFAULTS[id].label);
 
   return (
-    <div className="ch flex flex-col h-full min-h-0" data-testid="chart-panel" data-panel-root="chart" tabIndex={-1}>
+    <div
+      className="ch flex flex-col h-full min-h-0"
+      data-testid="chart-panel"
+      data-panel-root="chart"
+      tabIndex={-1}
+    >
       <div className="ch-head">
         <h2 className="ch-sym" data-testid="chart-symbol">
           {name}
@@ -561,7 +761,15 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
         <span ref={chgRef} className="ch-chg k-num" />
         <div className="ch-tfs" role="radiogroup" aria-label="Timeframe">
           {CHART_TIMEFRAMES.map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={tf === t} className={`ch-tf ${tf === t ? 'is-on' : ''}`} onClick={() => setTf(t)} data-testid={`tf-${t}`}>
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={tf === t}
+              className={`ch-tf ${tf === t ? 'is-on' : ''}`}
+              onClick={() => setTf(t)}
+              data-testid={`tf-${t}`}
+            >
               {t}
             </button>
           ))}
@@ -573,7 +781,13 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
           <div className="ch-menu-pop" role="group" aria-label="Indicators">
             {(Object.keys(INDICATOR_DEFAULTS) as IndicatorId[]).map((id) => (
               <label key={id} className="flex items-center gap-2">
-                <input type="checkbox" checked={indicators.includes(id)} onChange={() => toggleIndicator(id)} data-testid={`ind-${id}`} /> {INDICATOR_DEFAULTS[id].label}
+                <input
+                  type="checkbox"
+                  checked={indicators.includes(id)}
+                  onChange={() => toggleIndicator(id)}
+                  data-testid={`ind-${id}`}
+                />{' '}
+                {INDICATOR_DEFAULTS[id].label}
               </label>
             ))}
           </div>
@@ -583,29 +797,65 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
             <span aria-hidden="true">✎</span> Draw
           </summary>
           <div className="ch-menu-pop" role="group" aria-label="Drawing tools">
-            <button type="button" className="ch-tf" aria-pressed={drawMode === 'hline'} onClick={() => setDrawMode(drawMode === 'hline' ? 'none' : 'hline')} data-testid="draw-hline">
+            <button
+              type="button"
+              className="ch-tf"
+              aria-pressed={drawMode === 'hline'}
+              onClick={() => setDrawMode(drawMode === 'hline' ? 'none' : 'hline')}
+              data-testid="draw-hline"
+            >
               Horizontal line
             </button>
-            <button type="button" className="ch-tf" aria-pressed={drawMode === 'trend'} onClick={() => setDrawMode(drawMode === 'trend' ? 'none' : 'trend')} data-testid="draw-trend">
+            <button
+              type="button"
+              className="ch-tf"
+              aria-pressed={drawMode === 'trend'}
+              onClick={() => setDrawMode(drawMode === 'trend' ? 'none' : 'trend')}
+              data-testid="draw-trend"
+            >
               Trendline (2 clicks)
             </button>
-            <button type="button" className="ch-tf" onClick={clearDrawings} data-testid="draw-clear">
+            <button
+              type="button"
+              className="ch-tf"
+              onClick={clearDrawings}
+              data-testid="draw-clear"
+            >
               Clear drawings ({drawings.h.length + drawings.t.length})
             </button>
           </div>
         </details>
       </div>
       <div className="ch-legend">
-        <span ref={readoutRef} className="ch-ohlc k-num" data-testid="chart-ohlc" aria-label="Candle open, high, low, close" />
+        <span
+          ref={readoutRef}
+          className="ch-ohlc k-num"
+          data-testid="chart-ohlc"
+          aria-label="Candle open, high, low, close"
+        />
         {legend.map((l) => (
           <span key={l}>— {l}</span>
         ))}
         <span>Vol</span>
         <span className="text-muted">Simulated feed · not market data</span>
-        {spec ? <SessionBadge mic={spec.venue} state={spec.session?.state} className="ml-auto" /> : null}
-        {drawMode !== 'none' ? <span className="text-warn">{drawMode === 'hline' ? 'Click to place a line' : pendingTrend ? 'Click the second point' : 'Click the first point'}</span> : null}
+        {spec ? (
+          <SessionBadge mic={spec.venue} state={spec.session?.state} className="ml-auto" />
+        ) : null}
+        {drawMode !== 'none' ? (
+          <span className="text-warn">
+            {drawMode === 'hline'
+              ? 'Click to place a line'
+              : pendingTrend
+                ? 'Click the second point'
+                : 'Click the first point'}
+          </span>
+        ) : null}
       </div>
-      <div className="ch-canvas" role="group" aria-label={`${name} ${tf} candlestick chart${lastPrice ? `, last ${lastPrice}` : ''}. Your working orders are buttons on the right edge.`}>
+      <div
+        className="ch-canvas"
+        role="group"
+        aria-label={`${name} ${tf} candlestick chart${lastPrice ? `, last ${lastPrice}` : ''}. Your working orders are buttons on the right edge.`}
+      >
         <div ref={hostRef} className="absolute inset-0" data-testid="chart-canvas" />
         <svg ref={overlayRef} className="ch-overlay" aria-hidden="true" />
         <div className="ch-handles">
@@ -629,15 +879,28 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
         </div>
       </div>
       {aiStrip !== 'off' ? <AiStrip mode={aiStrip} /> : null}
-      <Dialog open={amend !== null} onOpenChange={(o) => !o && (setAmend(null), setDrag(null))} title="Amend working order?" description="Paper order. The engine re-checks risk and may fill at once if the new price is marketable." data-testid="confirm-amend">
+      <Dialog
+        open={amend !== null}
+        onOpenChange={(o) => !o && (setAmend(null), setDrag(null))}
+        title="Amend working order?"
+        description="Paper order. The engine re-checks risk and may fill at once if the new price is marketable."
+        data-testid="confirm-amend"
+      >
         {amend ? (
           <p className="text-sm m-0">
-            {amend.order.side === 'buy' ? 'Buy' : 'Sell'} {amend.order.qty} {amend.order.symbol}: {amend.field === 'limitPrice' ? 'limit' : 'stop'} {formatPrice(amend.from, precision)} → <strong>{formatPrice(amend.to, precision)}</strong>
+            {amend.order.side === 'buy' ? 'Buy' : 'Sell'} {amend.order.qty} {amend.order.symbol}:{' '}
+            {amend.field === 'limitPrice' ? 'limit' : 'stop'} {formatPrice(amend.from, precision)} →{' '}
+            <strong>{formatPrice(amend.to, precision)}</strong>
           </p>
         ) : null}
         <div className="k-dialog__actions">
           <Button onClick={() => (setAmend(null), setDrag(null))}>Keep</Button>
-          <Button variant="primary" onClick={() => void confirmAmend()} data-testid="confirm-amend-ok" autoFocus>
+          <Button
+            variant="primary"
+            onClick={() => void confirmAmend()}
+            data-testid="confirm-amend-ok"
+            autoFocus
+          >
             Amend order
           </Button>
         </div>

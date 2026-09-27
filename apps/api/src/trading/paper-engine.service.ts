@@ -373,7 +373,17 @@ export class PaperEngineService {
     if (liquidity === 'taker') this.useBook(order.symbol, side, bookSeq, pieces);
 
     for (const piece of pieces) {
-      order = await this.bookFill(tx, order, inst, snap, piece, reference, liquidity, rate.rate, rate.fresh);
+      order = await this.bookFill(
+        tx,
+        order,
+        inst,
+        snap,
+        piece,
+        reference,
+        liquidity,
+        rate.rate,
+        rate.fresh,
+      );
     }
     if (arrival && order.tif === 'ioc' && WORKABLE.includes(order.status))
       order = await this.expire(tx, order, 'ioc_remainder');
@@ -406,7 +416,12 @@ export class PaperEngineService {
         [
           order.account_id,
           `Resting order refused at fill: ${breaches.join(', ')} (${order.side} ${order.qty} ${order.symbol}).`,
-          JSON.stringify({ orderId: order.id, symbol: order.symbol, codes: breaches, atFill: true }),
+          JSON.stringify({
+            orderId: order.id,
+            symbol: order.symbol,
+            codes: breaches,
+            atFill: true,
+          }),
         ],
       );
     return this.cancel(tx, order, `risk_recheck:${codes[0]}`, ENGINE_ACTOR, {
@@ -482,7 +497,13 @@ export class PaperEngineService {
   ): Promise<OrderRow> {
     return withSpan(
       'engine.fill',
-      { 'kora.order_id': order.id, 'kora.symbol': order.symbol, 'kora.side': order.side, 'kora.qty': piece.qty.toString(), 'kora.liquidity': liquidity },
+      {
+        'kora.order_id': order.id,
+        'kora.symbol': order.symbol,
+        'kora.side': order.side,
+        'kora.qty': piece.qty.toString(),
+        'kora.liquidity': liquidity,
+      },
       () => this.bookFillInSpan(tx, order, inst, snap, piece, reference, liquidity, rate, fxFresh),
       contextFrom(order.trace_parent),
     );
@@ -540,7 +561,11 @@ export class PaperEngineService {
     const slippage = piece.price.sub(reference).mul(sideSign(order.side));
     // Goal 10: fills and slippage (bps of the reference) for the order-quality dashboard.
     this.metrics?.fills.inc({ liquidity });
-    if (!reference.isZero()) this.metrics?.observeSlippageBps(order.symbol, slippage.div(reference).mul(10_000).toFixed(4));
+    if (!reference.isZero())
+      this.metrics?.observeSlippageBps(
+        order.symbol,
+        slippage.div(reference).mul(10_000).toFixed(4),
+      );
     const q = snap.quote!;
     const quoteAtDecision = {
       bid: q.bid,

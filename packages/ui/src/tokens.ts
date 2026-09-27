@@ -155,9 +155,22 @@ export const typography = {
 } as const;
 
 /** Text/surface pairs that must meet 4.5:1. [foreground, background, where it is used]. */
-export function contrastPairs(t: ThemeTokens): Array<[keyof ThemeTokens, keyof ThemeTokens, string]> {
+export function contrastPairs(
+  t: ThemeTokens,
+): Array<[keyof ThemeTokens, keyof ThemeTokens, string]> {
   const surfaces: Array<keyof ThemeTokens> = ['bg', 'panel', 'raised'];
-  const texts: Array<keyof ThemeTokens> = ['text', 'textMuted', 'up', 'down', 'accent', 'ai', 'warn', 'kill', 'loss', 'ok'];
+  const texts: Array<keyof ThemeTokens> = [
+    'text',
+    'textMuted',
+    'up',
+    'down',
+    'accent',
+    'ai',
+    'warn',
+    'kill',
+    'loss',
+    'ok',
+  ];
   const pairs: Array<[keyof ThemeTokens, keyof ThemeTokens, string]> = [];
   for (const fg of texts) for (const bg of surfaces) pairs.push([fg, bg, `${fg} text on ${bg}`]);
   void t;

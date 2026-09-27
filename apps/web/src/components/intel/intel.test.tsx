@@ -36,7 +36,11 @@ describe('market intelligence components (goal 07B)', () => {
               name: 'Toyota Motor',
               headline: 'Toyota Motor has gone up more than usual. That is a big move for it.',
               why: 'In the news: "Toyota raises target" (SIMULATED Wire APAC).',
-              whySource: { id: 'a1', source: 'SIMULATED Wire APAC', url: 'https://news.simulated.invalid/a1' },
+              whySource: {
+                id: 'a1',
+                source: 'SIMULATED Wire APAC',
+                url: 'https://news.simulated.invalid/a1',
+              },
               confidence: null,
             },
           ],
@@ -61,10 +65,16 @@ describe('market intelligence components (goal 07B)', () => {
             {
               symbol: 'EURUSD',
               name: 'Euro / US Dollar',
-              headline: 'Euro / US Dollar has gone down more than usual. That is a big move for it.',
+              headline:
+                'Euro / US Dollar has gone down more than usual. That is a big move for it.',
               why: 'In the news: "ECB holds rates" (SIMULATED Wire EMEA).',
-              whySource: { id: 'a2', source: 'SIMULATED Wire EMEA', url: 'https://news.simulated.invalid/a2' },
-              confidence: 'In the past, forecasts like this came true about 57 times out of 100 (120 cases).',
+              whySource: {
+                id: 'a2',
+                source: 'SIMULATED Wire EMEA',
+                url: 'https://news.simulated.invalid/a2',
+              },
+              confidence:
+                'In the past, forecasts like this came true about 57 times out of 100 (120 cases).',
               move: 'down',
               news: { title: 'ECB holds rates', source: 'SIMULATED Wire EMEA' },
               odds: { per100: 57, n: 120 },
@@ -94,8 +104,18 @@ describe('market intelligence components (goal 07B)', () => {
       symbol: '7203.XTKS',
       horizon: '1d',
       drivers: [
-        { feature: 'mom_z', label: 'Momentum z-score (20 bars)', value: 2.41, contribution: 0.2134 },
-        { feature: 'vol_ratio', label: 'Volatility ratio (20/100)', value: 0.83, contribution: -0.0412 },
+        {
+          feature: 'mom_z',
+          label: 'Momentum z-score (20 bars)',
+          value: 2.41,
+          contribution: 0.2134,
+        },
+        {
+          feature: 'vol_ratio',
+          label: 'Volatility ratio (20/100)',
+          value: 0.83,
+          contribution: -0.0412,
+        },
       ],
     } as unknown as TrendCard;
     render(<DriversChart card={card} />);

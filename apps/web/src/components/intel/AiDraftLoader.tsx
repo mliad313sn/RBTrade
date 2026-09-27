@@ -27,7 +27,11 @@ export function AiDraftLoader({ draftId }: { draftId: string | null }) {
   useEffect(() => {
     if (!draftId || !/^[0-9a-f-]{36}$/i.test(draftId)) return;
     let cancelled = false;
-    void fetch(`/api/ai/drafts/${draftId}`, { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } })
+    void fetch(`/api/ai/drafts/${draftId}`, {
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    })
       .then((r) => (r.ok ? (r.json() as Promise<OrderDraftDto>) : null))
       .then((d) => {
         if (cancelled || !d || d.kind !== 'order' || d.status !== 'draft') return;

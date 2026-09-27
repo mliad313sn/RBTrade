@@ -13,7 +13,10 @@ export interface ParsedHotkey {
 }
 
 export function parseHotkey(spec: string, isMac = false): ParsedHotkey | null {
-  const parts = spec.split('+').map((p) => p.trim()).filter(Boolean);
+  const parts = spec
+    .split('+')
+    .map((p) => p.trim())
+    .filter(Boolean);
   // "Shift++" style is not supported; "?" and other symbols are the last part.
   if (spec.endsWith('++')) parts.push('+');
   const key = parts.pop();
@@ -42,9 +45,11 @@ export interface KeyLike {
 
 function keyMatches(k: string, e: KeyLike): boolean {
   // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
-  if (/^[a-z]$/i.test(k)) return e.code ? e.code === `Key${k.toUpperCase()}` : e.key.toLowerCase() === k.toLowerCase();
+  if (/^[a-z]$/i.test(k))
+    return e.code ? e.code === `Key${k.toUpperCase()}` : e.key.toLowerCase() === k.toLowerCase();
   // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
-  if (/^[0-9]$/.test(k)) return e.code ? e.code === `Digit${k}` || e.code === `Numpad${k}` : e.key === k;
+  if (/^[0-9]$/.test(k))
+    return e.code ? e.code === `Digit${k}` || e.code === `Numpad${k}` : e.key === k;
   if (k.toLowerCase() === 'esc' || k.toLowerCase() === 'escape') return e.key === 'Escape';
   return e.key.toLowerCase() === k.toLowerCase();
 }
@@ -54,7 +59,13 @@ export function matchHotkey(e: KeyLike, spec: string, isMac = false): boolean {
   if (!p) return false;
   // "?" is produced with Shift on most layouts: Shift is implied, not required to be declared.
   const shiftOk = p.key === '?' ? true : e.shiftKey === p.shift;
-  return keyMatches(p.key, e) && e.ctrlKey === p.ctrl && e.altKey === p.alt && e.metaKey === p.meta && shiftOk;
+  return (
+    keyMatches(p.key, e) &&
+    e.ctrlKey === p.ctrl &&
+    e.altKey === p.alt &&
+    e.metaKey === p.meta &&
+    shiftOk
+  );
 }
 
 /** True when single-key hotkeys must not fire (the user is typing). */
@@ -76,18 +87,24 @@ export function hasModifier(spec: string): boolean {
 
 /** Display parts for <Kbd> chips, e.g. "Mod+K" → ["⌘", "K"] on macOS, ["Ctrl", "K"] elsewhere. */
 export function hotkeyParts(spec: string, isMac = false): string[] {
-  return spec.split('+').filter(Boolean).map((p) => {
-    const l = p.toLowerCase();
-    if (l === 'mod') return isMac ? '⌘' : 'Ctrl';
-    if (l === 'meta' || l === 'cmd') return '⌘';
-    if (l === 'alt' || l === 'option') return isMac ? '⌥' : 'Alt';
-    if (l === 'enter') return 'Enter';
-    return p.length === 1 ? p.toUpperCase() : p;
-  });
+  return spec
+    .split('+')
+    .filter(Boolean)
+    .map((p) => {
+      const l = p.toLowerCase();
+      if (l === 'mod') return isMac ? '⌘' : 'Ctrl';
+      if (l === 'meta' || l === 'cmd') return '⌘';
+      if (l === 'alt' || l === 'option') return isMac ? '⌥' : 'Alt';
+      if (l === 'enter') return 'Enter';
+      return p.length === 1 ? p.toUpperCase() : p;
+    });
 }
 
 export function isMacPlatform(): boolean {
-  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  return (
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+  );
 }
 
 /** Validates a user-entered binding (Settings). */

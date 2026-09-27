@@ -10,7 +10,10 @@ import { useFeedState } from '@/lib/terminal/store';
 
 import { useShell } from './ShellContext';
 
-type Conn = { state: 'connecting' | 'connected' | 'degraded' | 'offline'; latencyMs: number | null };
+type Conn = {
+  state: 'connecting' | 'connected' | 'degraded' | 'offline';
+  latencyMs: number | null;
+};
 
 function useApiHealth(): Conn {
   const [conn, setConn] = useState<Conn>({ state: 'connecting', latencyMs: null });
@@ -96,25 +99,40 @@ export function StatusBar() {
   const feed = useFeedState();
   const robots = useRobotsLabel(me.capabilities.robotBuilder);
   return (
-    <footer className="flex flex-wrap items-center gap-x-5 px-3 min-h-[23px] border-t border-border bg-bg text-xs text-muted k-num" data-testid="status-bar">
+    <footer
+      className="flex flex-wrap items-center gap-x-5 px-3 min-h-[23px] border-t border-border bg-bg text-xs text-muted k-num"
+      data-testid="status-bar"
+    >
       <span role="status" aria-live="polite" className="flex items-center gap-1">
         <span aria-hidden="true" className={DOT[conn.state]}>
           ●
         </span>
         <span className="text-text">{LABEL[conn.state]}</span>
       </span>
-      <span className="inline-block min-w-[11ch]" data-testid="status-latency">Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}</span>
+      <span className="inline-block min-w-[11ch]" data-testid="status-latency">
+        Latency {conn.latencyMs === null ? '—' : `${conn.latencyMs} ms`}
+      </span>
       <span className="hidden md:inline" data-testid="status-feed">
         Feed: simulated{feed.feed ? ` · ${feed.feed}` : ''}
         {feed.socket === 'reconnecting' ? ' · reconnecting' : ''}
       </span>
-      <span className="hidden lg:inline-block min-w-[17ch]" data-testid="status-tick">{feed.tickP95 !== null ? `Tick→paint p95 ${Math.round(feed.tickP95)} ms` : ''}</span>
+      <span className="hidden lg:inline-block min-w-[17ch]" data-testid="status-tick">
+        {feed.tickP95 !== null ? `Tick→paint p95 ${Math.round(feed.tickP95)} ms` : ''}
+      </span>
       {robots ? (
-        <Link href="/robots" className="hidden lg:inline text-muted underline-offset-2 hover:underline" data-testid="status-robots">
+        <Link
+          href="/robots"
+          className="hidden lg:inline text-muted underline-offset-2 hover:underline"
+          data-testid="status-robots"
+        >
           {robots}
         </Link>
       ) : null}
-      <span className="ml-auto" aria-label={`${clockLabel(mode)} time ${utc}`} data-testid="status-clock">
+      <span
+        className="ml-auto"
+        aria-label={`${clockLabel(mode)} time ${utc}`}
+        data-testid="status-clock"
+      >
         {clockLabel(mode)} {utc}
       </span>
       <span>Env: PAPER</span>

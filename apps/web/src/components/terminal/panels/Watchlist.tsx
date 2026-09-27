@@ -1,10 +1,26 @@
 'use client';
 
-import { assetClassLabel, dec, quoteBadge, sessionBadge, type Quote, type WatchlistDto } from '@kora/domain';
+import {
+  assetClassLabel,
+  dec,
+  quoteBadge,
+  sessionBadge,
+  type Quote,
+  type WatchlistDto,
+} from '@kora/domain';
 import type { InstrumentDto } from '@kora/sdk';
 import { useToast } from '@kora/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from 'react';
 
 import { api } from '@/lib/api-browser';
 import { useRegistry } from '@/lib/terminal/registry';
@@ -94,10 +110,14 @@ const Row = memo(function Row({
       const badge = quoteBadge({ stale: quote.stale, session });
       if (lastRef.current) lastRef.current.textContent = v.last;
       if (chgRef.current) {
-        chgRef.current.textContent = v.change ? `${v.dir === 'up' ? '▲' : v.dir === 'down' ? '▼' : ''} ${v.change}` : '—';
+        chgRef.current.textContent = v.change
+          ? `${v.dir === 'up' ? '▲' : v.dir === 'down' ? '▼' : ''} ${v.change}`
+          : '—';
         chgRef.current.className = `wl-chg k-dir--${v.dir}`;
       }
-      if (subRef.current) subRef.current.textContent = badge === 'stale' ? 'Stale' : badge === 'closed' ? 'Closed' : `spr ${v.spread}`;
+      if (subRef.current)
+        subRef.current.textContent =
+          badge === 'stale' ? 'Stale' : badge === 'closed' ? 'Closed' : `spr ${v.spread}`;
       rowRef.current.dataset.stale = badge === 'stale' ? 'true' : 'false';
       rowRef.current.dataset.closed = badge === 'closed' ? 'true' : 'false';
       const mid = v.mid;
@@ -170,7 +190,16 @@ const Row = memo(function Row({
       <span ref={chgRef} className="wl-chg k-dir--flat">
         —
       </span>
-      <button type="button" className="wl-remove" aria-label={`Remove ${spec?.displayName ?? symbol} from the watchlist`} onClick={(e) => { e.stopPropagation(); onRemove(symbol); }} tabIndex={-1}>
+      <button
+        type="button"
+        className="wl-remove"
+        aria-label={`Remove ${spec?.displayName ?? symbol} from the watchlist`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(symbol);
+        }}
+        tabIndex={-1}
+      >
         <Trash2 size={11} aria-hidden="true" />
       </button>
     </div>
@@ -216,7 +245,9 @@ function useWatchlists() {
   const setSymbols = useCallback(
     (id: string, symbols: string[]) => {
       setLists((ls) => ls.map((l) => (l.id === id ? { ...l, symbols } : l)));
-      api.updateWatchlist(id, { symbols }).catch((e: Error) => toast.push(`Could not save the watchlist: ${e.message}`, 'critical'));
+      api
+        .updateWatchlist(id, { symbols })
+        .catch((e: Error) => toast.push(`Could not save the watchlist: ${e.message}`, 'critical'));
     },
     [toast],
   );
@@ -267,14 +298,21 @@ export function WatchlistPanel({ onTitle }: { onTitle?: (t: string) => void }) {
     next.splice(to, 0, x!);
     setSymbols(active.id, next);
   };
-  const removeSymbol = (s: string) => active && setSymbols(active.id, active.symbols.filter((x) => x !== s));
+  const removeSymbol = (s: string) =>
+    active &&
+    setSymbols(
+      active.id,
+      active.symbols.filter((x) => x !== s),
+    );
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>, i: number) => {
     const focusRow = (j: number) => {
       const k = Math.max(0, Math.min(symbols.length - 1, j));
       setFocusIdx(k);
       listRef.current?.scrollToIndex(k);
-      requestAnimationFrame(() => listRef.current?.element()?.querySelector<HTMLElement>(`[data-index="${k}"]`)?.focus());
+      requestAnimationFrame(() =>
+        listRef.current?.element()?.querySelector<HTMLElement>(`[data-index="${k}"]`)?.focus(),
+      );
     };
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
@@ -302,26 +340,60 @@ export function WatchlistPanel({ onTitle }: { onTitle?: (t: string) => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0" data-testid="watchlist" data-panel-root="watchlist" tabIndex={-1}>
+    <div
+      className="flex flex-col h-full min-h-0"
+      data-testid="watchlist"
+      data-panel-root="watchlist"
+      tabIndex={-1}
+    >
       <div className="wl-toolbar">
         <label className="k-sr-only" htmlFor="wl-select">
           Watchlist
         </label>
-        <select id="wl-select" className="wl-select" value={active?.id ?? ''} onChange={(e) => select(e.target.value)} data-testid="watchlist-select">
+        <select
+          id="wl-select"
+          className="wl-select"
+          value={active?.id ?? ''}
+          onChange={(e) => select(e.target.value)}
+          data-testid="watchlist-select"
+        >
           {lists.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name} ({l.symbols.length})
             </option>
           ))}
         </select>
-        <button type="button" className="wl-tool" aria-label="Add a symbol (opens the command palette)" title="Add symbol (⌘K)" onClick={() => window.dispatchEvent(new CustomEvent('kora:palette', { detail: { mode: 'add' } }))} data-testid="watchlist-add">
+        <button
+          type="button"
+          className="wl-tool"
+          aria-label="Add a symbol (opens the command palette)"
+          title="Add symbol (⌘K)"
+          onClick={() =>
+            window.dispatchEvent(new CustomEvent('kora:palette', { detail: { mode: 'add' } }))
+          }
+          data-testid="watchlist-add"
+        >
           <Plus size={13} aria-hidden="true" />
         </button>
-        <button type="button" className="wl-tool" onClick={newList} aria-label="New watchlist" title="New watchlist">
+        <button
+          type="button"
+          className="wl-tool"
+          onClick={newList}
+          aria-label="New watchlist"
+          title="New watchlist"
+        >
           New
         </button>
         {active && lists.length > 1 ? (
-          <button type="button" className="wl-tool" aria-label={`Delete watchlist ${active.name}`} title="Delete watchlist" onClick={() => window.confirm(`Delete the watchlist "${active.name}"?`) && void remove(active.id)}>
+          <button
+            type="button"
+            className="wl-tool"
+            aria-label={`Delete watchlist ${active.name}`}
+            title="Delete watchlist"
+            onClick={() =>
+              window.confirm(`Delete the watchlist "${active.name}"?`) && void remove(active.id)
+            }
+          >
             <Trash2 size={12} aria-hidden="true" />
           </button>
         ) : null}
@@ -365,7 +437,9 @@ export function WatchlistPanel({ onTitle }: { onTitle?: (t: string) => void }) {
           />
         )}
       />
-      {active && symbols.length === 0 ? <p className="text-muted text-xs px-2">Empty list. Press ⌘K to add symbols.</p> : null}
+      {active && symbols.length === 0 ? (
+        <p className="text-muted text-xs px-2">Empty list. Press ⌘K to add symbols.</p>
+      ) : null}
       <p className="wl-foot">Simulated feed · not market data</p>
     </div>
   );

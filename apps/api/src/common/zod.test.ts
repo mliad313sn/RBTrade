@@ -7,7 +7,10 @@ import { openApiSchema, ZodValidationPipe } from './zod';
 describe('ZodValidationPipe', () => {
   const schema = z.object({ email: z.string().email(), n: z.number().int() }).strict();
   it('returns parsed data', () => {
-    expect(new ZodValidationPipe(schema).transform({ email: 'a@b.co', n: 1 })).toEqual({ email: 'a@b.co', n: 1 });
+    expect(new ZodValidationPipe(schema).transform({ email: 'a@b.co', n: 1 })).toEqual({
+      email: 'a@b.co',
+      n: 1,
+    });
   });
   it('throws a 400 with issues', () => {
     try {

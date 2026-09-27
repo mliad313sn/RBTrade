@@ -13,6 +13,10 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
     this.log.error(err.message, err.stack);
     if (process.env.KORA_TEST_LOGS === '1') console.error(err);
     const res = host.switchToHttp().getResponse<Response>();
-    res.status(500).json({ statusCode: 500, error: 'internal_error', message: 'Something went wrong. It has been logged.' });
+    res.status(500).json({
+      statusCode: 500,
+      error: 'internal_error',
+      message: 'Something went wrong. It has been logged.',
+    });
   }
 }

@@ -11,4 +11,5 @@ export function robotCtlPrefix(env: NodeJS.ProcessEnv = process.env): string {
 export const robotControlChannel = (prefix = robotCtlPrefix()): string => `${prefix}ctl:robots`;
 /** What the runner reports (halts with latency, decisions). */
 export const robotEventsChannel = (prefix = robotCtlPrefix()): string => `${prefix}robots:events`;
-export const robotHeartbeatKey = (robotId: string, prefix = robotCtlPrefix()): string => `${prefix}robots:hb:${robotId}`;
+export const robotHeartbeatKey = (robotId: string, prefix = robotCtlPrefix()): string =>
+  `${prefix}robots:hb:${robotId}`;

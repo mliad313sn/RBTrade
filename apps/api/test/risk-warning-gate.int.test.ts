@@ -17,7 +17,8 @@ describe('risk warning acknowledgement before the first order, every role (IRTC 
   const md = new MarketFixture();
 
   const doc = async (token: string) =>
-    (await request(http).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200)).body.document as {
+    (await request(http).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200))
+      .body.document as {
       version: string;
       contentHash: string;
     };
@@ -26,13 +27,24 @@ describe('risk warning acknowledgement before the first order, every role (IRTC 
     return request(http)
       .post('/orders')
       .set(bearer(token))
-      .send({ clientOrderId: `r409-${Date.now()}`, symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000' });
+      .send({
+        clientOrderId: `r409-${Date.now()}`,
+        symbol: 'EURUSD',
+        side: 'buy',
+        type: 'market',
+        qty: '1000',
+      });
   };
   const signUp = async () => {
     const email = uniqueEmail('r409');
-    await request(http).post('/auth/signup').set(CSRF).send({ email, password: 'correct-horse-battery-staple', displayName: 'R409' }).expect(201);
+    await request(http)
+      .post('/auth/signup')
+      .set(CSRF)
+      .send({ email, password: 'correct-horse-battery-staple', displayName: 'R409' })
+      .expect(201);
     const first = await login(app, email);
-    const id = (await request(http).get('/me').set(bearer(first.token)).expect(200)).body.user.id as string;
+    const id = (await request(http).get('/me').set(bearer(first.token)).expect(200)).body.user
+      .id as string;
     return { email, id, token: first.token };
   };
 
@@ -64,7 +76,12 @@ describe('risk warning acknowledgement before the first order, every role (IRTC 
     const stale = await request(http)
       .post('/appropriateness/attempts')
       .set(bearer(u.token))
-      .send({ questionnaireId: q.id, version: q.version, answers: passingAnswers(), riskWarning: { version: 'old', contentHash: 'a'.repeat(64), locale: 'en' } });
+      .send({
+        questionnaireId: q.id,
+        version: q.version,
+        answers: passingAnswers(),
+        riskWarning: { version: 'old', contentHash: 'a'.repeat(64), locale: 'en' },
+      });
     expect(stale.status).toBe(409);
   });
 
@@ -75,7 +92,12 @@ describe('risk warning acknowledgement before the first order, every role (IRTC 
     const r = await request(http)
       .post('/appropriateness/attempts')
       .set(bearer(u.token))
-      .send({ questionnaireId: q.id, version: q.version, answers: passingAnswers(), riskWarning: { version: d.version, contentHash: d.contentHash, locale: 'en' } })
+      .send({
+        questionnaireId: q.id,
+        version: q.version,
+        answers: passingAnswers(),
+        riskWarning: { version: d.version, contentHash: d.contentHash, locale: 'en' },
+      })
       .expect(200);
     expect(r.body.passed).toBe(true);
     const acks = await ownerQuery<{ context: string; version: string }>(

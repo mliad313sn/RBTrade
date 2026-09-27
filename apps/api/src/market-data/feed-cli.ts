@@ -13,7 +13,9 @@ class FeedProcessModule {}
 
 /** Standalone feed process: run the api with KORA_MD_FEED=off and this next to it. */
 async function main(): Promise<void> {
-  const ctx = await NestFactory.createApplicationContext(FeedProcessModule, { logger: ['log', 'warn', 'error'] });
+  const ctx = await NestFactory.createApplicationContext(FeedProcessModule, {
+    logger: ['log', 'warn', 'error'],
+  });
   ctx.enableShutdownHooks();
   await ctx.get(FeedService).start();
 }

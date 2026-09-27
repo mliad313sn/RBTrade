@@ -23,13 +23,21 @@ const AuditQuerySchema = z
       .optional(),
     from: z.iso.datetime({ offset: true }).optional(),
     to: z.iso.datetime({ offset: true }).optional(),
-    beforeId: z.string().regex(/^\d{1,19}$/).optional(),
+    beforeId: z
+      .string()
+      .regex(/^\d{1,19}$/)
+      .optional(),
     limit: z.coerce.number().int().min(1).max(500).optional(),
   })
   .strict();
 
 /** IRTC R1-08: chain verification is O(N); its own low limit per client (read per request). */
-const verifyThrottle = () => ({ default: { limit: () => Number(process.env.KORA_AUDIT_VERIFY_RATE_LIMIT ?? 10) || 10, ttl: 60_000 } });
+const verifyThrottle = () => ({
+  default: {
+    limit: () => Number(process.env.KORA_AUDIT_VERIFY_RATE_LIMIT ?? 10) || 10,
+    ttl: 60_000,
+  },
+});
 
 @ApiTags('audit')
 @Controller('audit')
@@ -48,7 +56,11 @@ export class AuditController {
   @ApiQuery({ name: 'actorType', required: false, enum: ACTOR_TYPES })
   @ApiQuery({ name: 'entity', required: false })
   @ApiQuery({ name: 'entityId', required: false })
-  @ApiQuery({ name: 'action', required: false, description: 'exact, or prefix with .* (e.g. kill_switch.*)' })
+  @ApiQuery({
+    name: 'action',
+    required: false,
+    description: 'exact, or prefix with .* (e.g. kill_switch.*)',
+  })
   @ApiQuery({ name: 'from', required: false, description: 'ISO-8601, inclusive' })
   @ApiQuery({ name: 'to', required: false, description: 'ISO-8601, exclusive' })
   @ApiQuery({ name: 'beforeId', required: false })
@@ -59,11 +71,21 @@ export class AuditController {
   ) {
     if (!hasAnyRole(principal.roles, AUDIT_READ_ROLES)) {
       if (q.actorId && q.actorId !== principal.sub) {
-        throw new ForbiddenException({ error: 'forbidden', message: 'You can only read your own audit events' });
+        throw new ForbiddenException({
+          error: 'forbidden',
+          message: 'You can only read your own audit events',
+        });
       }
       // B-303: your own events, plus engine/robot/system events about your own paper account.
-      const accounts = await this.db.query<{ id: string }>('SELECT id FROM accounts WHERE user_id = $1', [principal.sub]);
-      return this.audit.list({ ...q, actorId: undefined, visibleTo: { userId: principal.sub, accountIds: accounts.map((a) => a.id) } });
+      const accounts = await this.db.query<{ id: string }>(
+        'SELECT id FROM accounts WHERE user_id = $1',
+        [principal.sub],
+      );
+      return this.audit.list({
+        ...q,
+        actorId: undefined,
+        visibleTo: { userId: principal.sub, accountIds: accounts.map((a) => a.id) },
+      });
     }
     return this.audit.list(q);
   }
@@ -75,8 +97,12 @@ export class AuditController {
       'Recompute the hash chain. Auditors, risk officers and admins verify the whole chain (scope "chain"); everyone else verifies their own events and their links (scope "own", no platform totals). Returns valid:false with the first broken id on tamper. IRTC R1-08: 10 per minute per client.',
   })
   async verify(@CurrentPrincipal() principal: Principal) {
-    if (hasAnyRole(principal.roles, AUDIT_READ_ROLES)) return { ...(await this.audit.verifyShared()), scope: 'chain' as const };
-    const accounts = await this.db.query<{ id: string }>('SELECT id FROM accounts WHERE user_id = $1', [principal.sub]);
+    if (hasAnyRole(principal.roles, AUDIT_READ_ROLES))
+      return { ...(await this.audit.verifyShared()), scope: 'chain' as const };
+    const accounts = await this.db.query<{ id: string }>(
+      'SELECT id FROM accounts WHERE user_id = $1',
+      [principal.sub],
+    );
     return this.audit.verifyOwn({ userId: principal.sub, accountIds: accounts.map((a) => a.id) });
   }
 }

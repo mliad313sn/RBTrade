@@ -11,7 +11,14 @@ import { asRecord, StubAdapterBase, vendorDecimal, type StubCapabilities } from 
  * local per-instrument counter and gap detection does not apply (contiguousSeq.quotes = false).
  */
 
-const GRANULARITY: Partial<Record<Timeframe, string>> = { '1m': 'M1', '5m': 'M5', '15m': 'M15', '1h': 'H1', '4h': 'H4', '1D': 'D' };
+const GRANULARITY: Partial<Record<Timeframe, string>> = {
+  '1m': 'M1',
+  '5m': 'M5',
+  '15m': 'M15',
+  '1h': 'H1',
+  '4h': 'H4',
+  '1D': 'D',
+};
 
 export class FxCfdBrokerStubAdapter extends StubAdapterBase {
   readonly source = 'broker-fxcfd';
@@ -36,7 +43,10 @@ export class FxCfdBrokerStubAdapter extends StubAdapterBase {
     const top = (side: unknown, what: string): { price: string; size: string } => {
       if (!Array.isArray(side) || side.length === 0) throw new TypeError(`${what}: empty`);
       const lvl = asRecord(side[0], what);
-      return { price: formatPrice(vendorDecimal(lvl.price, what), spec), size: formatSize(vendorDecimal(lvl.liquidity, what), spec) };
+      return {
+        price: formatPrice(vendorDecimal(lvl.price, what), spec),
+        size: formatSize(vendorDecimal(lvl.liquidity, what), spec),
+      };
     };
     const bid = top(f.bids, 'bids');
     const ask = top(f.asks, 'asks');
@@ -97,7 +107,10 @@ export class FxCfdBrokerStubAdapter extends StubAdapterBase {
     return `/pricing?instruments=${vendorSymbol}`;
   }
 
-  protected decodeSnapshot(symbol: string, body: unknown): { quote: Quote | null; depth: DepthSnapshot | null } {
+  protected decodeSnapshot(
+    symbol: string,
+    body: unknown,
+  ): { quote: Quote | null; depth: DepthSnapshot | null } {
     const prices = asRecord(body, 'pricing').prices;
     if (!Array.isArray(prices) || prices.length === 0) return { quote: null, depth: null };
     const [quote] = this.decode({ ...asRecord(prices[0], 'price'), type: 'PRICE' });

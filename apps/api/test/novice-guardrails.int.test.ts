@@ -2,7 +2,15 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { acknowledgeRiskWarning, awayFromUtcMidnight, bearer, createUser, login, startApp, type TestUser } from './helpers';
+import {
+  acknowledgeRiskWarning,
+  awayFromUtcMidnight,
+  bearer,
+  createUser,
+  login,
+  startApp,
+  type TestUser,
+} from './helpers';
 import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
 import { knowledgeFail, onboard, passKnowledgeCheck } from './novice-helpers';
 import knowledgeCheckV1 from '../src/appropriateness/questionnaires/knowledge-check.v1.json';
@@ -47,7 +55,10 @@ describe('novice guardrails through the API', () => {
 
   const send = async (u: { token: string }, body: object) => {
     await md.touch();
-    return request(http).post('/orders').set(bearer(u.token)).send({ clientOrderId: cid(), ...body });
+    return request(http)
+      .post('/orders')
+      .set(bearer(u.token))
+      .send({ clientOrderId: cid(), ...body });
   };
   const rejected = async (u: { token: string }, body: object, code: string) => {
     const res = await send(u, body);
@@ -68,27 +79,71 @@ describe('novice guardrails through the API', () => {
   it('cannot place an order without a stop (market, limit, or through the Pro endpoints)', async () => {
     const nov = await createUser(app, 'novice');
     await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
-    const r = await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000' }, 'NOVICE_STOP_REQUIRED');
-    expect(r.violations.find((v) => v.code === 'NOVICE_STOP_REQUIRED')!.message).toContain('stop loss');
-    await rejected(nov, { symbol: 'EURUSD', side: 'sell', type: 'market', qty: '10000' }, 'NOVICE_STOP_REQUIRED');
+    const r = await rejected(
+      nov,
+      { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000' },
+      'NOVICE_STOP_REQUIRED',
+    );
+    expect(r.violations.find((v) => v.code === 'NOVICE_STOP_REQUIRED')!.message).toContain(
+      'stop loss',
+    );
+    await rejected(
+      nov,
+      { symbol: 'EURUSD', side: 'sell', type: 'market', qty: '10000' },
+      'NOVICE_STOP_REQUIRED',
+    );
     // Advanced types are refused too (market + stop only), whatever the client sends.
-    await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '10000', limitPrice: '1.08300' }, 'NOVICE_STOP_REQUIRED');
-    await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '10000', limitPrice: '1.08300' }, 'NOVICE_ORDER_TYPE');
+    await rejected(
+      nov,
+      { symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '10000', limitPrice: '1.08300' },
+      'NOVICE_STOP_REQUIRED',
+    );
+    await rejected(
+      nov,
+      { symbol: 'EURUSD', side: 'buy', type: 'limit', qty: '10000', limitPrice: '1.08300' },
+      'NOVICE_ORDER_TYPE',
+    );
     // The preview says so before anything happens.
-    const pv = await request(http).post('/orders/preview').set(bearer(nov.token)).send({ symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000' }).expect(200);
+    const pv = await request(http)
+      .post('/orders/preview')
+      .set(bearer(nov.token))
+      .send({ symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000' })
+      .expect(200);
     expect(pv.body.risk.ok).toBe(false);
-    expect(pv.body.risk.violations.map((v: { code: string }) => v.code)).toContain('NOVICE_STOP_REQUIRED');
+    expect(pv.body.risk.violations.map((v: { code: string }) => v.code)).toContain(
+      'NOVICE_STOP_REQUIRED',
+    );
     // With a stop it goes through.
-    expect((await send(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '10000', stopLossPrice: '1.08000' })).status).toBe(201);
+    expect(
+      (
+        await send(nov, {
+          symbol: 'EURUSD',
+          side: 'buy',
+          type: 'market',
+          qty: '10000',
+          stopLossPrice: '1.08000',
+        })
+      ).status,
+    ).toBe(201);
   });
 
   it('cannot use leverage: off by default; asking needs the knowledge check; on only after 24 h, capped at 2×', async () => {
     const nov = await createUser(app, 'novice');
     await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     // 1.5 × the 100,000 practice balance in EUR/USD (margin allows it; the novice rule does not).
-    const big = { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '138000', stopLossPrice: '1.07500' };
+    const big = {
+      symbol: 'EURUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '138000',
+      stopLossPrice: '1.07500',
+    };
     await rejected(nov, big, 'NOVICE_LEVERAGE');
-    const noCheck = await request(http).put('/novice/leverage').set(bearer(nov.token)).send({ enabled: true }).expect(403);
+    const noCheck = await request(http)
+      .put('/novice/leverage')
+      .set(bearer(nov.token))
+      .send({ enabled: true })
+      .expect(403);
     expect(noCheck.body.error).toBe('knowledge_check_required');
 
     // A failed check (score below 4/5) does not unlock and starts a cool-down.
@@ -99,11 +154,19 @@ describe('novice guardrails through the API', () => {
       .expect(200);
     expect(fail.body).toMatchObject({ passed: false, passMarkPct: 80 });
     expect(fail.body.cooldownUntil).toBeTruthy();
-    await request(http).put('/novice/leverage').set(bearer(nov.token)).send({ enabled: true }).expect(403);
+    await request(http)
+      .put('/novice/leverage')
+      .set(bearer(nov.token))
+      .send({ enabled: true })
+      .expect(403);
     await later(nov, 61 * 60_000); // after the 60 min cool-down
     await passKnowledgeCheck(app, nov.token);
 
-    const asked = await request(http).put('/novice/leverage').set(bearer(nov.token)).send({ enabled: true }).expect(200);
+    const asked = await request(http)
+      .put('/novice/leverage')
+      .set(bearer(nov.token))
+      .send({ enabled: true })
+      .expect(200);
     expect(asked.body.leverage).toMatchObject({ state: 'pending', current: '1', max: '2' });
     expect(Date.parse(asked.body.leverage.effectiveAt) - Date.now()).toBeGreaterThan(23.9 * HOUR);
     await rejected(nov, big, 'NOVICE_LEVERAGE'); // still off during the wait
@@ -115,7 +178,11 @@ describe('novice guardrails through the API', () => {
     const over = await rejected(nov, { ...big, qty: '60000' }, 'NOVICE_LEVERAGE');
     expect(over.violations.find((v) => v.code === 'NOVICE_LEVERAGE')!.message).toContain('2×');
     // Turning it off is immediate.
-    const off = await request(http).put('/novice/leverage').set(bearer(nov.token)).send({ enabled: false }).expect(200);
+    const off = await request(http)
+      .put('/novice/leverage')
+      .set(bearer(nov.token))
+      .send({ enabled: false })
+      .expect(200);
     expect(off.body.leverage).toMatchObject({ state: 'off', current: '1' });
   });
 
@@ -124,8 +191,16 @@ describe('novice guardrails through the API', () => {
     await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
     await request(http).get('/robots/builder').set(bearer(nov.token)).expect(403);
     await request(http).get('/strategies/catalog').set(bearer(nov.token)).expect(403);
-    await request(http).post('/strategies/validate').set(bearer(nov.token)).send({ definition: {} }).expect(403);
-    await request(http).post('/strategies').set(bearer(nov.token)).send({ definition: {}, reason: 'x' }).expect(403);
+    await request(http)
+      .post('/strategies/validate')
+      .set(bearer(nov.token))
+      .send({ definition: {} })
+      .expect(403);
+    await request(http)
+      .post('/strategies')
+      .set(bearer(nov.token))
+      .send({ definition: {}, reason: 'x' })
+      .expect(403);
     await request(http).post('/backtests').set(bearer(nov.token)).send({}).expect(403);
     await request(http).get('/robots').set(bearer(nov.token)).expect(403);
     await request(http).post('/robots').set(bearer(nov.token)).send({}).expect(403);
@@ -142,22 +217,55 @@ describe('novice guardrails through the API', () => {
     expect(p.limits.monthly.limit).toBe('600');
 
     // Loosen through the Novice endpoint and through the generic settings endpoint: both wait.
-    const loose = await request(http).put('/novice/limits').set(bearer(nov.token)).send({ dailyLossLimit: '300' }).expect(200);
+    const loose = await request(http)
+      .put('/novice/limits')
+      .set(bearer(nov.token))
+      .send({ dailyLossLimit: '300' })
+      .expect(200);
     expect(loose.body.limits.daily.limit).toBe('150');
-    expect(loose.body.limits.pending).toEqual([expect.objectContaining({ field: 'dailyLossLimit', value: '300' })]);
-    const viaSettings = await request(http).put('/accounts/me/settings').set(bearer(nov.token)).send({ riskLimits: { monthlyLossLimit: '900' } }).expect(200);
+    expect(loose.body.limits.pending).toEqual([
+      expect.objectContaining({ field: 'dailyLossLimit', value: '300' }),
+    ]);
+    const viaSettings = await request(http)
+      .put('/accounts/me/settings')
+      .set(bearer(nov.token))
+      .send({ riskLimits: { monthlyLossLimit: '900' } })
+      .expect(200);
     expect(viaSettings.body.limits.monthlyLossLimit).toBe('600');
-    expect(viaSettings.body.pendingLimits.map((x: { field: string }) => x.field).sort()).toEqual(['dailyLossLimit', 'monthlyLossLimit']);
+    expect(viaSettings.body.pendingLimits.map((x: { field: string }) => x.field).sort()).toEqual([
+      'dailyLossLimit',
+      'monthlyLossLimit',
+    ]);
 
     // The old limit still applies: a 200 loss today is past 150 (not past the pending 300).
-    expect((await send(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '90000', stopLossPrice: '1.07500' })).status).toBe(201);
+    expect(
+      (
+        await send(nov, {
+          symbol: 'EURUSD',
+          side: 'buy',
+          type: 'market',
+          qty: '90000',
+          stopLossPrice: '1.07500',
+        })
+      ).status,
+    ).toBe(201);
     await md.quote('EURUSD', '1.08220', '1.08222'); // about −183 unrealised (with fees)
-    await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' }, 'DAILY_LOSS_LIMIT');
+    await rejected(
+      nov,
+      { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' },
+      'DAILY_LOSS_LIMIT',
+    );
 
     // Tightening applies at once and cancels the pending loosening of that field.
-    const tight = await request(http).put('/novice/limits').set(bearer(nov.token)).send({ dailyLossLimit: '100' }).expect(200);
+    const tight = await request(http)
+      .put('/novice/limits')
+      .set(bearer(nov.token))
+      .send({ dailyLossLimit: '100' })
+      .expect(200);
     expect(tight.body.limits.daily.limit).toBe('100');
-    expect(tight.body.limits.pending.map((x: { field: string }) => x.field)).toEqual(['monthlyLossLimit']);
+    expect(tight.body.limits.pending.map((x: { field: string }) => x.field)).toEqual([
+      'monthlyLossLimit',
+    ]);
 
     // 23 h later still waiting; after 24 h the loosening applies itself.
     await later(nov, 23 * HOUR);
@@ -168,21 +276,50 @@ describe('novice guardrails through the API', () => {
     expect(p.limits.pending).toEqual([]);
 
     // Audit carries what applied and what waits.
-    const audit = await request(http).get('/audit?action=account.settings_updated&limit=10').set(bearer(nov.token)).expect(200);
-    const payloads = (audit.body.events as Array<{ payload: Record<string, unknown> }>).map((e) => e.payload);
-    expect(payloads.some((x) => x.guarded === true && (x.limitsPending as Record<string, unknown>).dailyLossLimit)).toBe(true);
+    const audit = await request(http)
+      .get('/audit?action=account.settings_updated&limit=10')
+      .set(bearer(nov.token))
+      .expect(200);
+    const payloads = (audit.body.events as Array<{ payload: Record<string, unknown> }>).map(
+      (e) => e.payload,
+    );
+    expect(
+      payloads.some(
+        (x) => x.guarded === true && (x.limitsPending as Record<string, unknown>).dailyLossLimit,
+      ),
+    ).toBe(true);
   });
 
   it('Pro users keep immediate loosening (the 24 h wait is a Novice guardrail)', async () => {
     const trader = await createUser(app, 'trader');
-    await request(http).put('/accounts/me/settings').set(bearer(trader.token)).send({ riskLimits: { dailyLossLimit: '100' } }).expect(200);
-    const r = await request(http).put('/accounts/me/settings').set(bearer(trader.token)).send({ riskLimits: { dailyLossLimit: '900' } }).expect(200);
+    await request(http)
+      .put('/accounts/me/settings')
+      .set(bearer(trader.token))
+      .send({ riskLimits: { dailyLossLimit: '100' } })
+      .expect(200);
+    const r = await request(http)
+      .put('/accounts/me/settings')
+      .set(bearer(trader.token))
+      .send({ riskLimits: { dailyLossLimit: '900' } })
+      .expect(200);
     expect(r.body.limits.dailyLossLimit).toBe('900');
     // …but the same trader in the Novice view waits.
-    await request(http).put('/me/preferences').set(bearer(trader.token)).send({ viewMode: 'novice' }).expect(200);
-    const w = await request(http).put('/accounts/me/settings').set(bearer(trader.token)).send({ riskLimits: { dailyLossLimit: '2000' } }).expect(200);
+    await request(http)
+      .put('/me/preferences')
+      .set(bearer(trader.token))
+      .send({ viewMode: 'novice' })
+      .expect(200);
+    const w = await request(http)
+      .put('/accounts/me/settings')
+      .set(bearer(trader.token))
+      .send({ riskLimits: { dailyLossLimit: '2000' } })
+      .expect(200);
     expect(w.body.limits.dailyLossLimit).toBe('900');
-    await request(http).put('/me/preferences').set(bearer(trader.token)).send({ viewMode: 'pro' }).expect(200);
+    await request(http)
+      .put('/me/preferences')
+      .set(bearer(trader.token))
+      .send({ viewMode: 'pro' })
+      .expect(200);
   });
 
   it('cooling-off after 3 losing trades in a day; closing still allowed; lifts the next day', async () => {
@@ -195,19 +332,33 @@ describe('novice guardrails through the API', () => {
     await md.standard();
     const nov = await createUser(app, 'novice', [], { realClock: true });
     await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
-    const open = { symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.05', stopLossPrice: '62000.0' };
+    const open = {
+      symbol: 'BTCUSD',
+      side: 'buy',
+      type: 'market',
+      qty: '0.05',
+      stopLossPrice: '62000.0',
+    };
     for (let i = 0; i < 3; i++) {
       expect((await send(nov, open)).status).toBe(201);
       await md.touch();
-      expect((await request(http).post('/positions/BTCUSD/close').set(bearer(nov.token))).status).toBe(201);
+      expect(
+        (await request(http).post('/positions/BTCUSD/close').set(bearer(nov.token))).status,
+      ).toBe(201);
     }
     const p = await profile(nov);
-    expect(p.coolingOff).toMatchObject({ active: true, reason: 'losing_trades', losingTradesToday: 3 });
+    expect(p.coolingOff).toMatchObject({
+      active: true,
+      reason: 'losing_trades',
+      losingTradesToday: 3,
+    });
     const midnight = new Date(Date.now());
     midnight.setUTCHours(24, 0, 0, 0);
     expect(p.coolingOff.until).toBe(midnight.toISOString());
     const r = await rejected(nov, open, 'NOVICE_COOLING_OFF');
-    expect(r.violations.find((v) => v.code === 'NOVICE_COOLING_OFF')!.message).toMatch(/^Time for a break/);
+    expect(r.violations.find((v) => v.code === 'NOVICE_COOLING_OFF')!.message).toMatch(
+      /^Time for a break/,
+    );
     // A trader in the Pro view is not cooled off by the Novice rule.
     const trader = await createUser(app, 'trader', [], { realClock: true });
     for (let i = 0; i < 3; i++) {
@@ -225,21 +376,62 @@ describe('novice guardrails through the API', () => {
   it('cooling-off after a 5 % daily loss (closing allowed), and the monthly loss limit', async () => {
     const nov = await createUser(app, 'novice');
     await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
-    expect((await send(nov, { symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '1', stopLossPrice: '62000.0' })).status).toBe(201);
+    expect(
+      (
+        await send(nov, {
+          symbol: 'BTCUSD',
+          side: 'buy',
+          type: 'market',
+          qty: '1',
+          stopLossPrice: '62000.0',
+        })
+      ).status,
+    ).toBe(201);
     await md.quote('BTCUSD', '59600.0', '59602.0'); // about −5,200 on a 100,000 balance
-    const r = await rejected(nov, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' }, 'NOVICE_COOLING_OFF');
-    expect(r.violations.find((v) => v.code === 'NOVICE_COOLING_OFF')!.message).toContain('large for your balance');
-    expect((await profile(nov)).coolingOff).toMatchObject({ active: true, reason: 'daily_loss_pct' });
+    const r = await rejected(
+      nov,
+      { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' },
+      'NOVICE_COOLING_OFF',
+    );
+    expect(r.violations.find((v) => v.code === 'NOVICE_COOLING_OFF')!.message).toContain(
+      'large for your balance',
+    );
+    expect((await profile(nov)).coolingOff).toMatchObject({
+      active: true,
+      reason: 'daily_loss_pct',
+    });
     await md.touch();
-    expect((await request(http).post('/positions/BTCUSD/close').set(bearer(nov.token))).status).toBe(201);
+    expect(
+      (await request(http).post('/positions/BTCUSD/close').set(bearer(nov.token))).status,
+    ).toBe(201);
 
     const m = await createUser(app, 'novice');
 
     await acknowledgeRiskWarning(app, m.token); // B-801 gate (goal 09)
-    await request(http).put('/novice/limits').set(bearer(m.token)).send({ monthlyLossLimit: '100' }).expect(200);
-    expect((await send(m, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '90000', stopLossPrice: '1.07500' })).status).toBe(201);
+    await request(http)
+      .put('/novice/limits')
+      .set(bearer(m.token))
+      .send({ monthlyLossLimit: '100' })
+      .expect(200);
+    expect(
+      (
+        await send(m, {
+          symbol: 'EURUSD',
+          side: 'buy',
+          type: 'market',
+          qty: '90000',
+          stopLossPrice: '1.07500',
+        })
+      ).status,
+    ).toBe(201);
     await md.quote('EURUSD', '1.08290', '1.08292'); // about −120 (with fees)
-    const ml = await rejected(m, { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' }, 'MONTHLY_LOSS_LIMIT');
-    expect(ml.violations.find((v) => v.code === 'MONTHLY_LOSS_LIMIT')!.message).toContain('100.00 USD monthly limit');
+    const ml = await rejected(
+      m,
+      { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', stopLossPrice: '1.07500' },
+      'MONTHLY_LOSS_LIMIT',
+    );
+    expect(ml.violations.find((v) => v.code === 'MONTHLY_LOSS_LIMIT')!.message).toContain(
+      '100.00 USD monthly limit',
+    );
   });
 });

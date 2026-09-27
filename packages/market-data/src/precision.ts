@@ -24,7 +24,9 @@ export function assertPriceSpec(spec: PriceSpec): void {
   const tick = dec(spec.tickSize);
   if (tick.lte(0)) throw new RegistrySpecError(`tick ${spec.tickSize} must be > 0`);
   if (decimalPlaces(tick.toFixed()) > spec.pricePrecision) {
-    throw new RegistrySpecError(`tick ${spec.tickSize} has more decimals than precision ${spec.pricePrecision}`);
+    throw new RegistrySpecError(
+      `tick ${spec.tickSize} has more decimals than precision ${spec.pricePrecision}`,
+    );
   }
 }
 
@@ -37,14 +39,22 @@ export function floatToDecimal(x: number): Decimal {
   return new Decimal(x.toPrecision(15));
 }
 
-export function roundPrice(value: Decimal | string, spec: PriceSpec, mode: RoundMode = 'nearest'): Decimal {
+export function roundPrice(
+  value: Decimal | string,
+  spec: PriceSpec,
+  mode: RoundMode = 'nearest',
+): Decimal {
   return roundToTick(dec(value), spec.tickSize, ROUNDING[mode]);
 }
 
 const PLAIN = /^(0|[1-9]\d*)(?:\.(\d+))?$/;
 const unitTick = (p: number) => (p === 0 ? '1' : `0.${'0'.repeat(p - 1)}1`);
 
-export function formatPrice(value: Decimal | string, spec: PriceSpec, mode: RoundMode = 'nearest'): string {
+export function formatPrice(
+  value: Decimal | string,
+  spec: PriceSpec,
+  mode: RoundMode = 'nearest',
+): string {
   // Fast path (goal 10 load finding: candle reads spent ~15 % of the api's CPU here). A plain
   // non-negative decimal string with no more places than the precision already sits on a tick of
   // 10^-precision, so rounding cannot change it; only zero padding is left.
@@ -77,13 +87,21 @@ export function formatQty(value: Decimal | string, spec: QtySpec): string {
 }
 
 /** Non-negative size (e.g. depth or volume) on the qty grid; zero allowed. */
-export function formatSize(value: Decimal | string, spec: Pick<InstrumentSpec, 'qtyStep' | 'qtyPrecision'>): string {
+export function formatSize(
+  value: Decimal | string,
+  spec: Pick<InstrumentSpec, 'qtyStep' | 'qtyPrecision'>,
+): string {
   return roundToTick(dec(value), spec.qtyStep, Decimal.ROUND_FLOOR).toFixed(spec.qtyPrecision);
 }
 
 /** Aggregate amounts (volume): quantised to qty precision only (a sum need not sit on the step grid). */
-export function formatVolume(value: Decimal | string, spec: Pick<InstrumentSpec, 'qtyPrecision'>): string {
-  return dec(value).toDecimalPlaces(spec.qtyPrecision, Decimal.ROUND_DOWN).toFixed(spec.qtyPrecision);
+export function formatVolume(
+  value: Decimal | string,
+  spec: Pick<InstrumentSpec, 'qtyPrecision'>,
+): string {
+  return dec(value)
+    .toDecimalPlaces(spec.qtyPrecision, Decimal.ROUND_DOWN)
+    .toFixed(spec.qtyPrecision);
 }
 
 export function floatToQty(x: number, spec: QtySpec): string {
@@ -96,7 +114,10 @@ export function isOnTick(value: string, spec: PriceSpec): boolean {
 }
 
 /** Pip value helpers for FX display (pip size from the registry). */
-export function toPips(priceDiff: Decimal | string, spec: Pick<InstrumentSpec, 'pipSize'>): Decimal | null {
+export function toPips(
+  priceDiff: Decimal | string,
+  spec: Pick<InstrumentSpec, 'pipSize'>,
+): Decimal | null {
   if (!spec.pipSize) return null;
   return dec(priceDiff).div(dec(spec.pipSize));
 }

@@ -63,7 +63,10 @@ export async function middleware(req: NextRequest) {
     url.pathname = '/forbidden';
     url.search = `?feature=${encodeURIComponent(decision.feature)}&from=${encodeURIComponent(pathname)}`;
     const page = await fetch(url, { headers: { accept: 'text/html' }, cache: 'no-store' });
-    const headers = new Headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    const headers = new Headers({
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+    });
     const pageCsp = page.headers.get('content-security-policy');
     if (pageCsp) headers.set('content-security-policy', pageCsp);
     return new NextResponse(page.body, { status: 403, headers });

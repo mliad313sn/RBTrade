@@ -28,7 +28,8 @@ const CORE_WORDS = 'confetti|streak|leaderboard|trophy|trophies|achievement|gami
 const NOVICE_WORDS = `${CORE_WORDS}|badge|reward`;
 const MESSAGE =
   'No gamification in the Novice view: confetti, streaks, leaderboards, badges, trophies and rewards are forbidden (goal 08 §9).';
-const PRO_MESSAGE = 'No gamification on any KORA screen (master goal): confetti, streaks, leaderboards, trophies.';
+const PRO_MESSAGE =
+  'No gamification on any KORA screen (master goal): confetti, streaks, leaderboards, trophies.';
 const NUDGE_MESSAGE =
   'No push nudges to trade (master goal): browser notifications and push subscriptions are not used.';
 
@@ -41,7 +42,10 @@ const rules = (words, message) => [
 
 const NUDGES = [
   { selector: "NewExpression[callee.name='Notification']", message: NUDGE_MESSAGE },
-  { selector: "MemberExpression[object.name='Notification'][property.name='requestPermission']", message: NUDGE_MESSAGE },
+  {
+    selector: "MemberExpression[object.name='Notification'][property.name='requestPermission']",
+    message: NUDGE_MESSAGE,
+  },
   { selector: "MemberExpression[property.name='pushManager']", message: NUDGE_MESSAGE },
 ];
 

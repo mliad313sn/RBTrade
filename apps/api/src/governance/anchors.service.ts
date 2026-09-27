@@ -64,7 +64,14 @@ export function keyIdOf(jwk: JsonWebKey): string {
  * with any other key (for example one an insider generated and stored in the row) is not valid.
  */
 export function verifyAnchorSignature(
-  a: { headId: string; headHash: string; eventCount: string; anchoredAt: string; keyId: string; signature: string },
+  a: {
+    headId: string;
+    headHash: string;
+    eventCount: string;
+    anchoredAt: string;
+    keyId: string;
+    signature: string;
+  },
   trusted: ReadonlyMap<string, KeyObject>,
 ): { signatureValid: boolean; trustedKey: boolean } {
   const key = trusted.get(a.keyId);
@@ -93,7 +100,8 @@ export function witnessOf(
   anchor: { id: string; headId: string; headHash: string; eventCount: number; anchoredAt: string },
   chain: { count: number; hashAtHead: string | null },
 ): AnchorWitness {
-  const truncated = anchor.headId !== '0' && (chain.hashAtHead === null || chain.count < anchor.eventCount);
+  const truncated =
+    anchor.headId !== '0' && (chain.hashAtHead === null || chain.count < anchor.eventCount);
   return {
     anchorId: anchor.id,
     anchoredHeadId: anchor.headId,
@@ -117,8 +125,18 @@ export interface WormCheck {
 }
 
 /** The exact bytes that are signed (canonical JSON, keys sorted). */
-export function anchorMessage(a: { headId: string; headHash: string; eventCount: string; anchoredAt: string }): string {
-  return canonicalJson({ headId: a.headId, headHash: a.headHash, eventCount: a.eventCount, anchoredAt: a.anchoredAt });
+export function anchorMessage(a: {
+  headId: string;
+  headHash: string;
+  eventCount: string;
+  anchoredAt: string;
+}): string {
+  return canonicalJson({
+    headId: a.headId,
+    headHash: a.headHash,
+    eventCount: a.eventCount,
+    anchoredAt: a.anchoredAt,
+  });
 }
 
 /**
@@ -152,8 +170,16 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
     this.trusted.set(this.keyId, createPublicKey({ key: this.publicJwk, format: 'jwk' }));
     if (cfg.anchorTrustedJwks) {
       const extra = JSON.parse(cfg.anchorTrustedJwks) as JsonWebKey[];
-      if (!Array.isArray(extra)) throw new Error('KORA_AUDIT_ANCHOR_TRUSTED_JWKS must be a JSON array of public JWKs');
-      for (const jwk of extra) this.trusted.set(keyIdOf(jwk), createPublicKey({ key: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y }, format: 'jwk' }));
+      if (!Array.isArray(extra))
+        throw new Error('KORA_AUDIT_ANCHOR_TRUSTED_JWKS must be a JSON array of public JWKs');
+      for (const jwk of extra)
+        this.trusted.set(
+          keyIdOf(jwk),
+          createPublicKey({
+            key: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y },
+            format: 'jwk',
+          }),
+        );
     }
   }
 
@@ -168,7 +194,9 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
               signature, created_by, anchored_at
        FROM audit_anchors ORDER BY anchored_at DESC, id DESC LIMIT 50`,
     );
-    const latest = rows.find((r) => verifyAnchorSignature(this.fieldsOf(r), this.trusted).signatureValid);
+    const latest = rows.find(
+      (r) => verifyAnchorSignature(this.fieldsOf(r), this.trusted).signatureValid,
+    );
     if (!latest) return null;
     const chain = (
       await this.db.query<{ n: string; hash: string | null }>(
@@ -178,19 +206,41 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
     )[0]!;
     const f = this.fieldsOf(latest);
     return witnessOf(
-      { id: String(latest.id), headId: f.headId, headHash: f.headHash, eventCount: Number(f.eventCount), anchoredAt: f.anchoredAt },
+      {
+        id: String(latest.id),
+        headId: f.headId,
+        headHash: f.headHash,
+        eventCount: Number(f.eventCount),
+        anchoredAt: f.anchoredAt,
+      },
       { count: Number(chain.n), hashAtHead: chain.hash },
     );
   }
 
   /** IRTC R4-07: the WORM copy is read back and checked, not only written. */
   async wormCheck(): Promise<WormCheck> {
-    const out: WormCheck = { configured: !!this.cfg.anchorDir, fileAnchors: 0, invalidSignatures: 0, missingInDatabase: 0, notMatchingChain: 0, unreadableLines: 0 };
+    const out: WormCheck = {
+      configured: !!this.cfg.anchorDir,
+      fileAnchors: 0,
+      invalidSignatures: 0,
+      missingInDatabase: 0,
+      notMatchingChain: 0,
+      unreadableLines: 0,
+    };
     if (!this.cfg.anchorDir) return out;
     const file = join(this.cfg.anchorDir, 'audit-anchors.jsonl');
     if (!existsSync(file)) return out;
-    const lines = readFileSync(file, 'utf8').split('\n').filter((l) => l.trim());
-    const parsed: Array<{ headId: string; headHash: string; eventCount: string; anchoredAt: string; keyId: string; signature: string }> = [];
+    const lines = readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim());
+    const parsed: Array<{
+      headId: string;
+      headHash: string;
+      eventCount: string;
+      anchoredAt: string;
+      keyId: string;
+      signature: string;
+    }> = [];
     for (const l of lines) {
       try {
         const j = JSON.parse(l) as Record<string, unknown>;
@@ -211,12 +261,15 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
     const db = await this.db.query<{ head_id: string; head_hash: string; anchored_at: Date }>(
       'SELECT head_id::text AS head_id, head_hash, anchored_at FROM audit_anchors',
     );
-    const inDb = new Set(db.map((r) => `${r.head_id}|${r.head_hash}|${r.anchored_at.toISOString()}`));
+    const inDb = new Set(
+      db.map((r) => `${r.head_id}|${r.head_hash}|${r.anchored_at.toISOString()}`),
+    );
     const chain = new Map(
       (
-        await this.db.query<{ id: string; hash: string }>('SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])', [
-          parsed.map((p) => p.headId).filter((id) => /^\d+$/.test(id)),
-        ])
+        await this.db.query<{ id: string; hash: string }>(
+          'SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])',
+          [parsed.map((p) => p.headId).filter((id) => /^\d+$/.test(id))],
+        )
       ).map((r) => [r.id, r.hash]),
     );
     for (const p of parsed) {
@@ -240,7 +293,10 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
 
   onApplicationBootstrap(): void {
     if (this.cfg.anchorIntervalMs > 0) {
-      this.timer = setInterval(() => void this.anchor('system:anchor-job').catch((e: Error) => this.log.warn(e.message)), this.cfg.anchorIntervalMs);
+      this.timer = setInterval(
+        () => void this.anchor('system:anchor-job').catch((e: Error) => this.log.warn(e.message)),
+        this.cfg.anchorIntervalMs,
+      );
       this.timer.unref();
     }
   }
@@ -258,13 +314,30 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
       )
     )[0]!;
     const anchoredAt = new Date().toISOString();
-    const fields = { headId: head.id ?? '0', headHash: head.hash ?? '0'.repeat(64), eventCount: head.n, anchoredAt };
-    const signature = sign('sha256', Buffer.from(anchorMessage(fields)), { key: this.key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    const fields = {
+      headId: head.id ?? '0',
+      headHash: head.hash ?? '0'.repeat(64),
+      eventCount: head.n,
+      anchoredAt,
+    };
+    const signature = sign('sha256', Buffer.from(anchorMessage(fields)), {
+      key: this.key,
+      dsaEncoding: 'ieee-p1363',
+    }).toString('base64url');
     const row = (
       await this.db.query<AnchorRow>(
         `INSERT INTO audit_anchors (head_id, head_hash, event_count, algorithm, key_id, public_jwk, signature, created_by, anchored_at)
          VALUES ($1, $2, $3, 'ES256', $4, $5::jsonb, $6, $7, $8) RETURNING *`,
-        [fields.headId, fields.headHash, fields.eventCount, this.keyId, JSON.stringify(this.publicJwk), signature, createdBy, anchoredAt],
+        [
+          fields.headId,
+          fields.headHash,
+          fields.eventCount,
+          this.keyId,
+          JSON.stringify(this.publicJwk),
+          signature,
+          createdBy,
+          anchoredAt,
+        ],
       )
     )[0]!;
     if (this.cfg.anchorDir) {
@@ -280,7 +353,13 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
       action: 'internal_audit.anchor_created',
       entity: 'audit_anchor',
       entityId: row.id,
-      payload: { anchorId: row.id, headId: fields.headId, headHash: fields.headHash, eventCount: fields.eventCount, keyId: this.keyId },
+      payload: {
+        anchorId: row.id,
+        headId: fields.headId,
+        headHash: fields.headHash,
+        eventCount: fields.eventCount,
+        keyId: this.keyId,
+      },
     });
     return (await this.check([row]))[0]!;
   }
@@ -304,7 +383,10 @@ export class AnchorsService implements OnModuleInit, OnApplicationBootstrap, OnM
     const ids = rows.map((r) => String(r.head_id));
     const chain = new Map(
       (
-        await this.db.query<{ id: string; hash: string }>('SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])', [ids])
+        await this.db.query<{ id: string; hash: string }>(
+          'SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])',
+          [ids],
+        )
       ).map((r) => [r.id, r.hash]),
     );
     return rows.map((r) => {

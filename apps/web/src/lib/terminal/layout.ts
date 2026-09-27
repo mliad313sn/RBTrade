@@ -8,7 +8,19 @@ import type { DockviewApi, SerializedDockview } from 'dockview-react';
  * layout is kept in localStorage.
  */
 
-export const PANEL_IDS = ['watchlist', 'calendar', 'chart', 'orderbook', 'trades', 'ticket', 'positions', 'orders', 'fills', 'alerts', 'risk'] as const;
+export const PANEL_IDS = [
+  'watchlist',
+  'calendar',
+  'chart',
+  'orderbook',
+  'trades',
+  'ticket',
+  'positions',
+  'orders',
+  'fills',
+  'alerts',
+  'risk',
+] as const;
 export type PanelId = (typeof PANEL_IDS)[number];
 
 export const PANEL_TITLES: Record<PanelId, string> = {
@@ -26,7 +38,10 @@ export const PANEL_TITLES: Record<PanelId, string> = {
 };
 
 /** Alt+1..5 targets. */
-export const FOCUS_PANELS: Record<'watchlist' | 'chart' | 'orderbook' | 'ticket' | 'blotter', PanelId> = {
+export const FOCUS_PANELS: Record<
+  'watchlist' | 'chart' | 'orderbook' | 'ticket' | 'blotter',
+  PanelId
+> = {
   watchlist: 'watchlist',
   chart: 'chart',
   orderbook: 'orderbook',
@@ -38,7 +53,10 @@ const LOCAL_KEY = 'kora.terminal.layout.v1';
 export const LOCAL_ACTIVE_KEY = 'kora.terminal.layout.active';
 
 /** Column widths at a given content width: 2 / 7 / 3 of 12 with 8 px gaps (prototype: 225 / 798 / 340 at 1440). */
-export function defaultSizes(width: number, height: number): { left: number; right: number; blotter: number; calendar: number; orderbook: number } {
+export function defaultSizes(
+  width: number,
+  height: number,
+): { left: number; right: number; blotter: number; calendar: number; orderbook: number } {
   const usable = Math.max(0, width - 16);
   const col = usable / 12;
   return {
@@ -57,15 +75,57 @@ export function buildDefaultLayout(api: DockviewApi): void {
   const h = api.height || 836;
   const s = defaultSizes(w, h);
   api.addPanel({ id: 'chart', component: 'chart', title: PANEL_TITLES.chart });
-  api.addPanel({ id: 'positions', component: 'positions', title: PANEL_TITLES.positions, position: { direction: 'below' }, initialHeight: s.blotter });
+  api.addPanel({
+    id: 'positions',
+    component: 'positions',
+    title: PANEL_TITLES.positions,
+    position: { direction: 'below' },
+    initialHeight: s.blotter,
+  });
   for (const id of ['orders', 'fills', 'alerts', 'risk'] as const) {
-    api.addPanel({ id, component: id, title: PANEL_TITLES[id], position: { referencePanel: 'positions', direction: 'within' }, inactive: true });
+    api.addPanel({
+      id,
+      component: id,
+      title: PANEL_TITLES[id],
+      position: { referencePanel: 'positions', direction: 'within' },
+      inactive: true,
+    });
   }
-  api.addPanel({ id: 'watchlist', component: 'watchlist', title: PANEL_TITLES.watchlist, position: { referencePanel: 'chart', direction: 'left' }, initialWidth: s.left });
-  api.addPanel({ id: 'calendar', component: 'calendar', title: PANEL_TITLES.calendar, position: { referencePanel: 'watchlist', direction: 'below' }, initialHeight: s.calendar });
-  api.addPanel({ id: 'orderbook', component: 'orderbook', title: PANEL_TITLES.orderbook, position: { referencePanel: 'chart', direction: 'right' }, initialWidth: s.right });
-  api.addPanel({ id: 'trades', component: 'trades', title: PANEL_TITLES.trades, position: { referencePanel: 'orderbook', direction: 'within' }, inactive: true });
-  api.addPanel({ id: 'ticket', component: 'ticket', title: PANEL_TITLES.ticket, position: { referencePanel: 'orderbook', direction: 'below' }, initialHeight: h - s.blotter - s.orderbook - 16 });
+  api.addPanel({
+    id: 'watchlist',
+    component: 'watchlist',
+    title: PANEL_TITLES.watchlist,
+    position: { referencePanel: 'chart', direction: 'left' },
+    initialWidth: s.left,
+  });
+  api.addPanel({
+    id: 'calendar',
+    component: 'calendar',
+    title: PANEL_TITLES.calendar,
+    position: { referencePanel: 'watchlist', direction: 'below' },
+    initialHeight: s.calendar,
+  });
+  api.addPanel({
+    id: 'orderbook',
+    component: 'orderbook',
+    title: PANEL_TITLES.orderbook,
+    position: { referencePanel: 'chart', direction: 'right' },
+    initialWidth: s.right,
+  });
+  api.addPanel({
+    id: 'trades',
+    component: 'trades',
+    title: PANEL_TITLES.trades,
+    position: { referencePanel: 'orderbook', direction: 'within' },
+    inactive: true,
+  });
+  api.addPanel({
+    id: 'ticket',
+    component: 'ticket',
+    title: PANEL_TITLES.ticket,
+    position: { referencePanel: 'orderbook', direction: 'below' },
+    initialHeight: h - s.blotter - s.orderbook - 16,
+  });
   // Explicit sizes (initial sizes are hints when groups are split later).
   api.getPanel('watchlist')?.group.api.setSize({ width: s.left });
   api.getPanel('orderbook')?.group.api.setSize({ width: s.right, height: s.orderbook });
@@ -94,12 +154,23 @@ function placedViews(node: unknown, out: string[] = []): string[] {
  */
 export function isCompleteLayout(json: unknown): json is SerializedDockview {
   if (!json || typeof json !== 'object') return false;
-  const j = json as { panels?: Record<string, unknown>; grid?: { root?: unknown }; floatingGroups?: Array<{ data?: { views?: unknown } }> };
+  const j = json as {
+    panels?: Record<string, unknown>;
+    grid?: { root?: unknown };
+    floatingGroups?: Array<{ data?: { views?: unknown } }>;
+  };
   if (!j.panels || typeof j.panels !== 'object' || !j.grid) return false;
   const ids = Object.keys(j.panels);
-  if (!(PANEL_IDS.every((id) => ids.includes(id)) && ids.every((id) => (PANEL_IDS as readonly string[]).includes(id)))) return false;
+  if (
+    !(
+      PANEL_IDS.every((id) => ids.includes(id)) &&
+      ids.every((id) => (PANEL_IDS as readonly string[]).includes(id))
+    )
+  )
+    return false;
   const placed = placedViews(j.grid.root);
-  for (const f of j.floatingGroups ?? []) if (Array.isArray(f.data?.views)) placed.push(...(f.data.views as string[]));
+  for (const f of j.floatingGroups ?? [])
+    if (Array.isArray(f.data?.views)) placed.push(...(f.data.views as string[]));
   return PANEL_IDS.every((id) => placed.filter((v) => v === id).length === 1);
 }
 

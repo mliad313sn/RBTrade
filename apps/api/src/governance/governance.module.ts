@@ -35,7 +35,12 @@ import { RiskConsoleService } from './risk-console.service';
     AlertsBridgeService,
     ReleaseRecordService,
   ],
-  controllers: [ApprovalsController, GovernanceController, InternalAuditController, RiskConsoleController],
+  controllers: [
+    ApprovalsController,
+    GovernanceController,
+    InternalAuditController,
+    RiskConsoleController,
+  ],
   exports: [FourEyesService, EvidenceService, AnchorsService],
 })
 export class GovernanceModule {}

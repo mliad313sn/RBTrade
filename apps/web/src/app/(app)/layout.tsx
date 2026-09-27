@@ -14,13 +14,20 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // (Compliance-set figure, "[XX]" until the Sponsor supplies it), in the viewer's language.
   const disclosure =
     me.preferences.viewMode === 'novice'
-      ? await (await serverClient())
+      ? await (
+          await serverClient()
+        )
           .disclosure('risk-warning', locale)
           .then((r) => r.document)
           .catch(() => null)
       : null;
   return (
-    <AppShell me={me} locale={locale} disclosure={disclosure} explainMode={parseExplainMode(process.env.KORA_EXPLAIN_THIS)}>
+    <AppShell
+      me={me}
+      locale={locale}
+      disclosure={disclosure}
+      explainMode={parseExplainMode(process.env.KORA_EXPLAIN_THIS)}
+    >
       {children}
     </AppShell>
   );

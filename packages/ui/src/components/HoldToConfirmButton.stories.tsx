@@ -15,7 +15,11 @@ function Demo({ holdMs }: { holdMs: number }) {
   );
 }
 
-const meta = { title: 'Primitives/HoldToConfirmButton', component: Demo, args: { holdMs: 1500 } } satisfies Meta<typeof Demo>;
+const meta = {
+  title: 'Primitives/HoldToConfirmButton',
+  component: Demo,
+  args: { holdMs: 1500 },
+} satisfies Meta<typeof Demo>;
 export default meta;
 export const KillSwitch: StoryObj<typeof meta> = {};
 export const Short: StoryObj<typeof meta> = { args: { holdMs: 600 } };

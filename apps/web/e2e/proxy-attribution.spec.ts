@@ -10,15 +10,36 @@ import { uniqueEmail } from './helpers';
  * move it to another one. Loopback aliases 127.0.0.2 / 127.0.0.3 stand in for two clients. Before
  * the fix every caller was reported as 127.0.0.1, so both shared one bucket.
  */
-function login(baseURL: string, localAddress: string, headers: Record<string, string> = {}): Promise<{ status: number; remaining: number }> {
+function login(
+  baseURL: string,
+  localAddress: string,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; remaining: number }> {
   const u = new URL('/api/auth/login', baseURL);
   const body = JSON.stringify({ email: uniqueEmail('attrib'), password: 'junk-password-123' });
   return new Promise((resolve, reject) => {
     const req = httpRequest(
-      { host: u.hostname, port: u.port, path: u.pathname, method: 'POST', localAddress, headers: { 'content-type': 'application/json', 'x-kora-csrf': '1', 'content-length': String(Buffer.byteLength(body)), ...headers } },
+      {
+        host: u.hostname,
+        port: u.port,
+        path: u.pathname,
+        method: 'POST',
+        localAddress,
+        headers: {
+          'content-type': 'application/json',
+          'x-kora-csrf': '1',
+          'content-length': String(Buffer.byteLength(body)),
+          ...headers,
+        },
+      },
       (res) => {
         res.resume();
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, remaining: Number(res.headers['x-ratelimit-remaining']) }));
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            remaining: Number(res.headers['x-ratelimit-remaining']),
+          }),
+        );
       },
     );
     req.on('error', reject);
@@ -26,7 +47,9 @@ function login(baseURL: string, localAddress: string, headers: Record<string, st
   });
 }
 
-test('the /api proxy gives each client its own address; a spoofed X-Forwarded-For does not escape it (IRTC R1-05)', async ({ baseURL }) => {
+test('the /api proxy gives each client its own address; a spoofed X-Forwarded-For does not escape it (IRTC R1-05)', async ({
+  baseURL,
+}) => {
   const a1 = await login(baseURL!, '127.0.0.2');
   const a2 = await login(baseURL!, '127.0.0.2', { 'x-forwarded-for': '203.0.113.5' });
   const b1 = await login(baseURL!, '127.0.0.3');

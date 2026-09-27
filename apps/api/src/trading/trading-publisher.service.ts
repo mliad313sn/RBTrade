@@ -51,7 +51,8 @@ export class TradingPublisher implements OnModuleDestroy {
         // One valuation serves both snapshots (goal 10 load finding: it was computed twice).
         const v = await this.accounts.value(a);
         this.events.account(id, await this.accounts.view(a, undefined, v));
-        if (positions.has(id)) this.events.positions(id, await this.accounts.positionsView(a, undefined, v));
+        if (positions.has(id))
+          this.events.positions(id, await this.accounts.positionsView(a, undefined, v));
       } catch (e) {
         this.log.warn(`publish ${id}: ${(e as Error).message}`);
       }

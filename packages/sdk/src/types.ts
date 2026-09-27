@@ -123,7 +123,13 @@ export interface KillSwitchState {
   reason: string | null;
   /** Goal 09: a firm halt needs a second authorised person to resume. */
   resumeNeedsApproval?: boolean;
-  pendingResume?: { id: string; requestedBy: string; requestedAt: string; expiresAt: string; reason: string } | null;
+  pendingResume?: {
+    id: string;
+    requestedBy: string;
+    requestedAt: string;
+    expiresAt: string;
+    reason: string;
+  } | null;
 }
 
 export interface AuditListQuery {
@@ -224,7 +230,14 @@ export interface CalendarResponse {
 
 // ---- Trading (goal 03) -------------------------------------------------------------------------
 
-export type { OrderDto, FillDto, PositionDto, RiskViolation, PlaceOrderRequest, PreviewOrderRequest };
+export type {
+  OrderDto,
+  FillDto,
+  PositionDto,
+  RiskViolation,
+  PlaceOrderRequest,
+  PreviewOrderRequest,
+};
 
 /** Place/preview body as sent by clients (defaults are applied server-side). */
 export type OrderInput = Omit<PlaceOrderRequest, 'tif' | 'reduceOnly' | 'postOnly' | 'source'> &
@@ -248,7 +261,13 @@ export interface PreviewResponse {
     feeScheduleId: string;
     feesSimulated: boolean;
   };
-  market: { bid: string | null; ask: string | null; session: SessionState; dataState: MarketDataState; dataReason: string | null };
+  market: {
+    bid: string | null;
+    ask: string | null;
+    session: SessionState;
+    dataState: MarketDataState;
+    dataReason: string | null;
+  };
   novice: boolean;
   preview: Omit<PreviewResult, 'exact' | 'estimatedPriceExact'> | null;
   risk: { ok: boolean; violations: RiskViolation[] };
@@ -293,7 +312,13 @@ export interface AccountView {
   dailyLossUsedPct: string;
   openPositions: number;
   unpriced: string[];
-  halt: { halted: boolean; scope: KillSwitchScope | null; haltedAt: string | null; haltedBy: string | null; reason: string | null };
+  halt: {
+    halted: boolean;
+    scope: KillSwitchScope | null;
+    haltedAt: string | null;
+    haltedBy: string | null;
+    reason: string | null;
+  };
   limits: RiskLimits;
   settings: { confirmMode: ConfirmMode; confirmNotionalAbove: string; confirmLossPctAbove: string };
   asOf: string;
@@ -328,8 +353,24 @@ export interface QuestionnaireResponse {
 }
 
 export type AttemptResponse =
-  | { passed: true; scorePct: number; passMarkPct: number; questionnaire: { id: string; version: number }; roleGranted: 'trader'; next: 'sign_in_again'; message: string }
-  | { passed: false; scorePct: number; passMarkPct: number; questionnaire: { id: string; version: number }; cooldownUntil: string | null; topicsToReview: string[]; message: string };
+  | {
+      passed: true;
+      scorePct: number;
+      passMarkPct: number;
+      questionnaire: { id: string; version: number };
+      roleGranted: 'trader';
+      next: 'sign_in_again';
+      message: string;
+    }
+  | {
+      passed: false;
+      scorePct: number;
+      passMarkPct: number;
+      questionnaire: { id: string; version: number };
+      cooldownUntil: string | null;
+      topicsToReview: string[];
+      message: string;
+    };
 
 // ---- Pro terminal (goal 04) ------------------------------------------------------------------
 

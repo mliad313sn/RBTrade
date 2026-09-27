@@ -69,7 +69,12 @@ function subscribe(): () => void {
  * Polls over REST, so it keeps working when the WebSocket is down (kill switch fallback path). A failed
  * poll keeps the last figures but sets `error`, which the top bar shows as "as of hh:mm:ss".
  */
-export function useAccount(): { account: AccountView | null; error: boolean; okAt: number | null; reload: () => void } {
+export function useAccount(): {
+  account: AccountView | null;
+  error: boolean;
+  okAt: number | null;
+  reload: () => void;
+} {
   const account = useAccountSnapshot((s) => s.account);
   const error = useAccountSnapshot((s) => s.error);
   const okAt = useAccountSnapshot((s) => s.okAt);

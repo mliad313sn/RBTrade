@@ -15,7 +15,13 @@ const SYMBOLS = Number(__ENV.SYMBOLS || 200);
 const PER_CLIENT = Number(__ENV.PER_CLIENT || 20);
 
 export const options = {
-  scenarios: { clients: { executor: 'constant-vus', vus: Number(__ENV.CLIENTS || 500), duration: __ENV.DURATION || '40s' } },
+  scenarios: {
+    clients: {
+      executor: 'constant-vus',
+      vus: Number(__ENV.CLIENTS || 500),
+      duration: __ENV.DURATION || '40s',
+    },
+  },
   thresholds: { fanout_latency_ms: ['p(99)<50'] },
 };
 

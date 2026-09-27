@@ -17,7 +17,9 @@ export class FeedMetrics implements OnModuleInit {
       if (!s) return;
       this.metrics.feedStatusAge.set(Math.max(0, (Date.now() - s.ts) / 1000));
       this.metrics.feedStaleSymbols.set(s.staleSymbols.length);
-      for (const f of s.feeds) if (f.state !== 'disabled') this.metrics.feedUp.set({ source: f.source }, f.state === 'up' ? 1 : 0);
+      for (const f of s.feeds)
+        if (f.state !== 'disabled')
+          this.metrics.feedUp.set({ source: f.source }, f.state === 'up' ? 1 : 0);
     });
   }
 }

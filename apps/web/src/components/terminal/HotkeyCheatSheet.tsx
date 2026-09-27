@@ -16,7 +16,13 @@ export function HotkeyCheatSheet() {
   const hotkeys = useHotkeys();
   const mac = isMacPlatform();
   return (
-    <Dialog open={open} onOpenChange={setOpen} title="Keyboard shortcuts" description="Change them in Settings. Single-key shortcuts are ignored while you type in a field." data-testid="hotkey-cheatsheet">
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Keyboard shortcuts"
+      description="Change them in Settings. Single-key shortcuts are ignored while you type in a field."
+      data-testid="hotkey-cheatsheet"
+    >
       <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 m-0 text-sm">
         {Object.entries(hotkeys).map(([id, spec]) => (
           <div key={id} className="contents">

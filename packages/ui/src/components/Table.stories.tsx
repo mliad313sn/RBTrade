@@ -18,15 +18,36 @@ const rows: Row[] = Array.from({ length: 500 }, (_, i) => ({
 }));
 const columns: Column<Row>[] = [
   { key: 'symbol', header: 'Symbol', cell: (r) => r.symbol },
-  { key: 'last', header: 'Last', numeric: true, cell: (r) => <Price value={r.last} precision={r.precision} /> },
-  { key: 'chg', header: 'Chg', numeric: true, width: '110px', cell: (r) => <DirectionBadge value={r.chg} format="percent" /> },
+  {
+    key: 'last',
+    header: 'Last',
+    numeric: true,
+    cell: (r) => <Price value={r.last} precision={r.precision} />,
+  },
+  {
+    key: 'chg',
+    header: 'Chg',
+    numeric: true,
+    width: '110px',
+    cell: (r) => <DirectionBadge value={r.chg} format="percent" />,
+  },
 ];
 
 function Demo({ count }: { count: number }) {
-  return <Table label="Simulated instruments" columns={columns} rows={rows.slice(0, count)} rowKey={(r) => r.symbol} height={240} />;
+  return (
+    <Table
+      label="Simulated instruments"
+      columns={columns}
+      rows={rows.slice(0, count)}
+      rowKey={(r) => r.symbol}
+      height={240}
+    />
+  );
 }
 
-const meta = { title: 'Primitives/Table', component: Demo, args: { count: 500 } } satisfies Meta<typeof Demo>;
+const meta = { title: 'Primitives/Table', component: Demo, args: { count: 500 } } satisfies Meta<
+  typeof Demo
+>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Virtualised: Story = {};

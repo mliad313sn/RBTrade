@@ -49,11 +49,18 @@ export class CandlesService {
 
   async spec(symbol: string): Promise<InstrumentSpec> {
     const spec = (await this.repo.load()).instruments.get(symbol);
-    if (!spec) throw new NotFoundException({ error: 'unknown_symbol', message: `Unknown symbol ${symbol}` });
+    if (!spec)
+      throw new NotFoundException({ error: 'unknown_symbol', message: `Unknown symbol ${symbol}` });
     return spec;
   }
 
-  async get(q: { symbol: string; tf: Timeframe; limit: number; from?: number; to?: number }): Promise<CandlesResponse> {
+  async get(q: {
+    symbol: string;
+    tf: Timeframe;
+    limit: number;
+    from?: number;
+    to?: number;
+  }): Promise<CandlesResponse> {
     const spec = await this.spec(q.symbol);
     const to = new Date(q.to ?? Date.now() + TIMEFRAME_SECONDS[q.tf] * 1000).toISOString();
     const from = new Date(q.from ?? 0).toISOString();

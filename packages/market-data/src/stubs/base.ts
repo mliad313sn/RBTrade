@@ -1,4 +1,13 @@
-import { Decimal, type Candle, type DepthDelta, type DepthSnapshot, type InstrumentSpec, type Quote, type Timeframe, type Trade } from '@kora/domain';
+import {
+  Decimal,
+  type Candle,
+  type DepthDelta,
+  type DepthSnapshot,
+  type InstrumentSpec,
+  type Quote,
+  type Timeframe,
+  type Trade,
+} from '@kora/domain';
 
 import {
   AdapterNotConfiguredError,
@@ -60,7 +69,10 @@ export class UnconfiguredLiveTransport implements StubTransport {
   constructor(private readonly source: string) {}
 
   async open(): Promise<void> {
-    throw new AdapterNotConfiguredError(this.source, 'live transport not implemented: needs a sponsor-approved provider contract and credentials (OQ-B1, OQ-B2)');
+    throw new AdapterNotConfiguredError(
+      this.source,
+      'live transport not implemented: needs a sponsor-approved provider contract and credentials (OQ-B1, OQ-B2)',
+    );
   }
 
   async close(): Promise<void> {}
@@ -101,7 +113,11 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
   protected readonly registry = new Map<string, InstrumentSpec>();
   protected readonly toVendor = new Map<string, string>();
   protected readonly clock: () => number;
-  private readonly subs = new Set<{ kind: Msg['type'] | 'depth'; symbols: Set<string>; cb: (m: never) => void }>();
+  private readonly subs = new Set<{
+    kind: Msg['type'] | 'depth';
+    symbols: Set<string>;
+    cb: (m: never) => void;
+  }>();
   private readonly listeners = new Listeners<AdapterHealth>();
   private state: AdapterState = 'disconnected';
   private detail: string | null = null;
@@ -110,7 +126,8 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
 
   constructor(protected readonly opts: StubAdapterOptions) {
     for (const i of opts.instruments) this.registry.set(i.symbol, i);
-    for (const [vendor, internal] of Object.entries(opts.symbolMap)) this.toVendor.set(internal, vendor);
+    for (const [vendor, internal] of Object.entries(opts.symbolMap))
+      this.toVendor.set(internal, vendor);
     this.clock = opts.clock ?? Date.now;
   }
 
@@ -119,7 +136,10 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
   protected abstract candlesPath(vendorSymbol: string, tf: Timeframe): string;
   protected abstract decodeCandles(symbol: string, tf: Timeframe, body: unknown): Candle[];
   protected abstract snapshotPath(vendorSymbol: string, levels: number): string;
-  protected abstract decodeSnapshot(symbol: string, body: unknown): { quote: Quote | null; depth: DepthSnapshot | null };
+  protected abstract decodeSnapshot(
+    symbol: string,
+    body: unknown,
+  ): { quote: Quote | null; depth: DepthSnapshot | null };
 
   async connect(): Promise<void> {
     this.setState('connecting', null);
@@ -143,12 +163,18 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
   }
 
   subscribeTrades(symbols: string[], onTrade: (t: Trade) => void): Unsubscribe {
-    if (!this.capabilities.trades) throw new AdapterNotConfiguredError(this.source, 'trades not offered');
+    if (!this.capabilities.trades)
+      throw new AdapterNotConfiguredError(this.source, 'trades not offered');
     return this.addSub('trade', symbols, onTrade);
   }
 
-  subscribeDepth(symbols: string[], _levels: number, onDepth: (d: DepthSnapshot | DepthDelta) => void): Unsubscribe {
-    if (!this.capabilities.depth) throw new AdapterNotConfiguredError(this.source, 'depth not offered');
+  subscribeDepth(
+    symbols: string[],
+    _levels: number,
+    onDepth: (d: DepthSnapshot | DepthDelta) => void,
+  ): Unsubscribe {
+    if (!this.capabilities.depth)
+      throw new AdapterNotConfiguredError(this.source, 'depth not offered');
     return this.addSub('depth', symbols, onDepth);
   }
 
@@ -157,12 +183,23 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
     return this.decodeCandles(symbol, tf, body).filter((c) => c.bucket >= from && c.bucket < to);
   }
 
-  async snapshot(symbol: string, levels: number): Promise<{ quote: Quote | null; depth: DepthSnapshot | null }> {
-    return this.decodeSnapshot(symbol, await this.opts.transport.request(this.snapshotPath(this.vendorSymbol(symbol), levels)));
+  async snapshot(
+    symbol: string,
+    levels: number,
+  ): Promise<{ quote: Quote | null; depth: DepthSnapshot | null }> {
+    return this.decodeSnapshot(
+      symbol,
+      await this.opts.transport.request(this.snapshotPath(this.vendorSymbol(symbol), levels)),
+    );
   }
 
   health(): AdapterHealth {
-    return { source: this.source, state: this.state, lastMessageTs: this.lastMessageTs, detail: this.detail };
+    return {
+      source: this.source,
+      state: this.state,
+      lastMessageTs: this.lastMessageTs,
+      detail: this.detail,
+    };
   }
 
   onStateChange(listener: (h: AdapterHealth) => void): Unsubscribe {
@@ -175,7 +212,11 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
   protected spec(vendorOrInternal: string): InstrumentSpec {
     const internal = this.opts.symbolMap[vendorOrInternal] ?? vendorOrInternal;
     const s = this.registry.get(internal);
-    if (!s) throw new AdapterNotConfiguredError(this.source, `no registry mapping for ${vendorOrInternal}`);
+    if (!s)
+      throw new AdapterNotConfiguredError(
+        this.source,
+        `no registry mapping for ${vendorOrInternal}`,
+      );
     return s;
   }
 
@@ -195,11 +236,16 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
     for (const m of msgs) {
       this.lastMessageTs = m.receivedTs;
       const kind = m.type === 'depth_snapshot' || m.type === 'depth_delta' ? 'depth' : m.type;
-      for (const s of this.subs) if (s.kind === kind && s.symbols.has(m.symbol)) (s.cb as (x: Msg) => void)(m);
+      for (const s of this.subs)
+        if (s.kind === kind && s.symbols.has(m.symbol)) (s.cb as (x: Msg) => void)(m);
     }
   }
 
-  private addSub<T>(kind: 'quote' | 'trade' | 'depth', symbols: string[], cb: (m: T) => void): Unsubscribe {
+  private addSub<T>(
+    kind: 'quote' | 'trade' | 'depth',
+    symbols: string[],
+    cb: (m: T) => void,
+  ): Unsubscribe {
     for (const s of symbols) this.spec(s);
     const sub = { kind, symbols: new Set(symbols), cb: cb as (m: never) => void };
     this.subs.add(sub);
@@ -214,7 +260,8 @@ export abstract class StubAdapterBase implements MarketDataAdapter {
 }
 
 export function asRecord(v: unknown, what: string): Record<string, unknown> {
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new TypeError(`${what}: expected object`);
+  if (typeof v !== 'object' || v === null || Array.isArray(v))
+    throw new TypeError(`${what}: expected object`);
   return v as Record<string, unknown>;
 }
 

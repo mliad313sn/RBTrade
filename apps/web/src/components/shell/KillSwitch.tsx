@@ -1,6 +1,11 @@
 'use client';
 
-import { KILL_SWITCH_HOLD_MS, KILL_SWITCH_SCOPE_LABELS, KILL_SWITCH_SCOPES, type KillSwitchScope } from '@kora/domain';
+import {
+  KILL_SWITCH_HOLD_MS,
+  KILL_SWITCH_SCOPE_LABELS,
+  KILL_SWITCH_SCOPES,
+  type KillSwitchScope,
+} from '@kora/domain';
 import { Button, Dialog, HoldToConfirmButton, Kbd, useToast, type HoldHandle } from '@kora/ui';
 import { useEffect, useRef, useState } from 'react';
 
@@ -34,7 +39,8 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
       }
     };
     const up = (e: KeyboardEvent) => {
-      if (source.current === 'hotkey' && ['K', 'k', 'Control', 'Shift'].includes(e.key)) hold.current?.cancel();
+      if (source.current === 'hotkey' && ['K', 'k', 'Control', 'Shift'].includes(e.key))
+        hold.current?.cancel();
     };
     const blur = () => hold.current?.cancel();
     window.addEventListener('keydown', down);
@@ -62,21 +68,32 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
         if (scope !== 'robots') parts.push(t('kill.doneOrders', { n: r.ordersCancelled }));
         if (scope === 'robots_cancel_flatten') {
           parts.push(t('kill.doneClosed', { n: r.positionsFlattened }));
-          if (r.flattenPending.length) parts.push(t('kill.donePending', { n: r.flattenPending.length }));
+          if (r.flattenPending.length)
+            parts.push(t('kill.donePending', { n: r.flattenPending.length }));
         }
         parts.push(t('kill.doneAudit', { id: r.auditEventId }));
       } else {
-        if (scope !== 'robots') parts.push(`${r.ordersCancelled} order${r.ordersCancelled === 1 ? '' : 's'} cancelled.`);
+        if (scope !== 'robots')
+          parts.push(`${r.ordersCancelled} order${r.ordersCancelled === 1 ? '' : 's'} cancelled.`);
         if (scope === 'robots_cancel_flatten') {
-          parts.push(`${r.positionsFlattened} position${r.positionsFlattened === 1 ? '' : 's'} closed.`);
-          if (r.flattenPending.length) parts.push(`${r.flattenPending.length} waiting for a safe market.`);
+          parts.push(
+            `${r.positionsFlattened} position${r.positionsFlattened === 1 ? '' : 's'} closed.`,
+          );
+          if (r.flattenPending.length)
+            parts.push(`${r.flattenPending.length} waiting for a safe market.`);
         }
         parts.push(`Audit event #${r.auditEventId}.`);
       }
       toast.push(parts.join(' '), 'success', 10000);
       refreshAccount();
     } catch {
-      toast.push(plainNovice ? t('kill.failed') : 'Kill switch request failed. Try again or use the REST fallback.', 'critical', 10000);
+      toast.push(
+        plainNovice
+          ? t('kill.failed')
+          : 'Kill switch request failed. Try again or use the REST fallback.',
+        'critical',
+        10000,
+      );
     } finally {
       setBusy(null);
       source.current = 'ui_button';
@@ -96,7 +113,11 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
         onActivate={() => setOpen(true)}
         labels={hold18n.labels}
         locale={hold18n.locale}
-        description={plainNovice ? t('kill.help') : 'Opens the kill-switch scope menu. Hotkey: hold Control, Shift and K.'}
+        description={
+          plainNovice
+            ? t('kill.help')
+            : 'Opens the kill-switch scope menu. Hotkey: hold Control, Shift and K.'
+        }
         data-testid="kill-switch"
         data-ready={ready ? 'true' : undefined}
       >
@@ -110,10 +131,18 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
         }}
         alert
         title={plainNovice ? t('kill.title') : 'Kill switch — choose a scope'}
-        description={plainNovice ? t('kill.desc') : 'Every choice is written to the audit log. Paper environment.'}
+        description={
+          plainNovice
+            ? t('kill.desc')
+            : 'Every choice is written to the audit log. Paper environment.'
+        }
         data-testid="kill-switch-menu"
       >
-        <div className="flex flex-col gap-2" role="group" aria-label={plainNovice ? t('kill.scopes') : 'Kill switch scopes'}>
+        <div
+          className="flex flex-col gap-2"
+          role="group"
+          aria-label={plainNovice ? t('kill.scopes') : 'Kill switch scopes'}
+        >
           {KILL_SWITCH_SCOPES.map((scope, i) => (
             <button
               key={scope}
@@ -128,9 +157,15 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
                 {i + 1}
               </span>
               <span>
-                <span className="block">{plainNovice ? t(`kill.scope.${scope}.title`) : KILL_SWITCH_SCOPE_LABELS[scope].title}</span>
+                <span className="block">
+                  {plainNovice
+                    ? t(`kill.scope.${scope}.title`)
+                    : KILL_SWITCH_SCOPE_LABELS[scope].title}
+                </span>
                 <span className="block text-muted font-normal">
-                  {plainNovice ? t(`kill.scope.${scope}.detail`) : KILL_SWITCH_SCOPE_LABELS[scope].detail}
+                  {plainNovice
+                    ? t(`kill.scope.${scope}.detail`)
+                    : KILL_SWITCH_SCOPE_LABELS[scope].detail}
                 </span>
               </span>
             </button>
@@ -138,9 +173,12 @@ export function KillSwitch({ compact = false }: { compact?: boolean }) {
         </div>
         <div className="k-dialog__actions">
           <span className="text-muted text-xs mr-auto">
-            {plainNovice ? t('kill.keys') : 'Hotkey: hold'} <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>K</Kbd>
+            {plainNovice ? t('kill.keys') : 'Hotkey: hold'} <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd>{' '}
+            <Kbd>K</Kbd>
           </span>
-          <Button onClick={() => setOpen(false)}>{plainNovice ? t('common.cancel') : 'Cancel'}</Button>
+          <Button onClick={() => setOpen(false)}>
+            {plainNovice ? t('common.cancel') : 'Cancel'}
+          </Button>
         </div>
       </Dialog>
     </>

@@ -76,7 +76,10 @@ export class RiskConsoleService {
 
   async exposure() {
     const rows = [];
-    const totals = new Map<string, { equity: Decimal; gross: Decimal; dayPnl: Decimal; accounts: number }>();
+    const totals = new Map<
+      string,
+      { equity: Decimal; gross: Decimal; dayPnl: Decimal; accounts: number }
+    >();
     for (const a of await this.activeAccounts()) {
       const v = await this.accounts.view(a);
       const limits = v.limits;
@@ -118,7 +121,12 @@ export class RiskConsoleService {
         haltScope: v.halt.scope,
         haltedBy: v.halt.haltedBy,
       });
-      const t = totals.get(v.baseCurrency) ?? { equity: new Decimal(0), gross: new Decimal(0), dayPnl: new Decimal(0), accounts: 0 };
+      const t = totals.get(v.baseCurrency) ?? {
+        equity: new Decimal(0),
+        gross: new Decimal(0),
+        dayPnl: new Decimal(0),
+        accounts: 0,
+      };
       t.equity = t.equity.add(equity);
       t.gross = t.gross.add(dec(v.grossExposure));
       t.dayPnl = t.dayPnl.add(dec(v.dayPnl));
@@ -194,9 +202,16 @@ export class RiskConsoleService {
   }
 
   async pendingApprovals() {
-    const fourEyes = (await this.fourEyes.list({ status: 'pending', limit: 200 })).map(toFourEyesView);
+    const fourEyes = (await this.fourEyes.list({ status: 'pending', limit: 200 })).map(
+      toFourEyesView,
+    );
     // Robots whose owner asked for promotion and still lack a valid four-eyes risk sign-off.
-    const signoffs = await this.db.query<{ robot_id: string; name: string; owner_id: string; requested_at: Date }>(
+    const signoffs = await this.db.query<{
+      robot_id: string;
+      name: string;
+      owner_id: string;
+      requested_at: Date;
+    }>(
       `SELECT DISTINCT ON (p.robot_id) p.robot_id, r.name, r.owner_id, p.created_at AS requested_at
        FROM robot_promotions p JOIN robots r ON r.id = p.robot_id
        WHERE NOT EXISTS (SELECT 1 FROM robot_risk_signoffs s WHERE s.robot_id = r.id AND s.limits_hash = r.limits_hash AND s.signed_by <> r.owner_id)
@@ -285,7 +300,11 @@ export class RiskConsoleService {
     );
     return {
       days,
-      rejections: rejections.map((x) => ({ code: x.code, events: Number(x.n), accounts: Number(x.accounts) })),
+      rejections: rejections.map((x) => ({
+        code: x.code,
+        events: Number(x.n),
+        accounts: Number(x.accounts),
+      })),
       looseningRequests: loosening,
       repeatedCoolingOff: repeat.map((x) => ({ accountId: x.account_id, days: Number(x.days) })),
     };
@@ -310,7 +329,8 @@ export class RiskConsoleService {
         `UPDATE alerts SET acknowledged_at = clock_timestamp(), acknowledged_by = $2 WHERE id = $1 AND acknowledged_at IS NULL RETURNING *`,
         [id, userId],
       );
-      const row = r.rows[0] ?? (await c.query<AlertRow>('SELECT * FROM alerts WHERE id = $1', [id])).rows[0];
+      const row =
+        r.rows[0] ?? (await c.query<AlertRow>('SELECT * FROM alerts WHERE id = $1', [id])).rows[0];
       if (!row) throw new NotFoundException({ error: 'not_found', message: 'No such alert.' });
       if (r.rows[0])
         await this.audit.record(
@@ -320,7 +340,13 @@ export class RiskConsoleService {
             action: 'risk.alert_acknowledged',
             entity: 'alert',
             entityId: id,
-            payload: { alertId: id, kind: row.kind, severity: row.severity, note, ...(row.account_id ? { accountId: row.account_id } : {}) },
+            payload: {
+              alertId: id,
+              kind: row.kind,
+              severity: row.severity,
+              note,
+              ...(row.account_id ? { accountId: row.account_id } : {}),
+            },
           },
           c,
         );
@@ -329,7 +355,18 @@ export class RiskConsoleService {
   }
 
   async overview() {
-    const [exposure, robots, approvals, killSwitch, reconciliation, ai, novice, alerts, breaches, incidents] = await Promise.all([
+    const [
+      exposure,
+      robots,
+      approvals,
+      killSwitch,
+      reconciliation,
+      ai,
+      novice,
+      alerts,
+      breaches,
+      incidents,
+    ] = await Promise.all([
       this.exposure(),
       this.robotsNearPause(),
       this.pendingApprovals(),
@@ -364,21 +401,35 @@ export class RiskConsoleService {
   async globalKillSwitch(actorId: string, scope: KillSwitchScope, reason: string) {
     const globalKillSwitchId = randomUUID();
     const t0 = performance.now();
-    const accounts = await this.db.query<AccountRow>(`SELECT * FROM accounts WHERE status = 'active' ORDER BY created_at`);
+    const accounts = await this.db.query<AccountRow>(
+      `SELECT * FROM accounts WHERE status = 'active' ORDER BY created_at`,
+    );
     await this.audit.record({
       actorId,
       actorType: 'user',
       action: 'risk.global_kill_switch',
       entity: 'kill_switch',
       entityId: scope,
-      payload: { globalKillSwitchId, scope, reason, accounts: accounts.length, phase: 'requested', environment: 'PAPER' },
+      payload: {
+        globalKillSwitchId,
+        scope,
+        reason,
+        accounts: accounts.length,
+        phase: 'requested',
+        environment: 'PAPER',
+      },
     });
     let ordersCancelled = 0;
     let positionsFlattened = 0;
     const failures: Array<{ accountId: string; error: string }> = [];
     for (const a of accounts) {
       try {
-        const r = await this.killSwitch.triggerAccount(actorId, a, { scope, source: 'risk_console', reason }, { globalKillSwitchId });
+        const r = await this.killSwitch.triggerAccount(
+          actorId,
+          a,
+          { scope, source: 'risk_console', reason },
+          { globalKillSwitchId },
+        );
         ordersCancelled += r.ordersCancelled;
         positionsFlattened += r.positionsFlattened;
       } catch (e) {

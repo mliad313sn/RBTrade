@@ -35,7 +35,12 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+    },
+  ],
   webServer: [
     {
       command: `bash ../../scripts/py-run.sh python -m uvicorn kora_quant.app:app --host 127.0.0.1 --port ${QUANT_PORT} --app-dir src`,
@@ -108,7 +113,14 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 60_000,
       // IRTC R1-05: the same peer-address preload as `pnpm start` and the Docker image.
-      env: { ...(process.env as Record<string, string>), NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${resolve(__dirname, 'peer-address.cjs')}`.trim(), API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`, KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on', KORA_EXPLAIN_THIS: process.env.E2E_EXPLAIN_THIS ?? 'on' },
+      env: {
+        ...(process.env as Record<string, string>),
+        NODE_OPTIONS:
+          `${process.env.NODE_OPTIONS ?? ''} --require ${resolve(__dirname, 'peer-address.cjs')}`.trim(),
+        API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`,
+        KORA_AI_STRIP: process.env.E2E_AI_STRIP ?? 'on',
+        KORA_EXPLAIN_THIS: process.env.E2E_EXPLAIN_THIS ?? 'on',
+      },
     },
   ],
 });
