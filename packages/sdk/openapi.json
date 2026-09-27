@@ -421,7 +421,7 @@
             }
           }
         },
-        "summary": "Recompute the hash chain. Returns valid:false with the first broken id on tamper.",
+        "summary": "Recompute the hash chain. Auditors, risk officers and admins verify the whole chain (scope \"chain\"); everyone else verifies their own events and their links (scope \"own\", no platform totals). Returns valid:false with the first broken id on tamper. IRTC R1-08: 10 per minute per client.",
         "tags": [
           "audit"
         ]
