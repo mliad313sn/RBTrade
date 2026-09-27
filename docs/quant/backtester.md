@@ -21,7 +21,8 @@ calendar data, AI regime before goal 07). An unavailable condition never opens a
 `ai_regime` condition set to `whenUnavailable: "ignore"`, which is skipped and recorded.
 
 Indicators (causal, NaN in warm-up): close/open/high/low/volume, EMA (SMA-seeded), SMA, RSI, ATR and
-ADX (Wilder), ROC %, highest high / lowest low of the **previous** n bars, realised volatility %.
+ADX (Wilder), ROC %, highest high / lowest low of the **previous** n bars, realised volatility %. RSI
+of a flat window is 50, as in the chart and alert library (IRTC R3-13).
 
 Realised volatility (and volatility-target sizing) is annualised with **bars a year from the venue
 session calendar** (IRTC R3-06): the api sends `barsPerYear` per instrument = trading days × session
@@ -83,11 +84,11 @@ Daily (UTC) equity returns; annualisation factor = observed days per year (≈ 3
 
 | Metric | Definition |
 |---|---|
-| CAGR | (E_end / E_start)^(365.25 / days) − 1 |
+| CAGR | (E_end / E_start)^(365.25 / days) − 1; not reported (and no Calmar) for segments under 30 days (IRTC R3-15) |
 | Sharpe | mean / stdev (ddof 1) × √A |
 | Sortino | mean / √mean(min(r, 0)²) × √A |
 | Calmar | CAGR / \|max DD\| |
-| Max DD, duration | on bar-close equity; longest peak-to-recovery time in days |
+| Max DD, duration | on bar-close equity; longest peak-to-recovery time in days (0 when the curve only makes new highs) |
 | Win rate, profit factor | net P&L per trade; gross wins / gross losses |
 | Expectancy | mean R multiple (net P&L / initial risk) and mean currency P&L |
 | Exposure | share of bars with an open position |

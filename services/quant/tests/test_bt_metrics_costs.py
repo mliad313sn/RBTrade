@@ -116,7 +116,30 @@ def test_metrics_on_a_hand_series() -> None:
     assert m["sharpe"] == pytest.approx(mean / sd * np.sqrt(m["annualisation"]), abs=1e-3)
     assert m["costDragPct"] is not None and m["costDragPct"] > 0
     assert m["turnover"] is not None and m["turnover"] > 0
-    assert m["calmar"] is not None
+    # A 4-day segment: CAGR and Calmar are not extrapolated to a year (IRTC R3-15).
+    assert m["cagr"] is None and m["calmar"] is None
+
+
+def test_no_drawdown_duration_on_new_highs_and_no_cagr_on_tiny_segments() -> None:
+    """IRTC R3-15: a curve that only makes new highs has no drawdown duration (was 1 day), and a
+    one-day +1 % segment has no CAGR (was 3,688 %)."""
+    ts = np.array([D0 + (i + 1) * DAY_MS for i in range(366)], dtype=np.int64)
+    eq = 1e5 * 1.001 ** np.arange(1, 367)
+    m = compute_metrics(ts, eq, np.ones(366, bool), 1e5, [], [], [], None, None)
+    assert m["maxDrawdown"] == 0.0 and m["maxDrawdownDays"] == 0.0
+    assert m["cagr"] == pytest.approx(1.001**365.25 - 1, rel=1e-4)
+    one = compute_metrics(
+        np.array([D0 + DAY_MS], dtype=np.int64),
+        np.array([1.01e5]),
+        np.ones(1, bool),
+        1e5,
+        [],
+        [],
+        [],
+        None,
+        None,
+    )
+    assert one["cagr"] is None and one["calmar"] is None
 
 
 def test_metrics_edge_cases() -> None:

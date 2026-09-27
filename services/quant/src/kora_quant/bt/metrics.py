@@ -25,6 +25,10 @@ import numpy as np
 
 from .engine import DAY_MS, EngineResult, Fill, Trade
 
+# Shortest segment (days) for which CAGR and Calmar are reported; shorter ones would only
+# extrapolate a few days to a year (IRTC R3-15).
+MIN_CAGR_DAYS = 30.0
+
 
 def _f(x: float | None, nd: int = 6) -> float | None:
     if x is None or not math.isfinite(x):
@@ -54,11 +58,15 @@ def max_drawdown(ts: np.ndarray, equity: np.ndarray, start_equity: float) -> tup
     dd = path / peak - 1.0
     longest = 0.0
     start: int | None = None
+    under = False  # below the running peak since `start` (IRTC R3-15: new highs are not drawdowns)
     for i in range(len(path)):
         if path[i] >= peak[i]:
-            if start is not None:
+            if start is not None and under:
                 longest = max(longest, (times[i] - times[start]) / DAY_MS)
             start = i
+            under = False
+        else:
+            under = True
     if start is not None and path[-1] < peak[-1]:
         longest = max(longest, (times[-1] - times[start]) / DAY_MS)
     return float(dd.min()), float(longest)
@@ -106,9 +114,11 @@ def compute_metrics(
     sharpe_pp = mean / sd if sd > 0 else None
     downside = float(np.sqrt(np.mean(np.minimum(r, 0.0) ** 2))) if len(r) else 0.0
     end_eq = float(eq[-1])
-    cagr = (
+    cagr: float | None = (
         (end_eq / start_eq) ** (365.25 / span_days) - 1.0 if start_eq > 0 and end_eq > 0 else -1.0
     )
+    if span_days < MIN_CAGR_DAYS:
+        cagr = None  # IRTC R3-15: +1 % in one day is not "3,688 % a year"
     mdd, mdd_days = max_drawdown(ts, eq, start_eq)
     wins = [t.net_pnl for t in trades if t.net_pnl > 0]
     losses = [t.net_pnl for t in trades if t.net_pnl <= 0]
@@ -131,7 +141,7 @@ def compute_metrics(
             "cagr": _f(cagr),
             "sharpe": _f(sharpe_pp * math.sqrt(ann) if sharpe_pp is not None else None, 4),
             "sortino": _f(mean / downside * math.sqrt(ann) if downside > 0 else None, 4),
-            "calmar": _f(cagr / abs(mdd) if mdd < 0 else None, 4),
+            "calmar": _f(cagr / abs(mdd) if cagr is not None and mdd < 0 else None, 4),
             "maxDrawdown": _f(mdd),
             "maxDrawdownDays": _f(mdd_days, 2),
             "winRate": _f(len(wins) / len(trades) if trades else None, 4),
