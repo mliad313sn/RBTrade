@@ -178,6 +178,11 @@
                         "auditor"
                       ]
                     }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
                   }
                 },
                 "required": [
@@ -193,7 +198,7 @@
             "description": ""
           }
         },
-        "summary": "Replace a user's roles (audited). Users with non-novice roles must enrol MFA at next login.",
+        "summary": "Replace a user's roles (audited). Adding admin, risk_officer, auditor or trader opens a four-eyes role_grant request (202) that a second admin approves; nobody changes their own roles upwards. Users with non-novice roles must enrol MFA at next login.",
         "tags": [
           "admin"
         ]
@@ -2584,6 +2589,11 @@
                       "manual",
                       "ai-draft-accepted"
                     ]
+                  },
+                  "aiDraftId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   }
                 },
                 "required": [
@@ -3104,6 +3114,11 @@
                       "manual",
                       "ai-draft-accepted"
                     ]
+                  },
+                  "aiDraftId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   }
                 },
                 "required": [
@@ -5624,6 +5639,30 @@
                       "type": "string",
                       "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
                     }
+                  },
+                  "riskWarning": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "contentHash": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "locale": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "contentHash",
+                      "locale"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -13430,6 +13469,30 @@
                       "type": "string",
                       "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
                     }
+                  },
+                  "riskWarning": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "contentHash": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "locale": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "contentHash",
+                      "locale"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -13606,7 +13669,8 @@
                 "limit_override",
                 "kill_switch_resume",
                 "mfa_reset",
-                "disclosure_publish"
+                "disclosure_publish",
+                "role_grant"
               ],
               "type": "string"
             }
@@ -15114,6 +15178,30 @@
                       "type": "string",
                       "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
                     }
+                  },
+                  "riskWarning": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "contentHash": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "locale": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "contentHash",
+                      "locale"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
