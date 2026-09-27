@@ -25,6 +25,8 @@ import { UsersRepository } from '../auth/users.repository';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
+import { DisclosureAcknowledgements } from '../disclosures/acknowledgements.service';
+import { DISCLOSURE_LOCALES, RISK_WARNING_DISCLOSURE_ID, type DisclosureLocale } from '../disclosures/disclosure.types';
 import { QuestionnaireService } from './questionnaire.service';
 
 const ID = 'appropriateness';
@@ -44,6 +46,7 @@ export class AppropriatenessController {
     private readonly users: UsersRepository,
     private readonly audit: AuditService,
     private readonly q: QuestionnaireService,
+    private readonly acks: DisclosureAcknowledgements,
   ) {}
 
   private def() {
@@ -107,6 +110,22 @@ export class AppropriatenessController {
         current: { id: def.id, version: def.version },
       });
     }
+    // IRTC R4-09: the attempt carries the risk warning the user confirmed; it must be the text in force.
+    if (!body.riskWarning)
+      throw new BadRequestException({
+        error: 'risk_warning_required',
+        message: 'Read and confirm the risk warning on this page before submitting.',
+      });
+    const locale = body.riskWarning.locale as DisclosureLocale;
+    if (!(DISCLOSURE_LOCALES as readonly string[]).includes(locale))
+      throw new BadRequestException({ error: 'invalid_locale', message: 'Unknown locale for the risk warning.' });
+    const warning = this.acks.document(RISK_WARNING_DISCLOSURE_ID, locale);
+    if (warning.version !== body.riskWarning.version || warning.contentHash !== body.riskWarning.contentHash)
+      throw new ConflictException({
+        error: 'disclosure_changed',
+        message: 'The risk warning has changed since you opened this page. Read the new version and confirm again.',
+        current: { version: warning.version, contentHash: warning.contentHash },
+      });
     const g = this.q.grade(def, body.answers);
     if (g.missing.length || g.unknown.length) {
       throw new BadRequestException({
@@ -167,6 +186,13 @@ export class AppropriatenessController {
       await c.query(
         `INSERT INTO user_roles (user_id, role, granted_by) VALUES ($1, 'trader', NULL) ON CONFLICT DO NOTHING`,
         [p.sub],
+      );
+      // IRTC R4-09: the new trader's acknowledgement of the risk warning, in the same transaction.
+      await this.acks.record(
+        p.sub,
+        RISK_WARNING_DISCLOSURE_ID,
+        { version: warning.version, contentHash: warning.contentHash, locale, context: 'appropriateness' },
+        c,
       );
       // Unlocking Pro switches the default view to Pro (the user can switch back; guardrails follow the view).
       await c.query(

@@ -69,12 +69,22 @@ export function failingAnswers(def: { questions: Array<{ id: string; options: Ar
   return Object.fromEntries(def.questions.map((q) => [q.id, [...q.options].sort((a, b) => a.points - b.points)[0]!.id]));
 }
 
-/** Passes the appropriateness assessment through the API with a novice session token. */
+/** The risk warning in force, as the assessment page confirms it (IRTC R4-09). */
+export async function riskWarningAck(app: INestApplication, token: string): Promise<{ version: string; contentHash: string; locale: 'en' }> {
+  const doc = (await request(app.getHttpServer()).get('/disclosures/risk-warning?locale=en').set(bearer(token)).expect(200)).body.document as {
+    version: string;
+    contentHash: string;
+  };
+  return { version: doc.version, contentHash: doc.contentHash, locale: 'en' };
+}
+
+/** Passes the appropriateness assessment through the API with a novice session token (confirming the risk warning). */
 export async function passAppropriateness(app: INestApplication, token: string): Promise<void> {
   const http = app.getHttpServer();
   const q = await request(http).get('/appropriateness/questionnaire').set(bearer(token)).expect(200);
   const { id, version } = q.body.questionnaire as { id: string; version: number };
-  const res = await request(http).post('/appropriateness/attempts').set(bearer(token)).send({ questionnaireId: id, version, answers: passingAnswers() }).expect(200);
+  const riskWarning = await riskWarningAck(app, token);
+  const res = await request(http).post('/appropriateness/attempts').set(bearer(token)).send({ questionnaireId: id, version, answers: passingAnswers(), riskWarning }).expect(200);
   if (!res.body.passed) throw new Error(`appropriateness not passed: ${JSON.stringify(res.body)}`);
 }
 
@@ -114,7 +124,11 @@ export async function createUser(
   if (extraRoles.includes('trader') && accountType !== 'trader') throw new Error('Use accountType "trader" (passes the assessment)');
   // A novice with no extra role keeps the first session (same roles); others sign in again.
   if (accountType === 'novice' && admin.length === 0) return { id, email, roles, token: first.token };
-  return { id, email, roles, ...(await login(app, email, undefined, opts)) };
+  const session = await login(app, email, undefined, opts);
+  // IRTC R4-09: staff accounts (admin-granted roles) acknowledge the risk warning on first use, as
+  // traders do when they pass the assessment; tests of the gate itself build their users by hand.
+  if (accountType === 'novice' && admin.length) await acknowledgeRiskWarning(app, session.token);
+  return { id, email, roles, ...session };
 }
 
 export async function login(

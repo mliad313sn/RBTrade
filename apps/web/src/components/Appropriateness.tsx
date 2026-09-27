@@ -1,6 +1,6 @@
 'use client';
 
-import { KoraApiError, type AttemptResponse, type QuestionnaireResponse } from '@kora/sdk';
+import { KoraApiError, type AttemptResponse, type DisclosureDocument, type QuestionnaireResponse } from '@kora/sdk';
 import { Banner, Button, Chip, Panel } from '@kora/ui';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -19,25 +19,37 @@ export function Appropriateness() {
   const [result, setResult] = useState<AttemptResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // IRTC R4-09: Pro trading starts only after the risk warning in force is read and confirmed here.
+  const [warning, setWarning] = useState<DisclosureDocument | null>(null);
+  const [ticked, setTicked] = useState(false);
 
   useEffect(() => {
     api
       .appropriateness()
       .then(setData)
       .catch(() => setError('The assessment could not be loaded. Try again later.'));
+    api
+      .disclosure('risk-warning', 'en')
+      .then((r) => setWarning(r.document))
+      .catch(() => setError('The risk warning could not be loaded. Try again later.'));
   }, []);
 
   if (error && !data) return <Banner tone="critical" title="Couldn't load.">{error}</Banner>;
   if (!data) return <p className="text-muted">Loading the assessment…</p>;
   const q = data.questionnaire;
-  const all = q.questions.every((x) => answers[x.id]);
+  const all = q.questions.every((x) => answers[x.id]) && ticked && !!warning;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const r = await api.submitAppropriateness(q.id, q.version, answers);
+      if (!warning) return;
+      const r = await api.submitAppropriateness(q.id, q.version, answers, {
+        version: warning.version,
+        contentHash: warning.contentHash,
+        locale: 'en',
+      });
       setResult(r);
       if (r.passed) {
         // The session cookie was cleared by the server; the next login sets up two-factor authentication.
@@ -123,11 +135,33 @@ export function Appropriateness() {
               </fieldset>
             </Panel>
           ))}
+          {warning ? (
+            <Panel>
+              <div className="flex flex-col gap-2" data-testid="appropriateness-risk-warning">
+                <h2 className="font-semibold m-0">{warning.title}</h2>
+                <ul className="m-0 pl-5 flex flex-col gap-1">
+                  {warning.body.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+                <p className="m-0 text-xs text-muted">Version {warning.version}</p>
+                <label className="flex gap-3 items-start cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ticked}
+                    onChange={(e) => setTicked(e.target.checked)}
+                    data-testid="appropriateness-risk-ack"
+                  />
+                  <span className="font-semibold">{warning.acknowledge}</span>
+                </label>
+              </div>
+            </Panel>
+          ) : null}
           <div className="flex items-center gap-3">
             <Button type="submit" variant="primary" disabled={!all || busy} data-testid="submit-appropriateness">
               Submit answers
             </Button>
-            {!all ? <span className="text-sm text-muted">Answer every question to submit.</span> : null}
+            {!all ? <span className="text-sm text-muted">Answer every question and confirm the risk warning to submit.</span> : null}
           </div>
         </form>
       ) : null}

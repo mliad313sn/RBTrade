@@ -33,6 +33,9 @@ test('no self-service trader (B-018): sign up as novice → appropriateness asse
   await expect(page.getByTestId('appropriateness-simulated')).toContainText('SIMULATED');
   const idx = answerIndex(true);
   for (const [qid, i] of Object.entries(idx)) await page.getByTestId(`question-${qid}`).getByRole('radio').nth(i).check();
+  // IRTC R4-09: the risk warning is confirmed on the assessment page before submitting.
+  await expect(page.getByTestId('appropriateness-risk-warning')).toBeVisible();
+  await page.getByTestId('appropriateness-risk-ack').check();
   await page.getByTestId('submit-appropriateness').click();
   await expect(page.getByTestId('appropriateness-result')).toContainText('Passed with 100%');
   await expect(page).toHaveURL(/\/login\?next=%2Fterminal/, { timeout: 10_000 });
@@ -88,6 +91,9 @@ test('a failed assessment shows the topics to review and starts a cool-down; the
   await page.goto('/appropriateness');
   const idx = answerIndex(false);
   for (const [qid, i] of Object.entries(idx)) await page.getByTestId(`question-${qid}`).getByRole('radio').nth(i).check();
+  // IRTC R4-09: the risk warning is confirmed on the assessment page before submitting.
+  await expect(page.getByTestId('appropriateness-risk-warning')).toBeVisible();
+  await page.getByTestId('appropriateness-risk-ack').check();
   await page.getByTestId('submit-appropriateness').click();
   await expect(page.getByTestId('appropriateness-result')).toContainText('Not passed: 0%');
   await expect(page.getByTestId('appropriateness-result')).toContainText('Leverage');

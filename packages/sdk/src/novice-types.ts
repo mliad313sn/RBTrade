@@ -210,7 +210,7 @@ export interface DisclosureAcknowledgement {
   contentHash: string;
   locale: DisclosureLocale;
   values: Record<string, string>;
-  context: 'onboarding' | 'banner' | 'settings' | 'reconfirm';
+  context: 'onboarding' | 'banner' | 'settings' | 'reconfirm' | 'appropriateness';
   at: string;
 }
 

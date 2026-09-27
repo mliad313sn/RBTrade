@@ -98,6 +98,8 @@ export class DisclosureAcknowledgements {
       locale: DisclosureLocale;
       context: AcknowledgementContext;
     },
+    /** Run inside the caller's transaction (e.g. the appropriateness pass, IRTC R4-09). */
+    tx?: Queryable,
   ): Promise<AcknowledgementRecord> {
     const doc = this.document(id, body.locale);
     if (doc.version !== body.version || doc.contentHash !== body.contentHash)
@@ -107,7 +109,7 @@ export class DisclosureAcknowledgements {
           'This text has changed since you opened it. Read the new version and confirm again.',
         current: { version: doc.version, contentHash: doc.contentHash },
       });
-    return this.db.tx(async (c) => {
+    const run = async (c: Queryable) => {
       const r = await c.query<AckRow>(
         `INSERT INTO disclosure_acknowledgements (user_id, disclosure_id, version, content_hash, locale, rendered_values, context, jurisdiction)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -145,7 +147,8 @@ export class DisclosureAcknowledgements {
         c,
       );
       return toRecord(row);
-    });
+    };
+    return tx ? run(tx) : this.db.tx(run);
   }
 
   /**

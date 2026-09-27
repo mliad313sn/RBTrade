@@ -14,7 +14,8 @@ const AckSchema = z.strictObject({
   version: z.string().min(1).max(64),
   contentHash: z.string().regex(/^[0-9a-f]{64}$/),
   locale: z.enum(DISCLOSURE_LOCALES),
-  context: z.enum(ACK_CONTEXTS).default('onboarding'),
+  // 'appropriateness' is recorded only by a passed assessment (IRTC R4-09), never self-declared.
+  context: z.enum(ACK_CONTEXTS.filter((c) => c !== 'appropriateness') as ['onboarding', 'banner', 'settings', 'reconfirm']).default('onboarding'),
 });
 
 /**

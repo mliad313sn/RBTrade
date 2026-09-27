@@ -138,8 +138,18 @@ describe('questionnaire engine', () => {
         questionnaireId: 'appropriateness',
         version: 1,
         answers: { q1: 'a' },
+        riskWarning: { version: '2026-09-26', contentHash: 'a'.repeat(64), locale: 'en' },
       }).success,
     ).toBe(true);
+    // IRTC R4-09: the risk warning confirmation has a strict shape (required by the appropriateness endpoint).
+    expect(
+      AttemptSchema.safeParse({
+        questionnaireId: 'appropriateness',
+        version: 1,
+        answers: { q1: 'a' },
+        riskWarning: { version: 'v', contentHash: 'nothex', locale: 'en' },
+      }).success,
+    ).toBe(false);
     expect(
       AttemptSchema.safeParse({
         questionnaireId: 'x',

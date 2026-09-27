@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { QuestionnaireService } from '../src/appropriateness/questionnaire.service';
 import { base32Decode, totp } from '../src/auth/totp';
-import { appQuery, bearer, CSRF, failingAnswers, nextTotpWindow, ownerQuery, passingAnswers, PASSWORD, startApp, uniqueEmail } from './helpers';
+import { appQuery, bearer, CSRF, failingAnswers, nextTotpWindow, ownerQuery, passingAnswers, PASSWORD, riskWarningAck, startApp, uniqueEmail } from './helpers';
 
 /** B-018 (Sponsor decision OQ-S2): no self-service trader; appropriateness assessment gates it. */
 describe('appropriateness assessment and the questionnaire engine', () => {
@@ -32,7 +32,8 @@ describe('appropriateness assessment and the questionnaire engine', () => {
     await request(http).post('/auth/signup').set(CSRF).send({ email, password: PASSWORD, displayName: 'A' }).expect(201);
     const l = await request(http).post('/auth/login').set(CSRF).send({ email, password: PASSWORD }).expect(200);
     expect(l.body.status).toBe('ok');
-    return { id: l.body.user.id as string, email, token: l.body.accessToken as string };
+    const token = l.body.accessToken as string;
+    return { id: l.body.user.id as string, email, token, rw: await riskWarningAck(app, token) };
   }
 
   it('serves the versioned SIMULATED questionnaire without the answer key', async () => {
@@ -49,9 +50,9 @@ describe('appropriateness assessment and the questionnaire engine', () => {
 
   it('a fail starts a cool-down, is audited with version and score, and never stores the answers', async () => {
     const u = await novice();
-    const res = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: failingAnswers() }).expect(200);
+    const res = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: failingAnswers() }).expect(200);
     expect(res.body).toMatchObject({ passed: false, scorePct: 0, passMarkPct: 75, cooldownUntil: expect.any(String), topicsToReview: expect.arrayContaining(['Leverage', 'Stop orders and gaps']) });
-    const again = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(429);
+    const again = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(429);
     expect(again.body).toMatchObject({ error: 'cooldown', cooldownUntil: res.body.cooldownUntil });
     const status = await request(http).get('/appropriateness/questionnaire').set(bearer(u.token)).expect(200);
     expect(status.body.status).toMatchObject({ eligible: false, cooldownUntil: res.body.cooldownUntil, lastAttempt: { version: 1, scorePct: 0, passed: false } });
@@ -64,7 +65,7 @@ describe('appropriateness assessment and the questionnaire engine', () => {
     await expect(appQuery('UPDATE questionnaire_attempts SET passed = true')).rejects.toMatchObject({ code: '42501' });
     // Cool-down is configurable: 0 minutes lets the user retry and pass.
     process.env.KORA_APPROPRIATENESS_COOLDOWN_MINUTES = '0';
-    const pass = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(200);
+    const pass = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(200);
     expect(pass.body.passed).toBe(true);
     delete process.env.KORA_APPROPRIATENESS_COOLDOWN_MINUTES;
   });
@@ -72,7 +73,7 @@ describe('appropriateness assessment and the questionnaire engine', () => {
   it('a pass grants trader, signs the user out and forces TOTP enrolment at the next login', async () => {
     const u = await novice();
     await request(http).get('/robots/builder').set(bearer(u.token)).expect(403);
-    const res = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(200);
+    const res = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(200);
     expect(res.body).toMatchObject({ passed: true, scorePct: 100, roleGranted: 'trader', next: 'sign_in_again' });
     expect((res.headers['set-cookie'] as unknown as string[]).join(';')).toMatch(/kora_at=;/);
     const audit = await ownerQuery<{ payload: Record<string, unknown> }>(`SELECT payload FROM audit_events WHERE action = 'appropriateness.passed' AND actor_id = $1`, [u.id]);
@@ -87,21 +88,21 @@ describe('appropriateness assessment and the questionnaire engine', () => {
     expect(me.body).toMatchObject({ roles: ['novice', 'trader'], mfa: true, preferences: { viewMode: 'pro' }, capabilities: { robotBuilder: true } });
     await request(http).get('/robots/builder').set(bearer(v.body.accessToken)).expect(200);
     // Already a trader: no second attempt.
-    await request(http).post('/appropriateness/attempts').set(bearer(v.body.accessToken)).send({ questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(409);
+    await request(http).post('/appropriateness/attempts').set(bearer(v.body.accessToken)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: passingAnswers() }).expect(409);
   });
 
   it('validates attempts: every question answered, current version only, pass mark configurable', async () => {
     const u = await novice();
     const partial = passingAnswers();
     delete partial.leverage;
-    const inc = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: partial }).expect(400);
+    const inc = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: partial }).expect(400);
     expect(inc.body).toMatchObject({ error: 'incomplete', missing: ['leverage'] });
-    await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 2, answers: passingAnswers() }).expect(409);
-    await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: passingAnswers(), score: 100 }).expect(400);
+    await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 2, answers: passingAnswers() }).expect(409);
+    await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: passingAnswers(), score: 100 }).expect(400);
     // 7 of 8 = 87% passes at 75, fails at 90.
     const seven = { ...passingAnswers(), leverage: 'a' };
     process.env.KORA_APPROPRIATENESS_PASS_MARK_PCT = '90';
-    const failed = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ questionnaireId: 'appropriateness', version: 1, answers: seven }).expect(200);
+    const failed = await request(http).post('/appropriateness/attempts').set(bearer(u.token)).send({ riskWarning: u.rw, questionnaireId: 'appropriateness', version: 1, answers: seven }).expect(200);
     expect(failed.body).toMatchObject({ passed: false, scorePct: 87, passMarkPct: 90, topicsToReview: ['Leverage'] });
     delete process.env.KORA_APPROPRIATENESS_PASS_MARK_PCT;
     // No attempt rows were written for the invalid submissions.

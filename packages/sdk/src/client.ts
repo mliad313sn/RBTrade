@@ -287,8 +287,14 @@ export class KoraClient {
     return this.request<QuestionnaireResponse>('GET', '/appropriateness/questionnaire');
   }
 
-  submitAppropriateness(questionnaireId: string, version: number, answers: Record<string, string>) {
-    return this.request<AttemptResponse>('POST', '/appropriateness/attempts', { questionnaireId, version, answers });
+  /** IRTC R4-09: `riskWarning` is the risk warning the user confirmed (version + content hash). */
+  submitAppropriateness(
+    questionnaireId: string,
+    version: number,
+    answers: Record<string, string>,
+    riskWarning: { version: string; contentHash: string; locale: DisclosureLocale },
+  ) {
+    return this.request<AttemptResponse>('POST', '/appropriateness/attempts', { questionnaireId, version, answers, riskWarning });
   }
 
   audit(q: AuditListQuery = {}) {
