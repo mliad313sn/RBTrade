@@ -115,7 +115,10 @@ describe('NumberInput (decimal-safe)', () => {
     const input = screen.getByLabelText('Limit price');
     fireEvent.change(input, { target: { value: '1.0842x' } });
     expect(screen.getByTestId('out').textContent).toBe('1.08421');
+    // IRTC R5-08: in English a comma only groups thousands; "1,1" is ambiguous and holds no value.
     fireEvent.change(input, { target: { value: '1,1' } });
+    expect(screen.getByTestId('out').textContent).toBe('');
+    fireEvent.change(input, { target: { value: '1.1' } });
     expect(screen.getByTestId('out').textContent).toBe('1.1');
     fireEvent.blur(input);
     expect(screen.getByTestId('out').textContent).toBe('1.10000');
