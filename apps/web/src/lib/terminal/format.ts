@@ -1,5 +1,5 @@
-import { dec, isDecimalString, pipSizeOf, type InstrumentSpec } from '@kora/domain';
-import { formatDecimal } from '@kora/ui';
+import { dec, isDecimalString, pipSizeOf, quantize, type InstrumentSpec } from '@kora/domain';
+import { formatDecimal, formatPrice } from '@kora/ui';
 
 /** Clock time for tables: "14:03:27" in UTC or the viewer's local zone (Settings → time display). */
 export function formatClock(ts: number | string, mode: 'utc' | 'local'): string {
@@ -27,6 +27,44 @@ export function formatSpread(bid: string, ask: string, spec: Pick<InstrumentSpec
   const diff = dec(ask).sub(dec(bid));
   if (spec.pipSize) return `${formatDecimal(diff.div(pipSizeOf(spec)), 1)} pip`;
   return formatDecimal(diff, spec.pricePrecision);
+}
+
+/**
+ * Result line and toast after placing an order: "Order filled: buy 900,000 EURUSD at 1.08349."
+ * The average fill price is a volume-weighted mean with up to 40 decimals on the wire; it is shown
+ * at the instrument's price precision like every other price (IRTC R5-07).
+ */
+export function orderResultText(
+  o: { status: string; side: string; qty: string; symbol: string; avgFillPrice?: string | null },
+  precision: { qty: number; price: number },
+): string {
+  const at = o.avgFillPrice && isDecimalString(o.avgFillPrice) ? ` at ${formatPrice(o.avgFillPrice, precision.price)}` : '';
+  return `Order ${o.status.replace('_', ' ')}: ${o.side} ${formatQty(o.qty, precision.qty)} ${o.symbol}${at}.`;
+}
+
+/**
+ * A BCP 47 tag the Intl APIs accept, for libraries that format with the browser language (IRTC R5-18).
+ * Linux browsers with a POSIX locale report "en-US@posix", which makes `toLocaleString` throw and left
+ * the chart blank. Invalid tags fall back to "en-US".
+ */
+export function safeLocale(tag: string | undefined | null, fallback = 'en-US'): string {
+  if (!tag) return fallback;
+  try {
+    return Intl.getCanonicalLocales(tag)[0] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Direction of a change as displayed (IRTC R5-19): taken from the value rounded to the places shown,
+ * so "0.00" gets no ▲/▼ and no colour, and a tiny negative never shows as "−0.00".
+ */
+export function displayDirection(value: string | number, places: number): 'up' | 'down' | 'flat' {
+  const s = typeof value === 'number' ? String(value) : value;
+  if (!isDecimalString(s)) return 'flat';
+  const d = quantize(s, places); // the same rounding as formatDecimal / formatMoney
+  return d.isZero() ? 'flat' : d.isNegative() ? 'down' : 'up';
 }
 
 /** Mid price from a quote at registry precision. */

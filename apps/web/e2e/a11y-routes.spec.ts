@@ -150,9 +150,11 @@ test('screen-reader spot checks: landmarks, names and live regions on the termin
   await expect(page.getByRole('banner').first()).toBeVisible();
   // the kill switch is a named button, never an icon-only control
   await expect(page.getByTestId('kill-switch')).toHaveAccessibleName(/kill switch/i);
-  // connection state is announced politely; the ticket preview updates in a live region
+  // connection state is announced politely; the ticket preview is summarised in its own polite status,
+  // once per settled edit (IRTC R5-05: the figures themselves are not a live region, they change every tick)
   await expect(page.getByTestId('status-bar').locator('[role="status"][aria-live="polite"]')).toHaveCount(1);
-  await expect(page.getByTestId('ticket-preview')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.getByTestId('ticket-announce')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.getByTestId('ticket-preview')).not.toHaveAttribute('aria-live', /.+/);
   // every button in the top bar has an accessible name
   const unnamed = await page.getByTestId('pro-topbar').getByRole('button').evaluateAll((els) =>
     els.filter((e) => !(e.getAttribute('aria-label') || e.textContent?.trim() || e.getAttribute('aria-labelledby'))).length,

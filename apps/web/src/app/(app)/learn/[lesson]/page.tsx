@@ -2,8 +2,12 @@ import { notFound } from 'next/navigation';
 
 import { Lesson } from '@/components/novice/Learn';
 import { isLesson } from '@/lib/novice/learn';
+import { localisedTitle } from '@/lib/i18n/metadata';
 
-export const metadata = { title: 'Lesson' };
+/** Localised page title (IRTC R5-12). */
+export function generateMetadata() {
+  return localisedTitle('meta.lesson');
+}
 
 export default async function Page({ params }: { params: Promise<{ lesson: string }> }) {
   const { lesson } = await params;

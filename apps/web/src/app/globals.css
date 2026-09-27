@@ -20,6 +20,12 @@
   --color-on-primary: var(--k-on-primary);
   --color-up-surface: var(--k-up-surface);
   --color-down-surface: var(--k-down-surface);
+  /* IRTC R5-15/R5-16: meaning colours independent of the up/down convention. */
+  --color-accent-surface: var(--k-accent-surface);
+  --color-loss: var(--k-loss);
+  --color-risk: var(--k-risk);
+  --color-ok: var(--k-ok);
+  --color-border-strong: var(--k-border-strong);
   --font-ui: var(--k-font-ui);
   --font-num: var(--k-font-num);
   --font-display: var(--k-font-display);
@@ -48,9 +54,39 @@ a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='option']:focus-visible,
 [tabindex]:focus-visible {
+  /* IRTC R5-14: <summary> (Indicators, Draw, "Why this level") had only the UA ring (~1.1:1 on pro-dark). */
   outline: 2px solid var(--k-focus);
   outline-offset: 2px;
+}
+
+/* IRTC R5-14: a visible disclosure marker for <details> whose summary is styled (flex removes ::marker). */
+.k-disclosure__icon {
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 120ms ease;
+}
+details[open] > summary .k-disclosure__icon {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-disclosure__icon {
+    transition: none;
+  }
+}
+
+/* IRTC R5-13: the light palette in the Pro view keeps the Pro typography (tabular mono numbers) and
+ * density; the Novice sizing and faces below apply only outside the Pro mode. */
+[data-theme='novice-light'][data-mode='pro'] {
+  --k-font-ui: 'IBM Plex Sans Condensed', 'IBM Plex Sans', system-ui, sans-serif;
+  --k-font-num: 'IBM Plex Mono', ui-monospace, monospace;
+  --k-font-display: 'IBM Plex Sans Condensed', system-ui, sans-serif;
+  --k-touch: 28px;
 }
 
 .skip-link {
@@ -94,45 +130,56 @@ select:focus-visible,
   descent-override: 22.7%;
   line-gap-override: 0%;
 }
-[data-theme='novice-light'][data-theme] {
+[data-theme='novice-light']:not(:where([data-mode='pro']))[data-theme] {
   --k-font-ui: 'Figtree', 'Figtree Fallback', system-ui, sans-serif;
   --k-font-display: 'Fraunces Variable', 'Fraunces', 'Fraunces Fallback', serif;
 }
 /* Every interactive target is at least 44 × 44 px (goal 08 §8). Dialogs portal to <body>, and
  * <html> carries the novice theme, so these selectors match them too. */
-[data-theme='novice-light'] .k-btn.k-btn,
-[data-theme='novice-light'] .k-btn--sm.k-btn--sm,
-[data-theme='novice-light'] .k-seg__opt.k-seg__opt,
-[data-theme='novice-light'] .k-input.k-input,
-[data-theme='novice-light'] .k-select.k-select {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-btn.k-btn,
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-btn--sm.k-btn--sm,
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-seg__opt.k-seg__opt,
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-input.k-input,
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-select.k-select {
   min-height: 44px;
 }
-[data-theme='novice-light'] .k-seg__opt.k-seg__opt {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-seg__opt.k-seg__opt {
   min-width: 44px;
 }
-[data-theme='novice-light'] .k-select.k-select {
+/* IRTC R5-09: long French labels wrap inside the button at 320 px instead of widening the page. */
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-btn.k-btn {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+  max-width: 100%;
+}
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-select.k-select {
   width: 100%;
   max-width: 100%;
 }
-[data-theme='novice-light'] .k-seg__opt.k-seg__opt[aria-pressed='true'] {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-seg__opt.k-seg__opt[aria-pressed='true'] {
   background: var(--k-primary);
   color: var(--k-on-primary);
 }
 /* Prototype: card titles in the sans face; only the balance and "Make a trade" use the display face. */
-[data-theme='novice-light'] .k-panel__title.k-panel__title {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-panel__title.k-panel__title {
   font-family: var(--k-font-ui);
   font-weight: 600;
   font-size: 17px;
 }
-[data-theme='novice-light'] .k-dialog__title.k-dialog__title {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-dialog__title.k-dialog__title {
   font-size: 22px;
 }
-[data-theme='novice-light'] .k-dialog__desc.k-dialog__desc {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) .k-dialog__desc.k-dialog__desc {
   font-size: 15px;
 }
 /* The review sheet and other dialogs slide up from the bottom on phones. */
 @media (max-width: 640px) {
-  [data-theme='novice-light'] .k-dialog.k-dialog {
+  [data-theme='novice-light']:not(:where([data-mode='pro'])) .k-dialog.k-dialog {
     top: auto;
     bottom: 0;
     left: 0;
@@ -142,13 +189,13 @@ select:focus-visible,
     border-radius: var(--k-radius-lg) var(--k-radius-lg) 0 0;
     padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
   }
-  [data-theme='novice-light'] .k-dialog__actions.k-dialog__actions {
+  [data-theme='novice-light']:not(:where([data-mode='pro'])) .k-dialog__actions.k-dialog__actions {
     flex-direction: column-reverse;
   }
-  [data-theme='novice-light'] .k-dialog__actions.k-dialog__actions > * {
+  [data-theme='novice-light']:not(:where([data-mode='pro'])) .k-dialog__actions.k-dialog__actions > * {
     width: 100%;
   }
 }
-[data-theme='novice-light'] input[type='range'][type='range'] {
+[data-theme='novice-light']:not(:where([data-mode='pro'])) input[type='range'][type='range'] {
   min-height: 44px;
 }

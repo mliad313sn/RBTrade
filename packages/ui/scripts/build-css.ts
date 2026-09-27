@@ -27,6 +27,8 @@ export function tokensCss(): string {
       out.push(`[data-theme='${name}'][data-colors='${conv}'], [data-theme='${name}'] [data-colors='${conv}'] {`);
       out.push(`  --k-up: ${c.up};`);
       out.push(`  --k-down: ${c.down};`);
+      out.push(`  --k-up-surface: ${c.upSurface};`);
+      out.push(`  --k-down-surface: ${c.downSurface};`);
       out.push('}');
     }
   }

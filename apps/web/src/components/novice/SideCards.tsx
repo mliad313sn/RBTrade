@@ -75,7 +75,7 @@ export function AutoInvestCard({ list }: { list: AutoInvestList | null }) {
                 <span className="block font-semibold">{text(tpl.id, 'name')}</span>
                 <span className="block text-xs text-muted">{text(tpl.id, 'summary')}</span>
               </span>
-              <RiskBars level={tpl.riskLevel} label={t('ai.risk', { n: tpl.riskLevel })} />
+              <RiskBars level={tpl.riskLevel} label={t('ai.risk', { n: tpl.riskLevel })} showText />
             </li>
           ))}
         </ul>

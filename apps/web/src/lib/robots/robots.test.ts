@@ -2,9 +2,18 @@ import { TREND_X } from '@kora/domain';
 import { describe, expect, it } from 'vitest';
 
 import { paramsIn, sizeLabel, stopLabel, targetLabel } from '../../components/robots/BlockChips';
-import { auditTag, auditText, fmtNum, fmtR, fmtRatioPct, fmtSigned, pauseLabel } from './format';
+import { auditTag, auditText, fmtNum, fmtR, fmtRatioPct, fmtSigned, pauseLabel, robotsStatusLabel } from './format';
 
 describe('robot formatting', () => {
+  it('status-bar robots label comes from the robots list (IRTC R5-03)', () => {
+    expect(robotsStatusLabel(null)).toBe('Robots: —');
+    expect(robotsStatusLabel([])).toBe('Robots: none');
+    expect(robotsStatusLabel([{ status: 'draft' }, { status: 'stopped' }])).toBe('Robots: none');
+    expect(robotsStatusLabel([{ status: 'running' }, { status: 'running' }])).toBe('Robots: 2 running');
+    expect(robotsStatusLabel([{ status: 'running' }, { status: 'paused' }])).toBe('Robots: 1 running · 1 paused');
+    expect(robotsStatusLabel([{ status: 'paused' }])).toBe('Robots: 0 running · 1 paused');
+  });
+
   it('always shows the sign (colour is never the only cue)', () => {
     expect(fmtSigned(1.234)).toBe('+1.23');
     expect(fmtSigned(-0.5, 1, '%')).toBe('−0.5%');

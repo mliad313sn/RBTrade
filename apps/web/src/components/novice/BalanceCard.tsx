@@ -40,7 +40,7 @@ export function AreaChart({
       preserveAspectRatio="none"
       data-testid="balance-chart"
     >
-      <path d={area} fill="var(--k-up-surface)" />
+      <path d={area} fill="var(--k-accent-surface)" />
       <path
         d={line}
         fill="none"
@@ -75,7 +75,7 @@ export function BalanceCard({ summary }: { summary: NoviceSummary | null }) {
           {t('home.balance.title')}
         </h2>
         <p
-          className="font-display text-[44px] md:text-5xl leading-tight m-0 mt-1"
+          className="font-display text-[clamp(32px,11vw,44px)] md:text-5xl leading-tight m-0 mt-1 break-words"
           data-testid="practice-balance"
         >
           {money(summary.balance, ccy)}

@@ -7,12 +7,15 @@ const minus = '−';
 
 export function fmtNum(v: number | null | undefined, digits = 2): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—';
-  return v < 0 ? `${minus}${Math.abs(v).toFixed(digits)}` : v.toFixed(digits);
+  // IRTC R5-19: the sign follows the rounded value ("−0.0%" is shown as "0.0%").
+  const s = Math.abs(v).toFixed(digits);
+  return v < 0 && Number(s) !== 0 ? `${minus}${s}` : s;
 }
 
 export function fmtSigned(v: number | null | undefined, digits = 2, suffix = ''): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—';
   const s = Math.abs(v).toFixed(digits);
+  if (Number(s) === 0) return `${s}${suffix}`;
   return `${v > 0 ? '+' : v < 0 ? minus : ''}${s}${suffix}`;
 }
 
@@ -97,4 +100,16 @@ export function auditText(e: { action: string; payload: Record<string, unknown> 
     default:
       return e.action;
   }
+}
+
+/**
+ * Status-bar robots label from the robots API (IRTC R5-03): "Robots: none", "Robots: 2 running",
+ * "Robots: 1 running · 1 paused"; "Robots: —" when the list could not be loaded.
+ */
+export function robotsStatusLabel(robots: ReadonlyArray<{ status: string }> | null): string {
+  if (!robots) return 'Robots: —';
+  const running = robots.filter((r) => r.status === 'running').length;
+  const paused = robots.filter((r) => r.status === 'paused').length;
+  if (!running && !paused) return 'Robots: none';
+  return `Robots: ${running} running${paused ? ` · ${paused} paused` : ''}`;
 }

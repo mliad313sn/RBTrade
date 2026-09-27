@@ -10,6 +10,7 @@ import { clockLabel, formatClock, formatQty, playFillSound } from '@/lib/termina
 import { useRegistry } from '@/lib/terminal/registry';
 import { useTerminal } from '@/lib/terminal/store';
 import { refreshTrading, useTrading } from '@/lib/terminal/trading';
+import { useLiveBook } from '@/lib/terminal/use-live-book';
 import { protectiveLevels } from '@/lib/terminal/views';
 
 import { useTerminalSettings } from '../TerminalContext';
@@ -39,10 +40,10 @@ function Empty({ what }: { what: string }) {
 // ---- Positions ------------------------------------------------------------------------------
 
 export function PositionsPanel() {
-  const positions = useTrading((s) => s.positions);
+  // IRTC R5-02: rows repriced from the live quotes; the same book feeds the summary and the top bar.
+  const { positions, account } = useLiveBook();
   const orders = useTrading((s) => s.orders);
   const recent = useTrading((s) => s.recent);
-  const account = useTrading((s) => s.account);
   const currency = useTrading((s) => s.currency);
   const fillSeq = useTrading((s) => s.fillSeq);
   const instruments = useRegistry((s) => s.instruments);
@@ -661,9 +662,9 @@ export function RiskPanel() {
   );
 }
 
-/** Blotter summary for the tab bar ("Unrealized … · Realized today …"). */
+/** Blotter summary for the tab bar ("Unrealized … · Realized today …"), from the same live book as the rows. */
 export function BlotterSummary() {
-  const account = useTrading((s) => s.account);
+  const { account } = useLiveBook();
   const fills = useTrading((s) => s.fills);
   const currency = useTrading((s) => s.currency);
   const today = new Date().toISOString().slice(0, 10);

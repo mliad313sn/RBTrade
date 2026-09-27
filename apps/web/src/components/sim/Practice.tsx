@@ -52,7 +52,7 @@ function Choice<V extends string>({
         {options.map((o) => (
           <label
             key={o.value}
-            className={`flex flex-col gap-0.5 p-3 rounded-xl border cursor-pointer min-h-11 ${value === o.value ? 'border-accent bg-up-surface' : 'border-border bg-panel'}`}
+            className={`flex flex-col gap-0.5 p-3 rounded-xl border cursor-pointer min-h-11 ${value === o.value ? 'border-accent bg-accent-surface' : 'border-border bg-panel'}`}
           >
             <span className="flex items-center gap-2">
               <input type="radio" name={name} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} className="accent-[var(--k-accent)] w-5 h-5" />
@@ -273,7 +273,12 @@ export function Practice({ disclosurePct }: { disclosurePct?: string | null }) {
                 />
               </div>
               <details className="mt-3">
-                <summary className="cursor-pointer font-semibold min-h-11 inline-flex items-center">{t('practice.howTitle')}</summary>
+                <summary className="cursor-pointer font-semibold min-h-11 inline-flex items-center">
+                  <span className="k-disclosure__icon" aria-hidden="true">
+                    ▸
+                  </span>
+                  {t('practice.howTitle')}
+                </summary>
                 <p className="mb-0">
                   <Rich text={t('practice.how')} termHref={inPage} />
                 </p>

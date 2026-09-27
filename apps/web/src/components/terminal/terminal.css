@@ -177,7 +177,7 @@
 .wl-select {
   flex: 1;
   min-width: 0;
-  height: 22px;
+  height: 24px;
   background: var(--k-bg);
   color: var(--k-text);
   border: 1px solid var(--k-border);
@@ -185,8 +185,8 @@
   font: 500 11px var(--k-font-ui);
 }
 .wl-tool {
-  height: 22px;
-  min-width: 22px;
+  height: 24px;
+  min-width: 24px;
   padding: 0 5px;
   background: transparent;
   border: 1px solid var(--k-border);
@@ -459,7 +459,8 @@
   color: var(--k-on-down);
 }
 .tk-type {
-  height: 22px;
+  /* IRTC R5-21: 24 px minimum target (WCAG 2.5.8). */
+  height: 24px;
   padding: 0 7px;
   border-radius: 3px;
   border: 1px solid var(--k-border);
@@ -485,7 +486,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 2px;
   padding-bottom: 4px;
   font-size: 12px;
 }
@@ -494,6 +495,11 @@
   height: 16px;
   margin: 0;
   accent-color: var(--k-accent);
+}
+/* The whole label is the target: at least 24 px tall (IRTC R5-21). */
+.tk-check label {
+  min-height: 24px;
+  cursor: pointer;
 }
 .tk-fhead .k-label {
   font-size: 10px;
@@ -548,6 +554,12 @@
   text-align: right;
   font-family: var(--k-font-num);
   font-variant-numeric: tabular-nums;
+}
+/* IRTC R5-01: figures computed for an earlier edit (a new preview is on its way). Not colour-only:
+ * the "Updating the preview…" line says it in text. */
+.tk-preview.is-updating dd {
+  font-style: italic;
+  text-decoration: underline dotted var(--k-text-muted);
 }
 .tk-warn {
   margin: 0;
@@ -614,7 +626,7 @@
   gap: 2px;
 }
 .ch-tf {
-  height: 22px;
+  height: 24px;
   padding: 0 8px;
   background: transparent;
   border: 0;
@@ -639,9 +651,17 @@
   border: 1px solid var(--k-border);
   border-radius: 3px;
   padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
 .ch-menu > summary::-webkit-details-marker {
   display: none;
+}
+/* IRTC R5-21: indicator rows are 24 px targets (the 13 px checkbox alone is too small). */
+.ch-menu-pop label {
+  min-height: 24px;
+  cursor: pointer;
 }
 .ch-menu-pop {
   position: absolute;

@@ -71,7 +71,7 @@ describe('HoldToConfirmButton', () => {
     const onConfirm = vi.fn();
     render(<HoldToConfirmButton onConfirm={onConfirm} disabled description="Opens the scope menu.">Kill</HoldToConfirmButton>);
     const btn = screen.getByRole('button');
-    expect(btn).toHaveAccessibleDescription('Press and hold for 1.5 seconds to confirm. Opens the scope menu.');
+    expect(btn).toHaveAccessibleDescription('Press and hold for 1.5 seconds to confirm, or activate once to confirm in a dialog. Opens the scope menu.');
     fireEvent.keyDown(btn, { key: ' ' });
     act(() => vi.advanceTimersByTime(2000));
     expect(onConfirm).not.toHaveBeenCalled();
@@ -115,7 +115,10 @@ describe('NumberInput (decimal-safe)', () => {
     const input = screen.getByLabelText('Limit price');
     fireEvent.change(input, { target: { value: '1.0842x' } });
     expect(screen.getByTestId('out').textContent).toBe('1.08421');
+    // IRTC R5-08: in English a comma only groups thousands; "1,1" is ambiguous and holds no value.
     fireEvent.change(input, { target: { value: '1,1' } });
+    expect(screen.getByTestId('out').textContent).toBe('');
+    fireEvent.change(input, { target: { value: '1.1' } });
     expect(screen.getByTestId('out').textContent).toBe('1.1');
     fireEvent.blur(input);
     expect(screen.getByTestId('out').textContent).toBe('1.10000');

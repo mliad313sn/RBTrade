@@ -30,6 +30,9 @@ export function LeftRail() {
       <li key={href}>
         <Link
           href={href}
+          // A locked module answers 403; prefetching it only leaves a dangling request (IRTC R5-25:
+          // governance users without the trader role now get this rail).
+          prefetch={locked ? false : undefined}
           aria-label={locked ? `${label} (not on your account)` : label}
           title={label}
           aria-current={active ? 'page' : undefined}

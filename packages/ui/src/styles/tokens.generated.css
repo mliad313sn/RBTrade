@@ -38,6 +38,11 @@
   --k-on-paper-chip: #0B0E13;
   --k-up-surface: #0F2238;
   --k-down-surface: #33220F;
+  --k-accent-surface: #0F2238;
+  --k-loss: #FF9F40;
+  --k-risk: #FF9F40;
+  --k-ok: #4DA3FF;
+  --k-border-strong: #667085;
   --k-font-ui: 'IBM Plex Sans Condensed', 'IBM Plex Sans', system-ui, sans-serif;
   --k-font-num: 'IBM Plex Mono', ui-monospace, monospace;
   --k-font-display: 'IBM Plex Sans Condensed', system-ui, sans-serif;
@@ -46,10 +51,14 @@
 [data-theme='pro-dark'][data-colors='green_red'], [data-theme='pro-dark'] [data-colors='green_red'] {
   --k-up: #3FB950;
   --k-down: #FF6B6B;
+  --k-up-surface: #0F2A17;
+  --k-down-surface: #3A1616;
 }
 [data-theme='pro-dark'][data-colors='red_up_asia'], [data-theme='pro-dark'] [data-colors='red_up_asia'] {
   --k-up: #FF6B6B;
   --k-down: #3FB950;
+  --k-up-surface: #3A1616;
+  --k-down-surface: #0F2A17;
 }
 [data-theme='novice-light'] {
   color-scheme: light;
@@ -78,6 +87,11 @@
   --k-on-paper-chip: #5C4300;
   --k-up-surface: #F0F6FD;
   --k-down-surface: #FDF5EF;
+  --k-accent-surface: #F0F6FD;
+  --k-loss: #B8520B;
+  --k-risk: #B8520B;
+  --k-ok: #1D6FD1;
+  --k-border-strong: #857F73;
   --k-font-ui: 'Figtree', system-ui, sans-serif;
   --k-font-num: 'Figtree', system-ui, sans-serif;
   --k-font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
@@ -86,8 +100,12 @@
 [data-theme='novice-light'][data-colors='green_red'], [data-theme='novice-light'] [data-colors='green_red'] {
   --k-up: #1A7F37;
   --k-down: #C62828;
+  --k-up-surface: #EEF7F0;
+  --k-down-surface: #FDEEEE;
 }
 [data-theme='novice-light'][data-colors='red_up_asia'], [data-theme='novice-light'] [data-colors='red_up_asia'] {
   --k-up: #C62828;
   --k-down: #1A7F37;
+  --k-up-surface: #FDEEEE;
+  --k-down-surface: #EEF7F0;
 }

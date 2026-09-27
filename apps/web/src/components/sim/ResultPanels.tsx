@@ -47,15 +47,22 @@ export function KpiTiles({ result }: { result: SimResult }) {
         <span className="k-num text-2xl">{fmtCompact(f.p50)}</span>
         <span className={`k-num text-xs ${dirClass[change.dir]}`}>{change.text}</span>
       </Tile>
+      {/* IRTC R5-23: the values wrap inside the tile, and each is coloured (with a glyph) by where it
+          ends against the starting capital: a P5 above the start is a gain, not "down". */}
       <Tile label="P5 · P95 final" testId="kpi-range" value={f.p5}>
-        <span className="k-num text-base whitespace-nowrap">
-          <span className="text-down" aria-label={`5th percentile ${fmtCompact(f.p5)}`}>
-            {fmtCompact(f.p5)}
-          </span>
-          <span className="text-muted"> · </span>
-          <span className="text-up" aria-label={`95th percentile ${fmtCompact(f.p95)}`}>
-            {fmtCompact(f.p95)}
-          </span>
+        <span className="k-num text-base flex flex-wrap gap-x-1 min-w-0">
+          {([['5th', f.p5], ['95th', f.p95]] as const).map(([pct, v], i) => {
+            const dir = v > result.startingCapital ? 'up' : v < result.startingCapital ? 'down' : 'flat';
+            return (
+              <span key={pct} className="whitespace-nowrap">
+                {i ? <span className="text-muted">· </span> : null}
+                <span className={dirClass[dir]} aria-label={`${pct} percentile ${fmtCompact(v)}`}>
+                  <span aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : ''}</span>
+                  {fmtCompact(v)}
+                </span>
+              </span>
+            );
+          })}
         </span>
       </Tile>
       <Tile label="P(ending below start)" testId="kpi-below-start" value={result.probEndBelowStart}>
@@ -125,7 +132,7 @@ export function RealityChecks({ checks }: { checks: RealityCheck[] }) {
   if (checks.length === 0) {
     return (
       <p
-        className="m-0 p-3 rounded border border-border bg-up-surface text-sm"
+        className="m-0 p-3 rounded border border-border bg-accent-surface text-sm"
         data-testid="reality-ok"
       >
         Inputs look internally consistent. Run the stress test before trusting the median.

@@ -37,6 +37,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { api } from '@/lib/api-browser';
+import { safeLocale } from '@/lib/terminal/format';
 import { useRegistry } from '@/lib/terminal/registry';
 import { useTerminal } from '@/lib/terminal/store';
 import { refreshTrading, useTrading } from '@/lib/terminal/trading';
@@ -151,6 +152,8 @@ export function ChartPanel({ aiStrip }: { aiStrip: 'off' | 'placeholder' | 'on' 
     const c = palette();
     const chart = createChart(host, {
       autoSize: true,
+      // IRTC R5-18: never hand an invalid browser tag ("en-US@posix") to the chart's Intl formatters.
+      localization: { locale: safeLocale(typeof navigator === 'undefined' ? undefined : navigator.language) },
       layout: { background: { color: c.panel }, textColor: c.muted, fontFamily: 'IBM Plex Mono, ui-monospace, monospace', fontSize: 11, panes: { separatorColor: c.border } },
       grid: { vertLines: { color: 'rgba(38,46,59,0.35)' }, horzLines: { color: 'rgba(38,46,59,0.35)' } },
       rightPriceScale: { borderColor: c.border },

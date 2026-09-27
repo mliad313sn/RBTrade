@@ -23,7 +23,8 @@ export function ProShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <div className="k-hazard" aria-hidden="true" />
-      <header className="flex items-center gap-4 px-3 h-[37px] border-b border-border bg-bg" data-testid="pro-topbar">
+      {/* IRTC R5-09: the bar wraps below ~460 px instead of widening the page (WCAG 1.4.10). */}
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 min-h-[37px] border-b border-border bg-bg" data-testid="pro-topbar">
         <Link href="/terminal" className="flex items-center gap-2 no-underline font-semibold tracking-wide" aria-label="KORA Pro home">
           <TrendingUp size={18} className="text-accent" aria-hidden="true" />
           <span>KORA</span>
@@ -32,7 +33,7 @@ export function ProShell({ children }: { children: ReactNode }) {
         <CommandPalette />
         <EnvChip env="PAPER" />
         <AccountSummary />
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center gap-3">
           <ModeToggle />
           <KillSwitch />
           <UserMenu />
@@ -40,7 +41,7 @@ export function ProShell({ children }: { children: ReactNode }) {
       </header>
       <div className="flex flex-1 min-h-0">
         <LeftRail />
-        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        <div className="flex-1 min-w-0 flex flex-col min-h-0 max-w-full">
           <WhatChangedNote />
           <TradingHaltBanner className="px-2 pt-2" />
           <ProRiskWarningBanner className="px-2 pt-2" />

@@ -11,6 +11,7 @@ import '@fontsource-variable/fraunces';
 import './globals.css';
 
 import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
 import { getLocale } from '@/lib/i18n/server';
@@ -31,8 +32,12 @@ export const viewport: Viewport = { width: 'device-width', initialScale: 1, them
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // The Novice view is localised (EN/FR); the app shell corrects `lang` to "en" on Pro screens.
   const locale = await getLocale();
+  // IRTC R5-26: the theme the app shell resolved last time (cookie written by AppShell), so a Novice
+  // page is light from the first paint instead of dark until hydration. Unknown values fall back to dark.
+  const themeCookie = (await cookies()).get('kora_theme')?.value;
+  const theme = themeCookie === 'novice-light' ? 'novice-light' : 'pro-dark';
   return (
-    <html lang={locale} data-theme="pro-dark">
+    <html lang={locale} data-theme={theme}>
       <body>{children}</body>
     </html>
   );

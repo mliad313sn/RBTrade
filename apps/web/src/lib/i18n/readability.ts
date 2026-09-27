@@ -80,8 +80,10 @@ export function sum(list: TextStats[]): TextStats {
 /** Keys that are labels or names, not prose (excluded from the corpus). */
 export function isProse(key: string, text: string): boolean {
   if (
+    // appr.q / appr.topic: the appropriateness questionnaire, verbatim from the graded, Compliance-owned
+    // data file (IRTC R5-12); its wording is reviewed by Compliance (OQ-C1), not by the Novice copy gate.
     // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- linear pattern (no nested quantifiers), reviewed goal 10
-    /^(ccy|nav|mode|shell\.nav|shell\.lang|kc\.topic|term\.[\w-]+\.name|ai\.t\.[\w-]+\.name)/.test(
+    /^(ccy|nav|mode|shell\.nav|shell\.lang|kc\.topic|appr\.q\.|appr\.topic|term\.[\w-]+\.name|ai\.t\.[\w-]+\.name)/.test(
       key,
     )
   )

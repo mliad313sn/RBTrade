@@ -1,12 +1,8 @@
-import { Placeholder } from '@/components/Placeholder';
+import { Portfolio } from '@/components/portfolio/Portfolio';
 
 export const metadata = { title: 'Portfolio' };
 
+/** Pro portfolio (IRTC R5-11): equity, P&L by period, positions and fills from the paper engine. */
 export default function Page() {
-  return (
-    <>
-      <h1 className="k-sr-only">Portfolio</h1>
-      <Placeholder title="Portfolio" goal="goal 03 (positions and P&L)" />
-    </>
-  );
+  return <Portfolio />;
 }

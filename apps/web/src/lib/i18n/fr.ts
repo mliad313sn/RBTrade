@@ -15,6 +15,7 @@ export const fr: Record<MessageKey, string> = {
   'nav.autoInvest': 'Robots',
   'nav.learn': 'Apprendre',
   'shell.env': 'Argent d’entraînement',
+  'shell.envShort': 'Entraînement',
   'shell.envAria': 'Environnement : argent d’entraînement (simulation)',
   'shell.lang.label': 'Langue',
   'shell.banner.title': 'Le trading peut vous faire perdre de l’argent.',
@@ -31,6 +32,106 @@ export const fr: Record<MessageKey, string> = {
   'mode.simple': 'Simple',
   'mode.pro': 'Pro',
   'mode.error': 'Impossible de changer de vue. Réessayez.',
+  'mode.needsAssessment.title': 'La vue Pro demande d’abord un court test',
+  'mode.needsAssessment.body':
+    'Les outils Pro sont réservés aux comptes qui ont réussi ce test. D’ici là, vous restez dans la vue simple.',
+  'mode.proRoute.title': 'Cet écran fait partie de la vue Pro',
+  'mode.proRoute.bodyTrader':
+    'Vous êtes dans la vue simple. Passez en Pro pour utiliser cet écran.',
+  'mode.proRoute.bodyNovice':
+    'Vous êtes dans la vue simple. Vous pouvez passer en Pro, mais les règles de la vue simple restent actives tant que vous n’avez pas réussi un court test sur les risques du trading.',
+  'mode.proRoute.switch': 'Passer en Pro',
+  'mode.proRoute.assess': 'Faire le test',
+  'mode.proRoute.home': 'Retour à l’accueil',
+  'meta.check': 'Test en 5 questions',
+  'meta.lesson': 'Leçon',
+  'meta.welcome': 'Bienvenue',
+  'meta.settings': 'Réglages',
+  'meta.appropriateness': 'Débloquer le trading Pro',
+  // IRTC R5-12: évaluation (traduction appr.q.* en attente de revue Conformité, OQ-C1).
+  'appr.q.title': 'Évaluation du caractère approprié du trading Pro',
+  'appr.q.intro':
+    'Questions fictives (SIMULATED) en attente de revue par la Conformité (OQ-C1). Ce court test vérifie que vous comprenez les risques d’un trading rapide et avec effet de levier avant d’ouvrir le terminal Pro. Vos réponses sont notées sur notre serveur et ne sont pas conservées ; seuls votre score et la version du questionnaire sont gardés.',
+  'appr.q.leverage.prompt':
+    'Vous ouvrez une position de 30 000 avec 1 000 de marge (1:30). Le prix bouge de 2 % contre vous. Que devient à peu près votre marge ?',
+  'appr.q.leverage.a': 'Je perds environ 2 % de mes 1 000 de marge (environ 20).',
+  'appr.q.leverage.b': 'Je perds environ 600, soit 60 % de ma marge.',
+  'appr.q.leverage.c': 'Rien, car les pertes ne comptent que quand je ferme.',
+  'appr.q.stop_gap.prompt':
+    'Votre stop loss est à 100. Le marché clôture à 101 et rouvre le lendemain à 95. À quel prix votre stop sera-t-il le plus probablement exécuté ?',
+  'appr.q.stop_gap.a': 'Exactement 100 : un stop est toujours exécuté à son prix.',
+  'appr.q.stop_gap.b':
+    'Vers 95, le prochain prix disponible, donc la perte est plus grande que prévu.',
+  'appr.q.stop_gap.c': 'Il n’est pas exécuté tant que le prix ne revient pas à 100.',
+  'appr.q.costs.prompt':
+    'Quels coûts réduisent le résultat d’un trade avec effet de levier gardé plusieurs jours ?',
+  'appr.q.costs.a': 'Seulement la commission à l’ouverture.',
+  'appr.q.costs.b':
+    'Le spread, les commissions et le financement de nuit (swap) pour chaque nuit où la position reste ouverte.',
+  'appr.q.costs.c': 'Aucun : le trading fictif et avec effet de levier n’a pas de coûts.',
+  'appr.q.margin_call.prompt':
+    'Vos pertes augmentent et vos fonds propres passent sous la marge dont vos positions ont besoin. Que peut-il se passer ?',
+  'appr.q.margin_call.a': 'Des positions peuvent être fermées automatiquement à perte.',
+  'appr.q.margin_call.b': 'Le courtier doit attendre que le marché remonte.',
+  'appr.q.margin_call.c': 'Les pertes sont toujours limitées à la marge que j’ai déposée.',
+  'appr.q.position_size.prompt':
+    'Vous voulez risquer au plus 1 % d’un compte de 10 000 sur un trade avec un stop à 50 points. Chaque point vaut 1 par unité. Quelle est la taille maximale ?',
+  'appr.q.position_size.a': '2 unités (2 × 50 = 100, soit 1 % de 10 000).',
+  'appr.q.position_size.b': '20 unités.',
+  'appr.q.position_size.c': 'Autant d’unités que ma marge le permet.',
+  'appr.q.volatility.prompt':
+    'Une annonce économique majeure est prévue dans cinq minutes. Que se passe-t-il le plus probablement autour de la publication ?',
+  'appr.q.volatility.a': 'Les spreads restent les mêmes et les prix bougent lentement.',
+  'appr.q.volatility.b':
+    'Les spreads peuvent s’élargir et les prix sauter, donc mes ordres peuvent être exécutés loin de ce que j’attends.',
+  'appr.q.volatility.c': 'Le marché ferme pendant les annonces.',
+  'appr.q.robots.prompt':
+    'Le backtest d’un robot de trading montre une courbe de capital régulière et en hausse. Que devez-vous supposer ?',
+  'appr.q.robots.a': 'Le robot continuera à produire les mêmes rendements en réel.',
+  'appr.q.robots.b':
+    'Les résultats passés et simulés ne garantissent pas les résultats futurs ; le trading réel peut perdre de l’argent.',
+  'appr.q.robots.c': 'Un robot ne peut pas perdre plus que le pire jour du backtest.',
+  'appr.q.loss_capacity.prompt': 'Quel argent est approprié pour trader avec effet de levier ?',
+  'appr.q.loss_capacity.a':
+    'De l’argent que je peux me permettre de perdre sans toucher à mes dépenses essentielles.',
+  'appr.q.loss_capacity.b': 'Mon épargne de précaution, car les gains sont rapides.',
+  'appr.q.loss_capacity.c': 'De l’argent emprunté, pour augmenter la taille de mes positions.',
+  'appr.topic.leverage': 'Effet de levier',
+  'appr.topic.stop_gap': 'Ordres stop et gaps',
+  'appr.topic.costs': 'Coûts',
+  'appr.topic.margin_call': 'Marge',
+  'appr.topic.position_size': 'Taille de position',
+  'appr.topic.volatility': 'Volatilité et actualités',
+  'appr.topic.robots': 'Trading automatisé',
+  'appr.topic.loss_capacity': 'Capacité à perdre',
+  'appr.loading': 'Chargement du test…',
+  'appr.loadError.title': 'Chargement impossible.',
+  'appr.loadError.body': 'Le test n’a pas pu être chargé. Réessayez plus tard.',
+  'appr.simulated': 'Questions SIMULATED · en attente de revue par la Conformité',
+  'appr.meta':
+    'Version {version} · note minimale {pass} % · après un échec, vous pourrez réessayer dans {hours} heures.',
+  'appr.done.title': 'Le trading Pro est déjà débloqué.',
+  'appr.done.body': 'Votre compte a le rôle de trader.',
+  'appr.passed.title': 'Réussi avec {score} %.',
+  'appr.passed.body':
+    'Vous avez réussi. Ensuite, reconnectez-vous et activez la connexion en deux étapes.',
+  'appr.passed.next': 'Redirection vers la connexion…',
+  'appr.failed.title': 'Non réussi : {score} % (note minimale {pass} %).',
+  'appr.failed.body': 'Relisez les sujets ci-dessous, puis réessayez plus tard.',
+  'appr.review': 'À revoir : {topics}.',
+  'appr.retryAfter': 'Vous pourrez réessayer après le {when}.',
+  'appr.cooldown.title': 'Merci d’attendre avant de réessayer.',
+  'appr.cooldown.body':
+    'Votre dernier essai n’a pas réussi. Vous pourrez réessayer après le {when}.',
+  'appr.submitError.title': 'Envoi impossible.',
+  'appr.submitError.body': 'Un problème est survenu. Réessayez.',
+  'appr.submit': 'Envoyer mes réponses',
+  'appr.answerAll': 'Répondez à toutes les questions et confirmez l’avertissement sur les risques pour envoyer.',
+  'appr.riskWarning.loadError': 'L’avertissement sur les risques n’a pas pu être chargé. Réessayez plus tard.',
+  'appr.riskWarning.version': 'Version {version}',
+  'appr.notEligible.title': 'Le trading Pro ne peut pas être débloqué pour ce compte.',
+  'appr.notEligible.body':
+    'L’un de vos rôles ne peut pas être combiné avec le trading (séparation des tâches). Contactez un administrateur si cela vous semble anormal.',
   'user.menu': 'Menu du compte de {name}',
   'user.unlockPro': 'Débloquer le trading Pro',
   'user.settings': 'Réglages',
@@ -39,7 +140,7 @@ export const fr: Record<MessageKey, string> = {
   'user.twoStepOn': 'connexion en deux étapes activée',
   'kill.button': 'Tout arrêter',
   'kill.help':
-    'Maintenez 1,5 seconde pour ouvrir le menu d’arrêt. Touches : maintenez Contrôle, Maj et K.',
+    'Maintenez 1,5 seconde, ou touchez une fois, pour ouvrir le menu d’arrêt. Touches : maintenez Contrôle, Maj et K.',
   'kill.title': 'Tout arrêter : que voulez-vous arrêter ?',
   'kill.desc': 'Chaque choix est enregistré dans votre journal d’activité. Argent d’entraînement.',
   'kill.scopes': 'Que faut-il arrêter',
@@ -59,6 +160,13 @@ export const fr: Record<MessageKey, string> = {
   'kill.donePending': '{n} seront fermés quand le marché sera sûr.',
   'kill.doneAudit': 'Enregistré comme activité n° {id}.',
   'kill.failed': 'Cela n’a pas marché. Réessayez.',
+  'hold.instruction': 'Maintenez {s} s, ou touchez une fois puis confirmez.',
+  'hold.holding': 'Maintien…',
+  'hold.confirmed': 'C’est fait',
+  'hold.confirmTitle': 'Vous êtes sûr ?',
+  'hold.confirmBody': 'La prochaine fois, vous pouvez aussi maintenir le bouton.',
+  'hold.confirm': 'Oui, continuer',
+  'hold.cancel': 'Annuler',
   'halt.title': 'Le trading est arrêté : {scope}.',
   'halt.since': 'Depuis {time} UTC.',
   'halt.body': 'Les robots sont arrêtés et ne peuvent pas trader.',
@@ -152,12 +260,15 @@ export const fr: Record<MessageKey, string> = {
   'moving.up': '{name} a monté plus que d’habitude. C’est un grand mouvement pour lui.',
   'moving.down': '{name} a baissé plus que d’habitude. C’est un grand mouvement pour lui.',
   'moving.choppy': '{name} monte et descend beaucoup. Les prix peuvent sauter vite en ce moment.',
-  'moving.turned': '{name} a changé de sens. Il est reparti dans l’autre sens après un grand mouvement.',
+  'moving.turned':
+    '{name} a changé de sens. Il est reparti dans l’autre sens après un grand mouvement.',
   'moving.quiet': '{name} est resté dans une petite zone. Il a peu bougé.',
   'moving.news': 'Dans l’actualité : « {title} » ({source}).',
   'moving.source': 'Source',
-  'moving.odds': 'Par le passé, des prévisions comme celle-ci se sont réalisées environ {per100} fois sur 100 ({n} cas).',
-  'moving.note': 'Marché d’entraînement avec des prix SIMULÉS. Cela montre ce qui a bougé, pas quoi faire.',
+  'moving.odds':
+    'Par le passé, des prévisions comme celle-ci se sont réalisées environ {per100} fois sur 100 ({n} cas).',
+  'moving.note':
+    'Marché d’entraînement avec des prix SIMULÉS. Cela montre ce qui a bougé, pas quoi faire.',
   'moving.disclaimer': 'Ceci n’est pas un conseil en investissement.',
 
   // ---- Explain this to me (goal 07 copilot, novice mode) ----
@@ -201,7 +312,8 @@ export const fr: Record<MessageKey, string> = {
   'review.fees': 'Les frais de {fees} sont déjà inclus dans ces chiffres.',
   'review.gap':
     'Sur un marché très rapide, le prix peut sauter au-delà du filet de sécurité, et la perte peut être un peu plus grande.',
-  'review.check': 'Je comprends que je pourrais perdre jusqu’à {loss}.',
+  'review.check': 'Je comprends que je pourrais perdre environ {loss}, ou plus si les prix sautent.',
+  'review.rounded': 'Nous avons arrondi {entered} à {used}, le montant le plus proche permis par ce marché.',
   'review.confirm': 'Confirmer le trade',
   'review.back': 'Revenir',
   'review.done': 'C’est fait. Votre trade est ouvert.',

@@ -2,7 +2,7 @@ import { dec, type DepthSnapshot, type OrderDto, type PositionDto, type Quote } 
 import type { InstrumentDto } from '@kora/sdk';
 import { formatPercent, formatPrice } from '@kora/ui';
 
-import { formatSpread, midOf } from './format';
+import { displayDirection, formatSpread, midOf } from './format';
 
 /** Pure view models for the terminal panels (unit-tested in views.test.ts). */
 
@@ -22,7 +22,8 @@ export function watchRowView(q: Pick<Quote, 'bid' | 'ask'>, dayOpen: string | nu
   let dir: WatchRowView['dir'] = 'flat';
   if (dayOpen && !dec(dayOpen).isZero()) {
     const ratio = dec(mid).sub(dec(dayOpen)).div(dec(dayOpen));
-    dir = ratio.isZero() ? 'flat' : ratio.isNegative() ? 'down' : 'up';
+    // IRTC R5-19: the direction of the change as shown (2 decimals of %), so "0.00%" has no ▲/▼.
+    dir = displayDirection(ratio.mul(100).toFixed(), 2);
     change = formatPercent(ratio);
   }
   return { mid, last: formatPrice(mid, spec.pricePrecision), change, dir, spread: formatSpread(q.bid, q.ask, spec) };

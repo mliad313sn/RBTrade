@@ -94,8 +94,8 @@ const iso = (msAgo: number) => new Date(FIXED_NOW - msAgo).toISOString();
 function account() {
   return {
     id: ACCOUNT_ID, environment: 'PAPER', simulated: true, baseCurrency: 'USD', marginTier: 'retail', status: 'active',
-    startingCash: '250000.00', cash: '247054.00', equity: '250000.00', unrealizedPnl: '2946.00', dayPnl: '1284.50', weekPnl: '1284.50',
-    marginUsed: '18420.00', marginFree: '231580.00', marginUsedPct: '7.37', grossExposure: '420000.00', leverage: '1.68',
+    startingCash: '250000.00', cash: '248916.63', equity: '250000.00', unrealizedPnl: '1083.37', dayPnl: '1284.50', weekPnl: '1284.50',
+    marginUsed: '42676.37', marginFree: '207323.63', marginUsedPct: '17.07', grossExposure: '420000.00', leverage: '1.68',
     dailyLossLimit: '5000.00', dailyLossUsedPct: '22.00', openPositions: 4, unpriced: [],
     halt: { halted: false, scope: null, haltedAt: null, haltedBy: null, reason: null },
     limits: { maxOrderNotional: '1000000', maxPositionNotional: '2000000', maxLeverage: '30', dailyLossLimit: '5000', weeklyLossLimit: '10000', maxOrdersPerMinute: 60 },
@@ -105,14 +105,16 @@ function account() {
 }
 
 function positions() {
-  const p = (symbol: string, qty: string, avgPrice: string, markPrice: string, unrealizedPnl: string, notional: string) => ({
-    accountId: ACCOUNT_ID, symbol, qty, avgPrice, markPrice, quoteCcy: 'USD', unrealizedPnl, realizedPnl: '0.00', notional, marginUsed: '0.00', updatedAt: iso(3_600_000), stale: false,
+  // IRTC R5-02: the account and the positions describe the same book (equity = cash + Σ unrealized,
+  // margin = Σ position margin), because the terminal now derives the top bar from the positions.
+  const p = (symbol: string, qty: string, avgPrice: string, markPrice: string, unrealizedPnl: string, notional: string, marginUsed: string) => ({
+    accountId: ACCOUNT_ID, symbol, qty, avgPrice, markPrice, quoteCcy: 'USD', unrealizedPnl, realizedPnl: '0.00', notional, marginUsed, updatedAt: iso(3_600_000), stale: false,
   });
   return [
-    p('EURUSD', '200000', '1.08120', '1.08420', '599.37', '216840.00'),
-    p('XAUUSD', '-20', '2401.10', '2395.40', '114.00', '47908.00'),
-    p('NVDA', '300', '121.40', '118.92', '-744.00', '35676.00'),
-    p('BTCUSD', '0.8', '63420.0', '64812.5', '1114.00', '51850.00'),
+    p('EURUSD', '200000', '1.08120', '1.08420', '599.37', '216840.00', '7220.77'),
+    p('XAUUSD', '-20', '2401.10', '2395.40', '114.00', '47908.00', '2395.40'),
+    p('NVDA', '300', '121.40', '118.92', '-744.00', '35676.00', '7135.20'),
+    p('BTCUSD', '0.8', '63420.0', '64812.5', '1114.00', '51850.00', '25925.00'),
   ];
 }
 
