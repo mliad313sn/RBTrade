@@ -93,6 +93,7 @@ async function main() {
   const API = `http://127.0.0.1:${PORT}`;
   const TOKEN = 'load-only-service-token-0123456789abcdef';
   const PREFIX = `kora:load:${Date.now()}:md:`;
+  // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_password -- test-only password for throwaway local accounts, reviewed goal 10
   const PASSWORD = 'correct-horse-battery-staple';
   const out = { startedAt: new Date().toISOString(), host: hostInfo(), scenarios: {} };
   const procs = [];
@@ -288,17 +289,34 @@ async function main() {
       for (const r of sig) perBar[new Date(r.bar_ts).toISOString()] = (perBar[new Date(r.bar_ts).toISOString()] ?? 0) + 1;
       const outcomes = {};
       for (const r of sig) outcomes[r.outcome] = (outcomes[r.outcome] ?? 0) + 1;
-      out.scenarios.C_bots = { robots: NBOTS, barsObserved: Object.keys(perBar).length, decisionsPerBar: perBar, outcomes, barCloseToDecisionMs: { p50: q_(ms, 0.5), p95: q_(ms, 0.95), p99: q_(ms, 0.99), max: ms[ms.length - 1] ?? null, n: ms.length } };
+      // Kill switch while the robots run: 10 owners hit robots_cancel_flatten at once (goal 03: < 2 s).
+      const owners = [...new Set(Array.from({ length: NBOTS }, (_, i) => users[i % users.length]))].slice(0, 10);
+      const kt0 = performance.now();
+      const ks = await Promise.all(
+        owners.map(async (t) => {
+          const r = await fetch(`${API}/kill-switch`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${t}` }, body: JSON.stringify({ scope: 'robots_cancel_flatten', source: 'rest_fallback', reason: 'load test' }) });
+          return { status: r.status, body: await r.json() };
+        }),
+      );
+      const killWallMs = Math.round(performance.now() - kt0);
+      await new Promise((r) => setTimeout(r, 1500));
+      const ownedIds = ids.filter((_, i) => owners.includes(users[i % users.length]));
+      const stillRunning = await db(`SELECT count(*)::int AS n FROM robots WHERE id = ANY($1::uuid[]) AND status = 'running'`, [ownedIds]);
+      const killSwitch = { triggers: ks.length, statuses: ks.map((x) => x.status), durationMs: ks.map((x) => x.body.durationMs ?? null), wallMs: killWallMs, ownersRobots: ownedIds.length, ownersRobotsStillRunning: stillRunning[0].n };
+      out.scenarios.C_bots = {
+        killSwitch, robots: NBOTS, barsObserved: Object.keys(perBar).length, decisionsPerBar: perBar, outcomes, barCloseToDecisionMs: { p50: q_(ms, 0.5), p95: q_(ms, 0.95), p99: q_(ms, 0.99), max: ms[ms.length - 1] ?? null, n: ms.length } };
       log('C done', out.scenarios.C_bots);
     }
 
     // server-side metrics ----------------------------------------------------------------------
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- loopback api started by this harness, reviewed goal 10
     const metrics = await (await fetch(`${API}/metrics`)).text();
     out.serverMetrics = {
       orderAck: histQuantiles(metrics, 'kora_order_submit_seconds', (l) => !l.includes('outcome="error"')),
       http: histQuantiles(metrics, 'kora_http_request_duration_seconds', () => true),
     };
     const dups = await db('SELECT count(*)::int AS n FROM (SELECT account_id, client_order_id FROM orders WHERE client_order_id IS NOT NULL GROUP BY 1, 2 HAVING count(*) > 1) d');
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- loopback api started by this harness, reviewed goal 10
     out.integrity = { duplicateClientOrderIds: dups[0].n, auditChain: await (await fetch(`${API}/health`)).json().then((h) => h.status) };
   } finally {
     for (const p of procs) {

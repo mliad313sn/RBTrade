@@ -1,0 +1,221 @@
+{
+  "startedAt": "2026-09-27T01:47:25.786Z",
+  "host": {
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "memGb": 17,
+    "node": "v22.22.2",
+    "note": "single shared cloud VM: generator, api, quant, runner, Postgres and Redis on the same host"
+  },
+  "scenarios": {
+    "A_terminal_users": {
+      "wsClients": 500,
+      "wsOpened": 500,
+      "wsErrors": 0,
+      "wsMessages": 870855,
+      "wsQuoteAgeMs": {
+        "p50": 9,
+        "p95": 32,
+        "p99": 58,
+        "n": 800000
+      },
+      "rest": {
+        "generator": "open loop (node:http)",
+        "requests": 15000,
+        "achievedRatePerS": 500,
+        "latencyMs": {
+          "p50": 4.7,
+          "p95": 82.2,
+          "p99": 406.2,
+          "max": 1137.2
+        },
+        "perPathMs": {
+          "/quotes": {
+            "p50": 5.7,
+            "p95": 97.7,
+            "p99": 212.3,
+            "n": 2500
+          },
+          "/candles": {
+            "p50": 5.4,
+            "p95": 91.7,
+            "p99": 205.9,
+            "n": 2499
+          },
+          "/market-data/status": {
+            "p50": 3.2,
+            "p95": 24.9,
+            "p99": 42.9,
+            "n": 2499
+          },
+          "/positions": {
+            "p50": 4.7,
+            "p95": 228.3,
+            "p99": 1037.2,
+            "n": 2500
+          },
+          "/accounts/me": {
+            "p50": 4.8,
+            "p95": 239.9,
+            "p99": 754.8,
+            "n": 2500
+          },
+          "/orders": {
+            "p50": 4.6,
+            "p95": 201,
+            "p99": 389.1,
+            "n": 2500
+          }
+        },
+        "errorRate": 0.0001,
+        "errors": 2,
+        "statusCodes": {
+          "200": 14998
+        }
+      }
+    },
+    "B_order_burst": {
+      "targetRatePerS": 100,
+      "http": {
+        "generator": "open loop (node:http)",
+        "requests": 3000,
+        "achievedRatePerS": 100,
+        "latencyMs": {
+          "p50": 16.7,
+          "p95": 23.9,
+          "p99": 35.6,
+          "max": 78.4
+        },
+        "errorRate": 0,
+        "errors": 0,
+        "statusCodes": {
+          "201": 3000
+        }
+      },
+      "spike": {
+        "orders": 300,
+        "simultaneous": 100,
+        "worstP50Ms": 521.3,
+        "worstP99Ms": 724.8,
+        "maxMs": 727.6,
+        "errors": 0,
+        "statusCodes": [
+          {
+            "201": 100
+          },
+          {
+            "201": 100
+          },
+          {
+            "201": 100
+          }
+        ]
+      },
+      "ordersByStatus": [
+        {
+          "status": "filled",
+          "reject_code": null,
+          "n": 3300
+        }
+      ],
+      "duplicates": 0,
+      "fills": 3300
+    },
+    "C_bots": {
+      "killSwitch": {
+        "triggers": 10,
+        "statuses": [
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202
+        ],
+        "durationMs": [
+          83,
+          179,
+          140,
+          159,
+          149,
+          172,
+          114,
+          172,
+          119,
+          173
+        ],
+        "wallMs": 240,
+        "ownersRobots": 10,
+        "ownersRobotsStillRunning": 0
+      },
+      "robots": 50,
+      "barsObserved": 4,
+      "decisionsPerBar": {
+        "2026-09-27T01:48:00.000Z": 50,
+        "2026-09-27T01:49:00.000Z": 50,
+        "2026-09-27T01:50:00.000Z": 50,
+        "2026-09-27T01:51:00.000Z": 50
+      },
+      "outcomes": {
+        "none": 200
+      },
+      "barCloseToDecisionMs": {
+        "p50": 1490.8,
+        "p95": 1783.6,
+        "p99": 1853.1,
+        "max": 1855.778,
+        "n": 200
+      }
+    }
+  },
+  "serverMetrics": {
+    "orderAck": {
+      "count": 3300,
+      "meanMs": 41.8,
+      "p50": "≤ 25 ms",
+      "p95": "≤ 500 ms",
+      "p99": "≤ 500 ms",
+      "buckets": {
+        "1": 3300,
+        "0.005": 0,
+        "0.01": 83,
+        "0.025": 2944,
+        "0.05": 2996,
+        "0.1": 3018,
+        "0.25": 3103,
+        "0.5": 3274,
+        "2.5": 3300,
+        "+Inf": 3300
+      }
+    },
+    "http": {
+      "count": 19806,
+      "meanMs": 27.6,
+      "p50": "≤ 5 ms",
+      "p95": "≤ 250 ms",
+      "p99": "≤ 500 ms",
+      "buckets": {
+        "1": 19776,
+        "5": 19806,
+        "0.005": 10161,
+        "0.01": 13033,
+        "0.025": 17407,
+        "0.05": 18094,
+        "0.1": 18564,
+        "0.25": 19248,
+        "0.5": 19643,
+        "2.5": 19806,
+        "+Inf": 19806
+      }
+    }
+  },
+  "integrity": {
+    "duplicateClientOrderIds": 0,
+    "auditChain": "ok"
+  },
+  "finishedAt": "2026-09-27T01:52:22.214Z"
+}
