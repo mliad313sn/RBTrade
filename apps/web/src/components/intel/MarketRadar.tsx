@@ -2,6 +2,7 @@
 
 import '../ai/ai.css';
 
+import { TIMEFRAME_SECONDS, type Timeframe } from '@kora/domain';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -19,6 +20,14 @@ import {
 } from '@/lib/intel/client';
 
 import { TrendCardView } from './TrendCardView';
+
+/** Next scan = the close of the next bar of the scan timeframe (the server scans once per closed bar). */
+function nextScanUtc(tf: string, now = Date.now()): string | null {
+  const sec = TIMEFRAME_SECONDS[tf as Timeframe];
+  if (!sec) return null;
+  const ms = sec * 1000;
+  return new Date(Math.ceil(now / ms) * ms).toISOString().slice(11, 16);
+}
 
 const REGIONS = [
   ['', 'All regions'],
@@ -93,6 +102,9 @@ export function MarketRadar() {
 
   useEffect(() => {
     void load();
+    // IRTC R5-22: pick up the next server scan without a manual reload.
+    const t = setInterval(() => void load(), 60_000);
+    return () => clearInterval(t);
   }, [load]);
 
   const loadAlerts = useCallback(async () => {
@@ -267,10 +279,18 @@ export function MarketRadar() {
                   </li>
                 ))}
               </ol>
-            ) : (
+            ) : data && data.movers.length > 0 ? (
               <p className="m-0 text-xs text-muted">No emerging trend labels for these filters. Biggest movers:</p>
+            ) : (
+              // IRTC R5-22: one clear sentence instead of dangling "Biggest movers:" / "Movers:" labels.
+              <p className="m-0 text-xs text-muted" data-testid="radar-empty">
+                {data?.scannedAt
+                  ? 'No emerging trends or movers for these filters. Widen the filters, or wait for the next scan'
+                  : 'No scan has run yet. The scanner runs on the server after each bar closes'}
+                {nextScanUtc(data?.timeframe ?? '1h') ? ` (next around ${nextScanUtc(data?.timeframe ?? '1h')} UTC)` : ''}; this page updates on its own.
+              </p>
             )}
-            {data && (
+            {data && data.movers.length > 0 && (
               <p className="m-0 mt-2 text-xs text-muted" data-testid="radar-movers">
                 Movers:{' '}
                 {data.movers.map((m, i) => (

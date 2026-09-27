@@ -1,7 +1,18 @@
 import { TREND_X } from '@kora/domain';
 import { expect, test, type Page } from '@playwright/test';
+import pg from 'pg';
 
-import { apiSignIn } from './helpers';
+import { apiSignIn, PASSWORD, totp } from './helpers';
+
+async function db<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+  const c = new pg.Client({ connectionString: process.env.DATABASE_URL_MIGRATE_E2E });
+  await c.connect();
+  try {
+    return (await c.query(sql, params)).rows as T[];
+  } finally {
+    await c.end();
+  }
+}
 
 const CSRF = { 'x-kora-csrf': '1' };
 
@@ -343,5 +354,63 @@ test.describe('Novice view', () => {
     await page.reload();
     expect(await risk()).toBe(blue);
     expect(blue).not.toBe('rgb(26, 127, 55)');
+  });
+});
+
+test.describe('Low findings', () => {
+  test('R5-18: the chart draws even when the browser reports an invalid language tag', async ({ page }) => {
+    await apiSignIn(page, 'trader');
+    await page.addInitScript(() => Object.defineProperty(navigator, 'language', { get: () => 'en-US@posix' }));
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('/terminal?symbol=BTCUSD');
+    await expect(page.locator('.ch-canvas canvas').first()).toBeVisible();
+    await page.waitForTimeout(3000);
+    expect(errors.filter((m) => /Invalid language tag/.test(m))).toEqual([]);
+  });
+
+  test('R5-21: ticket and chart toolbar targets are at least 24 px', async ({ page }) => {
+    await apiSignIn(page, 'trader');
+    await page.goto('/terminal?symbol=BTCUSD');
+    const ticket = page.getByTestId('order-ticket');
+    await expect(ticket.getByRole('radio', { name: 'Market', exact: true })).toBeVisible();
+    const heights = await page.evaluate(() =>
+      [...document.querySelectorAll('.tk-type, .ch-tf, .tk-check label, .ch-menu > summary, .wl-tool')].map((e) => [e.className || e.tagName, Math.round(e.getBoundingClientRect().height)] as const),
+    );
+    expect(heights.length).toBeGreaterThan(5);
+    expect(heights.filter(([, h]) => h > 0 && h < 24)).toEqual([]);
+  });
+
+  test('R5-22: Market Radar never shows dangling "Movers:" labels', async ({ page }) => {
+    await apiSignIn(page, 'trader');
+    await page.goto('/radar');
+    await expect(page.getByTestId('market-radar')).toBeVisible();
+    await page.waitForTimeout(1500);
+    const movers = page.getByTestId('radar-movers');
+    if ((await movers.count()) > 0) expect(await movers.getByRole('button').count()).toBeGreaterThan(0);
+    else if ((await page.getByTestId('radar-trend').count()) === 0) await expect(page.getByTestId('radar-empty')).toContainText(/next around \d\d:\d\d UTC/);
+  });
+
+  test('R5-25: a risk officer who prefers the simple view still gets the risk console in the Pro shell', async ({ page }) => {
+    const { email, secret } = await apiSignIn(page, 'trader');
+    await db(`INSERT INTO user_roles (user_id, role) SELECT id, 'risk_officer' FROM users WHERE email = $1 ON CONFLICT DO NOTHING`, [email]);
+    const login = await (await page.request.post('/api/auth/login', { headers: CSRF, data: { email, password: PASSWORD } })).json();
+    expect((await page.request.post('/api/auth/mfa/verify', { headers: CSRF, data: { mfaToken: login.mfaToken, code: totp(secret!, 1) } })).status()).toBe(200);
+    await setPrefs(page, { viewMode: 'novice' });
+    await page.goto('/risk');
+    await expect(page.getByTestId('pro-topbar')).toBeVisible();
+    await expect(page.getByTestId('novice-topbar')).toHaveCount(0);
+  });
+
+  test('R5-26: phones keep the practice-money chip; the light theme is on <html> from the server render', async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: test.info().project.use.baseURL, viewport: { width: 390, height: 800 }, javaScriptEnabled: false });
+    const page = await ctx.newPage();
+    await apiSignIn(page, 'novice');
+    await page.goto('/home');
+    await expect(page.getByTestId('env-chip')).toBeVisible();
+    await expect(page.getByTestId('env-chip')).toContainText('Practice');
+    const bg = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+    expect(bg).toBe('rgb(247, 245, 240)');
+    await ctx.close();
   });
 });
