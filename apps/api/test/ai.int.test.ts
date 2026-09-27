@@ -503,6 +503,7 @@ describe('AI copilot (goal 07)', () => {
       .set(bearer(trader.token))
       .send({ decision: 'accepted' })
       .expect(400);
+    await md.status({ state: 'ok', feed: 'up', staleSymbols: [], ts: null });
     await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
     const pf = d.body.prefill as Record<string, string>;
     const placed = await request(http)
@@ -576,6 +577,7 @@ describe('AI copilot (goal 07)', () => {
           .send({ symbol: 'BTCUSD', timeframe: '1h' })
           .expect(200)
       ).body as { draftId: string; prefill: Record<string, string> };
+    await md.status({ state: 'ok', feed: 'up', staleSymbols: [], ts: null });
     await md.quote('BTCUSD', (bars.at(-1)!.c - 0.5).toFixed(1), (bars.at(-1)!.c + 0.5).toFixed(1));
     const d1 = await mk();
     const d2 = await mk();
