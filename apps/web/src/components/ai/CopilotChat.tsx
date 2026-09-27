@@ -62,7 +62,10 @@ export function CopilotChat({
   }
 
   const final = answer?.status === 'ok' ? answer.answer : null;
+  // IRTC R4-01: the server streams only sentences that already passed the output guards; the final
+  // (guarded) answer always replaces the preview, and a preview is never shown once the answer ends.
   const shown: string = final ?? (answer && answer.status !== 'ok' ? answer.message : streamed);
+  const previewing = !answer && busy && !!streamed;
   return (
     <div className={compact ? 'ai-chat ai-chat--compact' : 'ai-chat'} data-testid="copilot-chat">
       <form onSubmit={ask} className="ai-chat__form">
@@ -92,9 +95,15 @@ export function CopilotChat({
         <div
           className="ai-chat__answer"
           aria-live="polite"
+          aria-busy={previewing}
           data-testid="copilot-answer"
           data-status={answer?.status ?? 'streaming'}
         >
+          {previewing ? (
+            <p className="ai-chat__checking" data-testid="copilot-checking">
+              Checking each sentence against KORA data…
+            </p>
+          ) : null}
           {shown.split('\n').map((line, i) => (line.trim() ? <p key={i}>{line}</p> : null))}
           {answer?.status === 'ok' && answer.flags.ungrounded.length ? (
             <p className="ai-chat__warn">

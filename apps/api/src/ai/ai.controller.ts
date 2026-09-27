@@ -141,7 +141,9 @@ export class AiController {
     res.flushHeaders();
     let closed = false;
     req.on('close', () => (closed = true));
-    // Novice answers are checked (readability, no suggestions) before anything is shown.
+    // `delta` events carry only sentences that passed the output guards (IRTC R4-01, see
+    // core/stream-guard.ts); novice answers are also checked as a whole (readability, no
+    // suggestions) before anything is shown, so they are never streamed.
     const streamDeltas = ask.mode !== 'novice';
     const send = (e: StreamEvent) => {
       if (closed) return;

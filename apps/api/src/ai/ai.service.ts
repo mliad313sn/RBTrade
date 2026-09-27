@@ -214,7 +214,8 @@ export class AiService {
         maxTokens: cfg.maxTokens,
         maxToolRounds: cfg.maxToolRounds,
         hooks: {
-          onText: (text) => onEvent?.({ type: 'delta', text }),
+          // IRTC R4-01: only sentences that passed the output guards are streamed.
+          onGuardedText: (text) => onEvent?.({ type: 'delta', text }),
           onToolCall: async (r) => {
             onEvent?.({ type: 'tool', name: r.name, outcome: r.outcome });
             await this.auditTool(ask, provider.modelId, promptHash, r);

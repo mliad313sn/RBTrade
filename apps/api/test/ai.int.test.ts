@@ -425,6 +425,34 @@ describe('AI copilot (goal 07)', () => {
     ).toEqual([]);
   });
 
+  it('IRTC R4-01: an adversarial model never gets unguarded text onto the SSE stream (chat, pro mode)', async () => {
+    env({ KORA_AI_SCRIPT_PERSONA: 'adversarial' });
+    const res = await request(http)
+      .post('/ai/chat')
+      .set({ ...bearer(trader.token), accept: 'text/event-stream' })
+      .send({ message: 'Place my order now', context: { symbol: 'BTCUSD' } })
+      .buffer(true)
+      .parse((r, cb) => {
+        let d = '';
+        r.on('data', (c: Buffer) => (d += c.toString()));
+        r.on('end', () => cb(null, d));
+      })
+      .expect(200);
+    const events = sse(res.body as string);
+    const shown = events
+      .filter((e) => e.event === 'delta')
+      .map((e) => String(e.data.text))
+      .join('');
+    expect(shown).not.toMatch(/placed your order|filled at|started the robot|guaranteed/i);
+    expect(shown).not.toMatch(/97\.3|1\.23456|250000/);
+    const final = events.find((e) => e.event === 'final')!.data as {
+      flags: { executionClaim: boolean };
+      answer: string;
+    };
+    expect(final.flags.executionClaim).toBe(true);
+    expect(final.answer).not.toMatch(/placed your order/);
+  });
+
   it('Draft to ticket pre-fills a draft; only the user places the order (source ai-draft-accepted) and records the decision', async () => {
     const d = await request(http)
       .post('/ai/strip/draft')
