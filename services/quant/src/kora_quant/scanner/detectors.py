@@ -15,9 +15,10 @@ Window lengths come from `ScanConfig` (defaults in brackets):
 - `mom_z`: ln(close_t / close_{t−fast}) / (sd of the previous `slow` 1-bar log returns × √fast).
   `mr_z`: (close − mean of `fast` closes) / sample sd of `fast` closes.
 - `rs_sector` / `rs_index`: `fast`-bar log return minus the mean of the other instruments in the
-  same sector / region at the same bar position.
+  same sector / region whose bar starts at the same wall-clock time (IRTC R3-04; peers with no bar
+  at that time, e.g. a closed venue or a stale feed, are left out).
 - `corr_break`: corr(fast) − corr(slow) of 1-bar log returns against the equal-weight mean return
-  of the other instruments in the region.
+  of the other instruments in the region at the same wall-clock time.
 - `volume_z`: (ln(1+v_t) − mean) / sd over the previous `fast` bars (0 when flat).
 - `vol_ratio`: sd of the last `fast` returns / sd of the last `slow`. `ret_z`: current return /
   sd of the previous `slow` returns.
@@ -79,17 +80,33 @@ def _shift(x: F2, lag: int) -> F2:
     return out
 
 
-def group_mean_excl(x: F2, groups: I1) -> F2:
-    """Per column, the mean of x over the *other* members of each row's group (NaN if none)."""
+def group_mean_excl(x: F2, t: NDArray[np.int64], groups: I1) -> F2:
+    """For every bar, the mean of x over the *other* members of the row's group that have a bar
+    starting at the same wall-clock time (NaN if none).
+
+    IRTC R3-04: the panel is right-aligned per instrument (instrument time), so one column can hold
+    different wall-clock times when an instrument is stale, halted or on another calendar. Peers are
+    therefore matched on the bar start time `t`, never on the column: a peer's bar is used only if
+    it covers exactly the same interval, so nothing after the row's own bar close can enter.
+    Padded cells (t == 0) never match."""
     out = np.full(x.shape, np.nan)
-    finite = np.isfinite(x)
-    vals = np.where(finite, x, 0.0)
+    valid = t > 0
     for g in np.unique(groups):
         idx = np.nonzero(groups == g)[0]
-        s = vals[idx].sum(axis=0)
-        cnt = finite[idx].sum(axis=0)
-        m = cnt[None, :] - finite[idx].astype(np.int64)
-        out[idx] = np.where(m > 0, (s[None, :] - vals[idx]) / np.maximum(m, 1), np.nan)
+        tg, xg, vg = t[idx], x[idx], valid[idx]
+        times = np.unique(tg[vg])
+        if len(times) == 0:
+            continue
+        pos = np.searchsorted(times, np.where(vg, tg, times[0]))
+        use = vg & np.isfinite(xg)
+        s = np.zeros(len(times))
+        cnt = np.zeros(len(times), dtype=np.int64)
+        np.add.at(s, pos[use], xg[use])
+        np.add.at(cnt, pos[use], 1)
+        own = np.where(use, xg, 0.0)
+        m = cnt[pos] - use.astype(np.int64)
+        res = np.where(m > 0, (s[pos] - own) / np.maximum(m, 1), np.nan)
+        out[idx] = np.where(vg, res, np.nan)
     return out
 
 
@@ -176,9 +193,9 @@ def compute(p: Panel, cfg: ScanConfig | None = None) -> Features:
         # Return statistics over the previous `slow` bars (current bar excluded).
         sd_r_slow_incl, sd_prev, mom, mom_z = _momentum(r, logc, cfg)
         mr_z = np.where(sd_f > 0, (c - mean_f) / sd_f, np.where(np.isnan(sd_f), np.nan, 0.0))
-        rs_sector = mom - group_mean_excl(mom, p.sector)
-        rs_index = mom - group_mean_excl(mom, p.region)
-        idx_r = group_mean_excl(r, p.region)
+        rs_sector = mom - group_mean_excl(mom, p.t, p.sector)
+        rs_index = mom - group_mean_excl(mom, p.t, p.region)
+        idx_r = group_mean_excl(r, p.t, p.region)
         corr_break = k.rolling_corr(r, idx_r, cfg.fast) - k.rolling_corr(r, idx_r, cfg.slow)
         lv = np.log1p(np.where(p.v >= 0, p.v, np.nan))
         mv, sv = k.rolling_mean_std(lv, cfg.fast, 1)
