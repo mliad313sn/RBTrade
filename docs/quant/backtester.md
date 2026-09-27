@@ -23,6 +23,14 @@ calendar data, AI regime before goal 07). An unavailable condition never opens a
 Indicators (causal, NaN in warm-up): close/open/high/low/volume, EMA (SMA-seeded), SMA, RSI, ATR and
 ADX (Wilder), ROC %, highest high / lowest low of the **previous** n bars, realised volatility %.
 
+Realised volatility (and volatility-target sizing) is annualised with **bars a year from the venue
+session calendar** (IRTC R3-06): the api sends `barsPerYear` per instrument = trading days × session
+bars over the last 365 venue-local dates (`sessionBarsPerYear`, e.g. ≈ 252 for daily equity bars, 7 a
+day for a 09:30–16:00 venue on 1h bars), when at least 95 % of the bars fall in trading time. A 24/7
+calendar, or a SIMULATED feed that runs outside the sessions, uses 365 × 86,400 / timeframe. Before,
+every instrument used the 24/7 figure: 23.9 % instead of 20 % for daily weekday bars, × 2.2 for
+7-hour equity sessions on 1h bars.
+
 ## Timing and fills (conservative)
 
 1. Decide on the close of bar *t* with bars 0…*t* only.

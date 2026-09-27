@@ -1,5 +1,12 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { currencyDecimals, sessionState, type StrategyTimeframe } from '@kora/domain';
+import {
+  TIMEFRAME_SECONDS,
+  barInSession,
+  currencyDecimals,
+  sessionBarsPerYear,
+  sessionState,
+  type StrategyTimeframe,
+} from '@kora/domain';
 import { SimulatedCalendarProvider, simProfileFor } from '@kora/market-data';
 
 import { CandlesService } from '../market-data/candles.service';
@@ -36,7 +43,15 @@ export interface SymbolDataWire {
   sessionOpen: boolean[];
   events: number[];
   costs: CostModelWire;
+  /**
+   * IRTC R3-06: bars a year from the venue session calendar when the bars follow it (omitted for a
+   * 24/7 calendar or a feed that runs outside the sessions: the quant service then uses 365 days).
+   */
+  barsPerYear?: number;
 }
+
+/** Share of bars that must fall in trading time for the calendar to describe the data. */
+const CALENDAR_SHARE = 0.95;
 
 export function maxBars(env: NodeJS.ProcessEnv = process.env): number {
   const n = Number(env.KORA_BT_MAX_BARS ?? '');
@@ -132,6 +147,17 @@ export class ResearchDataService {
       bars.v.push(Number(k.volume));
       sessionOpen.push(sessionState(cal, tz, k.t) === 'open');
     }
+    const tfSeconds = TIMEFRAME_SECONDS[tf];
+    // Up to 256 evenly spaced bars decide whether the data follows the calendar (Intl is costly).
+    const step = Math.max(1, Math.ceil(bars.t.length / 256));
+    const sample = bars.t.filter((_, i) => i % step === 0);
+    const inSession = sample.filter((t) => barInSession(cal, tz, t, tfSeconds)).length;
+    const lastT = bars.t.length ? bars.t[bars.t.length - 1]! : Date.now();
+    const calendarBpy = sessionBarsPerYear(cal, tfSeconds, lastT);
+    const continuousBpy = (365 * 86_400) / tfSeconds;
+    const followsCalendar = sample.length > 0 && inSession >= CALENDAR_SHARE * sample.length;
+    const barsPerYear =
+      followsCalendar && Math.abs(calendarBpy - continuousBpy) > 1e-9 ? calendarBpy : undefined;
     const events: number[] = [];
     if (bars.t.length) {
       const ccys = new Set([inst.spec.quoteCcy, inst.spec.baseCcy].filter((x): x is string => !!x));
@@ -146,6 +172,7 @@ export class ResearchDataService {
       sessionOpen,
       events,
       costs: await this.costModel(inst, baseCcy, opts.spreadTicks),
+      ...(barsPerYear !== undefined ? { barsPerYear } : {}),
     };
   }
 }

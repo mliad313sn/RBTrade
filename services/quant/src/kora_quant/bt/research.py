@@ -69,6 +69,7 @@ def to_input(sd: SymbolData, end_ts: int | None = None) -> SymbolInput:
         if sd.session_open is None
         else np.asarray(sd.session_open[:n], dtype=bool),
         events=None if sd.events is None else np.asarray(sorted(sd.events), dtype=np.int64),
+        bars_per_year=sd.bars_per_year,
     )
 
 
@@ -583,7 +584,7 @@ def signal(req: SignalRequest) -> dict[str, Any]:
         if len(sym.bars) == 0:
             raise ResearchError("No bars to evaluate.")
         tf_s = TIMEFRAME_SECONDS[d.universe.timeframe]
-        bpy = bars_per_year(tf_s)
+        bpy = sym.bars_per_year or bars_per_year(tf_s)
         keys = feature_keys(d, p, req.ai_regime == "model")
         feats = compute_features(sym.bars, keys, bpy)
         verify_point_in_time(sym.bars, keys, bpy, feats)

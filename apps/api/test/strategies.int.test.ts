@@ -319,6 +319,40 @@ describe('strategies, versions and research runs (goal 06)', () => {
     );
   });
 
+  it('IRTC R3-06: session-gated data is annualised from the venue calendar, a 24/7 feed from 365 days', async () => {
+    // Weekday-only daily AAPL bars (XNAS calendar) vs the 24/7 BTC hourly series seeded above.
+    const DAY = 86_400_000;
+    const weekdays = wave(420, T0, DAY, { base: 180, amp: 8, period: 40, tick: 0.01 }).filter(
+      (b) => ![0, 6].includes(new Date(b.t).getUTCDay()),
+    );
+    await seedCandles('AAPL', '1D', weekdays, 2);
+    const eq = await request(http)
+      .post('/strategies')
+      .set(bearer(trader.token))
+      .send({
+        definition: {
+          ...BTC_TREND,
+          name: 'Trend-X AAPL daily',
+          universe: { symbols: ['AAPL'], timeframe: '1D' },
+        },
+      })
+      .expect(201);
+    await request(http)
+      .post('/backtests')
+      .set(bearer(trader.token))
+      .send({ versionId: eq.body.latest.id })
+      .expect(201);
+    const runs = proxy.exchanges.filter((x) => x.path === '/bt/run');
+    const sent = (x: (typeof runs)[number]) =>
+      (x.requestBody as { data: Array<{ symbol: string; barsPerYear?: number }> }).data[0]!;
+    const aapl = sent(runs[runs.length - 1]!);
+    expect(aapl.symbol).toBe('AAPL');
+    expect(aapl.barsPerYear).toBeGreaterThanOrEqual(245);
+    expect(aapl.barsPerYear).toBeLessThanOrEqual(262);
+    const btc = sent(runs.find((x) => sent(x).symbol === 'BTCUSD')!);
+    expect(btc.barsPerYear).toBeUndefined();
+  });
+
   it('sends the OOS trade list to Monte Carlo through /sim/from-trades (B-502)', async () => {
     const t = await request(http)
       .get(`/backtests/${runId}/trades?segment=oos`)

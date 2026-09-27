@@ -66,6 +66,8 @@ Action = Literal["enter_long", "enter_short", "exit", "hold", "blocked"]
 
 
 def bars_per_year(tf_seconds: int) -> float:
+    """Continuous (24/7) trading. Session venues pass their calendar figure per instrument
+    (`SymbolInput.bars_per_year`, IRTC R3-06)."""
     return 365.0 * 86_400 / tf_seconds
 
 
@@ -306,14 +308,15 @@ def run(
 ) -> EngineResult:
     tf_s = TIMEFRAME_SECONDS[d.universe.timeframe]
     tf_ms = tf_s * 1000
-    bpy = bars_per_year(tf_s)
+    continuous = bars_per_year(tf_s)
+    bpys = {s.symbol: s.bars_per_year or continuous for s in symbols}
     keys = feature_keys(d, p, ai_regime)
     ctxs: dict[str, EvalContext] = {}
     checkpoints = 0
     for s in symbols:
-        feats = compute_features(s.bars, keys, bpy)
+        feats = compute_features(s.bars, keys, bpys[s.symbol])
         if guard:
-            checkpoints += verify_point_in_time(s.bars, keys, bpy, feats)
+            checkpoints += verify_point_in_time(s.bars, keys, bpys[s.symbol], feats)
         ctxs[s.symbol] = EvalContext(d, p, s, feats, tf_s)
     index = {s.symbol: {int(t): i for i, t in enumerate(s.bars.t)} for s in symbols}
     timeline = sorted({int(t) for s in symbols for t in s.bars.t})
@@ -481,7 +484,7 @@ def run(
                 st = pos.state
                 st.bars_held += 1
                 st.high_water = max(st.high_water, c) if st.side > 0 else min(st.high_water, c)
-                dx = decide(ctx, i, st, 0.0, 0, bpy)
+                dx = decide(ctx, i, st, 0.0, 0, bpys[s.symbol])
                 if dx.new_stop is not None:
                     st.stop = dx.new_stop
                 if dx.action == "exit":
@@ -489,7 +492,7 @@ def run(
             elif s.symbol not in pending:
                 equity_now = cash + _unrealised(positions, ctxs, last_close)
                 open_n = len(positions) + sum(1 for v in pending.values() if v[0] == "entry")
-                dx = decide(ctx, i, None, equity_now, open_n, bpy)
+                dx = decide(ctx, i, None, equity_now, open_n, bpys[s.symbol])
                 if dx.action in ("enter_long", "enter_short"):
                     signals += 1
                     if i + 1 < len(b):

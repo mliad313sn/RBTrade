@@ -54,6 +54,9 @@ class SymbolData(Wire):
     session_open: list[bool] | None = None
     events: Annotated[list[int] | None, Field(max_length=10_000)] = None
     costs: CostModel
+    # IRTC R3-06: bars a year from the venue session calendar (trading days x session bars), sent
+    # by the api per instrument. None = continuous 24/7 trading (365 x 86,400 / timeframe).
+    bars_per_year: Annotated[float | None, Field(gt=0, le=31_622_400)] = None
 
     @model_validator(mode="after")
     def _session(self) -> SymbolData:

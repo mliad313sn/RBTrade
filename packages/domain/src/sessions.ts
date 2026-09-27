@@ -75,7 +75,13 @@ function localParts(ts: number, tz: string): LocalParts {
   for (const part of formatter(tz).formatToParts(new Date(ts))) {
     if (part.type !== 'literal') p[part.type] = Number(part.value);
   }
-  return { y: p.year!, m: p.month!, d: p.day!, minutes: p.hour! * 60 + p.minute!, seconds: p.second! };
+  return {
+    y: p.year!,
+    m: p.month!,
+    d: p.day!,
+    minutes: p.hour! * 60 + p.minute!,
+    seconds: p.second!,
+  };
 }
 
 /** Offset of the zone at an instant, in ms (local wall time − UTC). */
@@ -99,14 +105,21 @@ const hhmm = (minutes: number): string =>
   `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
 /** Effective [start, end) minute ranges for a local date, after holidays and early closes. */
-export function sessionsForDate(cal: SessionCalendar, date: string): Array<[number, number]> | 'holiday' {
+export function sessionsForDate(
+  cal: SessionCalendar,
+  date: string,
+): Array<[number, number]> | 'holiday' {
   if (cal.holidays?.some((h) => h.date === date)) return 'holiday';
   const weekday = WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()]!;
-  let ranges = (cal.weekly[weekday] ?? []).map(([a, b]) => [parseHhmm(a), parseHhmm(b)] as [number, number]);
+  let ranges = (cal.weekly[weekday] ?? []).map(
+    ([a, b]) => [parseHhmm(a), parseHhmm(b)] as [number, number],
+  );
   const early = cal.earlyCloses?.find((e) => e.date === date);
   if (early) {
     const close = parseHhmm(early.close);
-    ranges = ranges.filter(([a]) => a < close).map(([a, b]) => [a, Math.min(b, close)] as [number, number]);
+    ranges = ranges
+      .filter(([a]) => a < close)
+      .map(([a, b]) => [a, Math.min(b, close)] as [number, number]);
   }
   return ranges.sort((x, y) => x[0] - y[0]);
 }
@@ -120,6 +133,47 @@ function stateAt(cal: SessionCalendar, date: string, minutes: number): SessionSt
   return before && after ? 'break' : 'closed';
 }
 
+/**
+ * Bars a year a venue trades on a timeframe (IRTC R3-06): over the 365 venue-local dates before
+ * `refMs`, the count of trading days (daily bars) or of `tfSeconds` buckets inside the sessions
+ * (intraday: each session range rounded up to whole bars). Weekly and longer bars use calendar
+ * weeks. A 24/7 calendar gives 365 × 86,400 / tf, the continuous figure.
+ */
+export function sessionBarsPerYear(cal: SessionCalendar, tfSeconds: number, refMs: number): number {
+  if (tfSeconds > 86_400) return (365 * 86_400) / tfSeconds;
+  const end = Math.floor(refMs / DAY_MS) * DAY_MS;
+  const tfMin = tfSeconds / 60;
+  let bars = 0;
+  for (let i = 1; i <= 365; i++) {
+    const ranges = sessionsForDate(cal, isoDate(end - i * DAY_MS));
+    if (ranges === 'holiday') continue;
+    const open = ranges.filter(([a, b]) => b > a);
+    if (!open.length) continue;
+    bars +=
+      tfSeconds === 86_400 ? 1 : open.reduce((acc, [a, b]) => acc + Math.ceil((b - a) / tfMin), 0);
+  }
+  return Math.max(1, bars);
+}
+
+/**
+ * Does the bar [t, t + tf) fall in trading time? Intraday: open at its start, middle or last minute.
+ * Daily and longer: its UTC date is a trading day. Used to tell whether a data set follows the venue
+ * calendar (then `sessionBarsPerYear` annualises it) or runs 24/7 (a SIMULATED continuous feed).
+ */
+export function barInSession(
+  cal: SessionCalendar,
+  tz: string,
+  t: number,
+  tfSeconds: number,
+): boolean {
+  if (tfSeconds >= 86_400) {
+    const r = sessionsForDate(cal, isoDate(t));
+    return r !== 'holiday' && r.some(([a, b]) => b > a);
+  }
+  const tfMs = tfSeconds * 1000;
+  return [t, t + tfMs / 2, t + tfMs - 60_000].some((x) => sessionState(cal, tz, x) === 'open');
+}
+
 /** State of a venue calendar at an instant. */
 export function sessionState(cal: SessionCalendar, tz: string, ts: number): SessionState {
   const l = localParts(ts, tz);
@@ -131,7 +185,10 @@ export function sessionState(cal: SessionCalendar, tz: string, ts: number): Sess
  * offset in use falls on a whole minute, so the answer is the same for any instant in that minute.
  * Goal 10 load finding: the order path asked for the status on every order (about 150 Intl calls).
  */
-const statusMemo = new WeakMap<SessionCalendar, Map<string, { minute: number; status: SessionStatus }>>();
+const statusMemo = new WeakMap<
+  SessionCalendar,
+  Map<string, { minute: number; status: SessionStatus }>
+>();
 
 export function sessionStatus(cal: SessionCalendar, tz: string, at: Date | number): SessionStatus {
   const ts = typeof at === 'number' ? at : at.getTime();
@@ -156,7 +213,8 @@ function computeSessionStatus(cal: SessionCalendar, tz: string, ts: number): Ses
     const day = today + i * DAY_MS;
     candidates.push(localToUtc(day, 0, tz));
     const ranges = sessionsForDate(cal, isoDate(day));
-    if (ranges !== 'holiday') for (const [a, b] of ranges) candidates.push(localToUtc(day, a, tz), localToUtc(day, b, tz));
+    if (ranges !== 'holiday')
+      for (const [a, b] of ranges) candidates.push(localToUtc(day, a, tz), localToUtc(day, b, tz));
   }
   candidates.sort((a, b) => a - b);
   let nextChange: string | null = null;
@@ -191,7 +249,8 @@ export function validateCalendar(cal: SessionCalendar): string[] {
       }
     }
   }
-  for (const h of cal.holidays ?? []) if (!/^\d{4}-\d{2}-\d{2}$/.test(h.date)) problems.push(`bad holiday date ${h.date}`);
+  for (const h of cal.holidays ?? [])
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(h.date)) problems.push(`bad holiday date ${h.date}`);
   for (const e of cal.earlyCloses ?? []) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(e.date)) problems.push(`bad early-close date ${e.date}`);
     if (!HHMM.test(e.close)) problems.push(`bad early-close time ${e.close}`);

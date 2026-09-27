@@ -71,6 +71,7 @@ class SymbolInput:
     cost: CostModel
     session_open: NDArray[np.bool_] | None = None
     events: NDArray[np.int64] | None = None
+    bars_per_year: float | None = None  # venue calendar (IRTC R3-06); None = 24/7
 
 
 @dataclass
