@@ -6,6 +6,7 @@
 - R3-04: cross-sectional features match peers by wall-clock time.
 - R3-05: the scanner guard is never vacuous and cuts prefixes by wall-clock time.
 - R3-09: the isotonic calibrator never says 0 or 1.
+- R3-12: each fold's calibrator is fitted only on rows whose label window ended before the fold.
 """
 
 from __future__ import annotations
@@ -276,3 +277,37 @@ def test_isotonic_calibrator_never_claims_certainty_on_noise() -> None:
         ps = np.array([q.p_up for q in r.oos])
         extreme += int(np.count_nonzero((ps >= 0.999) | (ps <= 0.001)))
     assert extreme == 0
+
+
+# --- R3-12: the fold calibrator respects the h-bar embargo ---------------------------------------
+
+
+def test_fold_calibrators_only_see_rows_labelled_before_the_fold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kora_quant.scanner import calibrate
+    from kora_quant.scanner import forecast as fc
+
+    seen: list[int] = []
+    real = calibrate.fit_calibrator
+
+    def spy(s: np.ndarray, y: np.ndarray, *a: Any, **k: Any) -> calibrate.Calibrator:
+        seen.append(len(s))
+        return real(s, y, *a, **k)
+
+    monkeypatch.setattr(fc, "fit_calibrator", spy)
+    rng = np.random.default_rng(8)
+    n, h = 1200, 24
+    c = 100 * np.exp(np.cumsum(rng.normal(0, 0.006, n)))
+    x = np.stack([np.r_[np.nan, np.diff(np.log(c))], rng.standard_normal(n)], axis=1)
+    res = fc.forecast(x, c, ["r", "z"], fc.ForecastConfig(horizon=h, folds=5, min_train=200))
+    assert res.status == "ok"
+    labelled = np.nonzero(np.isfinite(x).all(axis=1) & (np.arange(n) + h < n))[0]
+    plan = fc.fold_plan(labelled, 200, 5, h)
+    # Expected calibrator sizes: earlier test rows t with t + h < this fold's first bar.
+    tested: list[int] = []
+    expected = []
+    for _, block in plan:
+        expected.append(sum(1 for t in tested if t + h < int(block[0])))
+        tested.extend(int(t) for t in block)
+    assert seen[: len(expected)] == expected
