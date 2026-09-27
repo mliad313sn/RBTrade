@@ -230,6 +230,7 @@ async function signUp(kind) {
     const enr = await s.req('POST', '/auth/mfa/enroll', { mfaToken: l.json.mfaToken });
     const v = await s.req('POST', '/auth/mfa/verify', { mfaToken: l.json.mfaToken, code: totp(enr.json.secret) });
     if (v.status !== 200) throw new Error(`mfa verify failed ${v.text}`);
+    s.secret = enr.json.secret;
   } else {
     const doc = (await s.req('GET', '/disclosures/risk-warning?locale=en')).json.document;
     await s.req('POST', '/disclosures/risk-warning/acknowledgements', { version: doc.version, contentHash: doc.contentHash, locale: 'en' });
@@ -239,6 +240,17 @@ async function signUp(kind) {
   }
   s.email = email;
   return s;
+}
+
+/** Signs in again (new roles take effect in a new token); the next TOTP window avoids a replay refusal. */
+async function relogin(s) {
+  const l = await s.req('POST', '/auth/login', { email: s.email, password: PASSWORD });
+  if (l.json?.status === 'ok') return;
+  for (const offset of [0, 1]) {
+    const v = await s.req('POST', '/auth/mfa/verify', { mfaToken: l.json.mfaToken, code: totp(s.secret, offset) });
+    if (v.status === 200) return;
+  }
+  throw new Error('re-login failed');
 }
 
 async function db(sql, params = []) {
@@ -343,7 +355,9 @@ async function main() {
   await page.reload();
   await sleep(2500);
   const staleBadge = await page.getByTestId('watchlist').getByText('Stale').first().isVisible().catch(() => false);
-  step('stale badge on the watchlist', { quoteStale: staleQ.value?.stale ?? null, badgeVisible: staleBadge, screenshot: await shot('01-feed-down-stale-badges') }, staleBadge || staleQ.ok);
+  // IRTC R6-09: the badge itself must be visible (a stale API quote alone no longer passes the step).
+  step('api quote flagged stale', { quoteStale: staleQ.value?.stale ?? null }, staleQ.ok);
+  step('stale badge on the watchlist', { badgeVisible: staleBadge, screenshot: await shot('01-feed-down-stale-badges') }, staleBadge);
   // Goal 10 finding (first drill): the ticket and order book kept the last price without a marker.
   const ticketStale = await page.getByTestId('ticket-stale').isVisible().catch(() => false);
   const bookStale = (await page.getByTestId('order-book').getAttribute('data-stale').catch(() => null)) === 'true';
@@ -479,8 +493,17 @@ async function main() {
   step('no fill for any order sent during an outage', { fills: staleFills[0].n }, staleFills[0].n === 0);
   const verify = await trader.req('GET', '/audit/verify');
   step('audit chain still valid', { status: verify.status, valid: verify.json?.valid }, verify.status === 200 && verify.json?.valid === true);
+  // IRTC R6-09: reconcile every account (as a risk officer), and pass only on a clean result body.
+  const me = await trader.req('GET', '/me');
+  await db(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'risk_officer') ON CONFLICT DO NOTHING`, [me.json.user.id]);
+  await relogin(trader);
   const recon = await trader.req('POST', '/reconciliation/run');
-  step('reconciliation clean after the drill', { status: recon.status, mismatches: recon.json?.mismatches?.length ?? recon.json?.breaks ?? null }, recon.status < 300);
+  const mismatches = Array.isArray(recon.json?.mismatches) ? recon.json.mismatches : null;
+  step(
+    'reconciliation clean after the drill (all accounts)',
+    { status: recon.status, accountsChecked: recon.json?.accountsChecked ?? null, mismatches: mismatches ? mismatches.length : null },
+    recon.status === 200 && mismatches !== null && mismatches.length === 0 && (recon.json.accountsChecked ?? 0) >= 2,
+  );
 
   await browser.close();
 }
