@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+/** An optional number where an empty variable means "use the default" (not 0). */
+const optionalNumber = (n: z.ZodNumber) =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().pipe(n).optional());
+
 const bool = (def: boolean) =>
   z
     .enum(['true', 'false', '1', '0', ''])
@@ -22,7 +26,7 @@ const Schema = z.object({
    * IRTC R4-02: an approver role younger than this cannot approve anything (cooling period after a
    * grant). Empty = 24 h outside dev/test, 0 in dev/test.
    */
-  KORA_APPROVER_COOLING_HOURS: z.coerce.number().min(0).max(24 * 90).optional(),
+  KORA_APPROVER_COOLING_HOURS: optionalNumber(z.number().min(0).max(24 * 90)),
   /** Pending four-eyes requests expire after this many hours. */
   KORA_FOUR_EYES_TTL_HOURS: z.coerce.number().min(1).max(24 * 30).default(72),
   /** A running robot is "near auto-pause" at this % of any of its loss/drawdown limits. */
@@ -39,7 +43,7 @@ const Schema = z.object({
    */
   KORA_AUDIT_ANCHOR_TRUSTED_JWKS: z.string().default(''),
   /** Interval of the in-process anchoring job (0 = off). Empty = daily, except in tests (off). */
-  KORA_AUDIT_ANCHOR_INTERVAL_MS: z.coerce.number().int().min(0).max(7 * 86_400_000).optional(),
+  KORA_AUDIT_ANCHOR_INTERVAL_MS: optionalNumber(z.number().int().min(0).max(7 * 86_400_000)),
   /** Deployment jurisdiction whose disclosures are served (placeholder until OQ-R2). */
   KORA_JURISDICTION: z
     .string()
