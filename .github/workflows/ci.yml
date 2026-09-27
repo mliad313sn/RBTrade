@@ -64,17 +64,22 @@ jobs:
         run: pnpm build
       - name: Lint
         run: pnpm lint
+      - name: Format (Prettier, whole repo)
+        run: pnpm format:check
       - name: Typecheck
         run: pnpm typecheck
       - name: Unit tests (TS + Python)
         run: pnpm test
-      - name: AI copilot evals (scripted provider, thresholds enforced)
+      # IRTC R6-07: this is a regression test of the eval pipeline, the dispatcher guards and the
+      # graders against a deterministic scripted provider. It says nothing about a real model's
+      # quality or grounding; that is the `ai-evals-live` job below.
+      - name: AI evals, scripted-provider regression (pipeline, guards and graders; not model quality)
         run: pnpm evals
       - name: Contrast check (both themes)
         run: pnpm contrast
       - name: Novice copy complete in EN and FR (goal 08, no missing keys)
         run: pnpm --filter @kora/web i18n:check
-      - name: API integration tests (real Postgres + Redis)
+      - name: API integration tests (real Postgres + Redis, coverage floors enforced)
         run: pnpm --filter @kora/api test:integration
       - name: Playwright browsers
         run: pnpm --filter @kora/web exec playwright install --with-deps chromium
@@ -90,6 +95,38 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+
+  # IRTC R6-07: the real model against the same eval set and thresholds. It runs only when the
+  # repository has the ANTHROPIC_API_KEY secret and the KORA_AI_MODEL variable (billed model chosen by
+  # the Sponsor, OQ-A2); without them the job reports "skipped: no key" and passes. The release gate
+  # requires a green run of this job once the key exists (RELEASE_CHECKLIST.md).
+  ai-evals-live:
+    name: AI evals, live model (gated on secrets)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      KORA_AI_MODEL: ${{ vars.KORA_AI_MODEL }}
+    steps:
+      - name: Key and model configured?
+        id: gate
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ] && [ -n "$KORA_AI_MODEL" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; echo "skipped: no ANTHROPIC_API_KEY secret or KORA_AI_MODEL variable"; fi
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        if: steps.gate.outputs.run == 'true'
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        if: steps.gate.outputs.run == 'true'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        if: steps.gate.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Live evals (same cases and thresholds as the scripted run)
+        if: steps.gate.outputs.run == 'true'
+        run: KORA_ENV=test pnpm evals:live
 
   python:
     name: quant (py${{ matrix.python }})

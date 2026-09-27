@@ -122,6 +122,13 @@ jobs:
           docker run --rm -v "$PWD/zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py -t "${{ vars.STAGING_URL }}" -r zap-report.html -J zap-report.json -I
           jq -e '[.site[].alerts[] | select(.riskcode == "3")] | length == 0' zap/zap-report.json
+      # IRTC R6-14: a real artifact upload (it was an echo). This job only runs after a staging
+      # deploy; until staging exists the DAST gate is recorded as not run (docs/security/scans.md).
       - name: Upload ZAP report
         if: always()
-        run: echo "ZAP report in zap/ (attach as a build artifact in the hosted run)"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zap-baseline-report
+          path: zap/
+          if-no-files-found: error
+          retention-days: 30

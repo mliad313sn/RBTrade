@@ -111,7 +111,8 @@ RC-1 is a release candidate for PAPER. Market launch additionally needs, from th
 2. Market data and news licences per region, including redistribution and AI-processing rights
    (OQ-B2, OQ-M2–M4).
 3. An AI API key and model choice from the vault (`ANTHROPIC_API_KEY`, `KORA_AI_MODEL`), prices and
-   budgets, and a passing live eval run (`pnpm evals:live`, OQ-A2, B-703).
+   budgets, and a passing live eval run (`pnpm evals:live`, CI job `ai-evals-live`, OQ-A2, B-703). The CI
+   step "AI evals, scripted-provider regression" tests the pipeline and graders only, not model quality (IRTC R6-07).
 4. Every regulatory value in §4 supplied or explicitly accepted, per jurisdiction.
 5. Legal sign-off per launch jurisdiction (disclosures, appropriateness, KYC, retention, incident duties).
 6. Deployment verification: Keycloak realm (B-001), Docker images and compose/cluster, TLS, managed
