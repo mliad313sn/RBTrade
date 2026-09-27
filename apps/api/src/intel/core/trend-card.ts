@@ -1,4 +1,5 @@
 import type { CalibrationView } from '../../ai/core/calibration';
+import { MIN_EDGE_CLUSTERS } from '../../ai/core/edge-stat';
 import { DISCLAIMER } from '../../ai/core/types';
 import { unsafeDisplayText } from './news-score';
 import { FEATURE_LABELS, REGION_LABELS, TREND_KIND_LABELS, type RadarRegion } from './taxonomy';
@@ -72,26 +73,62 @@ export type ProbabilityView =
       reliabilityLine: string;
       edgeStatement: string;
     }
-  | { status: 'no_reliable_signal'; label: 'No reliable signal'; reason: string };
+  | {
+      status: 'no_reliable_signal';
+      label: 'No reliable signal';
+      reason: string;
+      /**
+       * The figures quoted in `reason`, as numbers. `reason` is a free-text key, so the copilot's
+       * numeric-fidelity guard never takes figures from it (IRTC R4-03/R4-05); the explanation can
+       * quote these numeric fields instead: resolved forecasts counted and the minimum required.
+       */
+      n?: number;
+      minN?: number;
+      /** Independent time buckets behind the edge test, and the minimum a positive edge needs (IRTC R3-03). */
+      clusters?: number;
+      minClusters?: number;
+    };
 
 export function probabilityView(
   f: ForecastRow | null,
   cal: CalibrationView | null,
 ): ProbabilityView {
-  const none = (reason: string): ProbabilityView => ({
+  const none = (
+    reason: string,
+    figures: { n?: number; minN?: number; clusters?: number; minClusters?: number } = {},
+  ): ProbabilityView => ({
     status: 'no_reliable_signal',
     label: 'No reliable signal',
     reason,
+    ...figures,
   });
   if (!f) return none('No forecast has been computed for this horizon yet.');
   if (f.status !== 'ok' || f.pDirection === null)
     return none('Not enough SIMULATED history to test this horizon out of sample.');
   if (!cal || cal.n === 0) return none('No resolved forecasts in the calibration table yet.');
-  if (cal.edge === 'insufficient_data')
-    return none(`Not enough resolved forecasts to judge skill (n=${cal.n}, need ${cal.minN}).`);
-  if (cal.edge === 'none') return none(`No edge after costs in past forecasts (n=${cal.n}).`);
+  if (cal.edge === 'insufficient_data') {
+    if (cal.n < cal.minN || cal.meanNetReturn === null)
+      return none(`Not enough resolved forecasts to judge skill (n=${cal.n}, need ${cal.minN}).`, {
+        n: cal.n,
+        minN: cal.minN,
+      });
+    // IRTC R3-03: enough rows, but too few independent time buckets (or dependence not measured).
+    const minClusters = cal.minEdgeClusters ?? MIN_EDGE_CLUSTERS;
+    if (typeof cal.edgeClusters === 'number')
+      return none(
+        `Not enough independent history to judge skill (${cal.edgeClusters} time buckets, need ${minClusters}).`,
+        { clusters: cal.edgeClusters, minClusters },
+      );
+    return none(
+      'Not enough independent history to judge skill: the dependence between past forecasts has not been measured yet.',
+    );
+  }
+  if (cal.edge === 'none')
+    return none(`No edge after costs in past forecasts (n=${cal.n}).`, { n: cal.n });
   if (!cal.confidence || !cal.reliabilityLine)
-    return none(`Too few past forecasts at this score level (need ${cal.minN}).`);
+    return none(`Too few past forecasts at this score level (need ${cal.minN}).`, {
+      minN: cal.minN,
+    });
   return {
     status: 'calibrated',
     value: cal.confidence.value,

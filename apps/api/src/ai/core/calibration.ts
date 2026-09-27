@@ -86,6 +86,8 @@ export interface CalibrationView {
   updatedAt: string | null;
   /** Effective sample size of the edge test (time buckets, IRTC R3-03); null = pooled rows. */
   edgeClusters?: number | null;
+  /** Time buckets a positive edge needs (MIN_EDGE_CLUSTERS), so statements quoting it trace to data. */
+  minEdgeClusters?: number;
 }
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
@@ -143,9 +145,13 @@ export function calibrationView(
   const edgeStatement =
     edge === 'none'
       ? 'No edge after costs.'
-      : edge === 'insufficient_data'
-        ? `Not enough history to judge an edge (n=${N}, need ${opts.minN}).`
-        : 'Positive after costs on past predictions, which does not guarantee future results.';
+      : edge !== 'insufficient_data'
+        ? 'Positive after costs on past predictions, which does not guarantee future results.'
+        : N < opts.minN || mean === null
+          ? `Not enough history to judge an edge (n=${N}, need ${opts.minN}).`
+          : es
+            ? `Not enough independent history to judge an edge (${es.clusters} time buckets, need ${MIN_EDGE_CLUSTERS}).`
+            : 'Not enough independent history to judge an edge: the dependence between past predictions has not been measured yet.';
 
   let confidence: CalibrationView['confidence'] = null;
   let line: string | null = null;
@@ -172,6 +178,7 @@ export function calibrationView(
     source: opts.source ?? null,
     updatedAt: opts.updatedAt ?? null,
     edgeClusters: es ? es.clusters : null,
+    minEdgeClusters: MIN_EDGE_CLUSTERS,
   };
 }
 

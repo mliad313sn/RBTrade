@@ -4,6 +4,7 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { calibrationView, buildBins } from '../ai/core/calibration';
+import { ungroundedNumbers } from '../ai/core/guards';
 import type { AiProvider, ProviderRequest } from '../ai/core/types';
 import { ScriptedProvider } from '../ai/providers/scripted.provider';
 import {
@@ -307,6 +308,58 @@ describe('trend cards', () => {
     );
     expect(probabilityView(forecast(), sparse)).toMatchObject({
       reason: expect.stringMatching(/Too few past forecasts at this score/),
+    });
+  });
+
+  it('every figure in a "No reliable signal" reason is also a numeric field of the card (grounding)', () => {
+    // `reason` is free text, so the numeric-fidelity guard never takes figures from it (IRTC R4-03/05):
+    // each figure it quotes must be carried as a number beside it for an explanation to repeat it.
+    const edge = (clusters: number) => ({
+      method: 'time_bucket_hac' as const,
+      n: 1060,
+      clusters,
+      bucketMs: 86_400_000,
+      lag: 1,
+      mean: 0.002,
+      tStat: 3.1,
+    });
+    const views = [
+      calibrationView('k', bins(3, 2, 0.002, 0.01), { rawScore: 0.58, minN: 30 }),
+      calibrationView('k', bins(212, 100, -0.001, 0.01), { rawScore: 0.58, minN: 30 }),
+      calibrationView('k', bins(5, 3, 0.002, 0.01), {
+        rawScore: 0.58,
+        minN: 3,
+        edgeStat: edge(12),
+      }),
+      calibrationView('k', bins(212, 121, 0.002, 0.01), {
+        rawScore: 0.58,
+        minN: 30,
+        edgeStat: null,
+      }),
+      calibrationView('k', bins(10, 6, 0.002, 0.01), {
+        rawScore: 0.58,
+        minN: 30,
+        edgeStat: edge(60),
+      }),
+    ].map((cal) => probabilityView(forecast(), cal));
+    expect(views.map((v) => v.status)).toEqual(Array(5).fill('no_reliable_signal'));
+    for (const v of views) {
+      const reason = (v as { reason: string }).reason;
+      expect(ungroundedNumbers(reason, [{ probability: v }], 'exact')).toEqual([]);
+      // …and the reason alone vouches for nothing (figures > 10 need the numeric fields).
+      expect(ungroundedNumbers(reason, [{ probability: { reason } }], 'exact')).toEqual(
+        ungroundedNumbers(reason, [], 'exact'),
+      );
+    }
+    expect(views[2]).toMatchObject({
+      reason: 'Not enough independent history to judge skill (12 time buckets, need 30).',
+      clusters: 12,
+      minClusters: 30,
+    });
+    expect((views[3] as { reason: string }).reason).toMatch(/dependence .* not been measured/);
+    expect(views[4]).toMatchObject({
+      reason: 'Too few past forecasts at this score level (need 30).',
+      minN: 30,
     });
   });
 
