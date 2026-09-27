@@ -14,8 +14,8 @@ import { useShell } from './ShellContext';
 /**
  * IRTC R5-10: a Pro-only screen opened while the account is in the simple view. The Pro panels used to
  * render into a zero-height novice layout (blank for sighted users, readable by screen readers). Now
- * the screen explains itself: a trader can switch to Pro; a novice-only account is pointed to the
- * appropriateness assessment that unlocks Pro trading (master goal: no self-service trader access).
+ * the screen explains itself and offers the switch; a novice-only account is also told that the
+ * simple-view rules stay on until it passes the appropriateness assessment (B-018).
  */
 export function ProRouteNotice() {
   const { me, setMe } = useShell();
@@ -40,15 +40,14 @@ export function ProRouteNotice() {
         <h1 className="k-panel__title m-0">{t('mode.proRoute.title')}</h1>
         <p className="mt-2 mb-4">{noviceOnly ? t('mode.proRoute.bodyNovice') : t('mode.proRoute.bodyTrader')}</p>
         <div className="flex flex-wrap gap-3">
+          <Button variant="primary" onClick={switchToPro} disabled={pending}>
+            {t('mode.proRoute.switch')}
+          </Button>
           {noviceOnly ? (
-            <Link href="/appropriateness?from=pro" className="k-btn k-btn--primary no-underline">
+            <Link href="/appropriateness?from=pro" className="k-btn no-underline">
               {t('mode.proRoute.assess')}
             </Link>
-          ) : (
-            <Button variant="primary" onClick={switchToPro} disabled={pending}>
-              {t('mode.proRoute.switch')}
-            </Button>
-          )}
+          ) : null}
           <Link href="/home" className="k-btn no-underline">
             {t('mode.proRoute.home')}
           </Link>

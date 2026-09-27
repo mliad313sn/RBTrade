@@ -39,7 +39,7 @@ export const fr: Record<MessageKey, string> = {
   'mode.proRoute.bodyTrader':
     'Vous êtes dans la vue simple. Passez en Pro pour utiliser cet écran.',
   'mode.proRoute.bodyNovice':
-    'La vue Pro s’ouvre quand vous avez réussi un court test sur les risques du trading.',
+    'Vous êtes dans la vue simple. Vous pouvez passer en Pro, mais les règles de la vue simple restent actives tant que vous n’avez pas réussi un court test sur les risques du trading.',
   'mode.proRoute.switch': 'Passer en Pro',
   'mode.proRoute.assess': 'Faire le test',
   'mode.proRoute.home': 'Retour à l’accueil',

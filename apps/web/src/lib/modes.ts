@@ -80,4 +80,12 @@ export const WHAT_CHANGED: Record<ViewMode, string> = {
   pro: 'Pro view: same account and instrument. Full order types, depth and robots are available. Paper money only.',
 };
 
+/**
+ * IRTC R5-10: the Pro view for an account that has not passed the appropriateness assessment. The
+ * screens are the Pro ones, but the server keeps the simple-view rules; say so instead of promising
+ * "full order types, depth and robots".
+ */
+export const WHAT_CHANGED_PRO_NOVICE_ONLY =
+  'Pro view: same account and instrument. Your account has not passed the Pro assessment yet, so the simple-view rules still apply on the server: every new trade needs a stop loss, and borrowing and robots stay off. Paper money only.';
+
 export const DEFAULT_SYMBOL = 'EURUSD';

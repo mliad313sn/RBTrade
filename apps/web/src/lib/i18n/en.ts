@@ -39,7 +39,7 @@ export const en = {
   'mode.proRoute.title': 'This screen is part of the Pro view',
   'mode.proRoute.bodyTrader': 'You are in the simple view. Switch to Pro to use this screen.',
   'mode.proRoute.bodyNovice':
-    'The Pro view opens after you pass a short check about the risks of trading.',
+    'You are in the simple view. You can switch to Pro, but the simple-view rules stay on until you pass a short check about the risks of trading.',
   'mode.proRoute.switch': 'Switch to Pro',
   'mode.proRoute.assess': 'Take the check',
   'mode.proRoute.home': 'Back to home',

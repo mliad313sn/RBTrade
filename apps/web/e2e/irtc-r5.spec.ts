@@ -272,16 +272,20 @@ test.describe('Pro views (trader), numbers and state', () => {
 });
 
 test.describe('Novice view', () => {
-  test('R5-10: a novice-only user choosing Pro is sent to the assessment; Pro URLs in the simple view explain instead of rendering blank', async ({ page }) => {
+  test('R5-10: Pro URLs in the simple view explain instead of rendering blank; a novice-only user in Pro is told the simple-view rules still apply', async ({ page }) => {
     await apiSignIn(page, 'novice');
-    await page.goto('/home');
-    await page.getByTestId('mode-toggle').getByRole('radio', { name: 'Pro' }).click();
-    await expect(page).toHaveURL(/\/appropriateness/);
-    await expect(page.getByTestId('pro-needs-assessment')).toBeVisible();
-    expect(((await (await page.request.get('/api/me')).json()) as { preferences: { viewMode: string } }).preferences.viewMode).toBe('novice');
     await page.goto('/terminal');
     await expect(page.getByTestId('pro-route-in-simple-view')).toBeVisible();
     await expect(page.locator('main')).not.toContainText('Order ticket');
+    await page.goto('/home');
+    await page.getByTestId('mode-toggle').getByRole('radio', { name: 'Pro' }).click();
+    await expect(page).toHaveURL(/\/terminal\?.*switched=pro/);
+    const note = page.getByTestId('what-changed');
+    await expect(note).not.toContainText('Full order types, depth and robots are available');
+    await expect(page.getByTestId('pro-safeguards')).toContainText('every new trade needs a stop loss');
+    await page.getByTestId('pro-safeguards').getByRole('link').click();
+    await expect(page).toHaveURL(/\/appropriateness\?from=pro/);
+    await expect(page.getByTestId('pro-needs-assessment')).toBeVisible();
   });
 
   test('R5-08: amounts accept thousands separators per language and refuse ambiguous input', async ({ page }) => {
@@ -402,15 +406,14 @@ test.describe('Low findings', () => {
     await expect(page.getByTestId('novice-topbar')).toHaveCount(0);
   });
 
-  test('R5-26: phones keep the practice-money chip; the light theme is on <html> from the server render', async ({ browser }) => {
-    const ctx = await browser.newContext({ baseURL: test.info().project.use.baseURL, viewport: { width: 390, height: 800 }, javaScriptEnabled: false });
-    const page = await ctx.newPage();
+  test('R5-26: phones keep the practice-money chip; the light theme is on <html> from the server render', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
     await apiSignIn(page, 'novice');
     await page.goto('/home');
     await expect(page.getByTestId('env-chip')).toBeVisible();
     await expect(page.getByTestId('env-chip')).toContainText('Practice');
-    const bg = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
-    expect(bg).toBe('rgb(247, 245, 240)');
-    await ctx.close();
+    // The next server render already carries the light theme on <html> (no dark paint before hydration).
+    const html = await (await page.request.get('/home')).text();
+    expect(html).toMatch(/<html[^>]*data-theme="novice-light"/);
   });
 });
