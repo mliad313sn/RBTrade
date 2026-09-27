@@ -126,7 +126,11 @@ export class KillSwitchService {
 
       let cancelled: OrderRow[] = [];
       if (KILL_SWITCH_SCOPE_RANK[req.scope] >= KILL_SWITCH_SCOPE_RANK.robots_cancel) {
-        cancelled = await this.oms.cancelAllOpen(tx, 'kill_switch', actor, { killSwitchId });
+        // IRTC R2-12: "halt robots + cancel orders" leaves positions open, so it keeps their
+        // protective bracket children (stop loss / take profit); flatten cancels everything.
+        cancelled = await this.oms.cancelAllOpen(tx, 'kill_switch', actor, { killSwitchId }, {
+          keepProtective: req.scope === 'robots_cancel',
+        });
       }
 
       let flattened = 0;
@@ -233,14 +237,9 @@ export class KillSwitchService {
     order = await this.engine.transition(tx, order, 'working', actor, {}, { killSwitchId });
     const snap = await this.market.snapshot(inst, tx.now);
     order = await this.engine.work(tx, order, snap, inst, true);
+    // IRTC R2-26: the reason names the real cause (market data, session, FX route, depth).
     const reason =
-      order.status === 'filled'
-        ? 'filled'
-        : snap.safety !== 'ok'
-          ? `held: market data ${snap.safety}`
-          : snap.session !== 'open'
-            ? `held: session ${snap.session}`
-            : 'held: insufficient depth';
+      order.status === 'filled' ? 'filled' : await this.engine.holdReason(tx, order, inst, snap);
     if (order.status !== 'filled') {
       tx.audit(actor, 'kill_switch.flatten_pending', 'order', order.id, {
         killSwitchId,
@@ -315,12 +314,36 @@ export class KillSwitchService {
     actorId: string,
     accountId: string,
     reason: string,
-    approval?: { requestId: string; requestedBy: string },
+    approval?: {
+      requestId: string;
+      requestedBy: string;
+      /** The halt the approval was given for; a different halt needs its own approval. */
+      haltedAt?: string | null;
+      haltedBy?: string | null;
+    },
   ) {
     const actor: Actor = { type: 'user', id: actorId };
     return this.oms.withAccount(accountId, async (tx) => {
       if (!tx.account.trading_halted)
         throw new ConflictException({ error: 'not_halted', message: 'Trading is not halted.' });
+      // IRTC R2-09: the four-eyes policy is re-evaluated under the account lock, so a firm halt that
+      // landed after the caller's check is never lifted by the owner alone.
+      if (!approval && this.resumeNeedsFourEyes(tx.account))
+        throw new ConflictException({
+          error: 'four_eyes_required',
+          message:
+            'This halt was set by the firm. A second authorised person (risk officer or admin) must approve the resume.',
+        });
+      if (
+        approval &&
+        ((approval.haltedAt !== undefined &&
+          approval.haltedAt !== (tx.account.halted_at?.toISOString() ?? null)) ||
+          (approval.haltedBy !== undefined && approval.haltedBy !== tx.account.halted_by))
+      )
+        throw new ConflictException({
+          error: 'halt_changed',
+          message: 'The halt changed after this resume was requested. Request a new approval.',
+        });
       const prev = {
         scope: tx.account.halt_scope,
         haltedAt: tx.account.halted_at?.toISOString() ?? null,
