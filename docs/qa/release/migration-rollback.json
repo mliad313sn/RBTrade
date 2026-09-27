@@ -1,0 +1,79 @@
+{
+  "startedAt": "2026-09-27T01:46:57.686Z",
+  "source": "kora_e2e",
+  "scratch": "kora_rollback_test",
+  "steps": [
+    {
+      "name": "pre-release backup taken",
+      "ok": true,
+      "auditEvents": 1136,
+      "orders": 11,
+      "migrations": 18
+    },
+    {
+      "name": "failed migration is atomic (no table, no column, not recorded)",
+      "ok": true,
+      "t": false,
+      "c": false,
+      "m": false
+    },
+    {
+      "name": "bad release applied (schema changed)",
+      "ok": true,
+      "applied": [
+        "9990_rollback_probe.sql"
+      ]
+    },
+    {
+      "name": "schema identical to pre-release",
+      "ok": true,
+      "pre": "610ac9a47096e3b8",
+      "post": "610ac9a47096e3b8"
+    },
+    {
+      "name": "schema_migrations identical (probe not recorded)",
+      "ok": true
+    },
+    {
+      "name": "probe objects removed",
+      "ok": true
+    },
+    {
+      "name": "row counts identical",
+      "ok": true,
+      "counts": {
+        "users": 100,
+        "accounts": 50,
+        "orders": 11,
+        "fills": 6,
+        "positions": 5,
+        "ledger_entries": 113,
+        "audit_events": 1136,
+        "robots": 50
+      }
+    },
+    {
+      "name": "audit chain verifies from genesis, head unchanged",
+      "ok": true,
+      "chain": {
+        "valid": true,
+        "count": 1136,
+        "firstBrokenId": null,
+        "reason": null,
+        "headHash": "bc927abce499e2b69a78d35e367d474a0cce68677ff0c149872bfd38af937a6d"
+      },
+      "head": {
+        "id": "1136",
+        "hash": "bc927abce499e2b69a78d35e367d474a0cce68677ff0c149872bfd38af937a6d"
+      }
+    },
+    {
+      "name": "roll forward: already up to date",
+      "ok": true,
+      "skipped": 18
+    }
+  ],
+  "restoreMs": 853,
+  "ok": true,
+  "finishedAt": "2026-09-27T01:47:00.833Z"
+}

@@ -1,6 +1,6 @@
 [project]
 name = "kora-quant"
-version = "0.1.0"
+version = "1.0.0rc1"
 description = "KORA quant service: Monte Carlo projection, bootstrap, reality checks and paper analytics."
 requires-python = ">=3.11"
 dependencies = [

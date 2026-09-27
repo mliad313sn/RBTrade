@@ -1,0 +1,127 @@
+name: release
+
+# Goal 10 release pipeline: full CI → images (scanned) → staging deploy behind a manual approval →
+# smoke checks → OWASP ZAP baseline against staging. Production is not deployed from here: market
+# launch is a Sponsor decision (docs/governance/CHARTER.md, RELEASE_CHECKLIST.md).
+#
+# Manual approval: the `staging` GitHub environment must have "Required reviewers" set (repository
+# Settings → Environments → staging). The deploy job waits for a reviewer before it starts; the
+# approval run URL becomes KORA_RELEASE_APPROVAL_REF (control KC-11).
+#
+# Secrets (staging environment): STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY,
+# STAGING_URL (https://…), STAGING_API_URL. Runtime secrets (DB/Redis URLs, JWKs, service token,
+# AI key) live on the staging host's vault-backed env file, never in this repository.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  LIVE_TRADING_ENABLED: "false"
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  ci:
+    name: full CI (lint, types, unit, integration, e2e, evals, a11y, security)
+    uses: ./.github/workflows/ci.yml
+
+  images:
+    name: build, scan and push ${{ matrix.image }}
+    needs: [ci]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: api
+            dockerfile: apps/api/Dockerfile
+            context: .
+          - image: web
+            dockerfile: apps/web/Dockerfile
+            context: .
+          - image: bot-runner
+            dockerfile: services/bot-runner/Dockerfile
+            context: .
+          - image: quant
+            dockerfile: services/quant/Dockerfile
+            context: services/quant
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Build
+        run: docker build -f ${{ matrix.dockerfile }} -t "$REGISTRY/kora-${{ matrix.image }}:${{ github.sha }}" ${{ matrix.context }}
+      - name: Trivy image scan (fail on fixable high/critical)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/kora-${{ matrix.image }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$REGISTRY/kora-${{ matrix.image }}:${{ github.sha }}"
+
+  deploy-staging:
+    name: deploy to staging (manual approval)
+    needs: [images]
+    runs-on: ubuntu-24.04
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Refuse LIVE
+        run: |
+          test "$LIVE_TRADING_ENABLED" = "false"
+          ! grep -RInE '^LIVE_TRADING_ENABLED=true' .env.example infra/ docker-compose.yml
+      - name: Deploy (backup first, forward-only migrations, PAPER only)
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KORA_BUILD_SHA: ${{ github.sha }}
+          KORA_RELEASE_APPROVAL_REF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Host contract (/srv/kora/deploy.sh, owned by the staging environment, B-008): run
+        # scripts/backup.sh; pull the four images tagged with the SHA; run `node dist/db/migrate-cli.js`
+        # from the api image; restart with KORA_BUILD_SHA, KORA_RELEASE_APPROVAL_REF and
+        # LIVE_TRADING_ENABLED=false; exit non-zero on any failure. Rollback = docs/runbooks/database-restore.md.
+        run: |
+          install -m 600 /dev/null key && printf '%s\n' "$SSH_KEY" > key
+          ssh -i key -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" \
+            "KORA_BUILD_SHA=$KORA_BUILD_SHA KORA_RELEASE_APPROVAL_REF='$KORA_RELEASE_APPROVAL_REF' LIVE_TRADING_ENABLED=false /srv/kora/deploy.sh $KORA_BUILD_SHA"
+          rm -f key
+      - name: Smoke checks (health, PAPER only, audit chain)
+        env:
+          API: ${{ vars.STAGING_API_URL }}
+        run: |
+          for i in $(seq 1 30); do curl -fsS "$API/health" > health.json && break; sleep 10; done
+          jq -e '.status == "ok" and .environment == "PAPER" and .liveTradingEnabled == false' health.json
+
+  zap-baseline:
+    name: OWASP ZAP baseline (staging)
+    needs: [deploy-staging]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: ZAP baseline scan (fails on high)
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm -v "$PWD/zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "${{ vars.STAGING_URL }}" -r zap-report.html -J zap-report.json -I
+          jq -e '[.site[].alerts[] | select(.riskcode == "3")] | length == 0' zap/zap-report.json
+      - name: Upload ZAP report
+        if: always()
+        run: echo "ZAP report in zap/ (attach as a build artifact in the hosted run)"

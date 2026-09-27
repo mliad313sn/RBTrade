@@ -1,6 +1,6 @@
 {
   "name": "@kora/ai-evals",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "commonjs",
   "description": "Goal 07 copilot evaluation harness: graded cases, deterministic graders, scripted (CI) and live providers.",

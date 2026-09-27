@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Goal 10: the release pipeline runs the full CI as its first stage.
+  workflow_call:
 
 permissions:
   contents: read
