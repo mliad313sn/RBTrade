@@ -69,7 +69,7 @@ export type LocaleParse = { ok: true; canonical: string } | { ok: false; reason:
  *   point (numeric keypads).
  */
 export function parseLocaleDecimal(raw: string, locale: string | undefined): LocaleParse {
-  const s = raw.trim().replace(/[\s  ]/g, '');
+  const s = raw.trim().replace(/[\s\u00a0\u202f]/g, '');
   if (s === '') return { ok: true, canonical: '' };
   if (!/^-?[\d.,]*$/.test(s)) return { ok: false, reason: 'invalid' };
   const neg = s.startsWith('-') ? '-' : '';

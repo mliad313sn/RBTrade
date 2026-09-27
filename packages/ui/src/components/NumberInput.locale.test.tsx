@@ -22,8 +22,8 @@ describe('NumberInput separators per language (IRTC R5-08)', () => {
   it('parses French decimal comma and space / no-break-space / dot grouping', () => {
     expect(parseLocaleDecimal('2,5', 'fr')).toEqual({ ok: true, canonical: '2.5' });
     expect(parseLocaleDecimal('2 500,5', 'fr')).toEqual({ ok: true, canonical: '2500.5' });
-    expect(parseLocaleDecimal('2 500,50', 'fr-FR')).toEqual({ ok: true, canonical: '2500.50' });
-    expect(parseLocaleDecimal('2 500', 'fr')).toEqual({ ok: true, canonical: '2500' });
+    expect(parseLocaleDecimal('2\u202f500,50', 'fr-FR')).toEqual({ ok: true, canonical: '2500.50' });
+    expect(parseLocaleDecimal('2\u00a0500', 'fr')).toEqual({ ok: true, canonical: '2500' });
     expect(parseLocaleDecimal('2.500,5', 'fr')).toEqual({ ok: true, canonical: '2500.5' });
     expect(parseLocaleDecimal('2.500.000', 'fr')).toEqual({ ok: true, canonical: '2500000' });
     expect(parseLocaleDecimal('1.5', 'fr')).toEqual({ ok: true, canonical: '1.5' });
