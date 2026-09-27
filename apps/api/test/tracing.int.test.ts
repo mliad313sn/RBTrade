@@ -255,7 +255,7 @@ describe('distributed traces (goal 10)', () => {
       const runnerSpanIds = readSpans(files.runner).filter((x) => x.traceId === traceId).map((x) => x.spanId);
       expect(runnerSpanIds).toContain(quantSpans[0]!.parentSpanId);
       // Leave no running robot behind for later files (their robot supervisor would pause it).
-      await request(api.url).post(`/robots/${r.body.id}/pause`).set(bearer(trader.token)).expect(200);
+      await request(api.url).post(`/robots/${r.body.id}/pause`).set(bearer(trader.token)).send({ reason: 'tracing test done' }).expect(200);
     } finally {
       redis.disconnect();
     }
