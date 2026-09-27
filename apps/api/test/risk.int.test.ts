@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { EngineLoopService } from '../src/trading/engine-loop.service';
 import { acknowledgeRiskWarning, bearer, createUser, startApp, type TestUser } from './helpers';
-import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
+import { MARKET_OPEN_UTC, MarketFixture, marketDay } from './market-fixture';
 
 let n = 0;
 const cid = () => `r-${process.pid}-${++n}`;
@@ -183,7 +183,7 @@ describe('pre-trade risk and fill safety through the API', () => {
     r.disconnect();
   });
   it('fill safety: closed session (Saturday) refuses market orders and holds resting ones', async () => {
-    vi.setSystemTime(new Date('2026-10-03T12:00:00Z')); // Saturday: FX and US equities closed
+    vi.setSystemTime(marketDay(3, '12:00:00')); // Saturday: FX and US equities closed
     const trader = await createUser(app, 'trader');
     await md.standard();
     const r = await rejected(trader, { symbol: 'AAPL', side: 'buy', type: 'market', qty: '1' }, 'SESSION_CLOSED');

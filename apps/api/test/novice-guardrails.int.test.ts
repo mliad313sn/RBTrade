@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { acknowledgeRiskWarning, bearer, createUser, login, startApp, type TestUser } from './helpers';
+import { acknowledgeRiskWarning, awayFromUtcMidnight, bearer, createUser, login, startApp, type TestUser } from './helpers';
 import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
 import { knowledgeFail, onboard, passKnowledgeCheck } from './novice-helpers';
 import knowledgeCheckV1 from '../src/appropriateness/questionnaires/knowledge-check.v1.json';
@@ -189,6 +189,9 @@ describe('novice guardrails through the API', () => {
     // Fills are stamped by the database clock, so this test runs on the real clock (bitcoin trades
     // around the clock) and then moves the app clock past midnight UTC.
     vi.setSystemTime(vi.getRealSystemTime());
+    // IRTC R6-15: the scenario takes well under two minutes; never let it straddle UTC midnight.
+    await awayFromUtcMidnight(120_000);
+    vi.setSystemTime(vi.getRealSystemTime());
     await md.standard();
     const nov = await createUser(app, 'novice', [], { realClock: true });
     await acknowledgeRiskWarning(app, nov.token); // B-801 gate (goal 09)
@@ -217,7 +220,7 @@ describe('novice guardrails through the API', () => {
     await later(nov, midnight.getTime() - Date.now() + 60_000);
     expect((await profile(nov)).coolingOff.active).toBe(false);
     expect((await send(nov, open)).status).toBe(201);
-  });
+  }, 180_000);
 
   it('cooling-off after a 5 % daily loss (closing allowed), and the monthly loss limit', async () => {
     const nov = await createUser(app, 'novice');

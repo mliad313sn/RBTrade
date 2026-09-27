@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { AlertsService } from '../src/terminal/alerts.service';
 import { bearer, createUser, ownerQuery, startApp, type TestUser } from './helpers';
-import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
+import { MARKET_OPEN_UTC, MarketFixture, marketDay } from './market-fixture';
 import { listen, TestWs } from './ws-helpers';
 
 let n = 0;
@@ -186,7 +186,7 @@ describe('Pro terminal API (goal 04): layouts, watchlists, alerts, cancel-all, r
     await ownerQuery(
       "DELETE FROM md_candles WHERE symbol = 'GBPUSD'; DELETE FROM md_candles_history WHERE symbol = 'GBPUSD'",
     );
-    const t0 = Date.parse('2026-09-30T13:00:00Z');
+    const t0 = marketDay(0, '13:00:00').getTime();
     for (let i = 0; i < 20; i++) {
       const px = (1.26 + i * 0.0001).toFixed(5);
       await ownerQuery(

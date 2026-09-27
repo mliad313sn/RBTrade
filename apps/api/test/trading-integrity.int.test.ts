@@ -6,7 +6,7 @@ import { LiveBrokerStub, LiveTradingDisabledError } from '../src/trading/broker/
 import { EngineLoopService } from '../src/trading/engine-loop.service';
 import { ReconciliationService } from '../src/trading/reconciliation.service';
 import { appQuery, bearer, createUser, ownerQuery, startApp, type TestUser } from './helpers';
-import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
+import { MARKET_OPEN_UTC, MarketFixture, marketDay } from './market-fixture';
 
 let n = 0;
 const cid = () => `i-${process.pid}-${++n}`;
@@ -97,7 +97,7 @@ describe('trading integrity', () => {
     await buy(u, 'EURUSD', '100000');
     const acct = (await request(http).get('/accounts/me').set(bearer(u.token)).expect(200)).body;
     const engine = app.get(EngineLoopService);
-    const rollTime = Date.parse('2026-09-30T21:30:00Z');
+    const rollTime = marketDay(0, '21:30:00').getTime();
     await md.touch();
     const booked = await engine.rollover(rollTime);
     expect(booked).toBeGreaterThanOrEqual(1);

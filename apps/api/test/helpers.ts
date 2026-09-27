@@ -155,6 +155,18 @@ export async function login(
 export const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 /**
+ * IRTC R6-15: a real-clock test that counts "today" on the database clock (fills, order counts)
+ * must not straddle UTC midnight. Waits until the next UTC day when fewer than `marginMs` remain.
+ */
+export async function awayFromUtcMidnight(marginMs = 120_000): Promise<void> {
+  const now = Date.now();
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  const left = next.getTime() - now;
+  if (left < marginMs) await new Promise((r) => setTimeout(r, left + 1_000));
+}
+
+/**
  * Goal 09 (B-801): acknowledges the risk warning in force through the API, so a novice-only user may
  * place orders that add exposure.
  */

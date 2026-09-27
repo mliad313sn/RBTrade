@@ -16,7 +16,7 @@ import {
   startApp,
   type TestUser,
 } from './helpers';
-import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
+import { MARKET_OPEN_UTC, MarketFixture, marketDay } from './market-fixture';
 
 let n = 0;
 const cid = () => `irtc-r2-${process.pid}-${++n}`;
@@ -353,10 +353,10 @@ describe('IRTC R2 regressions (trading and money correctness)', () => {
       expect(r0.status, JSON.stringify(r0.body)).toBe(201);
     }
     await new Promise((r) => setTimeout(r, 300)); // let the async account publish of the fill settle
-    vi.setSystemTime(new Date('2026-10-01T00:00:30Z')); // Thursday, just after the UTC day starts
+    vi.setSystemTime(marketDay(1, '00:00:30')); // Thursday, just after the UTC day starts
     await md.standard();
     await engine.sweep(Date.now());
-    vi.setSystemTime(new Date('2026-10-01T14:00:00Z'));
+    vi.setSystemTime(marketDay(1));
     await relogin(u);
     await md.standard();
     await md.quote('EURUSD', '1.07600', '1.07602'); // the loss happens before the user's first request
@@ -491,8 +491,8 @@ describe('IRTC R2 regressions (trading and money correctness)', () => {
     expect(
       (await place(eur2, { symbol: 'BTCUSD', side: 'buy', type: 'market', qty: '0.2' })).status,
     ).toBe(201);
-    const friday = Date.parse('2026-10-02T20:59:00Z');
-    vi.setSystemTime(new Date('2026-10-03T12:00:00Z')); // Saturday: FX closed, crypto trades
+    const friday = marketDay(2, '20:59:00').getTime();
+    vi.setSystemTime(marketDay(3, '12:00:00')); // Saturday: FX closed, crypto trades
     await relogin(eur);
     await relogin(eur2);
     await md.status({ state: 'ok', feed: 'up', staleSymbols: [], ts: null });

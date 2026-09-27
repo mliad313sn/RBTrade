@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { EngineLoopService } from '../src/trading/engine-loop.service';
 import { bearer, createUser, login, ownerQuery, startApp, type TestUser } from './helpers';
-import { MARKET_OPEN_UTC, MarketFixture } from './market-fixture';
+import { MARKET_OPEN_UTC, MarketFixture, marketDay, SEED_EFFECTIVE_UTC } from './market-fixture';
 
 let n = 0;
 const cid = () => `r6-${process.pid}-${++n}`;
@@ -61,12 +61,22 @@ describe('IRTC R6 regressions (risk wiring and fill safety)', () => {
   const settings = (u: TestUser, riskLimits: Record<string, unknown>) =>
     request(http).put('/accounts/me/settings').set(bearer(u.token)).send({ riskLimits }).expect(200);
 
+  it('R6-15: the scenario anchor is a Wednesday after the seeded legal content, and derived dates follow it', async () => {
+    expect(MARKET_OPEN_UTC.getUTCDay()).toBe(3);
+    expect(MARKET_OPEN_UTC.getTime()).toBeGreaterThan(SEED_EFFECTIVE_UTC.getTime());
+    const seeds = await ownerQuery<{ t: Date }>('SELECT min(effective_from) AS t FROM disclosure_documents');
+    expect(seeds[0]!.t.getTime()).toBe(SEED_EFFECTIVE_UTC.getTime());
+    // Scenarios that start earliest (marketDay(-2), the Monday) still fall after the seeds.
+    expect(marketDay(-2).getTime()).toBeGreaterThan(SEED_EFFECTIVE_UTC.getTime());
+    expect([marketDay(-2).getUTCDay(), marketDay(2).getUTCDay(), marketDay(3).getUTCDay()]).toEqual([1, 5, 6]);
+  });
+
   it('R6-03: a scope-3 kill switch in a closed session holds the flatten order (never fills at a stale close)', async () => {
-    vi.setSystemTime(new Date('2026-10-02T19:50:00Z')); // Friday 15:50 New York: AAPL open
+    vi.setSystemTime(marketDay(2, '19:50:00')); // Friday 15:50 New York: AAPL open
     const u = await createUser(app, 'trader');
     await md.standard();
     expect((await placed(u, { symbol: 'AAPL', side: 'buy', type: 'market', qty: '10' })).status).toBe('filled');
-    vi.setSystemTime(new Date('2026-10-02T20:10:00Z')); // Friday 16:10 New York: AAPL closed
+    vi.setSystemTime(marketDay(2, '20:10:00')); // Friday 16:10 New York: AAPL closed
     await md.standard(); // fresh quotes and a healthy feed: only the session is unsafe
     const res = await request(http).post('/kill-switch').set(bearer(u.token)).send({ scope: 'robots_cancel_flatten' }).expect(202);
     expect(res.body.positionsFlattened).toBe(0);
@@ -96,7 +106,7 @@ describe('IRTC R6 regressions (risk wiring and fill safety)', () => {
   });
 
   it('R6-05: the weekly loss limit sees a loss booked on an earlier day of the same week (the daily limit does not)', async () => {
-    vi.setSystemTime(new Date('2026-09-28T14:00:00Z')); // Monday of the same ISO week as MARKET_OPEN_UTC
+    vi.setSystemTime(marketDay(-2)); // Monday of the same ISO week as MARKET_OPEN_UTC
     const u = await createUser(app, 'trader');
     await md.standard();
     await request(http).get('/accounts/me').set(bearer(u.token)).expect(200); // Monday day/week/month start equity
@@ -115,9 +125,9 @@ describe('IRTC R6 regressions (risk wiring and fill safety)', () => {
   });
 
   it('R6-05: the monthly loss limit sees a loss booked in an earlier week of the same month', async () => {
-    // Monday 5 October, then Wednesday 14 October: an earlier week of the same month. (The seeded
-    // questionnaire and disclosures take effect on 2026-09-26, so the scenario stays after that date.)
-    vi.setSystemTime(new Date('2026-10-05T14:00:00Z'));
+    // The Monday after the anchor week, then the Wednesday two weeks after the anchor: an earlier
+    // week of the same month, both after the seeded legal content (SEED_EFFECTIVE_UTC).
+    vi.setSystemTime(marketDay(5));
     const u = await createUser(app, 'trader');
     await md.standard();
     await request(http).get('/accounts/me').set(bearer(u.token)).expect(200);
@@ -125,7 +135,7 @@ describe('IRTC R6 regressions (risk wiring and fill safety)', () => {
     await md.quote('EURUSD', '1.08119', '1.08121');
     await placed(u, { symbol: 'EURUSD', side: 'sell', type: 'market', qty: '100000' });
 
-    await jump(u, new Date('2026-10-14T14:00:00Z'));
+    await jump(u, marketDay(14));
     const acct = await request(http).get('/accounts/me').set(bearer(u.token)).expect(200);
     expect(Number(acct.body.weekPnl.replace(/,/g, ''))).toBe(0);
     await settings(u, { dailyLossLimit: '100', weeklyLossLimit: '100', monthlyLossLimit: '200' });

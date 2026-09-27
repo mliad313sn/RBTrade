@@ -102,5 +102,24 @@ export class MarketFixture {
   }
 }
 
-/** A Wednesday when FX, US equities (10:00 New York) and Xetra (16:00 Frankfurt) are all open. */
+/**
+ * IRTC R6-15: the one date constant the trading scenarios derive from. A Wednesday when FX, US
+ * equities (10:00 New York) and Xetra (16:00 Frankfurt) are all open, in US and EU summer time
+ * (moving it into winter time shifts the session edges the scenarios use by one hour).
+ */
 export const MARKET_OPEN_UTC = new Date('2026-09-30T14:00:00Z');
+
+/**
+ * Effective date of the seeded legal content (migration 0091 disclosures, the appropriateness
+ * questionnaire). A scenario clock before it has no risk warning or questionnaire in force.
+ */
+export const SEED_EFFECTIVE_UTC = new Date('2026-09-26T00:00:00Z');
+
+/**
+ * A UTC wall-clock time `days` after the Wednesday of MARKET_OPEN_UTC (0 = that Wednesday,
+ * -2 = the Monday before, 2 = Friday, 3 = Saturday), so every scenario date moves with the anchor.
+ */
+export function marketDay(days: number, hhmmss = '14:00:00'): Date {
+  const d = new Date(MARKET_OPEN_UTC.getTime() + days * 86_400_000);
+  return new Date(`${d.toISOString().slice(0, 10)}T${hhmmss}Z`);
+}
