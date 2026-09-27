@@ -94,6 +94,12 @@ describe('AI copilot: no side effects anywhere in the database (IRTC R6-02)', ()
     KORA_AI_RATE_PER_MIN: '1000',
     KORA_AI_ORG_ID: `org-r6-${process.pid}-${Date.now()}`,
     KORA_AI_REDIS_PREFIX: `kora:test:${process.pid}:r6ai:`,
+    // Background jobs that act on other files' leftover data are off: in the full suite the robot
+    // supervisor paused a robot another file had left running (and raised an alert) mid-turn.
+    // Nothing here is part of the AI path.
+    KORA_ROBOT_SUPERVISOR_MS: '0',
+    KORA_ROBOT_SUPERVISOR_CONTROL: 'off',
+    KORA_ALERTS_ENABLED: 'false',
   };
 
   beforeAll(async () => {
