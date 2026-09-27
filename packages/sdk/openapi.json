@@ -11283,6 +11283,12 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 1000
+                  },
+                  "validationFraction": {
+                    "default": 0.3,
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 0.5
                   }
                 },
                 "required": [
@@ -11299,7 +11305,7 @@
             "description": ""
           }
         },
-        "summary": "Grid or random search with a hard cap (KORA_BT_MAX_COMBOS), ranked by out-of-sample Sharpe.",
+        "summary": "Grid or random search with a hard cap (KORA_BT_MAX_COMBOS), ranked by validation Sharpe (inside the in-sample window); the out-of-sample holdout is scored once, for the selected combination.",
         "tags": [
           "strategies"
         ]
@@ -11425,6 +11431,12 @@
                       "values"
                     ],
                     "additionalProperties": false
+                  },
+                  "validationFraction": {
+                    "default": 0.3,
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 0.5
                   }
                 },
                 "required": [
@@ -11442,7 +11454,7 @@
             "description": ""
           }
         },
-        "summary": "Sensitivity heatmap: out-of-sample Sharpe over two parameters.",
+        "summary": "Sensitivity heatmap: validation Sharpe over two parameters (the out-of-sample holdout is not used).",
         "tags": [
           "strategies"
         ]
