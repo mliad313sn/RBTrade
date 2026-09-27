@@ -7,6 +7,7 @@ import { SimApiError, simApi } from '@/lib/sim/client';
 import { buildCsv } from '@/lib/sim/csv';
 import { fmtPct } from '@/lib/sim/format';
 import type { PaperProjection, ProjectRequest, Scenario, SizingModel } from '@/lib/sim/types';
+import { retailLossSentence } from '@/lib/retail-loss';
 
 import { DrawdownHistogram } from './DrawdownHistogram';
 import { downloadCsv, downloadSvgAsPng } from './export';
@@ -95,7 +96,7 @@ const SIZING_NOTE: Record<SizingModel, string> = {
     'Sizing: a fraction of full Kelly, computed after costs and fat tails. Every trade pays the cost in R.',
 };
 
-export function GainSimulator() {
+export function GainSimulator({ retailLossPct }: { retailLossPct?: string | null } = {}) {
   const [form, setForm] = useState<Form>(DEFAULTS);
   const [current, setCurrent] = useState<Scenario | null>(null);
   const [pinned, setPinned] = useState<Scenario | null>(null);
@@ -672,9 +673,8 @@ export function GainSimulator() {
               <p className="m-0 text-sm text-muted">Checks run with every projection.</p>
             )}
             <p className="mb-0 mt-4 text-[11px] text-muted" data-testid="sim-disclaimer">
-              Projections assume your edge stays constant, which real markets rarely allow. [XX]% of
-              retail CFD accounts lose money with this provider: [INSERT REGULATORY FIGURE]. Not
-              investment advice.
+              Projections assume your edge stays constant, which real markets rarely allow.{' '}
+              {retailLossSentence(retailLossPct)} Not investment advice.
             </p>
           </Panel>
         </div>
