@@ -223,6 +223,66 @@ export class AuditService {
   }
 
   /** Recomputes the entire chain in id order, streamed in pages. */
+  private inflight: Promise<ChainVerification> | null = null;
+
+  /**
+   * IRTC R1-08: whole-chain verification shared by concurrent callers (one O(N) pass at a time).
+   * Deliberately not cached across calls: a cached "valid" would hide a tamper until the next append.
+   */
+  verifyShared(): Promise<ChainVerification> {
+    this.inflight ??= this.verify().finally(() => {
+      this.inflight = null;
+    });
+    return this.inflight;
+  }
+
+  /**
+   * IRTC R1-08: self-scoped verification for users who may not read the whole log. Each of the
+   * caller's visible events (newest `max`) is recomputed from its content and linked to the stored
+   * hash of its predecessor. Discloses no platform-wide count or head hash.
+   */
+  async verifyOwn(visibleTo: { userId: string; accountIds: string[] }, max = 5000): Promise<ChainVerification & { scope: 'own' }> {
+    const rows = await this.db.query<AuditRow>(
+      `SELECT * FROM (SELECT ${SELECT_COLUMNS} FROM audit_events
+         WHERE actor_id = $1 OR (payload ? 'accountId' AND payload->>'accountId' = ANY($2::text[]))
+         ORDER BY audit_events.id DESC LIMIT $3) own ORDER BY own.id::bigint ASC`,
+      [visibleTo.userId, visibleTo.accountIds, max],
+    );
+    const events = rows.map(toEvent);
+    const prevIds = events.map((e) => (BigInt(e.id) - 1n).toString()).filter((id) => id !== '0');
+    const prev = new Map(
+      (prevIds.length
+        ? await this.db.query<{ id: string; hash: string }>('SELECT id::text AS id, hash FROM audit_events WHERE id = ANY($1::bigint[])', [prevIds])
+        : []
+      ).map((r) => [r.id, r.hash]),
+    );
+    let broken: Pick<ChainVerification, 'firstBrokenId' | 'reason'> | null = null;
+    for (const e of events) {
+      const pid = (BigInt(e.id) - 1n).toString();
+      const expectedPrev = pid === '0' ? GENESIS_HASH : prev.get(pid);
+      if (expectedPrev === undefined) broken = { firstBrokenId: e.id, reason: 'id_gap' };
+      else if (expectedPrev !== e.prevHash) broken = { firstBrokenId: e.id, reason: 'prev_hash_mismatch' };
+      else {
+        let expected: string | null;
+        try {
+          expected = computeAuditHash(e, e.prevHash);
+        } catch {
+          expected = null;
+        }
+        if (expected !== e.hash) broken = { firstBrokenId: e.id, reason: 'hash_mismatch' };
+      }
+      if (broken) break;
+    }
+    return {
+      valid: broken === null,
+      count: events.length,
+      firstBrokenId: broken?.firstBrokenId ?? null,
+      reason: broken?.reason ?? null,
+      headHash: events[events.length - 1]?.hash ?? GENESIS_HASH,
+      scope: 'own',
+    };
+  }
+
   async verify(pageSize = 1000): Promise<ChainVerification> {
     const verifier = new AuditChainVerifier();
     let after = '0';

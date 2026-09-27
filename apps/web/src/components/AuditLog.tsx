@@ -51,7 +51,9 @@ export function AuditLog() {
           <div data-testid="verify-result">
             <Banner tone={verify.valid ? 'info' : 'critical'} title={verify.valid ? 'Chain valid.' : 'Chain broken.'}>
               {verify.valid
-                ? `${verify.count} events recomputed. Head ${verify.headHash.slice(0, 16)}…`
+                ? (verify as { scope?: string }).scope === 'own'
+                  ? `${verify.count} of your events recomputed and linked into the chain. Latest ${verify.headHash.slice(0, 16)}…`
+                  : `${verify.count} events recomputed. Head ${verify.headHash.slice(0, 16)}…`
                 : `First broken event #${verify.firstBrokenId} (${verify.reason}).`}
             </Banner>
           </div>
