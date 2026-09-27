@@ -53,7 +53,9 @@ export async function createApp(opts: { logger?: boolean } = {}): Promise<NestEx
   );
   app.use(cookieParser());
   app.use(httpMetrics(app.get(OpsMetrics)));
-  app.enableShutdownHooks();
+  // Graceful shutdown on the signals an orchestrator or a terminal sends. SIGUSR2 is left free for
+  // the on-demand span flush of the file exporter (tests and drills, see tracing.ts).
+  app.enableShutdownHooks(['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGQUIT']);
   // IRTC R1-11: API docs only in dev and test (they were also exposed in staging).
   if (app.get<AppConfig>(APP_CONFIG).apiDocs) {
     SwaggerModule.setup('docs', app, buildOpenApi(app), { jsonDocumentUrl: 'openapi.json' });

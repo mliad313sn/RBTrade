@@ -19,6 +19,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bearer, createUser, type TestUser } from './helpers';
+import { robotHeartbeatKey } from '../src/robots/robot-channels';
 import { MarketFixture } from './market-fixture';
 import { clearCandles, freePort, seedCandles, startBotRunner, startQuant, TOKEN, wave, type Spawned } from './robot-helpers';
 
@@ -63,7 +64,7 @@ describe('distributed traces (goal 10)', () => {
   const prefix = `kora:test:${process.pid}:trace:md:`;
   let quant: Spawned;
   let runner: Spawned;
-  let api: { url: string; stop: () => Promise<void>; logs: string[] };
+  let api: { url: string; stop: () => Promise<void>; logs: string[]; flush: () => Promise<void> };
   let app: INestApplication;
   let trader: TestUser;
   const md = new MarketFixture();
@@ -110,6 +111,15 @@ describe('distributed traces (goal 10)', () => {
     api = {
       url,
       logs,
+      // IRTC R6: deterministic export. SIGUSR2 makes the api force-flush its span processor and then
+      // append a line to `<file>.flush`; the spans ended before the signal are in the file after it.
+      flush: async () => {
+        const marks = () => (existsSync(`${files.api}.flush`) ? readFileSync(`${files.api}.flush`, 'utf8').split('\n').filter(Boolean).length : 0);
+        const before = marks();
+        process.kill(proc.pid!, 'SIGUSR2');
+        const after = await until(marks, (n) => n > before, 10_000);
+        if (after <= before) throw new Error('the api did not acknowledge the span flush');
+      },
       stop: async () => {
         try {
           process.kill(-proc.pid!, 'SIGTERM');
@@ -132,8 +142,19 @@ describe('distributed traces (goal 10)', () => {
     await quant?.stop();
     await md.close();
     for (const f of Object.values(files)) rmSync(f, { force: true });
+    rmSync(`${files.api}.flush`, { force: true });
     delete process.env.KORA_MD_REDIS_PREFIX;
   });
+
+  /** Flush the api's exporter, read, and repeat (a bounded number of times) until `ok`. */
+  async function untilFlushed<T>(read: () => T, ok: (v: T) => boolean, rounds = 20): Promise<T> {
+    let v = read();
+    for (let i = 0; i < rounds && !ok(v); i++) {
+      await api.flush();
+      v = read();
+    }
+    return v;
+  }
 
   it('an order is one trace from the ticket to the fill (http → oms.submit → risk → pg → engine.fill)', async () => {
     const tp = newTraceparent();
@@ -151,10 +172,8 @@ describe('distributed traces (goal 10)', () => {
       (f) => f.length > 0,
     );
     expect(fills.length).toBeGreaterThan(0);
-    const spans = await until(
-      () => readSpans(files.api).filter((s) => s.traceId === tp.traceId),
-      (s) => s.some((x) => x.name === 'engine.fill'),
-    );
+    // The fill is committed before its span ends: flush (deterministic) until the span is exported.
+    const spans = await untilFlushed(() => readSpans(files.api).filter((s) => s.traceId === tp.traceId), (s) => s.some((x) => x.name === 'engine.fill'));
     const names = spans.map((s) => s.name);
     expect(names).toEqual(expect.arrayContaining(['oms.submit', 'risk.evaluate', 'engine.fill']));
     expect(names.some((n) => /^POST( \/orders)?$/.test(n)), names.join(', ')).toBe(true); // http server span
@@ -173,8 +192,8 @@ describe('distributed traces (goal 10)', () => {
       (s) => s.length > 0,
     );
     expect(q.map((s) => s.name)).toContain('POST /mc/project');
-    // The api batches span exports (every 500 ms), so wait for its client span to be written.
-    const apiSpans = await until(
+    // The api batches span exports; flush it instead of waiting for the batch delay.
+    const apiSpans = await untilFlushed(
       () => readSpans(files.api).filter((s) => s.traceId === tp.traceId),
       (s) => s.some((x) => x.spanId === q[0]!.parentSpanId),
     );
@@ -211,7 +230,7 @@ describe('distributed traces (goal 10)', () => {
       const s = await request(api.url).post('/strategies').set(bearer(trader.token)).send({ definition: def }).expect(201);
       const r = await request(api.url).post('/robots').set(bearer(trader.token)).send({ name: 'Trace', versionId: s.body.latest.id }).expect(201);
       await request(api.url).post(`/robots/${r.body.id}/start`).set(bearer(trader.token)).expect(200);
-      await until(async () => !!(await redis.get(`kora:robots:hb:${r.body.id}`)), (x) => x, 15_000);
+      await until(async () => !!(await redis.get(robotHeartbeatKey(r.body.id))), (x) => x, 15_000);
       const last = bars[bars.length - 1]!;
       const publish = () =>
         redis.publish(
@@ -226,7 +245,7 @@ describe('distributed traces (goal 10)', () => {
       );
       expect(barSpan, runner.logs.join('').slice(-1500)).toBeDefined();
       const traceId = barSpan!.traceId;
-      const apiSpans = await until(
+      const apiSpans = await untilFlushed(
         () => readSpans(files.api).filter((x) => x.traceId === traceId),
         (x) => x.length >= 2,
       );
