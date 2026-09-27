@@ -28,6 +28,8 @@ import { z } from 'zod';
 import { CurrentPrincipal } from '../auth/decorators';
 import type { Principal } from '../auth/principal';
 import { openApiSchema, ZodValidationPipe } from '../common/zod';
+import { decideOrderSource } from '../ai/draft-binding';
+import { DbService } from '../db/db.service';
 import { OmsService } from './oms.service';
 
 /** Order endpoints per client per minute (KORA_ORDER_RATE_LIMIT, ASVS rate limit on order endpoints). */
@@ -49,7 +51,10 @@ const CancelAllQuery = z.object({ symbol: z.string().regex(SYMBOL_RE).optional()
 @ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly oms: OmsService) {}
+  constructor(
+    private readonly oms: OmsService,
+    private readonly db: DbService,
+  ) {}
 
   @Post('preview')
   @HttpCode(200)
@@ -78,9 +83,11 @@ export class OrdersController {
     @Body(new ZodValidationPipe(PlaceOrderSchema)) body: PlaceOrderRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
+    // IRTC R4-06: the server, not the client, decides whether this order comes from an AI draft.
+    const origin = await decideOrderSource(this.db.pool, p.sub, body);
     const out = await this.oms.submit(
-      { userId: p.sub, roles: p.roles, actor: { type: 'user', id: p.sub }, source: body.source },
-      body,
+      { userId: p.sub, roles: p.roles, actor: { type: 'user', id: p.sub }, source: origin.source, aiDraftId: origin.aiDraftId },
+      { ...body, source: origin.source === 'ai-draft-accepted' ? 'ai-draft-accepted' : 'manual' },
     );
     res.status(out.idempotentReplay ? 200 : 201);
     return out;

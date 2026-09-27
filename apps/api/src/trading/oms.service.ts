@@ -28,6 +28,7 @@ import {
 
 import { OpsMetrics } from '../observability/ops-metrics.service';
 import { currentTraceparent, withSpan } from '../observability/spans';
+import { bindDraftToOrder } from '../ai/draft-binding';
 import { AuditService } from '../audit/audit.service';
 import { DbService, type Queryable } from '../db/db.service';
 import { DisclosureAcknowledgements } from '../disclosures/acknowledgements.service';
@@ -46,6 +47,8 @@ export interface Submitter {
   roles: Role[];
   actor: Actor;
   source: OrderSource;
+  /** IRTC R4-06: bind the new order to this AI draft (set by the server, see ai/draft-binding.ts). */
+  aiDraftId?: string;
 }
 
 export interface EvaluatedOrder {
@@ -506,6 +509,8 @@ export class OmsService {
         );
         return { order, replay: false, legs: [] as OrderRow[], violations: ev.violations };
       }
+      // IRTC R4-06: only an order risk accepted binds its AI draft, in this same transaction.
+      if (sub.aiDraftId) await bindDraftToOrder(tx.c, sub.userId, sub.aiDraftId, order.id);
       order = await this.engine.transition(
         tx,
         order,

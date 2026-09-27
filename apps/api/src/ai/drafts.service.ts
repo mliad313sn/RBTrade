@@ -253,8 +253,8 @@ export class DraftsService {
   }
 
   /**
-   * The human decision. Accepting an order draft links the order the user placed from the ticket
-   * (it must be theirs and carry `source: ai-draft-accepted`); accepting a strategy draft links the
+   * The human decision. Accepting an order draft links the order the server bound to it when the
+   * user placed it from the ticket (IRTC R4-06); accepting a strategy draft links the
    * version the user saved (authored by them, on that strategy). Rejecting just records it.
    */
   async decide(
@@ -279,15 +279,16 @@ export class DraftsService {
               error: 'order_required',
               message: 'Accepting an order draft needs the order you placed.',
             });
-          const o = await c.query<{ id: string; source: string; symbol: string }>(
-            `SELECT o.id, o.source, o.symbol FROM orders o JOIN accounts a ON a.id = o.account_id WHERE o.id = $1 AND a.user_id = $2`,
-            [body.orderId, userId],
+          // IRTC R4-06: only the order the server bound to this draft when it was placed (same
+          // symbol, side, type and qty, accepted by risk), and not one that was rejected since.
+          const o = await c.query<{ id: string; status: string }>(
+            `SELECT o.id, o.status FROM orders o
+               JOIN accounts a ON a.id = o.account_id
+               JOIN ai_order_drafts d ON d.placed_order_id = o.id
+              WHERE o.id = $1 AND a.user_id = $2 AND d.id = $3 AND d.user_id = $2`,
+            [body.orderId, userId, id],
           );
-          if (
-            !o.rows[0] ||
-            o.rows[0].source !== 'ai-draft-accepted' ||
-            o.rows[0].symbol !== draft.symbol
-          ) {
+          if (!o.rows[0] || o.rows[0].status === 'rejected') {
             throw new BadRequestException({
               error: 'order_mismatch',
               message: 'That order was not placed from this draft.',

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import type { INestApplication } from '@nestjs/common';
 import { TREND_X, type StrategyDefinition } from '@kora/domain';
@@ -506,9 +506,10 @@ describe('AI copilot (goal 07)', () => {
         side: pf.side,
         type: 'market',
         qty: pf.qty,
-        source: 'ai-draft-accepted',
+        aiDraftId: draftId,
       });
-    expect([200, 201, 422]).toContain(placed.status);
+    expect(placed.status).toBe(201);
+    expect(placed.body.order.source).toBe('ai-draft-accepted');
     const orderId = (placed.body.order ?? placed.body).id as string;
     const ok = await request(http)
       .post(`/ai/drafts/${draftId}/decision`)
@@ -556,6 +557,73 @@ describe('AI copilot (goal 07)', () => {
       .send({ decision: 'rejected' })
       .expect(200);
     expect(d.body.prefill).not.toHaveProperty('clientOrderId');
+  });
+
+  it('IRTC R4-06: a draft is accepted only with the order the server created from it (same symbol, side, qty; not rejected; once)', async () => {
+    const mk = async () =>
+      (
+        await request(http)
+          .post('/ai/strip/draft')
+          .set(bearer(trader.token))
+          .send({ symbol: 'BTCUSD', timeframe: '1h' })
+          .expect(200)
+      ).body as { draftId: string; prefill: Record<string, string> };
+    const d1 = await mk();
+    const d2 = await mk();
+    const accept = (draftId: string, orderId: string) =>
+      request(http)
+        .post(`/ai/drafts/${draftId}/decision`)
+        .set(bearer(trader.token))
+        .send({ decision: 'accepted', orderId });
+    const place = (body: Record<string, unknown>) =>
+      request(http)
+        .post('/orders')
+        .set(bearer(trader.token))
+        .send({
+          clientOrderId: `r406-${randomUUID()}`,
+          symbol: 'BTCUSD',
+          type: 'market',
+          ...body,
+        });
+    // The client cannot label an order as AI-accepted by itself.
+    const labelled = await place({ side: 'buy', qty: d1.prefill.qty, source: 'ai-draft-accepted' });
+    expect(labelled.status).toBe(400);
+    expect(labelled.body.error).toBe('ai_draft_required');
+    // An opposite-side order sent "from" the draft is the user's own manual order, not the draft.
+    const opposite = await place({ side: 'sell', qty: d1.prefill.qty, aiDraftId: d1.draftId });
+    expect([201, 422]).toContain(opposite.status);
+    const oppId = (opposite.body.order ?? opposite.body).id as string | undefined;
+    if (opposite.status === 201) expect(opposite.body.order.source).toBe('manual');
+    if (oppId) await accept(d1.draftId, oppId).expect(400);
+    // A risk-rejected order placed from the draft does not accept it.
+    const huge = await place({ side: 'buy', qty: '100000', aiDraftId: d2.draftId });
+    expect(huge.status).toBe(422);
+    const rejectedId = (
+      await ownerQuery<{ id: string }>(
+        `SELECT o.id FROM orders o JOIN accounts a ON a.id = o.account_id WHERE a.user_id = $1 AND o.status = 'rejected' ORDER BY o.created_at DESC LIMIT 1`,
+        [trader.id],
+      )
+    )[0]!.id;
+    await accept(d2.draftId, rejectedId).expect(400);
+    // The matching order is bound to d1 only: it cannot accept d2, and accepts d1 once.
+    const good = await place({ side: d1.prefill.side, qty: d1.prefill.qty, aiDraftId: d1.draftId });
+    expect(good.status).toBe(201);
+    expect(good.body.order.source).toBe('ai-draft-accepted');
+    await accept(d2.draftId, good.body.order.id).expect(400);
+    await accept(d1.draftId, good.body.order.id).expect(200);
+    // A second order from the same (already used) draft is manual.
+    const again = await place({
+      side: d1.prefill.side,
+      qty: d1.prefill.qty,
+      aiDraftId: d1.draftId,
+    });
+    expect(again.status).toBe(201);
+    expect(again.body.order.source).toBe('manual');
+    await request(http)
+      .post(`/ai/drafts/${d2.draftId}/decision`)
+      .set(bearer(trader.token))
+      .send({ decision: 'rejected' })
+      .expect(200);
   });
 
   it('strategy drafts are validated and never saved as a version; the human saves it', async () => {

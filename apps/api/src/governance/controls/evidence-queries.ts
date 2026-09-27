@@ -359,6 +359,13 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
        FROM orders WHERE source = 'ai-draft-accepted' AND created_at >= $1 AND created_at < $2`,
       [from, to],
     );
+    // IRTC R4-06: an accepted draft must name the order the server bound to it when it was placed.
+    const unbound = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM ai_order_drafts
+        WHERE status = 'accepted' AND decided_at >= $1 AND decided_at < $2
+          AND (order_id IS NULL OR placed_order_id IS NULL OR order_id <> placed_order_id)`,
+      [from, to],
+    );
     const count = (a: string) => rows.filter((x) => x.action === a).reduce((s, x) => s + Number(x.events), 0);
     const drafts = count('ai.draft');
     const accepted = count('ai.draft_accepted');
@@ -370,6 +377,7 @@ export const EVIDENCE: Record<string, (ctx: EvidenceContext, r: Range) => Promis
       acceptance_rate_pct: accepted + rejected > 0 ? Math.round((accepted / (accepted + rejected)) * 100) : null,
       ai_draft_orders: Number(orders[0]?.n ?? 0),
       ai_draft_orders_not_placed_by_a_user: Number(orders[0]?.bad ?? 0),
+      accepted_drafts_not_bound_to_their_order: Number(unbound[0]?.n ?? 0),
     });
   },
   'KC-22': async ({ db }, { from, to }) => {
