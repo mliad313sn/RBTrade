@@ -79,7 +79,7 @@ embargo = horizon: a training label must end before the test fold starts). Each 
 with isotonic regression (PAV) on the earlier folds' out-of-sample scores (Platt with fewer than 200,
 identity with fewer than 30). Skill after costs: Brier skill vs the training base rate and the net
 return of following the forecast direction minus a SIMULATED round-trip cost, t-statistic on
-non-overlapping forecasts. Drivers are exact linear SHAP values (log-odds). Gradient boosting was not
+non-overlapping forecasts. Drivers are exact linear SHAP values (log-odds). Calibrated probabilities are bounded to [0.01, 0.99] and isotonic blocks are Laplace-smoothed, so a forecast is never shown as certain (IRTC R3-09). Gradient boosting was not
 added: no ML dependency is installed, and logistic regression is enough to exercise the pipeline
 honestly (B-751).
 

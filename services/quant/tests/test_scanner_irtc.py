@@ -3,6 +3,9 @@
 - R3-03: replayed out-of-sample forecasts sit on a fixed calendar grid (multiples of the horizon),
   so consecutive hourly scans produce the same prediction times (idempotent inserts) instead of a
   new overlapping phase per scan.
+- R3-04: cross-sectional features match peers by wall-clock time.
+- R3-05: the scanner guard is never vacuous and cuts prefixes by wall-clock time.
+- R3-09: the isotonic calibrator never says 0 or 1.
 """
 
 from __future__ import annotations
@@ -233,3 +236,43 @@ def test_scanner_guard_reports_how_much_it_compared(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(detectors, "compute", warming_up)
     blank = _pair_scan(*_stale_pair(5, lag=0, n=400))
     assert blank["guard"]["compared"] == 0 and blank["guard"]["passed"] is False
+
+
+# --- R3-09: calibrated probabilities are never exactly 0 or 1 -----------------------------------
+
+
+def test_isotonic_calibrator_never_claims_certainty_on_noise() -> None:
+    from kora_quant.scanner import calibrate
+    from kora_quant.scanner.forecast import FORECAST_FEATURES, ForecastConfig, forecast
+
+    s = np.linspace(0, 1, 300)
+    iso = calibrate.fit_calibrator(s, (s > 0.99).astype(np.float64))
+    top = iso.predict(np.asarray([1.0]))[0]
+    assert 0.5 < top < 1.0  # a 3-point all-success block reads (3 + 1) / (3 + 2) = 0.8
+    extreme = 0
+    for seed in range(10):
+        rng = np.random.default_rng(seed)
+        n = 1000
+        c = 100 * np.exp(np.cumsum(rng.normal(0, 0.006, n)))
+        o = np.r_[100, c[:-1]]
+        p = build_panel(
+            ["X"],
+            [
+                (
+                    [T0 + k * H for k in range(n)],
+                    list(o),
+                    list(np.maximum(o, c) * 1.001),
+                    list(np.minimum(o, c) * 0.999),
+                    list(c),
+                    [1.0] * n,
+                )
+            ],
+            H,
+            ["s"],
+            ["r"],
+        )
+        x = detectors.matrix(detectors.compute(p, ScanConfig()), FORECAST_FEATURES, 0)
+        r = forecast(x, p.c[0], list(FORECAST_FEATURES), ForecastConfig(horizon=24))
+        ps = np.array([q.p_up for q in r.oos])
+        extreme += int(np.count_nonzero((ps >= 0.999) | (ps <= 0.001)))
+    assert extreme == 0

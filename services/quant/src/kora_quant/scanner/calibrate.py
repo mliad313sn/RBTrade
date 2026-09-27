@@ -14,6 +14,8 @@ from numpy.typing import NDArray
 F1 = NDArray[np.float64]
 F2 = NDArray[np.float64]
 EPS = 1e-6
+# Bounds of any calibrated probability (IRTC R3-09): 1 % either side.
+P_MIN = 0.01
 
 
 def sigmoid(z: F1) -> F1:
@@ -50,10 +52,23 @@ class Isotonic:
 
     upper: F1
     value: F1
+    weight: F1 | None = None  # points pooled in each block
+
+    def _index(self, s: F1) -> NDArray[np.intp]:
+        return np.clip(np.searchsorted(self.upper, s, side="left"), 0, len(self.value) - 1)
 
     def predict(self, s: F1) -> F1:
-        idx = np.searchsorted(self.upper, s, side="left")
-        return np.asarray(self.value[np.clip(idx, 0, len(self.value) - 1)], dtype=np.float64)
+        return np.asarray(self.value[self._index(s)], dtype=np.float64)
+
+    def predict_smoothed(self, s: F1) -> F1:
+        """Block means with one pseudo-success and one pseudo-failure (Laplace / Beta(1, 1)):
+        never exactly 0 or 1, and small blocks shrink towards 1/2 (IRTC R3-09: on no-skill random
+        walks the raw step function said 1.0 for 2 % of forecasts)."""
+        if self.weight is None:
+            return self.predict(s)
+        i = self._index(s)
+        w = self.weight[i]
+        return np.asarray((self.value[i] * w + 1.0) / (w + 2.0), dtype=np.float64)
 
 
 def fit_isotonic(s: F1, y: F1) -> Isotonic:
@@ -73,7 +88,7 @@ def fit_isotonic(s: F1, y: F1) -> Isotonic:
             vals[-2:] = [m]
             weights[-2:] = [w]
             uppers[-2:] = [uppers[-1]]
-    return Isotonic(np.asarray(uppers), np.asarray(vals))
+    return Isotonic(np.asarray(uppers), np.asarray(vals), np.asarray(weights))
 
 
 @dataclass(frozen=True)
@@ -100,11 +115,15 @@ class Calibrator:
     platt: Platt | None = None
 
     def predict(self, s: F1) -> F1:
+        """Calibrated probabilities, bounded to [P_MIN, 1 − P_MIN] whatever the method (IRTC
+        R3-09): an out-of-sample forecast is never shown as certain."""
         if self.iso is not None:
-            return np.clip(self.iso.predict(s), 0.0, 1.0)
-        if self.platt is not None:
-            return self.platt.predict(s)
-        return s
+            p = self.iso.predict_smoothed(s)
+        elif self.platt is not None:
+            p = self.platt.predict(s)
+        else:
+            p = s
+        return np.clip(np.asarray(p, dtype=np.float64), P_MIN, 1.0 - P_MIN)
 
 
 def fit_calibrator(s: F1, y: F1, min_isotonic: int = 200, min_platt: int = 30) -> Calibrator:
