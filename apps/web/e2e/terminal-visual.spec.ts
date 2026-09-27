@@ -4,7 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
 
-import { contractViolations, installTerminalFixtures } from './fixtures/terminal';
+import {
+  contractViolations,
+  installTerminalFixtures,
+  UNSCHEMED_FIXTURE_ENDPOINTS,
+} from './fixtures/terminal';
 import { apiSignIn } from './helpers';
 
 /**
@@ -228,4 +232,7 @@ test('the fixture contract check rejects a drifted body (IRTC R6-16 self-check)'
   expect(contractViolations('/no/such/path', {})).toEqual([
     'get /no/such/path: no 200 JSON response schema in openapi.json',
   ]);
+  // The unschemed list is exact: once the api documents one of these responses, drop it here.
+  for (const t of UNSCHEMED_FIXTURE_ENDPOINTS)
+    expect(contractViolations(t, { anything: true }), t).toEqual([]);
 });

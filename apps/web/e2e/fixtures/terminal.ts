@@ -34,6 +34,18 @@ const ajv = new Ajv2020({ strict: false, allErrors: true });
 addFormats(ajv);
 const validators = new Map<string, ReturnType<AjvLike['compile']>>();
 
+/**
+ * Endpoints the terminal fixture answers whose 200 response has no JSON schema in the published
+ * OpenAPI document yet, so their bodies cannot be contract-checked (open item for the api owner,
+ * docs/review/IRTC-R6-fixes.md). Any other template without a schema is a violation.
+ */
+export const UNSCHEMED_FIXTURE_ENDPOINTS = [
+  '/ai/strip',
+  '/calendar',
+  '/me/watchlists',
+  '/price-alerts',
+];
+
 /** Violations of `GET <template>` 200 for `body` (empty when it matches the published schema). */
 export function contractViolations(template: string, body: unknown, method = 'get'): string[] {
   const key = `${method} ${template}`;
@@ -41,7 +53,10 @@ export function contractViolations(template: string, body: unknown, method = 'ge
   if (!v) {
     const schema =
       OPENAPI.paths[template]?.[method]?.responses['200']?.content?.['application/json']?.schema;
-    if (!schema) return [`${key}: no 200 JSON response schema in openapi.json`];
+    if (!schema)
+      return method === 'get' && UNSCHEMED_FIXTURE_ENDPOINTS.includes(template)
+        ? []
+        : [`${key}: no 200 JSON response schema in openapi.json`];
     v = ajv.compile(schema);
     validators.set(key, v);
   }
@@ -459,7 +474,11 @@ export async function installTerminalFixtures(
           environment: 'PAPER',
           liveTradingEnabled: false,
           authProvider: 'dev',
-          checks: {},
+          checks: {
+            db: { status: 'up' },
+            redis: { status: 'up' },
+            keycloak: { status: 'skipped' },
+          },
           time: new Date(FIXED_NOW).toISOString(),
         }),
       );
