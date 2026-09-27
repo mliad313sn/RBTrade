@@ -1,7 +1,7 @@
 'use client';
 
 import * as RDialog from '@radix-ui/react-dialog';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 export interface DialogProps {
   open: boolean;
@@ -15,7 +15,16 @@ export interface DialogProps {
   'data-testid'?: string;
 }
 
+/**
+ * Modal dialog. Most KORA dialogs open from a hold, a hotkey or a drag (no Radix trigger), so the
+ * element that had focus when the dialog opened is remembered and gets focus back on close
+ * (WCAG 2.4.3; goal 10 keyboard walkthrough finding).
+ */
 export function Dialog({ open, onOpenChange, title, description, children, actions, alert, ...rest }: DialogProps) {
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (open && typeof document !== 'undefined') opener.current = document.activeElement as HTMLElement | null;
+  }, [open]);
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
@@ -23,6 +32,13 @@ export function Dialog({ open, onOpenChange, title, description, children, actio
         <RDialog.Content
           className="k-dialog"
           role={alert ? 'alertdialog' : 'dialog'}
+          onCloseAutoFocus={(e) => {
+            const el = opener.current;
+            if (el && el.isConnected && el !== document.body) {
+              e.preventDefault();
+              el.focus();
+            }
+          }}
           {...rest}
         >
           <RDialog.Title className="k-dialog__title">{title}</RDialog.Title>

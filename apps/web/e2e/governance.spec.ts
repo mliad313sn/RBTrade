@@ -71,7 +71,7 @@ test('risk console: real data, a breach alert within 5 s, four-eyes resume after
   const breach = page.locator('[data-testid="risk-alert"][data-kind="risk.limit_breach"]', { hasText: 'buy 40 BTCUSD' }).first();
   await expect(breach).toBeVisible({ timeout: 5000 });
   const latency = Date.now() - t0;
-  console.log(`[e2e governance] breach alert visible on the console after ${latency} ms`);
+  console.warn(`[e2e governance] breach alert visible on the console after ${latency} ms`);
   expect(latency).toBeLessThan(5000);
 
   // Firm-wide kill switch from the console (1.5 s hold), then the trader asks to resume: 202, pending.
