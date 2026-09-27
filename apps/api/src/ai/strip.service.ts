@@ -12,7 +12,6 @@ import { SimulatedCalendarProvider } from '@kora/market-data';
 
 import { ChannelHub } from '../market-data/channel-hub';
 import { MD_CONFIG, type MdConfig } from '../market-data/md-config';
-import { AccountsService } from '../trading/accounts.service';
 import { FxService } from '../trading/fx.service';
 import { TradingRegistryService } from '../trading/trading-registry.service';
 import { CalibrationService } from './calibration.service';
@@ -45,7 +44,6 @@ export class StripService {
     private readonly calibration: CalibrationService,
     private readonly hub: ChannelHub,
     private readonly registry: TradingRegistryService,
-    private readonly accounts: AccountsService,
     private readonly drafts: DraftsService,
     private readonly fx: FxService,
     private readonly ports: AiReadPorts,
@@ -136,8 +134,7 @@ export class StripService {
       side === 'buy' ? entry.add(atrD.mul(3)) : entry.sub(atrD.mul(3)),
       spec.tickSize,
     );
-    const account = await this.accounts.ensure(ctx.user.id);
-    const view = await this.accounts.view(account);
+    const { account, view } = await this.ports.accountView(ctx.user.id);
     const riskAmount = dec(view.equity.replace(/,/g, '')).mul(cfg.draftRiskPct).div(100);
     // Loss per unit at the stop, converted from the quote currency to the account currency.
     const fx = await this.fx.rate(spec.quoteCcy, account.base_currency);

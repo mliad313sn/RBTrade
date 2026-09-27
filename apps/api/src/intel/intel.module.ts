@@ -1,12 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, type OnModuleInit } from '@nestjs/common';
 
 import { AiModule } from '../ai/ai.module';
+import { IntelPortRegistry } from '../ai/intel-port';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { QuantClient } from '../sim/quant.client';
 import { AlertsService } from './alerts.service';
 import { IntelController } from './intel.controller';
 import { IntelReadService } from './intel-read.service';
-import { INTEL_READ } from './intel.tokens';
 import { NewsService } from './news.service';
 import { ScanService } from './scan.service';
 
@@ -15,7 +15,6 @@ import { ScanService } from './scan.service';
   imports: [MarketDataModule, AiModule],
   providers: [
     IntelReadService,
-    { provide: INTEL_READ, useExisting: IntelReadService },
     ScanService,
     NewsService,
     AlertsService,
@@ -24,4 +23,14 @@ import { ScanService } from './scan.service';
   controllers: [IntelController],
   exports: [IntelReadService],
 })
-export class IntelModule {}
+export class IntelModule implements OnModuleInit {
+  constructor(
+    private readonly port: IntelPortRegistry,
+    private readonly read: IntelReadService,
+  ) {}
+
+  /** IRTC R6-02: hand the copilot tools the read-only intel port (no dynamic provider lookup). */
+  onModuleInit(): void {
+    this.port.bind(this.read);
+  }
+}

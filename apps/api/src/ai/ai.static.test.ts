@@ -51,9 +51,14 @@ const FORBIDDEN_CALLS = [
   // IRTC R4-16: computed member calls (obj['submit'](...)) and dynamic service lookups.
   /\[\s*['"`](submit|amend|cancel\w*|closePosition|flatten\w*|newVersion|promote|signoff|start|pause|switchVersion|updateLimits|halt\w*|resume\w*)['"`]\s*\]/,
   /OmsService|RobotsService|StrategiesService|BacktestsService/,
+  // IRTC R6-02: account writes and dynamic provider lookups are out of reach as well.
+  /AccountsService/,
+  /\.updateSettings\s*\(/,
+  /\bModuleRef\b|\bmoduleRef\b/,
 ];
 
 const PRIVILEGED_IMPORTS = [
+  /trading\/accounts\.service/,
   /trading\/oms\.service/,
   /robots\/robots\.service/,
   /strategies\/strategies\.service/,
@@ -69,6 +74,9 @@ describe('copilot code cannot reach execution paths (static)', () => {
     expect(hits('robots[`start`](id)')).toBe(true);
     expect(hits('const oms = this.moduleRef.get(OmsService, { strict: false });')).toBe(true);
     expect(hits('this.read.trendCard(symbol, horizon)')).toBe(false);
+    // IRTC R6-02
+    expect(hits("await this.accounts.updateSettings(user, { confirmMode: 'never' })")).toBe(true);
+    expect(hits('constructor(private readonly moduleRef: ModuleRef) {}')).toBe(true);
   });
 
   it('scans the whole ai module', () => {
@@ -84,39 +92,85 @@ describe('copilot code cannot reach execution paths (static)', () => {
         .join('\n');
       for (const re of FORBIDDEN_CALLS) {
         // read-ports.ts is the one place that holds the OMS/robots/strategies services (read calls only, checked below).
-        if (f.endsWith('read-ports.ts') && re.source.startsWith('OmsService')) continue;
+        if (f.endsWith('read-ports.ts') && (re.source.startsWith('OmsService') || re.source === 'AccountsService')) continue;
         expect(src, `${re} in ${f}`).not.toMatch(re);
       }
     },
   );
 
-  it('dynamic provider lookups (ModuleRef) resolve only the read-only intel service', () => {
-    for (const f of all) {
-      const src = readFileSync(f, 'utf8');
-      const lookups = [
-        ...src.matchAll(/moduleRef\.(?:get|resolve|create)\s*<?\s*([\w]*)\s*>?\s*\(\s*([\w]+)/g),
-      ];
-      for (const m of lookups) expect(`${m[1]}:${m[2]}`, f).toBe('IntelReadService:INTEL_READ');
-      if (lookups.length) expect(f.endsWith('tool-backend.service.ts'), f).toBe(true);
-    }
+  it('no file in the ai or intel module uses ModuleRef (IRTC R6-02: no dynamic provider lookups)', () => {
+    for (const f of all) expect(readFileSync(f, 'utf8'), f).not.toMatch(/@nestjs\/core|\bModuleRef\b/);
   });
 
-  it('only read-ports.ts imports the OMS, robots and strategies services', () => {
+  it('only read-ports.ts imports the accounts, OMS, robots and strategies services', () => {
     for (const f of all) {
       const src = readFileSync(f, 'utf8');
       const imports = PRIVILEGED_IMPORTS.filter((re) => re.test(src));
-      if (f.endsWith('read-ports.ts')) expect(imports.length).toBe(4);
+      if (f.endsWith('read-ports.ts')) expect(imports.length).toBe(5);
       else expect(imports, f).toEqual([]);
+    }
+  });
+
+  /**
+   * IRTC R6-02: the tool code (the dispatcher's backend) may inject only this allow-list of read
+   * ports. A new dependency (AccountsService, DbService, a Pool, Redis, ModuleRef, any writer) fails
+   * here and needs a reviewed change to the list.
+   */
+  const TOOL_DEPS_ALLOWED = [
+    'CandlesService', // candles and instrument specs (read)
+    'ChannelHub', // last quote from Redis (read)
+    'AiReadPorts', // read-only facade over accounts, OMS preview, robots, strategies, backtests
+    'CalibrationService', // calibration tables (reads; rebuilds its own derived cache only)
+    'DraftsService', // the two draft tools: writes draft rows and their audit events only
+    'QuantClient', // stateless Monte Carlo call to the quant service
+    'IntelPortRegistry', // read-only intel port (radar, trend card, news)
+    'MdConfig', // static config
+  ];
+  const constructorDeps = (src: string, cls: string): string[] => {
+    const body = new RegExp(`class ${cls}[\\s\\S]*?constructor\\(([\\s\\S]*?)\\)\\s*\\{`).exec(src)?.[1] ?? '';
+    return [...body.matchAll(/(?:private|public|protected)?\s*(?:readonly\s+)?\w+\s*:\s*([\w.]+)/g)].map((m) => m[1]!);
+  };
+
+  it('the tool backend injects only allow-listed read ports (IRTC R6-02)', () => {
+    const src = readFileSync(join(AI_DIR, 'tool-backend.service.ts'), 'utf8');
+    const deps = constructorDeps(src, 'AiToolBackend');
+    expect(deps.length).toBeGreaterThanOrEqual(5);
+    for (const d of deps) expect(TOOL_DEPS_ALLOWED, `AiToolBackend injects ${d}`).toContain(d);
+  });
+
+  it('the read ports inject only the services whose read calls are checked below (IRTC R6-02)', () => {
+    const src = readFileSync(join(AI_DIR, 'read-ports.ts'), 'utf8');
+    expect(constructorDeps(src, 'AiReadPorts').sort()).toEqual(
+      ['AccountsService', 'BacktestsService', 'OmsService', 'RobotsService', 'StrategiesService'],
+    );
+  });
+
+  it('the constructor scan sees an injected writer (self-check)', () => {
+    const fake = 'class AiToolBackend {\n  constructor(\n    private readonly accounts: AccountsService,\n    private readonly db: DbService,\n    @Inject(MD_CONFIG) md: MdConfig,\n  ) {\n';
+    expect(constructorDeps(fake, 'AiToolBackend')).toEqual(['AccountsService', 'DbService', 'MdConfig']);
+  });
+
+  it('tool code runs no SQL and reaches no private member by cast or computed key (IRTC R6-02)', () => {
+    for (const name of ['tool-backend.service.ts', 'read-ports.ts', 'intel-port.ts']) {
+      const src = readFileSync(join(AI_DIR, name), 'utf8');
+      expect(src, name).not.toMatch(/db\/db\.service|DbService|\bPool\b|ioredis/);
+      expect(src, name).not.toMatch(/\.query\s*[(<]|\.tx\s*\(/);
+      expect(src, name).not.toMatch(/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|TRUNCATE)\b/i);
+      expect(src, name).not.toMatch(/as\s+unknown\s+as|as\s+any\b/);
+      expect(src, name).not.toMatch(/this\.\w+\s*\[/);
     }
   });
 
   it('read-ports.ts only calls read functions (and the pure validator)', () => {
     const src = readFileSync(join(AI_DIR, 'read-ports.ts'), 'utf8');
-    const calls = [...src.matchAll(/this\.(oms|robots|strategies|backtests)\.(\w+)\(/g)].map(
+    const calls = [...src.matchAll(/this\.(accounts|oms|robots|strategies|backtests)\.(\w+)\(/g)].map(
       (m) => `${m[1]}.${m[2]}`,
     );
     expect(new Set(calls)).toEqual(
       new Set([
+        'accounts.ensure',
+        'accounts.view',
+        'accounts.positionsView',
         'oms.preview',
         'robots.list',
         'robots.detail',

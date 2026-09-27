@@ -1,5 +1,4 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
 import { atr, ema, PreviewOrderSchema, quoteChannel, rsi, sma, type Quote } from '@kora/domain';
 import { SimulatedCalendarProvider } from '@kora/market-data';
 
@@ -8,13 +7,11 @@ import { ChannelHub } from '../market-data/channel-hub';
 import { MD_CONFIG, type MdConfig } from '../market-data/md-config';
 import { FromTradesRequestSchema } from '../sim/sim.schemas';
 import { QuantClient } from '../sim/quant.client';
-import { AccountsService } from '../trading/accounts.service';
 import { CalibrationService } from './calibration.service';
 import { loadAiConfig } from './core/config';
 import type { ToolBackend, ToolCallCtx, ToolInput } from './core/tools';
 import { DraftsService } from './drafts.service';
-import type { IntelReadService } from '../intel/intel-read.service';
-import { INTEL_READ } from '../intel/intel.tokens';
+import { IntelPortRegistry, type IntelReadPort } from './intel-port';
 import { AiReadPorts } from './read-ports';
 
 const IMPACT = { 1: 'low', 2: 'medium', 3: 'high' } as const;
@@ -33,12 +30,11 @@ export class AiToolBackend implements ToolBackend {
   constructor(
     private readonly candles: CandlesService,
     private readonly hub: ChannelHub,
-    private readonly accounts: AccountsService,
     private readonly ports: AiReadPorts,
     private readonly calibration: CalibrationService,
     private readonly drafts: DraftsService,
     private readonly quant: QuantClient,
-    private readonly moduleRef: ModuleRef,
+    private readonly intelPort: IntelPortRegistry,
     @Inject(MD_CONFIG) md: MdConfig,
   ) {
     this.calendar = new SimulatedCalendarProvider(md.seed);
@@ -97,8 +93,7 @@ export class AiToolBackend implements ToolBackend {
   }
 
   async get_positions(ctx: ToolCallCtx) {
-    const a = await this.accounts.ensure(ctx.user.id);
-    const ps = await this.accounts.positionsView(a);
+    const { account: a, positions: ps } = await this.ports.positions(ctx.user.id);
     return {
       environment: 'PAPER',
       baseCurrency: a.base_currency,
@@ -114,8 +109,7 @@ export class AiToolBackend implements ToolBackend {
   }
 
   async get_account_risk(ctx: ToolCallCtx) {
-    const a = await this.accounts.ensure(ctx.user.id);
-    const v = await this.accounts.view(a);
+    const { view: v } = await this.ports.accountView(ctx.user.id);
     const dayPnl = v.dayPnl;
     return {
       environment: 'PAPER',
@@ -300,9 +294,9 @@ export class AiToolBackend implements ToolBackend {
     return { ...v, bins: v.bins.filter((b) => b.n > 0) };
   }
 
-  /** Goal 07B reads (resolved lazily: the intel module depends on this one, not the reverse). */
-  private async intel(): Promise<IntelReadService> {
-    return this.moduleRef.get<IntelReadService>(INTEL_READ, { strict: false });
+  /** Goal 07B reads, bound by the intel module at start-up (it depends on this one, not the reverse). */
+  private async intel(): Promise<IntelReadPort> {
+    return this.intelPort.get();
   }
 
   async get_market_radar(_: ToolCallCtx, i: ToolInput<'get_market_radar'>) {

@@ -11,6 +11,7 @@ import { BudgetService, ResponseCacheService } from './budget.service';
 import { CalibrationService } from './calibration.service';
 import { DraftsService } from './drafts.service';
 import { InsightsService } from './insights.service';
+import { IntelPortRegistry } from './intel-port';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
 import { AiReadPorts } from './read-ports';
@@ -29,11 +30,12 @@ import { AiToolBackend } from './tool-backend.service';
     CalibrationService,
     DraftsService,
     InsightsService,
+    IntelPortRegistry,
     StripService,
     MetricsService,
     QuantClient,
   ],
   controllers: [AiController, MetricsController],
-  exports: [AiService, CalibrationService, MetricsService, DraftsService, BudgetService],
+  exports: [AiService, CalibrationService, MetricsService, DraftsService, BudgetService, IntelPortRegistry],
 })
 export class AiModule {}
