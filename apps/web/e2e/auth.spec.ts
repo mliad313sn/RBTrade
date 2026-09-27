@@ -136,7 +136,8 @@ for (const next of ['/%5Cevil.example/phish', '/%09/evil.example/phish', '//evil
     const signup = await page.request.post('/api/auth/signup', { headers: { 'x-kora-csrf': '1' }, data: { email, password: PASSWORD, displayName: 'Redirect' } });
     expect(signup.status()).toBe(201);
     const offsite: string[] = [];
-    await page.route(/evil\.example/, (route) => {
+    // only the attacker host (the login URL itself contains the string "evil.example")
+    await page.route((url) => url.hostname === 'evil.example', (route) => {
       offsite.push(route.request().url());
       return route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>attacker</h1>' });
     });
@@ -144,8 +145,8 @@ for (const next of ['/%5Cevil.example/phish', '/%09/evil.example/phish', '//evil
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).not.toHaveURL(/\/login/);
-    await page.waitForLoadState('networkidle');
+    // a new novice lands in the simple view (home or onboarding) on the KORA origin
+    await expect(page).toHaveURL(/\/(home|onboarding)/);
     expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
     expect(offsite).toEqual([]);
   });
