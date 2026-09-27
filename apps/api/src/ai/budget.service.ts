@@ -4,7 +4,7 @@ import { RedisService } from '../db/redis.service';
 import type { AiConfig } from './core/config';
 
 export type BudgetVerdict =
-  | { ok: true; userUsed: number; orgUsed: number }
+  | { ok: true; userUsed: number; orgUsed: number; reserved: number }
   | {
       ok: false;
       scope: 'user_budget' | 'org_budget' | 'rate';
@@ -46,6 +46,7 @@ export class BudgetService {
       user: `${prefix()}tokens:user:${userId}:${day}`,
       org: `${prefix()}tokens:org:${orgId}:${day}`,
       rate: `${prefix()}rate:user:${userId}:${Math.floor(now / 60_000)}`,
+      pipeline: `${prefix()}tokens:pipeline:${orgId}:${day}`,
     };
   }
 
@@ -62,9 +63,21 @@ export class BudgetService {
         retryAfterSeconds: 60 - Math.floor((Date.now() % 60_000) / 1000),
       };
     }
-    const [u, o] = await c.mget(k.user, k.org);
-    const userUsed = Number(u ?? 0);
-    const orgUsed = Number(o ?? 0);
+    // IRTC R4-20: reserve one answer's worth of tokens up front, so parallel requests see each
+    // other; a request is allowed while the budget was not yet spent before its own reservation.
+    const reserved = cfg.maxTokens;
+    const ttl = secondsToMidnight() + 3600;
+    const res = await c
+      .multi()
+      .incrby(k.user, reserved)
+      .expire(k.user, ttl)
+      .incrby(k.org, reserved)
+      .expire(k.org, ttl)
+      .exec();
+    const userUsed = Number(res?.[0]?.[1] ?? reserved) - reserved;
+    const orgUsed = Number(res?.[2]?.[1] ?? reserved) - reserved;
+    const deny = userUsed >= cfg.userDailyTokens || orgUsed >= cfg.orgDailyTokens;
+    if (deny) await this.release(userId, cfg, reserved);
     if (userUsed >= cfg.userDailyTokens) {
       return {
         ok: false,
@@ -83,26 +96,53 @@ export class BudgetService {
         retryAfterSeconds: secondsToMidnight(),
       };
     }
-    return { ok: true, userUsed, orgUsed };
+    return { ok: true, userUsed, orgUsed, reserved };
   }
 
-  /** Adds used tokens; returns the org total for the gauge. */
+  /**
+   * Adds used tokens, settling a reservation made by `check` (the difference can be negative);
+   * returns the org total for the gauge.
+   */
   async add(
     userId: string,
     cfg: AiConfig,
     tokens: number,
+    reserved = 0,
   ): Promise<{ userUsed: number; orgUsed: number }> {
     const c = await this.client();
     const k = this.keys(userId, cfg.orgId);
     const ttl = secondsToMidnight() + 3600;
+    const delta = tokens - reserved;
     const res = await c
       .multi()
-      .incrby(k.user, tokens)
+      .incrby(k.user, delta)
       .expire(k.user, ttl)
-      .incrby(k.org, tokens)
+      .incrby(k.org, delta)
       .expire(k.org, ttl)
       .exec();
     return { userUsed: Number(res?.[0]?.[1] ?? 0), orgUsed: Number(res?.[2]?.[1] ?? 0) };
+  }
+
+  /** Gives back a reservation that was not used (cache hit, provider error, denial). */
+  async release(userId: string, cfg: AiConfig, reserved: number): Promise<void> {
+    if (reserved > 0) await this.add(userId, cfg, 0, reserved);
+  }
+
+  /** IRTC R4-20: the news pipeline's own daily budget (it never spends the copilot org budget). */
+  async pipelineUsage(cfg: AiConfig): Promise<{ used: number; budget: number }> {
+    const c = await this.client();
+    const [v] = await c.mget(this.keys('pipeline', cfg.orgId).pipeline);
+    return { used: Number(v ?? 0), budget: cfg.pipelineDailyTokens };
+  }
+
+  async addPipeline(cfg: AiConfig, tokens: number): Promise<void> {
+    const c = await this.client();
+    const key = this.keys('pipeline', cfg.orgId).pipeline;
+    await c
+      .multi()
+      .incrby(key, tokens)
+      .expire(key, secondsToMidnight() + 3600)
+      .exec();
   }
 
   async usage(

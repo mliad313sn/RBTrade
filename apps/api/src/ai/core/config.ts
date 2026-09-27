@@ -21,6 +21,8 @@ export interface AiConfig {
   maxToolRounds: number;
   userDailyTokens: number;
   orgDailyTokens: number;
+  /** IRTC R4-20: daily token budget of the news pipeline, separate from the copilot budgets. */
+  pipelineDailyTokens: number;
   ratePerMin: number;
   cacheTtlSeconds: number;
   orgId: string;
@@ -68,6 +70,7 @@ export function loadAiConfig(e: NodeJS.ProcessEnv = process.env): AiConfig {
     maxToolRounds: Math.floor(num(e.KORA_AI_MAX_TOOL_ROUNDS, 6, 1)),
     userDailyTokens: Math.floor(num(e.KORA_AI_USER_DAILY_TOKENS, 200_000, 0)),
     orgDailyTokens: Math.floor(num(e.KORA_AI_ORG_DAILY_TOKENS, 5_000_000, 0)),
+    pipelineDailyTokens: Math.floor(num(e.KORA_AI_PIPELINE_DAILY_TOKENS, 1_000_000, 0)),
     ratePerMin: Math.floor(num(e.KORA_AI_RATE_PER_MIN, 20, 1)),
     cacheTtlSeconds: Math.floor(num(e.KORA_AI_CACHE_TTL_S, 300, 0)),
     orgId: e.KORA_AI_ORG_ID?.trim() || 'default',

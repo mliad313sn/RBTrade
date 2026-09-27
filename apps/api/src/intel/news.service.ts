@@ -251,12 +251,13 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       return 'unavailable';
     }
     const provider = sel.provider;
-    const usage = await this.budget.usage(SYSTEM_USER, cfg).catch(() => null);
-    if (usage && usage.orgUsed >= cfg.orgDailyTokens) {
+    // IRTC R4-20: the pipeline has its own daily budget; a news burst cannot starve the copilot.
+    const usage = await this.budget.pipelineUsage(cfg).catch(() => null);
+    if (usage && usage.used >= usage.budget) {
       await store({
         status: 'budget_exceeded',
         modelId: provider.modelId,
-        errors: ['organisation token budget reached'],
+        errors: ['news pipeline token budget reached'],
       });
       return 'budget_exceeded';
     }
@@ -335,7 +336,7 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       errors.push(String((err as Error).message).slice(0, 200));
     }
     const tokens = total.inputTokens + total.outputTokens + total.cacheWriteTokens;
-    await this.budget.add(SYSTEM_USER, cfg, tokens).catch(() => undefined);
+    await this.budget.addPipeline(cfg, tokens).catch(() => undefined);
     this.metrics.recordUsage(provider.modelId, 'news', total, cfg);
     this.metrics.requests.inc({ surface: 'news', mode: 'pro', status });
     // IRTC R4-08: the translation is its own audited AI request, with its prompt hash and a hash of

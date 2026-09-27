@@ -201,6 +201,7 @@ export class AiService {
     const promptHash = promptHashOf(provider.modelId, buildRequest(ask, cfg.maxTokens));
     const hit = await this.cache.get<CachedAnswer>(provider.modelId, promptHash).catch(() => null);
     if (hit) {
+      await this.budget.release(ask.user.id, cfg, verdict.reserved).catch(() => undefined);
       this.metrics.cacheHits.inc({ surface: ask.surface });
       const auditEventId = await this.auditRequest(ask, {
         status: 'ok',
@@ -243,7 +244,7 @@ export class AiService {
         },
       });
       const total = res.usage.inputTokens + res.usage.outputTokens + res.usage.cacheWriteTokens;
-      const used = await this.budget.add(ask.user.id, cfg, total);
+      const used = await this.budget.add(ask.user.id, cfg, total, verdict.reserved);
       this.metrics.recordUsage(provider.modelId, ask.surface, res.usage, cfg);
       this.metrics.orgTokensUsed.set({ org: cfg.orgId }, used.orgUsed);
       this.metrics.orgTokenBudget.set({ org: cfg.orgId }, cfg.orgDailyTokens);
@@ -306,6 +307,7 @@ export class AiService {
         'ok',
       );
     } catch (err) {
+      await this.budget.release(ask.user.id, cfg, verdict.reserved).catch(() => undefined);
       const f = friendlyProviderError(err);
       this.log.warn(`copilot request failed: ${f.code} ${(err as Error).message}`);
       const auditEventId = await this.auditRequest(ask, {
