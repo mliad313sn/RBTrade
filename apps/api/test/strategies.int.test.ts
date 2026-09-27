@@ -220,7 +220,7 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .expect(404);
   });
 
-  it('optimisation is capped and ranked by OOS; every combination is a trial', async () => {
+  it('optimisation is capped and ranked by validation (holdout scored once); every combination is a trial', async () => {
     const big = await request(http)
       .post('/backtests/optimise')
       .set(bearer(trader.token))
@@ -236,12 +236,16 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .set(bearer(trader.token))
       .send({ versionId: v1.id, grid: { fast: [5, 10], slow: [30, 50] } })
       .expect(201);
-    expect(opt.body.rankedBy).toBe('out_of_sample_sharpe');
+    // IRTC R3-01: ranked on the validation segment; only the selected combination sees the holdout.
+    expect(opt.body.rankedBy).toBe('validation_sharpe');
     expect(opt.body.evaluated).toBe(4);
-    const oos = opt.body.results
-      .map((r: { oosSharpe: number | null }) => r.oosSharpe)
+    const val = opt.body.results
+      .map((r: { validationSharpe: number | null }) => r.validationSharpe)
       .filter((x: number | null) => x !== null);
-    expect(oos).toEqual([...oos].sort((a: number, b: number) => b - a));
+    expect(val).toEqual([...val].sort((a: number, b: number) => b - a));
+    expect(opt.body.results.some((r: Record<string, unknown>) => 'oosSharpe' in r)).toBe(false);
+    expect(opt.body.best.holdout).toHaveProperty('sharpe');
+    expect(opt.body.validationStart).toBeLessThan(opt.body.oosStart);
     const s = await request(http)
       .get(`/strategies/${strategyId}`)
       .set(bearer(trader.token))
@@ -261,6 +265,7 @@ describe('strategies, versions and research runs (goal 06)', () => {
       .expect(201);
     expect(heat.body.cells).toHaveLength(2);
     expect(heat.body.cells[0]).toHaveLength(3);
+    expect(heat.body.metric).toBe('validation_sharpe');
     expect(heat.body.x.current).toBe(10);
     const wf = await request(http)
       .post('/backtests/walk-forward')

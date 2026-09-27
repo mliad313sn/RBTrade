@@ -48,7 +48,9 @@ policy, intrabar stop-first rule and funding are documented in `docs/quant/backt
 A mandatory prefix-invariance guard recomputes features on `bars[:t+1]` at checkpoints and fails the
 run on any difference. Trials are counted server-side per strategy (distinct configuration hashes),
 not supplied by the client; the DSR uses them (Bailey & López de Prado 2014, reproducing the paper's
-example). Optimisation has a hard cap (refuse, never truncate) and ranks by OOS Sharpe.
+example). Optimisation has a hard cap (refuse, never truncate). *Amended 2026-09-27 (IRTC R3-01):*
+it ranks on an inner validation segment and never reads the out-of-sample holdout, which is scored
+once for the selected combination (see `docs/quant/backtester.md`).
 
 ### 6. Bot runner ↔ OMS: internal authenticated api endpoint (B-301)
 

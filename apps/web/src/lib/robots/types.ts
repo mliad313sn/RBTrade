@@ -105,12 +105,13 @@ export interface WalkForwardResult {
   trades: BtTrade[];
 }
 
+/** Heatmap cell: scored on the validation segment, never on the out-of-sample holdout (R3-01). */
 export interface SensitivityCell {
   x: number;
   y: number;
-  oosSharpe?: number | null;
+  validationSharpe?: number | null;
   isSharpe?: number | null;
-  oosTrades?: number;
+  validationTrades?: number;
   error?: string;
 }
 
@@ -121,6 +122,7 @@ export interface SensitivityResult {
   x: { param: string; values: number[]; current: number };
   y: { param: string; values: number[]; current: number };
   cells: SensitivityCell[][];
+  metric?: 'validation_sharpe';
   note: string;
 }
 

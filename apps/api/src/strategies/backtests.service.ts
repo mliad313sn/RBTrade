@@ -282,12 +282,17 @@ export class BacktestsService {
       grid: req.grid,
       samples: req.samples,
       seed: req.seed,
+      validationFraction: req.validationFraction,
       ...(req.maxCombos ? { maxCombos: req.maxCombos } : {}),
     });
   }
 
   sensitivity(userId: string, roles: Role[], req: SensitivityRequest) {
-    return this.execute(userId, roles, 'sensitivity', req, { x: req.x, y: req.y });
+    return this.execute(userId, roles, 'sensitivity', req, {
+      x: req.x,
+      y: req.y,
+      validationFraction: req.validationFraction,
+    });
   }
 
   async list(
@@ -381,11 +386,19 @@ function summarise(
       wfTrades: (m?.trades as number) ?? 0,
       wfSharpe: m?.sharpe ?? null,
     };
-  if (kind === 'optimise')
+  if (kind === 'optimise') {
+    // IRTC R3-01: ranked on validation; the holdout was scored once, for the selected combination.
+    const best = r.best as {
+      validationSharpe?: number | null;
+      holdout?: { sharpe?: number | null };
+    } | null;
     return {
       ...base,
       evaluated: r.evaluated as number,
-      bestOosSharpe: (r.best as { oosSharpe?: number } | null)?.oosSharpe ?? null,
+      rankedBy: (r.rankedBy as string) ?? 'validation_sharpe',
+      bestValidationSharpe: best?.validationSharpe ?? null,
+      bestHoldoutSharpe: best?.holdout?.sharpe ?? null,
     };
+  }
   return { ...base, cells: (r.cells as unknown[][]).flat().length };
 }

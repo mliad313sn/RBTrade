@@ -616,7 +616,7 @@ export function RobotsMonitor() {
                     </dd>
                   </dl>
                   <h3 className="mb-1 mt-3 text-xs font-semibold uppercase text-muted">
-                    Sensitivity · Sharpe (OOS)
+                    Sensitivity · Sharpe (validation)
                   </h3>
                   <div className="mb-2 flex flex-wrap items-end gap-2">
                     <Select

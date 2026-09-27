@@ -91,10 +91,23 @@ Daily (UTC) equity returns; annualisation factor = observed days per year (≈ 3
 - **Deflated Sharpe** (Bailey & López de Prado, 2014) on the in-sample per-period Sharpe with
   N = trials and V[SR] = variance of the recorded trials' in-sample per-period Sharpes; with one trial
   it is the PSR against zero. Reproduces the paper's example (SR₀ = 0.1132, DSR = 0.9004).
-- **Sensitivity heatmap** over two parameters (≤ 12 × 12), OOS Sharpe per cell, current cell outlined.
+- **Sensitivity heatmap** over two parameters (≤ 12 × 12), validation Sharpe per cell (see below),
+  current cell outlined.
 - **Warnings**: fewer than 100 OOS trades; OOS Sharpe below half the IS Sharpe; no trades.
 - **Optimisation**: grid or seeded random search, hard cap `KORA_BT_MAX_COMBOS` (default 200, ceiling
-  1,000; larger grids are refused, not truncated), ranked by OOS Sharpe.
+  1,000; larger grids are refused, not truncated), **ranked by validation Sharpe** (IRTC R3-01).
+
+### Selection never reads the out-of-sample holdout (IRTC R3-01)
+
+The data splits three ways: in-sample, validation (the last `validationFraction`, default 30 %, of
+the bars before the holdout) and the out-of-sample **holdout** (default: the last 30 % of the bars).
+Optimisation and the heatmap run the engine on data **truncated at the holdout start**, so no
+holdout bar reaches the engine while combinations are scored; they rank on the validation segment.
+The holdout is scored **once**, for the selected combination only (`best.holdout`). Walk-forward
+chooses each fold's parameters on that fold's training window only (data truncated at the training
+end). Regression tests (`tests/test_bt_selection.py`): replacing the holdout bars leaves the ranking
+unchanged, and on driftless noise the selected combination is not the holdout maximum (before the
+fix it was, in 6 of 6 seeds, with a mean reported "OOS" Sharpe of about 5).
 
 ## Live signal and explainability
 
