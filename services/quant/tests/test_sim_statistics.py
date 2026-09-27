@@ -233,6 +233,7 @@ def test_kelly_fraction_sizing_uses_full_kelly() -> None:
         ProjectRequest(paths=500, sizing_model="kelly_fraction", kelly_fraction=0.5)
     )
     assert r.kelly.ratio == pytest.approx(0.5)
+    assert r.kelly.full is not None
     assert r.kelly.user_fraction == pytest.approx(0.5 * r.kelly.full)
 
 

@@ -7,7 +7,120 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "degraded"
+                      ]
+                    },
+                    "service": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "enum": [
+                        "PAPER",
+                        "LIVE"
+                      ]
+                    },
+                    "liveTradingEnabled": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "authProvider": {
+                      "type": "string",
+                      "enum": [
+                        "dev",
+                        "keycloak"
+                      ]
+                    },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "db": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "up",
+                                "down",
+                                "skipped"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        "redis": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "up",
+                                "down",
+                                "skipped"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        "keycloak": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "up",
+                                "down",
+                                "skipped"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "db",
+                        "redis",
+                        "keycloak"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "time": {
+                      "type": "string",
+                      "minLength": 10
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "service",
+                    "environment",
+                    "liveTradingEnabled",
+                    "authProvider",
+                    "checks",
+                    "time"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Liveness + dependency status (db, redis, keycloak). 503 when db or redis is down.",
@@ -158,7 +271,90 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                          },
+                          "ts": {
+                            "type": "string",
+                            "minLength": 10
+                          },
+                          "actorId": {
+                            "type": "string"
+                          },
+                          "actorType": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "robot",
+                              "ai",
+                              "system"
+                            ]
+                          },
+                          "action": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$"
+                          },
+                          "entity": {
+                            "type": "string"
+                          },
+                          "entityId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "payload": {},
+                          "prevHash": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
+                          "hash": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ts",
+                          "actorId",
+                          "actorType",
+                          "action",
+                          "entity",
+                          "entityId",
+                          "payload",
+                          "prevHash",
+                          "hash"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "nextBeforeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "nextBeforeId"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "List audit events (newest first). Non-privileged users see their own events and system/robot events about their own account (B-303); risk officers, admins and auditors see all.",
@@ -173,7 +369,56 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "firstBrokenId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "hash_mismatch",
+                            "prev_hash_mismatch",
+                            "id_gap"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "headHash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid",
+                    "count",
+                    "firstBrokenId",
+                    "reason",
+                    "headHash"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Recompute the hash chain. Returns valid:false with the first broken id on tamper.",
@@ -300,7 +545,90 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "ok"
+                        },
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "roles": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "novice",
+                                  "trader",
+                                  "quant",
+                                  "risk_officer",
+                                  "admin",
+                                  "auditor"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "email",
+                            "displayName",
+                            "roles"
+                          ],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "accessToken",
+                        "user"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "mfa_required",
+                            "mfa_enrollment_required"
+                          ]
+                        },
+                        "mfaToken": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "mfaToken"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            }
           }
         },
         "summary": "Password step. Returns ok, mfa_required or mfa_enrollment_required.",
@@ -386,6 +714,95 @@
         ]
       }
     },
+    "/auth/mfa/recovery": {
+      "post": {
+        "operationId": "AuthController_recovery",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mfaToken": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 4096
+                  },
+                  "recoveryCode": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z2-7]{5}-?[A-Za-z2-7]{5}$"
+                  }
+                },
+                "required": [
+                  "mfaToken",
+                  "recoveryCode"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "B-902: second factor with a one-time recovery code (lost authenticator); issues the session.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/mfa/recovery-codes": {
+      "post": {
+        "operationId": "AuthController_regenerateRecoveryCodes",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "B-902: replace the recovery codes (needs a fresh 6-digit code); returns them once.",
+        "tags": [
+          "auth"
+        ]
+      },
+      "get": {
+        "operationId": "AuthController_recoveryCodesStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "B-902: how many unused recovery codes the signed-in user has left.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -395,7 +812,7 @@
             "description": ""
           }
         },
-        "summary": "Clear the session cookie",
+        "summary": "End the session: clears the cookie and revokes the token server side (goal 10).",
         "tags": [
           "auth"
         ]
@@ -407,7 +824,122 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "email": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "displayName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "displayName"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "novice",
+                          "trader",
+                          "quant",
+                          "risk_officer",
+                          "admin",
+                          "auditor"
+                        ]
+                      }
+                    },
+                    "mfa": {
+                      "type": "boolean"
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "properties": {
+                        "viewMode": {
+                          "type": "string",
+                          "enum": [
+                            "pro",
+                            "novice"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "viewMode"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "orderTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "market",
+                              "limit",
+                              "stop",
+                              "stop_limit",
+                              "trailing",
+                              "bracket",
+                              "oco"
+                            ]
+                          }
+                        },
+                        "robotBuilder": {
+                          "type": "boolean"
+                        },
+                        "auditReadAll": {
+                          "type": "boolean"
+                        },
+                        "tradingEnvironment": {
+                          "type": "string",
+                          "enum": [
+                            "PAPER",
+                            "LIVE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "orderTypes",
+                        "robotBuilder",
+                        "auditReadAll",
+                        "tradingEnvironment"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "user",
+                    "roles",
+                    "mfa",
+                    "preferences",
+                    "capabilities"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Current user, roles, preferences and server-side capabilities",
@@ -580,7 +1112,128 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instruments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "assetClass": {
+                            "type": "string",
+                            "enum": [
+                              "equity",
+                              "etf",
+                              "bond",
+                              "future",
+                              "option",
+                              "fx",
+                              "metal",
+                              "energy",
+                              "agri",
+                              "crypto",
+                              "index",
+                              "cfd",
+                              "fund"
+                            ]
+                          },
+                          "venue": {
+                            "type": "string"
+                          },
+                          "quoteCcy": {
+                            "type": "string"
+                          },
+                          "tickSize": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "pricePrecision": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "qtyStep": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "minQty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "assetClassLabel": {
+                            "type": "string"
+                          },
+                          "session": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "open",
+                                      "break",
+                                      "closed",
+                                      "holiday"
+                                    ]
+                                  },
+                                  "localDate": {
+                                    "type": "string"
+                                  },
+                                  "localTime": {
+                                    "type": "string"
+                                  },
+                                  "nextChange": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "localDate",
+                                  "localTime",
+                                  "nextChange"
+                                ],
+                                "additionalProperties": {}
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "symbol",
+                          "assetClass",
+                          "venue",
+                          "quoteCcy",
+                          "tickSize",
+                          "pricePrecision",
+                          "qtyStep",
+                          "minQty",
+                          "assetClassLabel",
+                          "session"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "instruments"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Instrument registry (SIMULATED seed). Precision, tick, qty step and sessions for every instrument.",
@@ -604,7 +1257,123 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "assetClass": {
+                      "type": "string",
+                      "enum": [
+                        "equity",
+                        "etf",
+                        "bond",
+                        "future",
+                        "option",
+                        "fx",
+                        "metal",
+                        "energy",
+                        "agri",
+                        "crypto",
+                        "index",
+                        "cfd",
+                        "fund"
+                      ]
+                    },
+                    "venue": {
+                      "type": "string"
+                    },
+                    "quoteCcy": {
+                      "type": "string"
+                    },
+                    "tickSize": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "pricePrecision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "qtyStep": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "minQty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "assetClassLabel": {
+                      "type": "string"
+                    },
+                    "session": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "open",
+                                "break",
+                                "closed",
+                                "holiday"
+                              ]
+                            },
+                            "localDate": {
+                              "type": "string"
+                            },
+                            "localTime": {
+                              "type": "string"
+                            },
+                            "nextChange": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "localDate",
+                            "localTime",
+                            "nextChange"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "staleAfterMs": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "symbol",
+                    "assetClass",
+                    "venue",
+                    "quoteCcy",
+                    "tickSize",
+                    "pricePrecision",
+                    "qtyStep",
+                    "minQty",
+                    "assetClassLabel",
+                    "session",
+                    "staleAfterMs"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "One instrument with its venue and current session status.",
@@ -619,7 +1388,73 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "venues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "mic": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          },
+                          "session": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "break",
+                                  "closed",
+                                  "holiday"
+                                ]
+                              },
+                              "localDate": {
+                                "type": "string"
+                              },
+                              "localTime": {
+                                "type": "string"
+                              },
+                              "nextChange": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "localDate",
+                              "localTime",
+                              "nextChange"
+                            ],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "mic",
+                          "timezone",
+                          "session"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "venues"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Venues (ISO 10383 MIC; SIMULATED sample calendars) with current session status.",
@@ -706,7 +1541,91 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "tf": {
+                      "type": "string",
+                      "enum": [
+                        "1s",
+                        "1m",
+                        "5m",
+                        "15m",
+                        "1h",
+                        "4h",
+                        "1D"
+                      ]
+                    },
+                    "simulated": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "candles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "open": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "high": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "low": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "close": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "volume": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "open",
+                          "high",
+                          "low",
+                          "close",
+                          "volume",
+                          "trades"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "symbol",
+                    "tf",
+                    "simulated",
+                    "source",
+                    "candles"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "OHLCV candles, oldest first, registry precision. SIMULATED data.",
@@ -730,7 +1649,97 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "quotes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "quote": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "symbol": {
+                                    "type": "string"
+                                  },
+                                  "bid": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$"
+                                  },
+                                  "ask": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$"
+                                  },
+                                  "stale": {
+                                    "type": "boolean"
+                                  },
+                                  "source": {
+                                    "type": "string"
+                                  },
+                                  "seq": {
+                                    "type": "number"
+                                  },
+                                  "exchangeTs": {
+                                    "type": "number"
+                                  },
+                                  "receivedTs": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "symbol",
+                                  "bid",
+                                  "ask",
+                                  "stale",
+                                  "source",
+                                  "seq",
+                                  "exchangeTs",
+                                  "receivedTs"
+                                ],
+                                "additionalProperties": {}
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "dayOpen": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "symbol",
+                          "quote",
+                          "dayOpen"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "quotes"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Last quote per symbol (with stale flag) and the UTC day open.",
@@ -769,7 +1778,76 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "state": {
+                              "type": "string"
+                            },
+                            "ts": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "ts"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "gateway": {
+                      "type": "object",
+                      "properties": {
+                        "channels": {
+                          "type": "number"
+                        },
+                        "subscriptions": {
+                          "type": "number"
+                        },
+                        "connections": {
+                          "type": "number"
+                        },
+                        "feedLost": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "channels",
+                        "subscriptions",
+                        "connections",
+                        "feedLost"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "feedMode": {
+                      "type": "string",
+                      "enum": [
+                        "inprocess",
+                        "off"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "gateway",
+                    "feedMode"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Feed status (as published on the status channel) and gateway counters.",
@@ -1521,7 +2599,371 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "simulated": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "environment": {
+                      "type": "string",
+                      "const": "PAPER"
+                    },
+                    "instrument": {
+                      "type": "object",
+                      "properties": {
+                        "assetClass": {
+                          "type": "string",
+                          "enum": [
+                            "equity",
+                            "etf",
+                            "bond",
+                            "future",
+                            "option",
+                            "fx",
+                            "metal",
+                            "energy",
+                            "agri",
+                            "crypto",
+                            "index",
+                            "cfd",
+                            "fund"
+                          ]
+                        },
+                        "quoteCcy": {
+                          "type": "string"
+                        },
+                        "pricePrecision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "tickSize": {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        "qtyStep": {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        "minQty": {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        "multiplier": {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        "feesSimulated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "assetClass",
+                        "quoteCcy",
+                        "pricePrecision",
+                        "tickSize",
+                        "qtyStep",
+                        "minQty",
+                        "multiplier",
+                        "feesSimulated"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "market": {
+                      "type": "object",
+                      "properties": {
+                        "bid": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d+(\\.\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "ask": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d+(\\.\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "session": {
+                          "type": "string",
+                          "enum": [
+                            "open",
+                            "break",
+                            "closed",
+                            "holiday"
+                          ]
+                        },
+                        "dataState": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "no_quote",
+                            "stale",
+                            "feed_not_ok"
+                          ]
+                        },
+                        "dataReason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "bid",
+                        "ask",
+                        "session",
+                        "dataState",
+                        "dataReason"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "novice": {
+                      "type": "boolean"
+                    },
+                    "preview": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "estimatedPrice": {
+                              "type": "string",
+                              "pattern": "^-?\\d+(\\.\\d+)?$"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "fees": {
+                              "type": "object",
+                              "properties": {
+                                "commission": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "spread": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "fxConversion": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "total": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                }
+                              },
+                              "required": [
+                                "commission",
+                                "spread",
+                                "fxConversion",
+                                "total"
+                              ],
+                              "additionalProperties": {}
+                            },
+                            "margin": {
+                              "type": "object",
+                              "properties": {
+                                "rate": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "required": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "usedAfter": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "freeAfter": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                "equity": {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d+)?$"
+                                }
+                              },
+                              "required": [
+                                "rate",
+                                "required",
+                                "usedAfter",
+                                "freeAfter",
+                                "equity"
+                              ],
+                              "additionalProperties": {}
+                            },
+                            "lossIfStopHit": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "stopPrice": {
+                                      "type": "string",
+                                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                                    },
+                                    "total": {
+                                      "type": "string",
+                                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                                    }
+                                  },
+                                  "required": [
+                                    "stopPrice",
+                                    "total"
+                                  ],
+                                  "additionalProperties": {}
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "confirmation": {
+                              "type": "object",
+                              "properties": {
+                                "required": {
+                                  "type": "boolean"
+                                },
+                                "reasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "required",
+                                "reasons"
+                              ],
+                              "additionalProperties": {}
+                            }
+                          },
+                          "required": [
+                            "estimatedPrice",
+                            "currency",
+                            "fees",
+                            "margin",
+                            "lossIfStopHit",
+                            "confirmation"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "risk": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "violations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "MAX_ORDER_NOTIONAL",
+                                  "FAT_FINGER",
+                                  "MAX_POSITION",
+                                  "MAX_LEVERAGE",
+                                  "INSUFFICIENT_MARGIN",
+                                  "DAILY_LOSS_LIMIT",
+                                  "WEEKLY_LOSS_LIMIT",
+                                  "ORDER_RATE_LIMIT",
+                                  "SESSION_CLOSED",
+                                  "INSTRUMENT_NOT_TRADABLE",
+                                  "NO_MARKET_DATA",
+                                  "MARKET_DATA_STALE",
+                                  "FEED_NOT_OK",
+                                  "FX_RATE_UNAVAILABLE",
+                                  "NOVICE_ORDER_TYPE",
+                                  "NOVICE_STOP_REQUIRED",
+                                  "NOVICE_LEVERAGE",
+                                  "REDUCE_ONLY_WOULD_INCREASE",
+                                  "POST_ONLY_WOULD_TAKE",
+                                  "STOP_LOSS_WRONG_SIDE",
+                                  "TAKE_PROFIT_WRONG_SIDE",
+                                  "TRADING_HALTED",
+                                  "FOK_INSUFFICIENT_DEPTH",
+                                  "MONTHLY_LOSS_LIMIT",
+                                  "NOVICE_COOLING_OFF",
+                                  "DISCLOSURE_NOT_ACKNOWLEDGED"
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "message"
+                            ],
+                            "additionalProperties": {}
+                          }
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "violations"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "timings": {
+                      "type": "object",
+                      "properties": {
+                        "riskMs": {
+                          "type": "number"
+                        },
+                        "totalMs": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "riskMs",
+                        "totalMs"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "symbol",
+                    "simulated",
+                    "environment",
+                    "instrument",
+                    "market",
+                    "novice",
+                    "preview",
+                    "risk",
+                    "timings"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Order preview: notional, fees + spread, FX conversion, margin impact, loss if the stop is hit (currency and % of equity), reward:risk, confirmation flag and the pre-trade risk verdict. PAPER, SIMULATED.",
@@ -1678,7 +3120,371 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "accountId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "clientOrderId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "parentOrderId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "symbol": {
+                          "type": "string"
+                        },
+                        "side": {
+                          "type": "string",
+                          "enum": [
+                            "buy",
+                            "sell"
+                          ]
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "market",
+                            "limit",
+                            "stop",
+                            "stop_limit",
+                            "trailing",
+                            "bracket",
+                            "oco"
+                          ]
+                        },
+                        "qty": {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        "filledQty": {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        "avgFillPrice": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d+(\\.\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "limitPrice": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d+(\\.\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "stopPrice": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^-?\\d+(\\.\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tif": {
+                          "type": "string",
+                          "enum": [
+                            "day",
+                            "gtc",
+                            "ioc",
+                            "fok",
+                            "gtd"
+                          ]
+                        },
+                        "reduceOnly": {
+                          "type": "boolean"
+                        },
+                        "postOnly": {
+                          "type": "boolean"
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "manual",
+                                "ai-draft-accepted",
+                                "kill-switch"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^robot:[0-9a-f-]{36}$"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "new",
+                            "accepted",
+                            "working",
+                            "partially_filled",
+                            "filled",
+                            "cancelled",
+                            "rejected",
+                            "expired"
+                          ]
+                        },
+                        "rejectCode": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "minLength": 10
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "minLength": 10
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "accountId",
+                        "clientOrderId",
+                        "parentOrderId",
+                        "symbol",
+                        "side",
+                        "type",
+                        "qty",
+                        "filledQty",
+                        "avgFillPrice",
+                        "limitPrice",
+                        "stopPrice",
+                        "tif",
+                        "reduceOnly",
+                        "postOnly",
+                        "source",
+                        "status",
+                        "rejectCode",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "idempotentReplay": {
+                      "type": "boolean"
+                    },
+                    "legs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "accountId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "clientOrderId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "parentOrderId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "market",
+                              "limit",
+                              "stop",
+                              "stop_limit",
+                              "trailing",
+                              "bracket",
+                              "oco"
+                            ]
+                          },
+                          "qty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "filledQty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "avgFillPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "limitPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stopPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tif": {
+                            "type": "string",
+                            "enum": [
+                              "day",
+                              "gtc",
+                              "ioc",
+                              "fok",
+                              "gtd"
+                            ]
+                          },
+                          "reduceOnly": {
+                            "type": "boolean"
+                          },
+                          "postOnly": {
+                            "type": "boolean"
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "manual",
+                                  "ai-draft-accepted",
+                                  "kill-switch"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^robot:[0-9a-f-]{36}$"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "new",
+                              "accepted",
+                              "working",
+                              "partially_filled",
+                              "filled",
+                              "cancelled",
+                              "rejected",
+                              "expired"
+                            ]
+                          },
+                          "rejectCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 10
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 10
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "accountId",
+                          "clientOrderId",
+                          "parentOrderId",
+                          "symbol",
+                          "side",
+                          "type",
+                          "qty",
+                          "filledQty",
+                          "avgFillPrice",
+                          "limitPrice",
+                          "stopPrice",
+                          "tif",
+                          "reduceOnly",
+                          "postOnly",
+                          "source",
+                          "status",
+                          "rejectCode",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "idempotentReplay"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Place a paper order. Idempotent on clientOrderId (201 new, 200 replay, 409 reused with a different body). Risk rejections return 422 with a machine code and a plain-language message.",
@@ -1722,7 +3528,195 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "accountId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "clientOrderId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "parentOrderId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "market",
+                              "limit",
+                              "stop",
+                              "stop_limit",
+                              "trailing",
+                              "bracket",
+                              "oco"
+                            ]
+                          },
+                          "qty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "filledQty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "avgFillPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "limitPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stopPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tif": {
+                            "type": "string",
+                            "enum": [
+                              "day",
+                              "gtc",
+                              "ioc",
+                              "fok",
+                              "gtd"
+                            ]
+                          },
+                          "reduceOnly": {
+                            "type": "boolean"
+                          },
+                          "postOnly": {
+                            "type": "boolean"
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "manual",
+                                  "ai-draft-accepted",
+                                  "kill-switch"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^robot:[0-9a-f-]{36}$"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "new",
+                              "accepted",
+                              "working",
+                              "partially_filled",
+                              "filled",
+                              "cancelled",
+                              "rejected",
+                              "expired"
+                            ]
+                          },
+                          "rejectCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 10
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 10
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "accountId",
+                          "clientOrderId",
+                          "parentOrderId",
+                          "symbol",
+                          "side",
+                          "type",
+                          "qty",
+                          "filledQty",
+                          "avgFillPrice",
+                          "limitPrice",
+                          "stopPrice",
+                          "tif",
+                          "reduceOnly",
+                          "postOnly",
+                          "source",
+                          "status",
+                          "rejectCode",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "orders"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "List orders (open by default), newest first.",
@@ -1766,7 +3760,359 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "clientOrderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "parentOrderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": [
+                        "buy",
+                        "sell"
+                      ]
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "market",
+                        "limit",
+                        "stop",
+                        "stop_limit",
+                        "trailing",
+                        "bracket",
+                        "oco"
+                      ]
+                    },
+                    "qty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "filledQty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "avgFillPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "limitPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stopPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tif": {
+                      "type": "string",
+                      "enum": [
+                        "day",
+                        "gtc",
+                        "ioc",
+                        "fok",
+                        "gtd"
+                      ]
+                    },
+                    "reduceOnly": {
+                      "type": "boolean"
+                    },
+                    "postOnly": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "manual",
+                            "ai-draft-accepted",
+                            "kill-switch"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^robot:[0-9a-f-]{36}$"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "new",
+                        "accepted",
+                        "working",
+                        "partially_filled",
+                        "filled",
+                        "cancelled",
+                        "rejected",
+                        "expired"
+                      ]
+                    },
+                    "rejectCode": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 10
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 10
+                    },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "accountId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "clientOrderId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "parentOrderId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "market",
+                              "limit",
+                              "stop",
+                              "stop_limit",
+                              "trailing",
+                              "bracket",
+                              "oco"
+                            ]
+                          },
+                          "qty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "filledQty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "avgFillPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "limitPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stopPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tif": {
+                            "type": "string",
+                            "enum": [
+                              "day",
+                              "gtc",
+                              "ioc",
+                              "fok",
+                              "gtd"
+                            ]
+                          },
+                          "reduceOnly": {
+                            "type": "boolean"
+                          },
+                          "postOnly": {
+                            "type": "boolean"
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "manual",
+                                  "ai-draft-accepted",
+                                  "kill-switch"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^robot:[0-9a-f-]{36}$"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "new",
+                              "accepted",
+                              "working",
+                              "partially_filled",
+                              "filled",
+                              "cancelled",
+                              "rejected",
+                              "expired"
+                            ]
+                          },
+                          "rejectCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 10
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 10
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "accountId",
+                          "clientOrderId",
+                          "parentOrderId",
+                          "symbol",
+                          "side",
+                          "type",
+                          "qty",
+                          "filledQty",
+                          "avgFillPrice",
+                          "limitPrice",
+                          "stopPrice",
+                          "tif",
+                          "reduceOnly",
+                          "postOnly",
+                          "source",
+                          "status",
+                          "rejectCode",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "accountId",
+                    "clientOrderId",
+                    "parentOrderId",
+                    "symbol",
+                    "side",
+                    "type",
+                    "qty",
+                    "filledQty",
+                    "avgFillPrice",
+                    "limitPrice",
+                    "stopPrice",
+                    "tif",
+                    "reduceOnly",
+                    "postOnly",
+                    "source",
+                    "status",
+                    "rejectCode",
+                    "createdAt",
+                    "updatedAt",
+                    "children"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "One order with its children (bracket stop/target, OCO legs).",
@@ -1817,7 +4163,183 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "clientOrderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "parentOrderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": [
+                        "buy",
+                        "sell"
+                      ]
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "market",
+                        "limit",
+                        "stop",
+                        "stop_limit",
+                        "trailing",
+                        "bracket",
+                        "oco"
+                      ]
+                    },
+                    "qty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "filledQty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "avgFillPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "limitPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stopPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tif": {
+                      "type": "string",
+                      "enum": [
+                        "day",
+                        "gtc",
+                        "ioc",
+                        "fok",
+                        "gtd"
+                      ]
+                    },
+                    "reduceOnly": {
+                      "type": "boolean"
+                    },
+                    "postOnly": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "manual",
+                            "ai-draft-accepted",
+                            "kill-switch"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^robot:[0-9a-f-]{36}$"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "new",
+                        "accepted",
+                        "working",
+                        "partially_filled",
+                        "filled",
+                        "cancelled",
+                        "rejected",
+                        "expired"
+                      ]
+                    },
+                    "rejectCode": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 10
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 10
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "accountId",
+                    "clientOrderId",
+                    "parentOrderId",
+                    "symbol",
+                    "side",
+                    "type",
+                    "qty",
+                    "filledQty",
+                    "avgFillPrice",
+                    "limitPrice",
+                    "stopPrice",
+                    "tif",
+                    "reduceOnly",
+                    "postOnly",
+                    "source",
+                    "status",
+                    "rejectCode",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Amend quantity, limit, stop or trailing distance of a working order (audited).",
@@ -1839,7 +4361,183 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "clientOrderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "parentOrderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": [
+                        "buy",
+                        "sell"
+                      ]
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "market",
+                        "limit",
+                        "stop",
+                        "stop_limit",
+                        "trailing",
+                        "bracket",
+                        "oco"
+                      ]
+                    },
+                    "qty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "filledQty": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "avgFillPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "limitPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stopPrice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^-?\\d+(\\.\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tif": {
+                      "type": "string",
+                      "enum": [
+                        "day",
+                        "gtc",
+                        "ioc",
+                        "fok",
+                        "gtd"
+                      ]
+                    },
+                    "reduceOnly": {
+                      "type": "boolean"
+                    },
+                    "postOnly": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "manual",
+                            "ai-draft-accepted",
+                            "kill-switch"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^robot:[0-9a-f-]{36}$"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "new",
+                        "accepted",
+                        "working",
+                        "partially_filled",
+                        "filled",
+                        "cancelled",
+                        "rejected",
+                        "expired"
+                      ]
+                    },
+                    "rejectCode": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 10
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 10
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "accountId",
+                    "clientOrderId",
+                    "parentOrderId",
+                    "symbol",
+                    "side",
+                    "type",
+                    "qty",
+                    "filledQty",
+                    "avgFillPrice",
+                    "limitPrice",
+                    "stopPrice",
+                    "tif",
+                    "reduceOnly",
+                    "postOnly",
+                    "source",
+                    "status",
+                    "rejectCode",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Cancel an open order (audited). Cancelling an OCO group cancels its legs.",
@@ -1854,7 +4552,137 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "enum": [
+                        "PAPER",
+                        "LIVE"
+                      ]
+                    },
+                    "simulated": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "baseCurrency": {
+                      "type": "string"
+                    },
+                    "cash": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "equity": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "unrealizedPnl": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "dayPnl": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "marginUsed": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "marginFree": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "dailyLossLimit": {
+                      "type": "string",
+                      "pattern": "^-?\\d+(\\.\\d+)?$"
+                    },
+                    "openPositions": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "halt": {
+                      "type": "object",
+                      "properties": {
+                        "halted": {
+                          "type": "boolean"
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "robots",
+                                "robots_cancel",
+                                "robots_cancel_flatten"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "haltedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "halted",
+                        "scope",
+                        "haltedAt",
+                        "reason"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "limits": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": {}
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "minLength": 10
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "environment",
+                    "simulated",
+                    "baseCurrency",
+                    "cash",
+                    "equity",
+                    "unrealizedPnl",
+                    "dayPnl",
+                    "marginUsed",
+                    "marginFree",
+                    "dailyLossLimit",
+                    "openPositions",
+                    "halt",
+                    "limits",
+                    "asOf"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Paper account: cash, equity, day P&L, margin used/free, leverage, loss-limit usage, halt state (base currency, SIMULATED).",
@@ -1980,7 +4808,89 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "positions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "accountId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "qty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "avgPrice": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "markPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "unrealizedPnl": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "realizedPnl": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "stale": {
+                            "type": "boolean"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 10
+                          }
+                        },
+                        "required": [
+                          "accountId",
+                          "symbol",
+                          "qty",
+                          "avgPrice",
+                          "markPrice",
+                          "unrealizedPnl",
+                          "realizedPnl",
+                          "stale",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "positions"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Open positions with mark (exit side), unrealised P&L, notional and margin in base currency.",
@@ -2038,7 +4948,98 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "orderId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "qty": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "price": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "slippage": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "commission": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "realizedPnl": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "referencePrice": {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d+)?$"
+                          },
+                          "liquidity": {
+                            "type": "string",
+                            "enum": [
+                              "taker",
+                              "maker"
+                            ]
+                          },
+                          "ts": {
+                            "type": "string",
+                            "minLength": 10
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "orderId",
+                          "symbol",
+                          "side",
+                          "qty",
+                          "price",
+                          "slippage",
+                          "commission",
+                          "realizedPnl",
+                          "referencePrice",
+                          "liquidity",
+                          "ts"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "fills"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Fills with quote at decision, fill price, slippage, fees and FX conversion (newest first).",
@@ -2053,7 +5054,43 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "severity"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "alerts"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Alerts (reconciliation mismatches). Risk officers and admins see all; others their own account.",
@@ -2122,7 +5159,72 @@
         },
         "responses": {
           "202": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean"
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "robots",
+                        "robots_cancel",
+                        "robots_cancel_flatten"
+                      ]
+                    },
+                    "auditEventId": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string",
+                      "const": "paper"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "halted": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "alreadyHalted": {
+                      "type": "boolean"
+                    },
+                    "ordersCancelled": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "positionsFlattened": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "durationMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "accepted",
+                    "scope",
+                    "auditEventId",
+                    "engine",
+                    "accountId",
+                    "halted",
+                    "alreadyHalted",
+                    "ordersCancelled",
+                    "positionsFlattened",
+                    "durationMs"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Trigger the kill switch: robots | robots_cancel | robots_cancel_flatten. Idempotent, audited, REST fallback.",
@@ -2135,7 +5237,59 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "halted": {
+                      "type": "boolean"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "robots",
+                            "robots_cancel",
+                            "robots_cancel_flatten"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "haltedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "reason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "accountId",
+                    "halted",
+                    "scope",
+                    "haltedAt",
+                    "reason"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Current halt state of your paper account.",
@@ -2178,7 +5332,25 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "required": [
+                    "accountId"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Resume trading after a halt (trader, quant, risk officer or admin; MFA). Risk officers/admins may pass accountId. A firm halt (goal 09) answers 202 with a four-eyes request that a second person approves.",
@@ -2214,7 +5386,52 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "locale": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "contentHash": {
+                          "type": "string"
+                        },
+                        "placeholder": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "version",
+                        "locale",
+                        "title",
+                        "contentHash",
+                        "placeholder"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "document"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "The disclosure in force (rendered with the Compliance-set values, e.g. the retail-loss %) and whether you acknowledged this version.",
@@ -2297,7 +5514,78 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "questionnaire": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id"
+                            ],
+                            "additionalProperties": {}
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "version",
+                        "questions"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "status": {
+                      "type": "object",
+                      "properties": {
+                        "hasTraderRole": {
+                          "type": "boolean"
+                        },
+                        "eligible": {
+                          "type": "boolean"
+                        },
+                        "cooldownUntil": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "hasTraderRole",
+                        "eligible",
+                        "cooldownUntil"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "questionnaire",
+                    "status"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "The active appropriateness questionnaire (no answer key) and your status: eligible, passed, cool-down.",
@@ -2742,7 +6030,51 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message",
+                          "severity"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "contentHash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid",
+                    "issues",
+                    "contentHash"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Validation panel: schema + semantic issues (errors and warnings), content hash, warm-up.",
@@ -2757,7 +6089,41 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "strategies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "strategies"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "My strategies with their latest version.",
@@ -8136,7 +11502,58 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "templates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "riskLevel": {
+                            "type": "string",
+                            "enum": [
+                              "lower",
+                              "medium",
+                              "higher"
+                            ]
+                          },
+                          "definition": {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "riskLevel",
+                          "definition"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "disclaimer": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "templates",
+                    "disclaimer"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Strategy templates (plain-language summary, risk level, definition). Any signed-in user.",
@@ -8166,7 +11583,41 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "robots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "robots"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "My robots with status, equity and P&L (PAPER).",
@@ -8811,7 +12262,23 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "available"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
           }
         },
         "summary": "Is the copilot available, and today’s token usage against the budgets.",
@@ -11662,7 +15129,7 @@
   "info": {
     "title": "KORA API",
     "description": "KORA platform API (PAPER only). Money and prices are decimal strings.",
-    "version": "0.1.0",
+    "version": "1.0.0-rc.1",
     "contact": {}
   },
   "tags": [],

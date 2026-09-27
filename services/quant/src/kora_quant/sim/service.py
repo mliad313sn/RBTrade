@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from . import edge
@@ -137,9 +139,9 @@ def project(req: ProjectRequest) -> SimResult:
         expectancy_gross_r=edge.gross_expectancy(p_eff, req.avg_win_r, loss),
         expectancy_unit="r",
         kelly=Kelly(
-            full=full,
+            full=full if math.isfinite(full) else None,
             user_fraction=user_fraction,
-            ratio=(user_fraction / full) if full > 0 else None,
+            ratio=(user_fraction / full) if 0 < full < math.inf else None,
         ),
         effective=Effective(
             win_rate_pct=p_eff * 100.0,
@@ -234,7 +236,9 @@ def from_trades(req: FromTradesRequest) -> SimResult:
         expectancy_gross_r=gross * scale,
         expectancy_unit=unit,
         kelly=Kelly(
-            full=full, user_fraction=fraction, ratio=(fraction / full) if full > 0 else None
+            full=full if math.isfinite(full) else None,
+            user_fraction=fraction,
+            ratio=(fraction / full) if 0 < full < math.inf else None,
         ),
         effective=Effective(
             win_rate_pct=win_rate * 100.0,

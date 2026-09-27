@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { RecordingProxy, validateExchanges } from './contract-proxy';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -75,6 +76,7 @@ describe('Market intelligence (goal 07B)', () => {
   let app: INestApplication;
   let http: ReturnType<INestApplication['getHttpServer']>;
   let quant: Spawned;
+  let proxy: RecordingProxy;
   let trader: TestUser;
   let novice: TestUser;
   let admin: TestUser;
@@ -82,8 +84,9 @@ describe('Market intelligence (goal 07B)', () => {
 
   beforeAll(async () => {
     quant = await startQuant();
+    proxy = await new RecordingProxy(quant.url, 'api').start();
     env({
-      QUANT_URL: quant.url,
+      QUANT_URL: proxy.url,
       KORA_AI_PROVIDER: 'scripted',
       KORA_AI_SCRIPT_PERSONA: 'reference',
       KORA_AI_RATE_PER_MIN: '1000',
@@ -129,6 +132,7 @@ describe('Market intelligence (goal 07B)', () => {
     await md.close();
     await app.close();
     await quant.stop();
+    await proxy.stop();
     env({
       QUANT_URL: undefined,
       KORA_AI_PROVIDER: undefined,
@@ -573,5 +577,12 @@ describe('Market intelligence (goal 07B)', () => {
       expect(hasTradeSuggestion(`${it.headline} ${it.why ?? ''}`)).toBe(false);
     }
     expect(res.body.disclaimer).toBe('Not investment advice.');
+  });
+  it('contract (goal 10): every api → quant exchange matches the quant OpenAPI', async () => {
+    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const traffic = proxy.exchanges.filter((x) => x.path !== '/health');
+    expect(traffic.length).toBeGreaterThan(0);
+    expect([...new Set(traffic.map((x) => x.path))]).toEqual(expect.arrayContaining(['/scanner/run']));
+    expect(validateExchanges(doc, 'quant', traffic)).toEqual([]);
   });
 });

@@ -20,8 +20,8 @@ export class ZodValidationPipe<T extends ZodType> implements PipeTransform {
 }
 
 /** JSON Schema for OpenAPI docs, derived from the same zod schema used at runtime. */
-export function openApiSchema(schema: ZodType): Record<string, unknown> {
-  const json = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
+export function openApiSchema(schema: ZodType, io: 'input' | 'output' = 'input'): Record<string, unknown> {
+  const json = z.toJSONSchema(schema, { io, unrepresentable: 'any' }) as Record<string, unknown>;
   delete json.$schema;
   return json;
 }

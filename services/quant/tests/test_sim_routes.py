@@ -95,3 +95,17 @@ def test_reality_checks_route(client: TestClient) -> None:
     res = client.post("/reality-checks", json={"winRatePct": 70, "avgWinR": 3, "riskPct": 1})
     assert res.status_code == 200
     assert [c["code"] for c in res.json()["checks"]] == ["implausible_edge"]
+
+
+def test_from_trades_without_a_losing_trade_reports_unbounded_kelly_as_null(
+    client: TestClient,
+) -> None:
+    """Goal 10 contract finding: full Kelly is infinite with no losing trade; the wire says null
+    (documented `number | null`) instead of breaking the `number` contract."""
+    r = client.post("/mc/from-trades", json={"trades": [1.0, 2.0, 0.5, 1.5, 1.0], "paths": 500})
+    assert r.status_code == 200
+    kelly = r.json()["kelly"]
+    assert kelly["full"] is None
+    assert kelly["ratio"] is None
+    schema = client.app.openapi()["components"]["schemas"]["Kelly"]["properties"]["full"]  # type: ignore[attr-defined]
+    assert {"type": "null"} in schema["anyOf"]

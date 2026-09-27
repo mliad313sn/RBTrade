@@ -6,7 +6,8 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createApp } from '../src/create-app';
+import { buildOpenApi, createApp } from '../src/create-app';
+import { RecordingProxy, validateExchanges } from './contract-proxy';
 import { bearer, createUser, ownerQuery, type TestUser } from './helpers';
 import { MarketFixture } from './market-fixture';
 import {
@@ -93,6 +94,9 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
   let http: ReturnType<INestApplication['getHttpServer']>;
   let quant: Spawned;
   let runner: Spawned;
+  let apiToQuant: RecordingProxy;
+  let runnerToQuant: RecordingProxy;
+  let runnerToApi: RecordingProxy;
   let events: RunnerEvents;
   let redis: Redis;
   let owner: TestUser;
@@ -163,12 +167,16 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
     process.env.KORA_ROBOT_HEARTBEAT_MS = String(HB);
     process.env.KORA_ROBOT_SUPERVISOR_MS = '200';
     quant = await startQuant();
-    process.env.QUANT_URL = quant.url;
+    // Goal 10 contracts: api → quant, runner → quant and runner → api go through recording proxies.
+    apiToQuant = await new RecordingProxy(quant.url, 'api').start();
+    runnerToQuant = await new RecordingProxy(quant.url, 'bot-runner').start();
+    process.env.QUANT_URL = apiToQuant.url;
     app = await createApp({ logger: false });
     app.useLogger(process.env.KORA_TEST_LOGS === '1' ? ['error', 'warn'] : false);
     await app.listen(0, '127.0.0.1');
     http = app.getHttpServer();
     const apiUrl = `http://127.0.0.1:${(http.address() as AddressInfo).port}`;
+    runnerToApi = await new RecordingProxy(apiUrl, 'bot-runner').start();
     redis = new Redis(process.env.REDIS_URL!, { maxRetriesPerRequest: 2 });
     events = new RunnerEvents();
     await events.start();
@@ -178,8 +186,8 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
     const [b0, a0] = bidAsk(bars[0]!.o);
     await md.quote('BTCUSD', b0, a0);
     runner = await startBotRunner({
-      BOT_RUNNER_API_URL: apiUrl,
-      QUANT_URL: quant.url,
+      BOT_RUNNER_API_URL: runnerToApi.url,
+      QUANT_URL: runnerToQuant.url,
       KORA_SERVICE_TOKEN: TOKEN,
       KORA_MD_REDIS_PREFIX: prefix,
       KORA_ROBOT_HEARTBEAT_MS: String(HB),
@@ -195,6 +203,7 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
     await runner?.stop();
     await app.close();
     await quant.stop();
+    for (const p of [apiToQuant, runnerToQuant, runnerToApi]) await p?.stop();
     for (const k of [
       'KORA_ENGINE_ENABLED',
       'KORA_RECONCILIATION_INTERVAL_MS',
@@ -519,5 +528,17 @@ describe('bot runner through the OMS (goal 06 acceptance)', () => {
     await request(http).get(`/robots/${parityRobot}`).set(bearer(other.token)).expect(404);
     const list = await request(http).get('/robots').set(bearer(owner.token)).expect(200);
     expect(list.body.robots.length).toBeGreaterThanOrEqual(2);
+  });
+  it('service contracts (goal 10): api → quant, runner → quant and runner → api match the providers’ OpenAPI', async () => {
+    const quantDoc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const apiDoc = buildOpenApi(app) as unknown as Parameters<typeof validateExchanges>[0];
+    const quantTraffic = [...apiToQuant.exchanges, ...runnerToQuant.exchanges].filter((x) => x.path !== '/health');
+    const apiTraffic = runnerToApi.exchanges.filter((x) => x.path.startsWith('/internal/'));
+    // the flows above exercised the live path end to end
+    expect(new Set(runnerToQuant.exchanges.map((x) => x.path))).toContain('/bt/signal');
+    expect(apiToQuant.exchanges.map((x) => x.path)).toContain('/bt/run');
+    expect(apiTraffic.length).toBeGreaterThan(5);
+    expect(validateExchanges(quantDoc, 'quant', quantTraffic)).toEqual([]);
+    expect(validateExchanges(apiDoc, 'api', apiTraffic)).toEqual([]);
   });
 });

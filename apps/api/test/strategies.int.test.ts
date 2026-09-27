@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import { RecordingProxy, validateExchanges } from './contract-proxy';
 import { TREND_X, withParams, type StrategyDefinition } from '@kora/domain';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -26,13 +27,15 @@ describe('strategies, versions and research runs (goal 06)', () => {
   let app: INestApplication;
   let http: ReturnType<INestApplication['getHttpServer']>;
   let quant: Spawned;
+  let proxy: RecordingProxy;
   let trader: TestUser;
   let other: TestUser;
   let novice: TestUser;
 
   beforeAll(async () => {
     quant = await startQuant();
-    process.env.QUANT_URL = quant.url;
+    proxy = await new RecordingProxy(quant.url, 'api').start();
+    process.env.QUANT_URL = proxy.url;
     app = await startApp();
     http = app.getHttpServer();
     trader = await createUser(app, 'trader', [], { realClock: true });
@@ -49,6 +52,7 @@ describe('strategies, versions and research runs (goal 06)', () => {
   afterAll(async () => {
     await app.close();
     await quant.stop();
+    await proxy.stop();
     delete process.env.QUANT_URL;
   });
 
@@ -296,5 +300,12 @@ describe('strategies, versions and research runs (goal 06)', () => {
     expect(mc.body.kind).toBe('from_trades');
     expect(mc.body.realityChecks.map((c: { code: string }) => c.code)).toContain('small_sample');
     await request(http).get(`/backtests/${runId}`).set(bearer(other.token)).expect(404);
+  });
+  it('contract (goal 10): every api → quant exchange matches the quant OpenAPI', async () => {
+    const doc = (await (await fetch(`${quant.url}/openapi.json`)).json()) as Parameters<typeof validateExchanges>[0];
+    const traffic = proxy.exchanges.filter((x) => x.path !== '/health');
+    expect(traffic.length).toBeGreaterThan(0);
+    expect([...new Set(traffic.map((x) => x.path))]).toEqual(expect.arrayContaining(['/bt/optimise', '/bt/run', '/bt/sensitivity', '/bt/walk-forward']));
+    expect(validateExchanges(doc, 'quant', traffic)).toEqual([]);
   });
 });

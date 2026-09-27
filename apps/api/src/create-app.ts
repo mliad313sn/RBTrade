@@ -9,17 +9,31 @@ import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
+import { openApiSchema } from './common/zod';
+import { CONTRACTS } from './contracts/registry';
 
 export function buildOpenApi(app: INestApplication): OpenAPIObject {
   const doc = new DocumentBuilder()
     .setTitle('KORA API')
     .setDescription('KORA platform API (PAPER only). Money and prices are decimal strings.')
-    .setVersion('0.1.0')
+    .setVersion(API_VERSION)
     .addBearerAuth()
     .addCookieAuth('kora_at')
     .build();
-  return SwaggerModule.createDocument(app, doc);
+  const document = SwaggerModule.createDocument(app, doc);
+  // Goal 10: response contracts (B-004/B-209/B-312) from the same zod schemas the contract test uses.
+  for (const [key, c] of Object.entries(CONTRACTS)) {
+    const [method, path] = key.split(' ') as [string, string];
+    const op = (document.paths[path] as Record<string, { responses?: Record<string, unknown> }> | undefined)?.[method.toLowerCase()];
+    if (!op) throw new Error(`Contract for an unknown operation: ${key}`);
+    const schema = openApiSchema(c.schema, 'output');
+    op.responses = { ...(op.responses ?? {}), [String(c.status)]: { description: 'Success', content: { 'application/json': { schema } } } };
+  }
+  return document;
 }
+
+/** Release version of the API contract (goal 10: 1.0.0-rc.1). */
+export const API_VERSION = '1.0.0-rc.1';
 
 export async function createApp(opts: { logger?: boolean } = {}): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });

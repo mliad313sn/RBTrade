@@ -142,7 +142,9 @@ class Distribution(Wire):
 
 
 class Kelly(Wire):
-    full: float
+    # None when full Kelly is unbounded (no losing outcome in the sample): JSON has no infinity,
+    # and the api/web must not receive a bare null where the contract says number (goal 10).
+    full: float | None
     user_fraction: float
     ratio: float | None
 

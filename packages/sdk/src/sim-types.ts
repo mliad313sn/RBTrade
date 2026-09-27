@@ -76,7 +76,8 @@ export interface SimResult {
   expectancyR: number;
   expectancyGrossR: number;
   expectancyUnit: 'r' | 'pct';
-  kelly: { full: number; userFraction: number; ratio: number | null };
+  /** `full` is null when full Kelly is unbounded (no losing trade in the sample). */
+  kelly: { full: number | null; userFraction: number; ratio: number | null };
   effective: {
     winRatePct: number;
     avgWinR: number;
