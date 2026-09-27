@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest';
  */
 const AI_DIR = __dirname;
 
+/** IRTC R4-16: the intel module (which injects the AI services) is held to the same rules. */
+const INTEL_DIR = join(__dirname, '..', 'intel');
+
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
     const p = join(dir, f);
@@ -45,6 +48,9 @@ const FORBIDDEN_CALLS = [
   /PromotionService/,
   /INSERT\s+INTO\s+(orders|strategy_versions|robots)\b/i,
   /UPDATE\s+(orders|robots|strategy_versions)\b/i,
+  // IRTC R4-16: computed member calls (obj['submit'](...)) and dynamic service lookups.
+  /\[\s*['"`](submit|amend|cancel\w*|closePosition|flatten\w*|newVersion|promote|signoff|start|pause|switchVersion|updateLimits|halt\w*|resume\w*)['"`]\s*\]/,
+  /OmsService|RobotsService|StrategiesService|BacktestsService/,
 ];
 
 const PRIVILEGED_IMPORTS = [
@@ -55,7 +61,15 @@ const PRIVILEGED_IMPORTS = [
 ];
 
 describe('copilot code cannot reach execution paths (static)', () => {
-  const all = files(AI_DIR);
+  const all = [...files(AI_DIR), ...files(INTEL_DIR)];
+
+  it('the rules catch the evasions the review named (IRTC R4-16)', () => {
+    const hits = (code: string) => FORBIDDEN_CALLS.some((re) => re.test(code));
+    expect(hits("oms['submit'](sub, req)")).toBe(true);
+    expect(hits('robots[`start`](id)')).toBe(true);
+    expect(hits('const oms = this.moduleRef.get(OmsService, { strict: false });')).toBe(true);
+    expect(hits('this.read.trendCard(symbol, horizon)')).toBe(false);
+  });
 
   it('scans the whole ai module', () => {
     expect(all.length).toBeGreaterThan(15);
@@ -68,9 +82,24 @@ describe('copilot code cannot reach execution paths (static)', () => {
         .split('\n')
         .filter((l) => !/^\s*(\*|\/\/)/.test(l))
         .join('\n');
-      for (const re of FORBIDDEN_CALLS) expect(src, `${re} in ${f}`).not.toMatch(re);
+      for (const re of FORBIDDEN_CALLS) {
+        // read-ports.ts is the one place that holds the OMS/robots/strategies services (read calls only, checked below).
+        if (f.endsWith('read-ports.ts') && re.source.startsWith('OmsService')) continue;
+        expect(src, `${re} in ${f}`).not.toMatch(re);
+      }
     },
   );
+
+  it('dynamic provider lookups (ModuleRef) resolve only the read-only intel service', () => {
+    for (const f of all) {
+      const src = readFileSync(f, 'utf8');
+      const lookups = [
+        ...src.matchAll(/moduleRef\.(?:get|resolve|create)\s*<?\s*([\w]*)\s*>?\s*\(\s*([\w]+)/g),
+      ];
+      for (const m of lookups) expect(`${m[1]}:${m[2]}`, f).toBe('IntelReadService:INTEL_READ');
+      if (lookups.length) expect(f.endsWith('tool-backend.service.ts'), f).toBe(true);
+    }
+  });
 
   it('only read-ports.ts imports the OMS, robots and strategies services', () => {
     for (const f of all) {
