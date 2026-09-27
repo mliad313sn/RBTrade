@@ -1,6 +1,6 @@
 # KORA — delivery status
 
-Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B market intelligence; goal 08 Novice view merged with 07 and 07B; goal 09 risk, compliance and governance).
+Last updated: 2026-09-27 — **RC-1 (release candidate 1.0.0-rc.1, PAPER only)** after goal 10. Market launch remains a Sponsor gate (see the Sponsor launch checklist below and `RELEASE_CHECKLIST.md`).
 
 | Gate | Goal | State |
 |---|---|---|
@@ -15,6 +15,8 @@ Last updated: 2026-09-26 (goals 04 and 06 merged; goal 07 AI copilot; goal 07B m
 | G7B | 07B market intelligence (+ B-601, B-701) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/07b-market-intelligence.md` §6 (all data SIMULATED, providers flagged stubs, OQ-M3/OQ-M4; live-provider evals pending a key, OQ-A2; deferred items in §6.3) |
 | G8 | 08 Novice view (+ B-013, B-017, B-306, B-505, B-506, B-614; B-504 prep) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/08-novice-view.md` §6 (deferred items in §6.4) |
 | G9 | 09 Risk, compliance and governance (+ B-003 part, B-007, B-014, B-202, B-203, B-303, B-314, B-801, B-810) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/09-governance.md` §6 (deferred items in §6.3; regulatory values stay placeholders with owners) |
+| G10 | 10 QA, security hardening, observability, release (+ B-002 part, B-004, B-006, B-012, B-015, B-209, B-312, B-507, B-603 part, B-902, B-916) | **Done, with owned exceptions**: every acceptance criterion passes locally, see `docs/plans/10-release.md` §6; load exceptions E-1/E-2 pending Sponsor acceptance (OQ-O3) |
+| **RC-1** | charter gate: goal 10 criteria + `LIVE_TRADING_ENABLED=false` confirmed | **RC-1 reached 2026-09-27** (`RELEASE_CHECKLIST.md`); market launch = Sponsor only |
 
 ## What shipped in goal 01
 
@@ -523,3 +525,68 @@ B-916 (see BACKLOG).
   `KORA_BUILD_SHA`, `KORA_RELEASE_*`, `KORA_ALERT_RELAY`, `KORA_RETENTION_<CLASS>_DAYS`,
   `KORA_SUITABILITY_BANDS`, `KORA_MD_WS_MAX_CONN_PER_*`, `KORA_ALLOW_INSECURE_TRANSPORT` (see
   `.env.example`).
+
+## Goal 10: QA, security hardening, observability and release (G10: done — **RC-1**)
+
+Plan and evidence: `docs/plans/10-release.md` §6. Lead seats S10, S9, S3 (S1 for accessibility).
+Version `1.0.0-rc.1`, `CHANGELOG.md`, `RELEASE_CHECKLIST.md`. Migration `0101`, `0102`.
+
+### What shipped
+
+- **Security:** server-side session revocation (logout, role change, MFA reset, disable; REST and
+  WebSocket), MFA recovery codes (B-902), trusted proxy hops (B-015), fail-closed `/metrics`;
+  STRIDE threat model (`docs/security/threat-model.md`); authz matrix every route × 7 roles
+  (`docs/security/authz-matrix.md`); Semgrep, pnpm/pip audits and a whole-history secrets scan all
+  clean (`docs/security/scans.md`); headers/CSP/CSRF/rate-limit tests (api and web).
+- **Contracts:** zod response schemas → OpenAPI → generated SDK types with a drift test; live
+  responses validated against OpenAPI; api ↔ quant and runner ↔ api contracts.
+- **Observability:** one trace from ticket to fill and runner → api → quant; Prometheus metrics for
+  orders, rejections, fills/slippage, feed, bots, kill switch, relay, four-eyes, anchors, backups, AI;
+  Grafana dashboards (operations, SLOs, governance, AI) and 20 alert rules, each linked to a runbook
+  (tested).
+- **Quality:** golden-path e2e for all seven flows, axe on all 23 routes, keyboard walkthrough,
+  screen-reader spot checks, colour convention (`docs/qa/a11y.md`); coverage audit with a new web
+  gate (`docs/qa/coverage.md`); chaos drill 40/40 (`docs/qa/chaos.md`); load tests
+  (`docs/qa/load.md`) with seven performance fixes (audit-chain head in one round trip, session
+  status memo, candle rounding fast path, pool size, runner concurrency, single valuation, batched
+  spans).
+- **Release:** `release.yml` (full CI → images + Trivy → staging behind required reviewers →
+  PAPER smoke check → ZAP baseline), restore-based migration rollback drill
+  (`scripts/release/migration-rollback-test.mjs`), backup/restore drill (`docs/qa/release/`).
+
+### Known limitations (RC-1)
+
+- PAPER only: `LIVE_TRADING_ENABLED=false` is refused at start-up if changed; no broker adapter.
+- All market data, news, fees, calendars and questionnaires are SIMULATED; every regulatory value is
+  a placeholder pending the Sponsor (`RELEASE_CHECKLIST.md` §4).
+- Verified only on the native stack: Docker images, compose, Keycloak, Trivy and a real GitHub Actions
+  run have not executed in this environment; ZAP runs only against staging.
+- Load numbers come from one api process on a shared 4-vCPU host; REST tail latency under 500 reads/s
+  + 500 sockets (E-1) and a simultaneous-100 order spike (E-2) are owned exceptions pending Sponsor
+  acceptance; multi-replica run on staging is B-1013.
+- AI copilot and intelligence answer "unavailable" until a key and model are configured; live-provider
+  evals not yet run (OQ-A2).
+- Human reviews still owed: novice copy EN/FR (B-808), AI explanations, disclosures, assistive
+  technology sessions.
+- Product features and design changes found in goals 01–09 are re-targeted post-RC in `docs/BACKLOG.md`.
+
+### Sponsor launch checklist (market launch gate — Sponsor only)
+
+1. Licensed broker partner and a reviewed broker adapter (OQ-B1); only then may the Sponsor consider
+   enabling LIVE with the goal 09 controls operating.
+2. Market data and news licences per region, incl. redistribution and AI-processing rights (OQ-B2, OQ-M2–M4).
+3. AI API key and model choice from the vault (`ANTHROPIC_API_KEY`, `KORA_AI_MODEL`), prices, budgets,
+   and a passing live eval run (OQ-A2, B-703).
+4. Every regulatory value supplied or explicitly accepted, per jurisdiction (`RELEASE_CHECKLIST.md` §4).
+5. Legal sign-off per launch jurisdiction.
+6. Deployment verification: Keycloak realm (B-001), Docker images, cluster/compose, TLS, managed
+   backups/PITR, object-lock anchors (B-903), vault secrets, staging environment with required reviewers.
+7. A real GitHub Actions run of `ci.yml` and `release.yml` (incl. Trivy and ZAP).
+8. Human copy reviews (novice EN/FR, AI explanations, disclosures) and an assistive-technology session.
+9. Third-party penetration test of staging.
+10. Acceptance of load exceptions E-1/E-2 (OQ-O3) after a staging re-run.
+
+### Next steps
+
+Post-RC backlog in `docs/BACKLOG.md` (B-1002, B-1011–B-1013 added in goal 10); Sponsor items above.
+

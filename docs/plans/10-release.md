@@ -133,4 +133,72 @@ B-912, B-915), deployment-only (B-001, B-008, B-201, B-302, B-315, B-610, B-903,
 B-606, B-702, B-708, B-804/B-908).
 
 ## 6. Results
-_Filled in at the end of the goal._
+
+Run 2026-09-27 on branch `claude/magical-newton-yyxga6` (4 vCPU cloud VM, native Postgres 16 and
+Redis 7, no Docker, no Keycloak, no GitHub Actions). Gate review: Project Owner with S8/S9/S10 lenses.
+
+### 6.1 Acceptance criteria
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | All CI stages green: lint, types, unit, contract, e2e, AI evals, security scans, a11y | **Pass locally** (every stage run with the CI commands; a real GitHub Actions run is a Sponsor launch item) | §6.2 |
+| 2 | Load-test results meet the targets or have an owner-accepted exception | **Pass with exceptions**: all goal 02/03 targets and SLO-2/SLO-3 met; E-1 (REST tail on one saturated api process) and E-2 (simultaneous-100 spike) owned by S3/S4, **pending Sponsor acceptance** (OQ-O3) | `docs/qa/load.md` |
+| 3 | Every chaos scenario behaves as specified, evidence in `docs/qa/` | **Pass**: 40/40 checks (feed, Redis, quant, AI provider), logs and 7 screenshots | `docs/qa/chaos.md`, `docs/qa/chaos/` |
+| 4 | 0 open critical/high vulnerabilities; threat model committed | **Pass**: Semgrep 0, pnpm audit 0 high/critical (prod 0), pip-audit 0, history secrets 220/220 reviewed; STRIDE model committed. Trivy (CI) and ZAP (staging) deferred with owner S9 | `docs/security/` |
+| 5 | Traces show the full order path; each alert links to its runbook | **Pass**: one trace `POST /orders` → `oms.submit` → `risk.evaluate` → `engine.fill`, runner → api → quant; 20 alert rules, each `runbook_url` checked to exist | `tracing.int.test.ts`, `observability.int.test.ts` |
+| 6 | STATUS marked RC-1 with known limitations and next steps | **Done** | `docs/STATUS.md` |
+
+### 6.2 Final gate (after the last code change)
+
+| Stage | Command | Result |
+|---|---|---|
+| build | `pnpm build` | 7/7 tasks |
+| lint | `pnpm lint` | 13/13 |
+| typecheck | `pnpm typecheck` | 13/13 |
+| unit + coverage gates | `pnpm test` | 13/13 (domain 99.4 %, market-data 99.3 %, api cores 98.4 %, web logic 94.7 %, quant 97.4 %) |
+| integration ×2 | `pnpm test:integration` | 40 files, 248 tests — pass, pass |
+| e2e ×3 | `pnpm test:e2e` | 64/64, 64/64, 64/64 (no retries, no flakes) |
+| Python | `pnpm py:check` | ruff, mypy --strict, 164 tests, coverage 97.4 % |
+| AI evals | `pnpm evals` | overall 100 % (threshold 90 %; injection/refusal 100 %) |
+| i18n | `pnpm --filter @kora/web i18n:check` | pass |
+| contrast | `pnpm contrast` | 106/106 pairs ≥ 4.5:1 |
+| Storybook axe | `test:storybook-axe` | 84/84 stories, both themes |
+| SAST | `scripts/security/sast.sh` | 0 findings (422 rules) |
+| dependencies | `pnpm audit --prod --audit-level high`, `pip-audit` | 0 / 0 |
+| secrets | `scripts/security/secrets-history.py` | 1,651 blobs, 0 unreviewed |
+| chaos | `node scripts/chaos/run.mjs` | 40/40 |
+| load | `node apps/api/load/platform-load.mjs` + `load:ws` | see `docs/qa/load.md` |
+| rollback / restore | `scripts/release/migration-rollback-test.mjs`, `scripts/backup.sh` | pass / pass |
+
+### 6.3 Golden paths (goal 10 §2)
+
+| Flow | Spec |
+|---|---|
+| Pro trade lifecycle | `trading.spec.ts` (preview → place → blotter; kill switch scope 3), `terminal.spec.ts`, `terminal-a11y-perf.spec.ts` (keyboard ticket to fill) |
+| Simulator scenarios | `simulator.spec.ts` |
+| Robot build → backtest → paper-run → kill switch | `golden-path.spec.ts` |
+| Copilot explain + draft | `copilot.spec.ts` |
+| Novice onboarding → trade → limit → cooling-off | `novice.spec.ts` |
+| Risk officer approval | `governance.spec.ts` (four-eyes resume after a firm halt) |
+| Audit verification | `golden-path.spec.ts` (definition of done), `governance.spec.ts` (internal audit) |
+
+### 6.4 Findings fixed in goal 10
+
+Security: server-side session revocation incl. WebSockets; MFA recovery codes (B-902); trusted proxy
+hops (B-015); fail-closed metrics; GCM tag length; Actions pinned to SHAs; supply-chain settings.
+Performance (load): DB pool, double valuation, session-status CPU, audit-chain head in one round trip
+(migration 0102), candle rounding fast path, runner concurrency, batched span export.
+Resilience (chaos): Redis outage no longer returns 500; ticket and order book mark stale prices.
+Accessibility: dialogs return focus to their opener. Quant: unbounded Kelly reported as null.
+
+### 6.5 Deferred with reason and owner
+
+| Item | Reason | Owner |
+|---|---|---|
+| DAST (ZAP baseline) | no staging, ZAP not installable | S9 — `release.yml` job |
+| Trivy image scans, Keycloak e2e (B-001, B-008) | no Docker daemon | S9/S10 — CI |
+| A real GitHub Actions run | no runner here | Sponsor launch checklist |
+| Live-provider AI evals | no API key (OQ-A2) | Sponsor / S7 |
+| Multi-replica load run (B-207, B-1013) | needs deployment | S3 |
+| Human copy reviews and assistive-technology sessions (B-808) | human reviewers | Sponsor |
+| Product features re-targeted post-RC | goal 10 fixes, it does not add features | Product Owner (BACKLOG) |
