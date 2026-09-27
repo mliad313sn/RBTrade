@@ -206,9 +206,9 @@ new regression test run on the unfixed code; "after" is the same test after the 
 | `pnpm build` | pass (7/7) |
 | `pnpm lint` | pass (13/13) |
 | `pnpm typecheck` | pass (13/13) |
-| `pnpm test` | pass except `services/bot-runner` kill-switch test under parallel load; passes alone twice (see open items) |
+| `pnpm test` | pass (13/13). Earlier runs failed once in `services/bot-runner` (kill-switch test): other sessions' bot runners on the shared Redis answer the global halt channel with `robotIds: []`; the same test passes on this branch and on the baseline when no other runner is up |
 | `pnpm test:integration` ×2 | 42 files / 260 tests, green twice in a row (second with `--force`) |
-| `pnpm test:e2e` | 62/64; the 2 failures were the timing-bound axe and tick-to-paint checks at load average ~14 on 4 cores; the spec passes alone (3/3, p95 78 ms) |
+| `pnpm test:e2e` | 64/64 (rerun). A first run at load average ~14 on 4 cores timed out the axe and tick-to-paint checks (p95 118 ms); that spec then passed alone (3/3, p95 78 ms) and in the full rerun |
 | `pnpm py:check` | pass (164 tests, 97 % coverage) |
 | `pnpm evals` | 133/133, every category 100 % (new `guard_adversarial`: 16 cases) |
 
