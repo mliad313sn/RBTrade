@@ -36,6 +36,11 @@ def test_rsi_extremes_and_wilder_step() -> None:
     # al=0.125 → 87.5
     assert r[2:].tolist() == pytest.approx([50.0, 75.0, 87.5])
     assert np.isnan(ind.rsi(arr(1, 2), 3)).all()
+    # IRTC R3-13: a flat window is 50 (chart/alert parity), not 100 ("RSI > 70" on a stale series).
+    flat = ind.rsi(arr(5, 5, 5, 5, 5, 5), 3)
+    assert flat[3:].tolist() == [50.0, 50.0, 50.0]
+    down = ind.rsi(arr(6, 5, 4, 3, 2), 3)
+    assert down[3:].tolist() == [0.0, 0.0]
 
 
 def test_true_range_and_atr() -> None:
