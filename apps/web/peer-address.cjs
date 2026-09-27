@@ -12,6 +12,7 @@
  * `x-kora-peer-addr`, overwriting anything the client sent, before Next.js sees the request. The
  * proxy trusts that header only when this module is loaded in the same process (global flag).
  */
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a CommonJS preload for `node --require`
 const http = require('node:http');
 
 const HEADER = 'x-kora-peer-addr';

@@ -52,6 +52,8 @@ const MFA_LOCKED = 'Too many wrong codes. Two-factor sign-in is paused for this 
 export class DevIdpService {
   private readonly log = new Logger(DevIdpService.name);
   private readonly box: CryptoBox;
+  /** Housekeeping cadence for expired back-off rows (every 100th counted failure). */
+  private backoffWrites = 0;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -128,7 +130,7 @@ export class DevIdpService {
     const fail = async () => {
       await this.users.recordBackoffFailure('pair', keys.pair, now, AUTH_POLICY.windowHours, (n) => backoffSeconds(n, AUTH_POLICY.pair));
       await this.users.recordBackoffFailure('account', keys.account, now, AUTH_POLICY.windowHours, (n) => backoffSeconds(n, AUTH_POLICY.account));
-      if (Math.random() < 0.01) void this.users.pruneBackoff(now, AUTH_POLICY.windowHours).catch(() => undefined);
+      if (++this.backoffWrites % 100 === 0) void this.users.pruneBackoff(now, AUTH_POLICY.windowHours).catch(() => undefined);
     };
     if (!user || !user.password_hash || user.status !== 'active') {
       await verifyPassword(password, await dummyPasswordHash(this.config.auth.scryptN)); // equalise timing
