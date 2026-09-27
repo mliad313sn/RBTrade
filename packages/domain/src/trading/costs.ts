@@ -74,7 +74,26 @@ export function notional(qty: Decimal, price: Decimal, multiplier: Decimal): Dec
   return qty.abs().mul(price).mul(multiplier);
 }
 
-/** Commission for one fill in quote currency, rounded to the quote currency's minor unit. */
+/** Commission before the minimum and before rounding (quote currency). */
+export function commissionRaw(
+  fs: FeeSchedule,
+  qty: Decimal,
+  price: Decimal,
+  multiplier: Decimal,
+): Decimal {
+  return notional(qty, price, multiplier)
+    .mul(dec(fs.commissionBps))
+    .div(10_000)
+    .add(qty.abs().mul(dec(fs.commissionPerUnit)));
+}
+
+/** Commission of a whole order from its raw total: minimum applied once, rounded to the minor unit. */
+export function orderCommission(fs: FeeSchedule, raw: Decimal, quoteCcy: string): Decimal {
+  const min = dec(fs.commissionMin);
+  return roundMoney(raw.lt(min) ? min : raw, quoteCcy);
+}
+
+/** Commission for one order filled in one piece, in quote currency, rounded to the minor unit. */
 export function commission(
   fs: FeeSchedule,
   qty: Decimal,
@@ -82,12 +101,27 @@ export function commission(
   multiplier: Decimal,
   quoteCcy: string,
 ): Decimal {
-  const raw = notional(qty, price, multiplier)
-    .mul(dec(fs.commissionBps))
-    .div(10_000)
-    .add(qty.abs().mul(dec(fs.commissionPerUnit)));
-  const min = dec(fs.commissionMin);
-  return roundMoney(raw.lt(min) ? min : raw, quoteCcy);
+  return orderCommission(fs, commissionRaw(fs, qty, price, multiplier), quoteCcy);
+}
+
+/**
+ * IRTC R2-06: commission for the next fill of an order that already received fills with a raw
+ * commission of `rawBefore`. The minimum applies once per order (as the preview shows), so the fills
+ * of an order always add up to `orderCommission` of the order's total, however many depth levels or
+ * partial fills it takes.
+ */
+export function incrementalCommission(
+  fs: FeeSchedule,
+  rawBefore: Decimal,
+  hadFills: boolean,
+  qty: Decimal,
+  price: Decimal,
+  multiplier: Decimal,
+  quoteCcy: string,
+): Decimal {
+  const charged = hadFills ? orderCommission(fs, rawBefore, quoteCcy) : ZERO;
+  const total = orderCommission(fs, rawBefore.add(commissionRaw(fs, qty, price, multiplier)), quoteCcy);
+  return total.sub(charged);
 }
 
 /** Half the quoted spread times size: what crossing the spread costs versus mid (quote currency). */

@@ -98,7 +98,13 @@ export interface RiskContext {
   instrumentStatus: InstrumentStatus;
   session: SessionState;
   marketData: MarketDataState;
+  /** A fresh FX rate to the base currency exists (every leg within its staleness threshold). */
   fxAvailable: boolean;
+  /**
+   * IRTC R2-14: a last known FX rate exists, even if stale (e.g. FX closed at the weekend). Orders
+   * that only reduce exposure are priced with it and never blocked by FX staleness.
+   */
+  fxRateKnown?: boolean;
   mid: Decimal | null;
   fatFingerPct: Decimal;
   notionalBase: Decimal;
@@ -143,19 +149,136 @@ export function fillsImmediately(ctx: Pick<RiskContext, 'order'>): boolean {
   );
 }
 
+/**
+ * True when moving the position from `before` to `after` does not increase it or flip it. A
+ * reduce-only order opposite to the position also counts: the engine clips it at fill time, so it
+ * can never increase or flip exposure.
+ */
+export function isReducing(before: Decimal, after: Decimal, reduceOnly = false): boolean {
+  const opposite = after.sub(before).mul(before).lt(0); // lt: decimal.js keeps -0
+  return (
+    (reduceOnly && opposite) ||
+    (after.abs().lte(before.abs()) && !before.isZero() && after.mul(before).gte(0))
+  );
+}
+
+/** Inputs of the account-level limits (position, leverage, margin and loss limits). */
+export type AccountLimitContext = Pick<
+  RiskContext,
+  | 'baseCcy'
+  | 'positionNotionalAfter'
+  | 'grossExposureAfter'
+  | 'equity'
+  | 'marginAfter'
+  | 'dayPnl'
+  | 'weekPnl'
+  | 'monthPnl'
+  | 'limits'
+>;
+
+/**
+ * Account-level limits for anything that adds exposure. Shared by the pre-trade check and by the
+ * re-check the engine runs before a resting order fills (IRTC R2-01/R2-21).
+ */
+export function accountLimitViolations(ctx: AccountLimitContext): RiskViolation[] {
+  const v: RiskViolation[] = [];
+  const add = (code: RiskCode, message: string) => v.push({ code, message });
+  const ccy = ctx.baseCcy;
+  const money = (d: Decimal) => `${formatAmount(d, ccy)} ${ccy}`;
+  if (ctx.positionNotionalAfter.gt(dec(ctx.limits.maxPositionNotional)))
+    add(
+      'MAX_POSITION',
+      `The position would be worth ${money(ctx.positionNotionalAfter)}, above the ${money(dec(ctx.limits.maxPositionNotional))} limit per instrument.`,
+    );
+  const lev = ctx.equity.gt(0) ? ctx.grossExposureAfter.div(ctx.equity) : new Decimal(Infinity);
+  if (lev.gt(dec(ctx.limits.maxLeverage)))
+    add(
+      'MAX_LEVERAGE',
+      `Total exposure would be ${lev.isFinite() ? lev.toDecimalPlaces(1).toFixed(1) : 'unbounded'}× equity, above the ${ctx.limits.maxLeverage}× limit.`,
+    );
+  if (ctx.marginAfter.gt(ctx.equity))
+    add(
+      'INSUFFICIENT_MARGIN',
+      `Margin needed (${money(ctx.marginAfter)}) would exceed equity (${money(ctx.equity)}).`,
+    );
+  if (ctx.dayPnl.neg().gte(dec(ctx.limits.dailyLossLimit)))
+    add(
+      'DAILY_LOSS_LIMIT',
+      `Today's loss has reached the ${money(dec(ctx.limits.dailyLossLimit))} daily limit. Only orders that reduce positions are allowed until tomorrow.`,
+    );
+  if (
+    ctx.limits.monthlyLossLimit !== undefined &&
+    ctx.monthPnl &&
+    ctx.monthPnl.neg().gte(dec(ctx.limits.monthlyLossLimit))
+  )
+    add(
+      'MONTHLY_LOSS_LIMIT',
+      `This month's loss has reached the ${money(dec(ctx.limits.monthlyLossLimit))} monthly limit. Only orders that reduce positions are allowed.`,
+    );
+  if (ctx.weekPnl.neg().gte(dec(ctx.limits.weeklyLossLimit)))
+    add(
+      'WEEKLY_LOSS_LIMIT',
+      `This week's loss has reached the ${money(dec(ctx.limits.weeklyLossLimit))} weekly limit. Only orders that reduce positions are allowed.`,
+    );
+  return v;
+}
+
+const NOVICE_LEVERAGE_MESSAGE = (cap: Decimal) =>
+  cap.lte(1)
+    ? 'This trade would need borrowing (leverage), which is off in the simple view. Reduce the size.'
+    : `This trade would borrow more than ${cap.toFixed()}× your balance, the most allowed in the simple view. Reduce the size.`;
+
+const COOLING_OFF_MESSAGE: Record<CoolingOffReason, string> = {
+  losing_trades:
+    'Time for a break: you had several losing trades today. New trades open again tomorrow; you can still close trades.',
+  daily_loss_pct:
+    'Time for a break: today’s loss is large for your balance. New trades open again tomorrow; you can still close trades.',
+  daily_loss_limit:
+    'Time for a break: you reached your daily loss limit. New trades open again tomorrow; you can still close trades.',
+};
+
+/** Inputs of the re-check before a resting order fills (IRTC R2-21). */
+export interface FillExposureContext extends AccountLimitContext {
+  source: string;
+  halted: boolean;
+  positionQtyBefore: Decimal;
+  positionQtyAfter: Decimal;
+  novice: boolean;
+  noviceMaxLeverage?: Decimal;
+  coolingOff?: CoolingOffReason | null;
+}
+
+/**
+ * Re-check before a resting order (limit, stop, trailing, held market remainder, amended order)
+ * fills: an order approved when the account was healthy must not add exposure once margin is used
+ * up, a loss limit is hit, cooling-off started or robots are halted. Fills that only reduce the
+ * position always pass (stops, take-profits, kill-switch flatten and margin close-out orders).
+ */
+export function evaluateFillExposure(ctx: FillExposureContext): RiskViolation[] {
+  if (isReducing(ctx.positionQtyBefore, ctx.positionQtyAfter)) return [];
+  const v: RiskViolation[] = [];
+  if (ctx.halted && isRobotSource(ctx.source))
+    v.push({
+      code: 'TRADING_HALTED',
+      message:
+        'Trading is halted by the kill switch. Robot orders are blocked until someone authorised resumes trading.',
+    });
+  if (ctx.novice) {
+    const cap = ctx.noviceMaxLeverage ?? new Decimal(1);
+    if (ctx.grossExposureAfter.gt(ctx.equity.mul(cap)))
+      v.push({ code: 'NOVICE_LEVERAGE', message: NOVICE_LEVERAGE_MESSAGE(cap) });
+    if (ctx.coolingOff)
+      v.push({ code: 'NOVICE_COOLING_OFF', message: COOLING_OFF_MESSAGE[ctx.coolingOff] });
+  }
+  return [...v, ...accountLimitViolations(ctx)];
+}
+
 export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
   const v: RiskViolation[] = [];
   const add = (code: RiskCode, message: string) => v.push({ code, message });
   const ccy = ctx.baseCcy;
   const money = (d: Decimal) => `${formatAmount(d, ccy)} ${ccy}`;
-  // Opposite to an open position. A reduce-only order larger than the position is clipped by the
-  // engine at fill time, so it can never increase or flip exposure.
-  const opposite = ctx.positionQtyAfter.sub(ctx.positionQtyBefore).mul(ctx.positionQtyBefore).lt(0); // lt: decimal.js keeps -0
-  const reducing =
-    (ctx.order.reduceOnly && opposite) ||
-    (ctx.positionQtyAfter.abs().lte(ctx.positionQtyBefore.abs()) &&
-      !ctx.positionQtyBefore.isZero() &&
-      ctx.positionQtyAfter.mul(ctx.positionQtyBefore).gte(0));
+  const reducing = isReducing(ctx.positionQtyBefore, ctx.positionQtyAfter, ctx.order.reduceOnly);
   const immediate = fillsImmediately(ctx);
 
   if (ctx.halted && isRobotSource(ctx.order.source))
@@ -188,7 +311,7 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
       'SESSION_CLOSED',
       `The market is ${ctx.session === 'break' ? 'on a break' : ctx.session}. Orders that fill now are refused; place a resting order instead.`,
     );
-  if (!ctx.fxAvailable)
+  if (!ctx.fxAvailable && !(reducing && ctx.fxRateKnown))
     add(
       'FX_RATE_UNAVAILABLE',
       `No fresh exchange rate to ${ccy} is available, so costs and margin cannot be priced.`,
@@ -215,21 +338,8 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
       );
     const cap = ctx.noviceMaxLeverage ?? new Decimal(1);
     if (!reducing && ctx.grossExposureAfter.gt(ctx.equity.mul(cap)))
-      add(
-        'NOVICE_LEVERAGE',
-        cap.lte(1)
-          ? 'This trade would need borrowing (leverage), which is off in the simple view. Reduce the size.'
-          : `This trade would borrow more than ${cap.toFixed()}× your balance, the most allowed in the simple view. Reduce the size.`,
-      );
-    if (!reducing && ctx.coolingOff)
-      add(
-        'NOVICE_COOLING_OFF',
-        ctx.coolingOff === 'losing_trades'
-          ? 'Time for a break: you had several losing trades today. New trades open again tomorrow; you can still close trades.'
-          : ctx.coolingOff === 'daily_loss_pct'
-            ? 'Time for a break: today’s loss is large for your balance. New trades open again tomorrow; you can still close trades.'
-            : 'Time for a break: you reached your daily loss limit. New trades open again tomorrow; you can still close trades.',
-      );
+      add('NOVICE_LEVERAGE', NOVICE_LEVERAGE_MESSAGE(cap));
+    if (!reducing && ctx.coolingOff) add('NOVICE_COOLING_OFF', COOLING_OFF_MESSAGE[ctx.coolingOff]);
   }
 
   if (ctx.notionalBase.gt(dec(ctx.limits.maxOrderNotional)))
@@ -259,43 +369,7 @@ export function evaluateRisk(ctx: RiskContext): RiskViolation[] {
       'Fill-or-kill: the visible market cannot fill the whole size at once.',
     );
 
-  if (!reducing) {
-    if (ctx.positionNotionalAfter.gt(dec(ctx.limits.maxPositionNotional)))
-      add(
-        'MAX_POSITION',
-        `The position would be worth ${money(ctx.positionNotionalAfter)}, above the ${money(dec(ctx.limits.maxPositionNotional))} limit per instrument.`,
-      );
-    const lev = ctx.equity.gt(0) ? ctx.grossExposureAfter.div(ctx.equity) : new Decimal(Infinity);
-    if (lev.gt(dec(ctx.limits.maxLeverage)))
-      add(
-        'MAX_LEVERAGE',
-        `Total exposure would be ${lev.isFinite() ? lev.toDecimalPlaces(1).toFixed(1) : 'unbounded'}× equity, above the ${ctx.limits.maxLeverage}× limit.`,
-      );
-    if (ctx.marginAfter.gt(ctx.equity))
-      add(
-        'INSUFFICIENT_MARGIN',
-        `Margin needed (${money(ctx.marginAfter)}) would exceed equity (${money(ctx.equity)}).`,
-      );
-    if (ctx.dayPnl.neg().gte(dec(ctx.limits.dailyLossLimit)))
-      add(
-        'DAILY_LOSS_LIMIT',
-        `Today's loss has reached the ${money(dec(ctx.limits.dailyLossLimit))} daily limit. Only orders that reduce positions are allowed until tomorrow.`,
-      );
-    if (
-      ctx.limits.monthlyLossLimit !== undefined &&
-      ctx.monthPnl &&
-      ctx.monthPnl.neg().gte(dec(ctx.limits.monthlyLossLimit))
-    )
-      add(
-        'MONTHLY_LOSS_LIMIT',
-        `This month's loss has reached the ${money(dec(ctx.limits.monthlyLossLimit))} monthly limit. Only orders that reduce positions are allowed.`,
-      );
-    if (ctx.weekPnl.neg().gte(dec(ctx.limits.weeklyLossLimit)))
-      add(
-        'WEEKLY_LOSS_LIMIT',
-        `This week's loss has reached the ${money(dec(ctx.limits.weeklyLossLimit))} weekly limit. Only orders that reduce positions are allowed.`,
-      );
-  }
+  if (!reducing) v.push(...accountLimitViolations(ctx));
   if (ctx.ordersLastMinute >= ctx.limits.maxOrdersPerMinute)
     add(
       'ORDER_RATE_LIMIT',

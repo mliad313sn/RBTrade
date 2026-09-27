@@ -11,6 +11,8 @@ import { Redis } from 'ioredis';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { busChannel, MD_CONFIG, type MdConfig } from '../market-data/md-config';
+import { AccountsService } from './accounts.service';
+import { MarginService } from './margin.service';
 import { MarketViewService } from './market-view.service';
 import { OmsService } from './oms.service';
 import { PaperEngineService } from './paper-engine.service';
@@ -33,6 +35,8 @@ export class EngineLoopService implements OnApplicationBootstrap, OnModuleDestro
   private timer: NodeJS.Timeout | null = null;
   private sweeping = false;
   private lastRollDate: string | null = null;
+  private lastSnapshotDate: string | null = null;
+  private lastMarginCheck = 0;
 
   constructor(
     @Inject(TRADING_CONFIG) private readonly cfg: TradingConfig,
@@ -43,6 +47,8 @@ export class EngineLoopService implements OnApplicationBootstrap, OnModuleDestro
     private readonly engine: PaperEngineService,
     private readonly registry: TradingRegistryService,
     private readonly market: MarketViewService,
+    private readonly accounts: AccountsService,
+    private readonly margin: MarginService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -175,12 +181,24 @@ export class EngineLoopService implements OnApplicationBootstrap, OnModuleDestro
     this.sweeping = true;
     try {
       await this.syncSubscriptions();
+      // IRTC R2-08: day/week/month start equity is recorded at the boundary, not at the first request.
+      const today = new Date(now).toISOString().slice(0, 10);
+      if (this.lastSnapshotDate !== today) {
+        await this.accounts.snapshotPeriodStarts(now);
+        this.lastSnapshotDate = today;
+      }
       await this.expireDue(now);
       const symbols = await this.db.query<{ symbol: string }>(
         `SELECT DISTINCT symbol FROM orders WHERE status IN ('working','partially_filled') AND exec_type <> 'none'`,
       );
       for (const { symbol } of symbols) await this.matchSymbol(symbol);
       if (this.lastRollDate !== new Date(now).toISOString().slice(0, 10)) await this.rollover(now);
+      // IRTC R2-20: margin call and close-out (OQ-B3).
+      const sinceCheck = now - this.lastMarginCheck;
+      if (sinceCheck >= this.cfg.margin.checkMs || sinceCheck < 0) {
+        this.lastMarginCheck = now;
+        await this.margin.sweep(now);
+      }
     } catch (e) {
       this.log.warn(`sweep: ${(e as Error).message}`);
     } finally {

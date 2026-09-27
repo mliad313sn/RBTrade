@@ -29,7 +29,10 @@ export interface MarketSnapshot {
   bid: Decimal | null;
   ask: Decimal | null;
   mid: Decimal | null;
-  /** |mid − previous mid| seen by the engine (volatility term). */
+  /**
+   * |mid − previous quote's mid| (volatility term). IRTC R2-10: it belongs to the quote that moved;
+   * the next quote with an unchanged mid resets it to zero, and a move across a pause counts as zero.
+   */
   lastMidMove: Decimal;
   at: number;
 }
@@ -41,7 +44,11 @@ export interface MarketSnapshot {
  */
 @Injectable()
 export class MarketViewService {
-  private readonly prevMid = new Map<string, { mid: Decimal; move: Decimal }>();
+  /** Last quote seen per symbol: its sequence, mid, receive time and the move it carried. */
+  private readonly lastQuote = new Map<
+    string,
+    { seq: number; mid: Decimal; move: Decimal; receivedTs: number }
+  >();
 
   constructor(
     private readonly hub: ChannelHub,
@@ -67,15 +74,16 @@ export class MarketViewService {
     const ask = quote ? dec(quote.ask) : null;
     const mid = bid && ask ? bid.add(ask).div(2) : null;
     let lastMidMove = dec(0);
-    if (mid) {
-      const prev = this.prevMid.get(sym);
-      if (prev && !prev.mid.eq(mid)) {
-        lastMidMove = mid.sub(prev.mid).abs();
-        this.prevMid.set(sym, { mid, move: lastMidMove });
-      } else if (prev) {
+    if (mid && quote) {
+      // A pure function of consecutive quotes: previews and other callers cannot change it, and a
+      // move is never carried beyond the quote that made it.
+      const prev = this.lastQuote.get(sym);
+      if (prev && prev.seq === quote.seq) {
         lastMidMove = prev.move;
       } else {
-        this.prevMid.set(sym, { mid, move: lastMidMove });
+        const paused = !prev || quote.receivedTs - prev.receivedTs > inst.staleAfterMs;
+        lastMidMove = paused ? dec(0) : mid.sub(prev.mid).abs();
+        this.lastQuote.set(sym, { seq: quote.seq, mid, move: lastMidMove, receivedTs: quote.receivedTs });
       }
     }
     // Depth must belong to the same instant's book side; ignore a depth older than the quote's stale window.

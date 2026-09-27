@@ -9,6 +9,7 @@ import { FxService } from './fx.service';
 import { KillSwitchController } from './kill-switch.controller';
 import { KillSwitchService } from './kill-switch.service';
 import { LedgerService } from './ledger.service';
+import { MarginService } from './margin.service';
 import { MarketViewService } from './market-view.service';
 import { OmsService } from './oms.service';
 import { OrdersController } from './orders.controller';
@@ -33,6 +34,7 @@ import { TradingRegistryService } from './trading-registry.service';
     TradingPublisher,
     PaperEngineService,
     OmsService,
+    MarginService,
     EngineLoopService,
     KillSwitchService,
     ReconciliationService,

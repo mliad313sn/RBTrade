@@ -106,10 +106,10 @@ describe('trading integrity', () => {
       `SELECT e.amount::text AS amount FROM ledger_entries e JOIN ledger_journals j ON j.id = e.journal_id WHERE j.account_id = $1 AND j.kind = 'swap' AND e.ledger_account = 'cash'`,
       [acct.id],
     );
-    // 100,000 × 1.0842 (mid) × −150 bps / 360 = −4.5175
-    expect(swaps).toEqual([{ amount: '-4.5175' }]);
+    // 100,000 × 1.0842 (mid) × −150 bps / 360 = −4.5175, charged in whole cents (IRTC R2-07)
+    expect(swaps).toEqual([{ amount: '-4.52' }]);
     const ev = await ownerQuery<{ payload: { symbol: string; amount: string } }>(`SELECT payload FROM audit_events WHERE action = 'position.swap_booked' AND payload->>'accountId' = $1`, [acct.id]);
-    expect(ev[0]!.payload).toMatchObject({ symbol: 'EURUSD', amount: '-4.5175' });
+    expect(ev[0]!.payload).toMatchObject({ symbol: 'EURUSD', amount: '-4.52' });
     expect(await app.get(ReconciliationService).checkAccount(acct.id)).toEqual([]);
   });
 

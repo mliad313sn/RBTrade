@@ -229,9 +229,13 @@ export class FourEyesService {
       }
       case 'kill_switch_resume': {
         // The resume takes the account lock in its own transaction; this row stays locked meanwhile.
+        const halt = r.payload as { haltedAt?: string | null; haltedBy?: string | null };
         const out = await this.killSwitch.executeResume(approver, r.subject_id, r.reason, {
           requestId: r.id,
           requestedBy: r.requested_by,
+          // IRTC R2-09: the approval is bound to the halt it was requested for.
+          haltedAt: halt.haltedAt,
+          haltedBy: halt.haltedBy,
         });
         return { resumed: true, accountId: out.accountId, previousScope: out.previous.scope };
       }
