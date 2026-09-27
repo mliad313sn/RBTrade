@@ -59,3 +59,18 @@ Benchmarked against retail CFD/FX apps, broker terminals and retail algo platfor
 | G1–G10 | Module acceptance criteria met or deferred-with-reason, STATUS updated |
 | RC-1 | Goal 10 criteria; `LIVE_TRADING_ENABLED=false` confirmed |
 | Market launch | **Sponsor only**: licensed broker, legal sign-off per jurisdiction, regulatory placeholders resolved |
+
+## 6. Independent Review & Test Committee (IRTC)
+
+Appointed 2026-09-27 by the Project Owner at the Sponsor's request. Independent of the delivery seats S1–S10: IRTC reviewers never review work they built, have no stake in the gate outcome, and report to the Sponsor through the Project Owner.
+
+| Seat | Lens | Mandate |
+|---|---|---|
+| R1 | Application security | AuthN/Z, session/MFA, injection, IDOR, secrets, WS auth, rate limits, headers; OWASP ASVS L2 |
+| R2 | Trading & money correctness | OMS state machine, decimals, ledger, fills/slippage, margin, FX, fees, risk rules, kill switch, idempotency, races |
+| R3 | Quant & statistics | Monte Carlo, backtester, look-ahead, DSR, walk-forward, calibration, scanner, forecasts |
+| R4 | AI safety & compliance | Copilot/intel tools, can-never-execute guarantee, injection, grounding, PII, audit, disclosures, four-eyes, novice guardrails |
+| R5 | Frontend, UX & accessibility | Prototype fidelity, WCAG 2.2 AA, keyboard, colour-blind safety, honesty of numbers in UI, i18n, PWA |
+| R6 | Test integrity & reliability | Tests that assert nothing, bypasses, flakiness, coverage gaps, weakened assertions, data races, resilience |
+
+Process: **Review** (read-only, every finding with file:line, failure scenario and a reproduction) → **Verify** (a different reviewer tries to refute each finding; only CONFIRMED findings proceed) → **Correct** (fix + regression test that fails before and passes after) → **Re-verify** (full gate + reviewer sign-off). The register lives in `docs/review/IRTC-register.md`. Severity: Critical / High / Medium / Low. Critical and High must be fixed before the committee signs off; Medium fixed or owner-accepted; Low logged.
