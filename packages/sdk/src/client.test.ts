@@ -74,7 +74,7 @@ describe('KoraClient', () => {
     await c.killSwitchState();
     await c.resumeTrading('checked', 'a1');
     await c.appropriateness();
-    await c.submitAppropriateness('appropriateness', 1, { q: 'a' });
+    await c.submitAppropriateness('appropriateness', 1, { q: 'a' }, { version: 'v1', contentHash: 'a'.repeat(64), locale: 'en' });
     const calls = f.mock.calls.map((x) => [x[1]?.method, x[0]]);
     expect(calls).toEqual([
       ['GET', '/api/accounts/me'],
