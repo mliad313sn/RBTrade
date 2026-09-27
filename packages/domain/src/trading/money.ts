@@ -3,6 +3,10 @@ import { Decimal, dec, type DecimalInput } from '../decimal.js';
 /**
  * Currency minor units (ISO 4217 exponents) for display and for charging fees. Ledger amounts stay
  * exact; only charges (commission, swap, conversion fee) are rounded to the minor unit.
+ *
+ * Rounding policy for charges (IRTC R2-07): every charge is first converted to the account's base
+ * currency, then rounded once to the base currency's minor unit with banker's rounding
+ * (`roundMoney`, ROUND_HALF_EVEN: no systematic bias for or against the client).
  */
 const MINOR_UNITS: Record<string, number> = {
   JPY: 0,

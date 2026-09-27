@@ -63,6 +63,18 @@ export function depositJournal(raw: Decimal, currency: string): Journal {
 }
 
 /**
+ * Reverses a deposit (IRTC R2-05: the SIMULATED balance moves to a new account currency as a
+ * reversal in the old currency plus a deposit in the new one, so each journal has one currency).
+ */
+export function depositReversalJournal(raw: Decimal, currency: string): Journal {
+  const amount = ledgerAmount(raw);
+  return build('adjustment', currency, [
+    { account: 'cash', amount: amount.neg() },
+    { account: 'capital', amount },
+  ]);
+}
+
+/**
  * One journal per fill, in base currency. `realizedPnl` is signed (gain > 0); `commission` and
  * `fxConversionCost` are charges (≥ 0).
  */

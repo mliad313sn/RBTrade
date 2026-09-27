@@ -154,6 +154,9 @@ export function orderShapeIssues(o: Base): Array<{ path: string; message: string
       break;
     case 'trailing':
       need('trailAmount', 'A trailing stop needs a trailing distance');
+      // IRTC R2-16: the engine derives the stop from the trailing distance and never uses a limit.
+      forbid('limitPrice', 'A trailing stop has no limit price');
+      forbid('stopPrice', 'A trailing stop sets its own stop price from the trailing distance');
       break;
     case 'bracket':
       need('stopLossPrice', 'A bracket needs a stop loss');
@@ -179,6 +182,12 @@ export function orderShapeIssues(o: Base): Array<{ path: string; message: string
   if (o.type !== 'bracket') forbid('entryType', 'Only brackets take an entry type');
   if (o.tif === 'gtd') need('expireAt', 'Good-till-date needs an expiry time');
   else forbid('expireAt', 'Only good-till-date orders take an expiry time');
+  // IRTC R2-16: stop orders rest until triggered, so immediate-or-cancel / fill-or-kill cannot apply.
+  if ((o.type === 'stop' || o.type === 'stop_limit' || o.type === 'trailing') && (o.tif === 'ioc' || o.tif === 'fok'))
+    issues.push({
+      path: 'tif',
+      message: 'Stop orders wait for their trigger; use GTC, Day or GTD instead of IOC or FOK',
+    });
   if (o.postOnly && (o.tif === 'ioc' || o.tif === 'fok'))
     issues.push({
       path: 'postOnly',
