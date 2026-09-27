@@ -118,7 +118,7 @@ export function TicketPanel() {
   const [origin, setOrigin] = useState<'manual' | 'ai' | string>('manual');
   const [note, setNote] = useState<string | null>(null);
   const [aiDraftId, setAiDraftId] = useState<string | null>(null);
-  const [quote, setQuote] = useState<{ bid: string; ask: string } | null>(null);
+  const [quote, setQuote] = useState<{ bid: string; ask: string; stale: boolean } | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -153,7 +153,7 @@ export function TicketPanel() {
 
   useEffect(() => {
     setQuote(null);
-    return store.onQuote(symbol, (q) => setQuote({ bid: q.bid, ask: q.ask }));
+    return store.onQuote(symbol, (q) => setQuote({ bid: q.bid, ask: q.ask, stale: !!q.stale }));
   }, [store, symbol]);
 
   useEffect(() => {
@@ -399,12 +399,18 @@ export function TicketPanel() {
           ) : null}
         </p>
       ) : null}
+      {quote?.stale ? (
+        // Goal 10 chaos finding: the last price stayed on the buttons without a marker while the feed was down.
+        <p className="m-0 text-xs text-warn" role="status" data-testid="ticket-stale">
+          ⚠ Stale price: the feed is not live. Orders that need a price are refused until it recovers.
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Side">
         <button ref={buyRef} type="button" role="radio" aria-checked={side === 'buy'} onClick={() => setSide('buy')} className={`tk-side tk-side--buy ${side === 'buy' ? 'is-on' : ''}`} data-testid="ticket-side-buy">
-          BUY ▲ <span className="k-num">{quote ? formatPrice(quote.ask, precision) : ''}</span>
+          BUY ▲ <span className="k-num">{quote ? formatPrice(quote.ask, precision) : ''}</span>{quote?.stale ? <span className="text-xs"> Stale</span> : null}
         </button>
         <button ref={sellRef} type="button" role="radio" aria-checked={side === 'sell'} onClick={() => setSide('sell')} className={`tk-side tk-side--sell ${side === 'sell' ? 'is-on' : ''}`} data-testid="ticket-side-sell">
-          SELL ▼ <span className="k-num">{quote ? formatPrice(quote.bid, precision) : ''}</span>
+          SELL ▼ <span className="k-num">{quote ? formatPrice(quote.bid, precision) : ''}</span>{quote?.stale ? <span className="text-xs"> Stale</span> : null}
         </button>
       </div>
       <div role="radiogroup" aria-label="Order type" className="flex flex-wrap gap-1" data-testid="order-types">

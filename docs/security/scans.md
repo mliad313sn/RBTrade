@@ -14,4 +14,4 @@ building images.
 | DAST (OWASP ZAP baseline) | `release.yml` job `zap-baseline` against staging | **Deferred to staging**, owner S9 (ZAP cannot be installed here and there is no staging) | high fails |
 
 Moderate advisory follow-up: upgrade `vitest` to ≥ 4.1.11 when it clears the 7-day
-`minimumReleaseAge` window and the suite passes on it (B-1001, owner S10).
+`minimumReleaseAge` window and the suite passes on it (B-1011, owner S10).

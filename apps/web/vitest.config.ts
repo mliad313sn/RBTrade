@@ -5,7 +5,7 @@ import { defineConfig, type ViteUserConfig } from 'vitest/config';
 // Goal 10 test-pyramid audit: coverage gate on the web app's pure logic (formatting, layout, route
 // rules, novice and simulator helpers). HTTP clients, stores and server-only helpers are covered by
 // the e2e suite. The v8 provider is resolved from the api workspace (same vitest version) because a
-// new direct dependency cannot be added here inside the 7-day minimumReleaseAge window (B-1002).
+// new direct dependency cannot be added here inside the 7-day minimumReleaseAge window (B-1012).
 const v8 = createRequire(new URL('../api/package.json', import.meta.url)).resolve('@vitest/coverage-v8');
 
 export default defineConfig({

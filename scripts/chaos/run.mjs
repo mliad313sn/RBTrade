@@ -344,6 +344,10 @@ async function main() {
   await sleep(2500);
   const staleBadge = await page.getByTestId('watchlist').getByText('Stale').first().isVisible().catch(() => false);
   step('stale badge on the watchlist', { quoteStale: staleQ.value?.stale ?? null, badgeVisible: staleBadge, screenshot: await shot('01-feed-down-stale-badges') }, staleBadge || staleQ.ok);
+  // Goal 10 finding (first drill): the ticket and order book kept the last price without a marker.
+  const ticketStale = await page.getByTestId('ticket-stale').isVisible().catch(() => false);
+  const bookStale = (await page.getByTestId('order-book').getAttribute('data-stale').catch(() => null)) === 'true';
+  step('ticket and order book mark the price stale', { ticketStale, bookStale }, ticketStale && bookStale);
   const stale = await marketOrder(trader, cid('stale'));
   step('no order on stale data: market order refused with a data code', { status: stale.status, code: stale.json?.code }, stale.status === 422 && ['MARKET_DATA_STALE', 'FEED_NOT_OK', 'NO_MARKET_DATA'].includes(stale.json?.code));
   await sleep(1500);

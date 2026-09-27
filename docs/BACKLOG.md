@@ -123,6 +123,7 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-914 | KYC provider integration behind the `KycProvider` interface (Sponsor contract and DPA, OQ-K1) | goal 09 | post-RC (Sponsor) | Open |
 | B-915 | Best-execution review workflow with thresholds and sign-off (OQ-X1) | goal 09 | post-RC | Open — re-targeted in goal 10: product feature, goal 10 fixes and does not add features |
 | B-916 | Grafana / Alertmanager: alert relay counters, four-eyes expiries, evidence export and anchor job health, SLO dashboards from `docs/runbooks/slos.md` (with B-012) | goal 09 | 10 | Done in goal 10 (with B-012): alert relay, four-eyes, anchors, backups and SLO panels and alerts |
-| B-1001 | Upgrade `vitest` / `@vitest/mocker` to ≥ 4.1.11 (moderate dev-only advisory: path traversal via redirect mocks) once past `minimumReleaseAge` and the suites pass on it | goal 10 dependency audit | post-RC | Open |
-| B-1002 | Add `@vitest/coverage-v8` as a direct devDependency of `apps/web` (the web coverage gate borrows the api's provider because a new dependency could not clear `minimumReleaseAge` during goal 10) | goal 10 | post-RC | Open |
-| B-1003 | Re-run the platform load test on staging hardware with ≥ 2 api replicas (E-1) and decide on a spike SLO / audit group commit (E-2) | goal 10 load test | post-RC | Open |
+| B-1011 | Upgrade `vitest` / `@vitest/mocker` to ≥ 4.1.11 (moderate dev-only advisory: path traversal via redirect mocks) once past `minimumReleaseAge` and the suites pass on it | goal 10 dependency audit | post-RC | Open |
+| B-1012 | Add `@vitest/coverage-v8` as a direct devDependency of `apps/web` (the web coverage gate borrows the api's provider because a new dependency could not clear `minimumReleaseAge` during goal 10) | goal 10 | post-RC | Open |
+| B-1013 | Re-run the platform load test on staging hardware with ≥ 2 api replicas (E-1) and decide on a spike SLO / audit group commit (E-2) | goal 10 load test | post-RC | Open |
+| B-1002 | Status bar shows "Robots: none" for a user whose robot is running on the monitor (chaos drill observation) | goal 10 chaos | post-RC | Open |

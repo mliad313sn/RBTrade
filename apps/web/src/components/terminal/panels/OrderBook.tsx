@@ -42,6 +42,13 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
     });
   }, [store, symbol]);
 
+  // Goal 10 chaos finding: mark the book stale when the symbol's quote is stale (feed down).
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    setStale(false);
+    return store.onQuote(symbol, (q) => setStale(!!q.stale));
+  }, [store, symbol]);
+
   useEffect(() => {
     const b = bodyRef.current;
     if (!view || !b || centred.current) return;
@@ -53,8 +60,8 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
   const qtyPlaces = Math.min(spec?.qtyPrecision ?? 2, 2);
   const spreadText = view?.spread && spec && view.asks[0] && view.bids[0] ? formatSpread(view.bids[0].price, view.asks[0].price, spec) : '—';
   useEffect(() => {
-    onTitleRight?.(`spread ${spreadText}`);
-  }, [spreadText, onTitleRight]);
+    onTitleRight?.(stale ? 'Stale' : `spread ${spreadText}`);
+  }, [spreadText, stale, onTitleRight]);
 
   const fmtSize = (s: string) => {
     // Sizes shown in thousands for large FX books (prototype: 4.0 = 4.0M), otherwise at qty precision.
@@ -102,7 +109,12 @@ export function OrderBookPanel({ onTitleRight }: { onTitleRight?: (t: string) =>
   );
 
   return (
-    <div className="ob h-full flex flex-col min-h-0" data-testid="order-book" data-panel-root="orderbook" tabIndex={-1}>
+    <div className="ob h-full flex flex-col min-h-0" data-testid="order-book" data-panel-root="orderbook" data-stale={stale ? 'true' : 'false'} tabIndex={-1}>
+      {stale ? (
+        <p className="m-0 px-2 text-xs text-warn" role="status" data-testid="order-book-stale">
+          ⚠ Stale: last depth before the feed stopped
+        </p>
+      ) : null}
       <div className="ob-head" aria-hidden="true">
         <span>Price</span>
         <span className="text-right">Size</span>

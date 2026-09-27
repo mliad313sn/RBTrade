@@ -33,7 +33,7 @@ listening socket. After each fault the component is restarted and recovery is ch
 | No orders on stale data | **Pass.** Market orders during the feed outage → 422 `MARKET_DATA_STALE`; during the Redis outage → 422 `NO_MARKET_DATA`; zero fills for any order sent during an outage; no robot decision or order while quant was down. |
 | Recovery without duplicated orders | **Pass.** After each restart a new order fills exactly once, the client retry of the same `clientOrderId` replays (200, `idempotentReplay`), the retry of a refused order stays refused; no duplicated client order id and no over-filled order in the whole database; audit chain valid; reconciliation clean. |
 
-Overall: **39/39 checks passed** in 137 s (run of 2026-09-27; see `run.json` for the exact timings).
+Overall: **40/40 checks passed** in 143 s (re-run of 2026-09-27 after the stale-marker fix; see `run.json` for the exact timings; the per-step table below is from the first run).
 
 ## Findings fixed by the drill
 
@@ -47,9 +47,10 @@ Overall: **39/39 checks passed** in 137 s (run of 2026-09-27; see `run.json` for
 
 ## Observations for the backlog (not safety issues)
 
-- While the feed is down the order book and the ticket's buy/sell buttons keep showing the last
-  depth/quote without a stale marker (the server refuses the order and the watchlist shows Stale):
-  B-1001.
+- ~~While the feed is down the order book and the ticket's buy/sell buttons keep showing the last
+  depth/quote without a stale marker~~ **Fixed in goal 10:** the ticket shows "⚠ Stale price … orders
+  that need a price are refused" and "Stale" on both buttons, the order book shows a stale banner
+  (`data-stale`); the drill now checks both ("ticket and order book mark the price stale").
 - The status bar shows "Robots: none" for a user whose robot is running on the monitor: B-1002.
 
 ## Results
@@ -72,7 +73,7 @@ Fault: SIGKILL of the standalone feed process (md:feed).
 | t (s) | Check | Result | Evidence |
 |---|---|---|---|
 | 10.1 | api detects the lost feed heartbeat (status not ok / feedLost) | PASS | ms=2607, status="down", feedLost=true |
-| 12.9 | stale badge on the watchlist | PASS | quoteStale=true, badgeVisible=true, screenshot="docs/qa/chaos/screenshots/01-feed-down-stale-badges.png" |
+| 12.9 | stale badge on the watchlist (re-run adds: ticket and order book mark the price stale — PASS) | PASS | quoteStale=true, badgeVisible=true, screenshot="docs/qa/chaos/screenshots/01-feed-down-stale-badges.png" |
 | 12.9 | no order on stale data: market order refused with a data code | PASS | status=422, code="MARKET_DATA_STALE" |
 | 14.4 | no fill while the feed is down | PASS | fillsBefore=1, fillsAfter=1 |
 | 14.5 | kill switch works via REST while the feed is down | PASS | status=202, durationMs=15 |
