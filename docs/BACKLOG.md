@@ -127,3 +127,31 @@ Ordered by the Product Owner. Anything found at a gate lands here and is schedul
 | B-1012 | Add `@vitest/coverage-v8` as a direct devDependency of `apps/web` (the web coverage gate borrows the api's provider because a new dependency could not clear `minimumReleaseAge` during goal 10) | goal 10 | post-RC | Open |
 | B-1013 | Re-run the platform load test on staging hardware with ≥ 2 api replicas (E-1) and decide on a spike SLO / audit group commit (E-2) | goal 10 load test | post-RC | Open |
 | B-1002 | Status bar shows "Robots: none" for a user whose robot is running on the monitor (chaos drill observation) | goal 10 chaos | post-RC | Open |
+
+## IRTC open items (independent review, 2026-09-27/28)
+
+Every Critical, High and Medium IRTC finding is fixed and re-verified (`docs/review/IRTC-register.md`). These are the
+open Lows, residuals and hardening items, each with an owner. None blocks RC-1.
+
+| ID | Item | Source | Target goal | Status |
+|---|---|---|---|---|
+| B-1101 | A robot's protective stop is cancelled when manual trades net the account flat; needs position attribution by source (with B-408) | IRTC R2-22 | post-RC | Open — S4 / S2 |
+| B-1102 | Swap roll at 17:00 New York with DST, charge from the last known mark, triple-swap and holidays (with B-304) | IRTC R2-23 | post-RC | Open — S2 / S4 |
+| B-1103 | Financing per asset class (no overnight financing on unlevered cash equities) and an explicit novice short-selling policy | IRTC R2-24, OQ-R5 | post-RC (Sponsor) | Open — S8 → Sponsor |
+| B-1104 | Robot signal context sends prices as JSON numbers to quant; move to decimal strings and drop the `ref * 10` sentinel | IRTC R2-25 | post-RC | Open — S5 / S3 |
+| B-1105 | A second-factor lock completed by a login-step failure after stolen-session step-up failures does not end that user's sessions (only step-up-triggered locks do); end sessions on any lock that included step-up failures | IRTC re-verification (R1-07) | post-RC | Open — S9 |
+| B-1106 | Numeric fidelity lets small-integer odds through ("the chance of a rise is 3 in 4"); treat "n in m" / "n out of m" next to chance words as a calibrated-figure claim | IRTC re-verification (R4-03) | post-RC | Open — S7 |
+| B-1107 | Calibration compares the gross direction probability with a net-of-cost outcome; store P(net > 0) or show both events | IRTC R3-11 | post-RC | Open — S5 |
+| B-1108 | Kelly sizing with no edge after costs shows a flat band; show the unsized distribution or refuse | IRTC R3-14 | post-RC | Open — S5 |
+| B-1109 | Backtest exit fills (stop at the stop, target on touch) are optimistic relative to entries; change with the paper-parity tolerance | IRTC R3-16 | post-RC | Open — S2 / S5 |
+| B-1110 | Chart VWAP anchors to the venue session, not the UTC day | IRTC R3-17 | post-RC | Open — S6 |
+| B-1111 | Appropriateness "topics to review" acts as a per-question answer oracle; feedback policy | IRTC R4-21, OQ-C4 | post-RC (Compliance) | Open — S8 |
+| B-1112 | CSP refuses the Next.js preload links of dynamic chunks (console errors on Pro pages); nonce the preloads or drop them; also the middleware 403 on RSC prefetch never completing | IRTC R5-17 | post-RC | Open — S9 |
+| B-1113 | AI strip "Why?" toggle below the 24 px target size | IRTC R5-21 | post-RC | Open — S7 / S6 |
+| B-1114 | Simulator page overflows 69 px at 1440×900 and "Run projection" sits below the fold | IRTC R5-23 | post-RC | Open — S6 |
+| B-1115 | Structured second-pass classifier (`{containsSuggestion, claimsExecution}`) on top of the keyword guards, failing closed | IRTC R4-04 | post-RC | Open — S7 |
+| B-1116 | Audit events after the latest anchor are unwitnessed until the next (daily) anchor, and `/audit/verify` alone does not read the WORM copy (internal audit does); real object-lock storage (B-903) | IRTC R4-07 | post-RC (deployment) | Open — S10 |
+| B-1117 | Defence in depth for "AI never executes": a `READ ONLY` transaction around read-tool dispatch (draft tools split out) | IRTC R6-02 | post-RC | Open — S7 / S10 |
+| B-1118 | OpenAPI 200 response schemas for `GET /ai/strip`, `/calendar`, `/me/watchlists`, `/price-alerts` (the visual fixture check lists them) | IRTC R6-16 | post-RC | Open — S3 / S4 |
+| B-1119 | Control evidence KC-08: also count approvals where the decider granted or approved a role of the requester (the reverse relation enforced since the re-verification) | IRTC re-verification (R1-02/R4-02) | post-RC | Open — S8 |
+| B-1120 | Shared (Redis) throttler store so per-IP sign-up, assessment and sign-in limits hold across api replicas; owner notification of locks/back-off with Keycloak (B-001) | IRTC R1 open items | post-RC (deployment) | Open — S9 |

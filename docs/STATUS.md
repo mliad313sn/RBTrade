@@ -1,6 +1,6 @@
 # KORA — delivery status
 
-Last updated: 2026-09-27 — **RC-1 (release candidate 1.0.0-rc.1, PAPER only)** after goal 10. Market launch remains a Sponsor gate (see the Sponsor launch checklist below and `RELEASE_CHECKLIST.md`).
+Last updated: 2026-09-28 — **RC-1 (release candidate 1.0.0-rc.1, PAPER only)** after goal 10. Market launch remains a Sponsor gate (see the Sponsor launch checklist below and `RELEASE_CHECKLIST.md`).
 
 | Gate | Goal | State |
 |---|---|---|
@@ -17,6 +17,7 @@ Last updated: 2026-09-27 — **RC-1 (release candidate 1.0.0-rc.1, PAPER only)**
 | G9 | 09 Risk, compliance and governance (+ B-003 part, B-007, B-014, B-202, B-203, B-303, B-314, B-801, B-810) | **Done, with deferrals**: every acceptance criterion passes, see `docs/plans/09-governance.md` §6 (deferred items in §6.3; regulatory values stay placeholders with owners) |
 | G10 | 10 QA, security hardening, observability, release (+ B-002 part, B-004, B-006, B-012, B-015, B-209, B-312, B-507, B-603 part, B-902, B-916) | **Done, with owned exceptions**: every acceptance criterion passes locally, see `docs/plans/10-release.md` §6; load exceptions E-1/E-2 pending Sponsor acceptance (OQ-O3) |
 | **RC-1** | charter gate: goal 10 criteria + `LIVE_TRADING_ENABLED=false` confirmed | **RC-1 reached 2026-09-27** (`RELEASE_CHECKLIST.md`); market launch = Sponsor only |
+| **IRTC** | independent review (CHARTER §6): review → verify → correct → re-verify, seats R1–R6 | **Signed off 2026-09-28**: 119 findings, all confirmed; Critical 2/2, High 20/20, Medium 40/40 fixed and re-verified; 12 Lows open with owners. Register `docs/review/IRTC-register.md`; R5 conditional on human screen-reader / real-device sessions |
 
 ## What shipped in goal 01
 
@@ -590,3 +591,22 @@ Version `1.0.0-rc.1`, `CHANGELOG.md`, `RELEASE_CHECKLIST.md`. Migration `0101`, 
 
 Post-RC backlog in `docs/BACKLOG.md` (B-1002, B-1011–B-1013 added in goal 10); Sponsor items above.
 
+
+## Independent review (IRTC)
+
+Charter §6 committee (seats R1 security, R2 trading, R3 quant, R4 AI & compliance, R5 frontend & accessibility, R6
+test integrity), independent of the delivery seats. Register: `docs/review/IRTC-register.md`; correction reports
+`docs/review/IRTC-R1-fixes.md` … `IRTC-R6-fixes.md`.
+
+- **Findings:** 119 (Critical 2, High 20, Medium 40, Low 57, incl. 2 Lows found in re-verification); all confirmed,
+  none refuted.
+- **Re-verification:** every Critical/High/Medium original reproduction re-run against the corrected code, plus one
+  bypass variant per Critical/High. Three were PARTIAL and were fixed in this step: four-eyes independence was
+  one-directional (R1-02/R4-02; now symmetric, robot risk sign-off included), guard paraphrases (R4-04), and
+  "2,500" typed key by key became 500 (R5-08). Two new Lows fixed (RV-01 draft note markup, RV-02 confirm copy); the
+  R6-02 static scan hardened against reflective calls. Mutation re-run: 16/16 mutants killed.
+- **Final gate (no retries):** build, lint, typecheck, format, unit, integration ×2 (50 files / 323 tests), e2e ×2
+  (92/92), py:check (186, 97.5 %), evals 133/133, i18n, contrast 152/152, Semgrep 0, pnpm audit and pip-audit clean.
+- **Open:** 12 Lows with owners (BACKLOG B-1101 … B-1114) and residuals B-1115 … B-1120; proposed policy rows OQ-G4,
+  OQ-C3, OQ-C4 for Compliance/Security; Sponsor/people items (live evals key, licences, legal, human screen-reader
+  and real-device tests, pen test, staging ZAP) — register §7.
