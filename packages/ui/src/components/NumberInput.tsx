@@ -186,8 +186,13 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
 
   // While editing, keep the person's text unless the value was changed from outside (a draft prefill).
   const textValue = text !== null ? parseLocaleDecimal(text, locale ?? lang) : null;
+  // IRTC re-verify R5-08: an ambiguous text ("2," on the way to "2,500") holds no value; it must stay
+  // on screen, otherwise the next keystrokes start from an empty field and "2,500" becomes "500".
   const inSync =
-    text !== null && (problem !== null || (textValue?.ok && textValue.canonical === value));
+    text !== null &&
+    (problem !== null ||
+      (textValue?.ok === true && textValue.canonical === value) ||
+      (textValue?.ok === false && value === ''));
   const shown = inSync ? text : formatForInput(value, locale ?? lang);
 
   const stepBy = (dir: 1 | -1, e: KeyboardEvent<HTMLInputElement>) => {

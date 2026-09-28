@@ -71,6 +71,32 @@ describe('NumberInput separators per language (IRTC R5-08)', () => {
     expect(input).toHaveAttribute('aria-invalid', 'true');
   });
 
+  /** Types like a browser: each keystroke appends to what the field currently shows. */
+  function typeKeys(input: HTMLElement, text: string): string[] {
+    const seen: string[] = [];
+    for (const ch of text) {
+      fireEvent.change(input, { target: { value: `${(input as HTMLInputElement).value}${ch}` } });
+      seen.push((input as HTMLInputElement).value);
+    }
+    return seen;
+  }
+
+  it('IRTC re-verify R5-08: "2,500" typed key by key keeps "2," on screen and gives 2500, never 500', () => {
+    render(<Harness locale="en" />);
+    const input = screen.getByRole('textbox', { name: 'How much?' });
+    fireEvent.focus(input);
+    expect(typeKeys(input, '2,500')).toEqual(['2', '2,', '2,5', '2,50', '2,500']);
+    expect(screen.getByTestId('out')).toHaveTextContent('2500');
+    fireEvent.blur(input);
+    expect(input).toHaveValue('2500.00');
+    // While the text is ambiguous ("2,5") no amount is held, and nothing is announced before blur.
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '' } });
+    typeKeys(input, '1,5');
+    expect(input).toHaveValue('1,5');
+    expect(screen.getByTestId('out')).toBeEmptyDOMElement();
+  });
+
   it('French: "2 500,5" gives 2500.50 and is shown with a decimal comma', () => {
     render(<Harness locale="fr" />);
     const input = screen.getByRole('textbox', { name: 'How much?' });

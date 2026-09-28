@@ -408,6 +408,12 @@ test.describe('Novice view', () => {
     await amount.blur();
     await expect(amount).toHaveValue(/^2,?500\.00$/);
     await expect(page.getByTestId('amount-min')).toHaveCount(0);
+    // IRTC re-verify: typed key by key, as people do ("2," must not clear the field: 500 ≠ 2,500).
+    await amount.fill('');
+    await amount.pressSequentially('2,500', { delay: 60 });
+    await expect(amount).toHaveValue('2,500');
+    await amount.blur();
+    await expect(amount).toHaveValue(/^2,?500\.00$/);
     await amount.fill('2,50');
     await amount.blur();
     await expect(page.getByText(/Use a comma only between thousands/)).toBeVisible();
