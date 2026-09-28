@@ -155,3 +155,4 @@ open Lows, residuals and hardening items, each with an owner. None blocks RC-1.
 | B-1118 | OpenAPI 200 response schemas for `GET /ai/strip`, `/calendar`, `/me/watchlists`, `/price-alerts` (the visual fixture check lists them) | IRTC R6-16 | post-RC | Open — S3 / S4 |
 | B-1119 | Control evidence KC-08: also count approvals where the decider granted or approved a role of the requester (the reverse relation enforced since the re-verification) | IRTC re-verification (R1-02/R4-02) | post-RC | Open — S8 |
 | B-1120 | Shared (Redis) throttler store so per-IP sign-up, assessment and sign-in limits hold across api replicas; owner notification of locks/back-off with Keycloak (B-001) | IRTC R1 open items | post-RC (deployment) | Open — S9 |
+| B-1121 | Appropriateness feedback per OQ-C4 decision: replace per-question "topics to review" after a fail with generic per-section guidance (closes IRTC R4-21) | IRTC / PO decision | next | Open |
