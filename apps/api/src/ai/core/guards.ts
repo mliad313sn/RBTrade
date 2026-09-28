@@ -262,6 +262,8 @@ const EXECUTION_CLAIMS: RegExp[] = [
   // "the order went through", "the trade has gone through"
   /\b(?:order|trade)\s+(?:(?:has|have)\s+)?(?:went|gone|go|goes)\s+through\b/i,
   /\b(?:was|were|been|got)\s+filled\s+at\b/i,
+  // IRTC re-verification: "your position is now open / live" (a state change the copilot claims).
+  /\b(?:your|the)\s+(?:[a-z0-9/]+\s+)?position\s+is\s+now\s+(?:open|live|active|on)\b/i,
 ];
 
 /** True when the text claims KORA/the copilot acted (checked on normalised, confusable-folded variants). */
@@ -292,6 +294,12 @@ const SUGGESTIONS: RegExp[] = [
   // "it may be wise to purchase", "worth buying"
   /\b(?:wise|smart|sensible|prudent|advisable|worth|a\s+good\s+idea)\s+(?:to\s+)?(?:buy|sell|purchase|short|invest|buying|selling|purchasing|shorting|investing)\b/i,
   /\bload\s+up\s+on\b/i,
+  // IRTC re-verification: "consider going long", "consider a short", "grab some ETH", "looks like a buy",
+  // "a long position looks attractive".
+  /\bconsider\s+(?:going\s+(?:long|short)|an?\s+(?:long|short)|longs?\b|shorts?\b|entering|getting\s+(?:in|out)|taking\s+(?:a|some)\s+(?:position|profit))/i,
+  /\b(?:grab|snap\s+up|scoop\s+up|pick\s+up|stock\s+up\s+on)\s+(?:some|more|a\s+few|a\s+bit\s+of|shares|units)\b/i,
+  /\blooks?\s+like\s+an?\s+(?:buy|sell|short|long|bargain|steal)\b/i,
+  /\b(?:a\s+)?(?:long|short)\s+(?:position|trade|entry)\s+(?:looks|seems|appears|would\s+be|is)\s+(?:very\s+|quite\s+|really\s+)?(?:attractive|compelling|appealing|tempting|sensible|smart|wise|like\s+a\s+good\s+idea)\b/i,
   // Imperative at the start of a sentence: "Buy gold today.", "Purchase some ..."
   /(?:^|[.!?]\s+|\n\s*)(?:buy|sell|purchase|short|invest\s+in|get\s+into|pile\s+into)\s+(?!orders?\b|side\b|price\b|and\b|or\b)[a-z0-9]/i,
 ];

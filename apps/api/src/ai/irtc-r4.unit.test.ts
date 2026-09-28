@@ -221,8 +221,24 @@ describe('R4-04 · execution and suggestion guards see normalised text and broad
     'Yоu should buy now.', // Cyrillic о
   ])('trade suggestion: %s', (t) => expect(hasTradeSuggestion(t)).toBe(true));
 
+  // IRTC re-verification: paraphrases that still passed after the R4-04 correction.
+  it.each(['Your position is now open.', 'Your EURUSD position is now live.'])(
+    're-verify execution claim: %s',
+    (t) => expect(hasExecutionClaim(t)).toBe(true),
+  );
+  it.each([
+    'Consider going long here.',
+    'Consider a short on gold.',
+    'Grab some ETH while it is cheap.',
+    'Snap up some shares before the close.',
+    'A long position looks attractive right now.',
+    'EURUSD looks like a buy.',
+  ])('re-verify trade suggestion: %s', (t) => expect(hasTradeSuggestion(t)).toBe(true));
+
   it.each([
     'Your EURUSD position is open with an unrealised P&L shown in the panel.',
+    'A long position gains when the price rises and loses when it falls.',
+    'The chart looks attractive to trend followers in back-tests, but past results do not predict.',
     'The robot bought when the EMA 20 crossed above the EMA 50.',
     'Prices move up and down all the time.',
     'I can prepare a draft for you to review in the ticket.',
