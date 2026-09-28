@@ -625,3 +625,28 @@ describe('engine with the scripted provider', () => {
     expect(deltas.join('')).toContain('bid 1.08419');
   });
 });
+
+describe('IRTC re-verify RV-01: draft prefill for the ticket', () => {
+  it('the client gets the KORA-built note unwrapped; only the model sees it wrapped as untrusted', async () => {
+    const note = "AI draft d9 · copilot's words, not advice: Draft requested by the user.";
+    const r = await runCopilot(
+      ask({ message: 'Draft a buy of 1000 EURUSD for me', context: { symbol: 'EURUSD' } }),
+      {
+        provider: new ScriptedProvider('reference'),
+        backend: {
+          ...backend,
+          create_order_draft: async () => ({
+            draftId: 'd9',
+            prefill: { symbol: 'EURUSD', side: 'buy', type: 'market', qty: '1000', note },
+          }),
+        },
+        maxTokens: 1024,
+        maxToolRounds: 6,
+      },
+    );
+    const draft = r.drafts.find((d) => d.kind === 'order');
+    expect(draft?.prefill?.note).toBe(note);
+    const rec = r.toolCalls.find((t) => t.name === 'create_order_draft');
+    expect(JSON.stringify(rec?.output)).toContain('untrusted_data');
+  });
+});

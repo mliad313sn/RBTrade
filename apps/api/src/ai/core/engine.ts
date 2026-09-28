@@ -88,7 +88,7 @@ function textOf(content: Anthropic.ContentBlockParam[]): string {
 
 function draftFrom(record: ToolCallRecord): DraftRef | null {
   if (record.outcome !== 'ok' || record.kind !== 'draft') return null;
-  const o = record.output as
+  const o = (record.clientOutput ?? record.output) as
     | { draftId?: string; prefill?: Record<string, unknown>; summary?: Record<string, unknown> }
     | undefined;
   if (!o?.draftId) return null;

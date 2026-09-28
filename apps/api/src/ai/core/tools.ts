@@ -375,6 +375,12 @@ export interface ToolCallRecord {
   input: unknown;
   /** Sanitised output as the model saw it (ok calls only). */
   output?: unknown;
+  /**
+   * Draft tools only: the output as KORA built it (PII keys stripped, not wrapped as untrusted), for the
+   * ticket prefill shown to the user. IRTC re-verify RV-01: the wrapped form showed `<untrusted_data>`
+   * markup in the ticket note. The drafts service already neutralises the model's rationale in it.
+   */
+  clientOutput?: unknown;
   error?: string;
   durationMs: number;
   kind: 'read' | 'draft' | 'unknown';
@@ -459,7 +465,8 @@ export async function dispatchTool(
       ctx,
       parsed.data,
     );
-    const output = sanitiseToolOutput(stripPiiKeys(raw), spec.untrustedKeys ?? []);
+    const stripped = stripPiiKeys(raw);
+    const output = sanitiseToolOutput(stripped, spec.untrustedKeys ?? []);
     return {
       block: { type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(output) },
       record: {
@@ -467,6 +474,7 @@ export async function dispatchTool(
         input: parsed.data,
         outcome: 'ok',
         output,
+        ...(spec.kind === 'draft' ? { clientOutput: stripped } : {}),
         durationMs: Date.now() - started,
         kind: spec.kind,
       },
