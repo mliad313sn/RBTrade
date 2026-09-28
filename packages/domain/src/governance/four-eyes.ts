@@ -118,6 +118,11 @@ export interface RoleGrantRecord {
  * (`approverRoles`) that was neither granted nor approved by the requester, and that is older than
  * the cooling period. Otherwise one person could create their own approver. Returns null when the
  * decider is independent, or the reason.
+ *
+ * IRTC re-verification (R1-02/R4-02): the relation is symmetric. A decider who granted or approved
+ * any role of the requester vouched for that person, so the two cannot decide each other's requests
+ * either way (`requester_granted_by_decider`). Without this, an admin who once got a second admin
+ * approve a puppet's admin role could approve every request the puppet makes.
  */
 export function approverIndependenceIssue(
   grants: readonly RoleGrantRecord[],
@@ -125,9 +130,22 @@ export function approverIndependenceIssue(
   approverRoles: readonly Role[],
   now: Date,
   coolingMs: number,
-): 'no_approver_role' | 'granted_by_requester' | 'cooling_period' | null {
+  reverse?: { deciderId: string; requesterGrants: readonly RoleGrantRecord[] },
+):
+  | 'no_approver_role'
+  | 'granted_by_requester'
+  | 'requester_granted_by_decider'
+  | 'cooling_period'
+  | null {
   const eligible = grants.filter((g) => approverRoles.includes(g.role));
   if (!eligible.length) return 'no_approver_role';
+  if (
+    reverse &&
+    reverse.requesterGrants.some(
+      (g) => g.grantedBy === reverse.deciderId || g.approvedBy === reverse.deciderId,
+    )
+  )
+    return 'requester_granted_by_decider';
   const independent = eligible.filter(
     (g) => g.grantedBy !== requesterId && g.approvedBy !== requesterId,
   );

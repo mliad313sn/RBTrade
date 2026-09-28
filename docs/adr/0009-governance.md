@@ -65,6 +65,11 @@ Segregation of duties is only as strong as role assignment. Rules (2026-09-27, I
   role (`risk_officer`/`admin`; `admin` for role grants) that the requester neither granted nor
   approved, and that is older than `KORA_APPROVER_COOLING_HOURS` (default 24 h outside dev/test, 0 in
   dev/test). Otherwise 403 `approver_not_independent`. The check reads `user_roles`, not the token.
+  **The relation is symmetric** (IRTC re-verification, 2026-09-27): the decider also may not have
+  granted or approved any role of the requester (`requester_granted_by_decider`). Without it, an admin
+  who once had a second admin approve a puppet's admin role could approve every request the puppet
+  made. The goal 06 robot risk sign-off applies the same rule between the signer and the robot owner
+  (refused at sign-off, and a sign-off by a non-independent signer does not satisfy the checklist).
 - **Trader outside the assessment.** Passing the appropriateness assessment stays the normal path. An
   admin grant of `trader` is a `role_grant` with a reason; the request records
   `appropriatenessPassed` and, without a passed attempt, `appropriatenessOverride: true` (KC-28

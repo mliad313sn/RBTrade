@@ -6,8 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  approverIndependenceIssue,
   hasAnyRole,
   holdoutDeflatedSharpe,
+  isRole,
   type ChecklistItem,
   type HoldoutMoments,
   type Role,
@@ -18,6 +20,7 @@ import { DevIdpService } from '../auth/dev-idp.service';
 import { UsersRepository } from '../auth/users.repository';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
+import { GOVERNANCE_CONFIG, type GovernanceConfig } from '../governance/governance-config';
 import { BacktestsService } from '../strategies/backtests.service';
 import type { RobotRow } from './robots.types';
 
@@ -65,7 +68,43 @@ export class PromotionService {
     private readonly users: UsersRepository,
     private readonly idp: DevIdpService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(GOVERNANCE_CONFIG) private readonly governance: GovernanceConfig,
   ) {}
+
+  /**
+   * IRTC re-verification (R1-02): the risk sign-off is a four-eyes control, so the signer must be
+   * independent of the robot owner in both directions (the signer's risk-officer role neither granted
+   * nor approved by the owner, no role of the owner granted or approved by the signer) and past the
+   * approver cooling period, as for every other four-eyes decision.
+   */
+  private async signerIssue(signerId: string, ownerId: string) {
+    const grantsOf = async (userId: string) =>
+      (
+        await this.db.query<{
+          role: string;
+          granted_by: string | null;
+          approved_by: string | null;
+          granted_at: Date;
+        }>('SELECT role, granted_by, approved_by, granted_at FROM user_roles WHERE user_id = $1', [
+          userId,
+        ])
+      )
+        .filter((g) => isRole(g.role))
+        .map((g) => ({
+          role: g.role as Role,
+          grantedBy: g.granted_by,
+          approvedBy: g.approved_by,
+          grantedAt: g.granted_at,
+        }));
+    return approverIndependenceIssue(
+      await grantsOf(signerId),
+      ownerId,
+      ['risk_officer'],
+      new Date(),
+      this.governance.approverCoolingMs,
+      { deciderId: signerId, requesterGrants: await grantsOf(ownerId) },
+    );
+  }
 
   private async robot(id: string): Promise<RobotRow> {
     const r = (await this.db.query<RobotRow>('SELECT * FROM robots WHERE id = $1', [id]))[0];
@@ -122,7 +161,8 @@ export class PromotionService {
       signoff.limits_hash === robot.limits_hash &&
       signoff.signed_by !== robot.owner_id &&
       signoff.signed_by !== requesterId &&
-      signerRoles.includes('risk_officer');
+      signerRoles.includes('risk_officer') &&
+      (await this.signerIssue(signoff.signed_by, robot.owner_id)) === null;
     const items: ChecklistItem[] = [
       {
         id: 'oos_sharpe',
@@ -244,6 +284,12 @@ export class PromotionService {
         error: 'four_eyes',
         message:
           'Four-eyes rule: you cannot sign the limits of your own robot. Another risk officer must sign.',
+      });
+    if (await this.signerIssue(userId, r.owner_id))
+      throw new ForbiddenException({
+        error: 'approver_not_independent',
+        message:
+          "Four-eyes rule: you and the robot owner granted or approved each other's roles (or your risk-officer role is too recent), so another risk officer must sign.",
       });
     if (body.limitsHash !== r.limits_hash)
       throw new ConflictException({

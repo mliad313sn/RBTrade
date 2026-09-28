@@ -4,7 +4,15 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { base32Decode, totp } from '../src/auth/totp';
-import { bearer, createUser, nextTotpWindow, ownerQuery, startApp, type TestUser } from './helpers';
+import {
+  bearer,
+  createUser,
+  login,
+  nextTotpWindow,
+  ownerQuery,
+  startApp,
+  type TestUser,
+} from './helpers';
 
 const DEF: StrategyDefinition = {
   ...TREND_X,
@@ -129,6 +137,44 @@ describe('promote-to-LIVE workflow (four-eyes, TOTP, LIVE flag)', () => {
         [ownRobot, r.body.limitsHash, owner.id, 'not a risk officer'],
       ),
     ).rejects.toThrow(/only a risk officer/);
+  });
+
+  it('IRTC re-verify R1-02: a risk officer whose role the robot owner requested cannot sign that robot', async () => {
+    const ownerAdmin = await createUser(app, 'trader', ['admin']);
+    const adminB = await createUser(app, 'novice', ['admin']);
+    const puppet = await createUser(app, 'novice');
+    const g = await request(http)
+      .put(`/admin/users/${puppet.id}/roles`)
+      .set(bearer(ownerAdmin.token))
+      .send({ roles: ['novice', 'risk_officer'], reason: 'second-line reviewer' })
+      .expect(202);
+    await request(http)
+      .post(`/governance/approvals/${g.body.requestId}/approve`)
+      .set(bearer(adminB.token))
+      .send({ note: 'reviewed' })
+      .expect(200);
+    const p = { ...puppet, ...(await login(app, puppet.email)) };
+    const adminRobot = await robotFor(ownerAdmin);
+    const d = await request(http)
+      .get(`/robots/${adminRobot}`)
+      .set(bearer(ownerAdmin.token))
+      .expect(200);
+    const res = await request(http)
+      .post(`/robot-reviews/${adminRobot}/signoff`)
+      .set(bearer(p.token))
+      .send({ limitsHash: d.body.limitsHash, note: 'looks fine to me' })
+      .expect(403);
+    expect(res.body.error).toBe('approver_not_independent');
+    // A sign-off row written behind the API by such a signer does not satisfy the checklist either.
+    await ownerQuery(
+      'INSERT INTO robot_risk_signoffs (robot_id, limits_hash, signed_by, note) VALUES ($1, $2, $3, $4)',
+      [adminRobot, d.body.limitsHash, puppet.id, 'behind the API'],
+    );
+    const v = await request(http)
+      .get(`/robots/${adminRobot}/promotion`)
+      .set(bearer(ownerAdmin.token))
+      .expect(200);
+    expect(v.body.items.find((i: { id: string }) => i.id === 'risk_signoff').pass).toBe(false);
   });
 
   it('with every item evidenced and a different risk officer’s sign-off, promotion is still refused while LIVE is disabled, and recorded', async () => {

@@ -230,30 +230,33 @@ export class FourEyesService {
     row: FourEyesRow,
     deciderId: string,
   ): Promise<void> {
-    const grants = (
-      await c.query<{
-        role: string;
-        granted_by: string | null;
-        approved_by: string | null;
-        granted_at: Date;
-      }>('SELECT role, granted_by, approved_by, granted_at FROM user_roles WHERE user_id = $1', [
-        deciderId,
-      ])
-    ).rows
-      .filter((g) => isRole(g.role))
-      .map((g) => ({
-        role: g.role as Role,
-        grantedBy: g.granted_by,
-        approvedBy: g.approved_by,
-        grantedAt: g.granted_at,
-      }));
+    const grantsOf = async (userId: string) =>
+      (
+        await c.query<{
+          role: string;
+          granted_by: string | null;
+          approved_by: string | null;
+          granted_at: Date;
+        }>('SELECT role, granted_by, approved_by, granted_at FROM user_roles WHERE user_id = $1', [
+          userId,
+        ])
+      ).rows
+        .filter((g) => isRole(g.role))
+        .map((g) => ({
+          role: g.role as Role,
+          grantedBy: g.granted_by,
+          approvedBy: g.approved_by,
+          grantedAt: g.granted_at,
+        }));
     const now = (await c.query<{ now: Date }>('SELECT clock_timestamp() AS now')).rows[0]!.now;
     const issue = approverIndependenceIssue(
-      grants,
+      await grantsOf(deciderId),
       row.requested_by,
       this.approverRolesFor(row),
       now,
       this.cfg.approverCoolingMs,
+      // IRTC re-verification: the reverse relation (the decider vouched for the requester).
+      { deciderId, requesterGrants: await grantsOf(row.requested_by) },
     );
     if (issue === 'no_approver_role')
       throw new ForbiddenException({
@@ -266,7 +269,9 @@ export class FourEyesService {
         message:
           issue === 'granted_by_requester'
             ? 'Four-eyes rule: your approval role was granted or approved by the requester, so you cannot decide their request.'
-            : 'Four-eyes rule: your approval role is too recent to decide requests yet (cooling period).',
+            : issue === 'requester_granted_by_decider'
+              ? "Four-eyes rule: you granted or approved one of the requester's roles, so you cannot decide their request."
+              : 'Four-eyes rule: your approval role is too recent to decide requests yet (cooling period).',
       });
   }
 

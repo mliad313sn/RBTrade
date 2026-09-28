@@ -105,6 +105,41 @@ describe('privileged role grants (IRTC R4-02, R4-10)', () => {
       .expect(200);
   });
 
+  it('IRTC re-verify R1-02/R4-02: the admin who requested a puppet admin role cannot decide the puppet requests (reverse direction)', async () => {
+    // A requests admin for a second identity it controls; B (honest) approves once.
+    const puppet = await createUser(app, 'novice', [], { realClock: true });
+    const g = await setRoles(adminA, puppet.id, {
+      roles: ['novice', 'admin'],
+      reason: 'new operations admin',
+    }).expect(202);
+    await approve(adminB, g.body.requestId).expect(200);
+    await new Promise((r) => setTimeout(r, 1100));
+    const p = { ...puppet, ...(await login(app, puppet.email, undefined, { realClock: true })) };
+    // The puppet requests an MFA reset of the victim; A approves it. That is one person on both sides.
+    const req = await request(http)
+      .post('/governance/approvals')
+      .set(bearer(p.token))
+      .send({ kind: 'mfa_reset', userId: victim.id, reason: 'lost phone (ticket 77)' })
+      .expect(201);
+    const denied = await approve(adminA, req.body.id).expect(403);
+    expect(denied.body.error).toBe('approver_not_independent');
+    // B approved the puppet's role, so B is not independent of it either.
+    const deniedB = await approve(adminB, req.body.id).expect(403);
+    expect(deniedB.body.error).toBe('approver_not_independent');
+    expect(await ownerQuery('SELECT 1 FROM user_mfa WHERE user_id = $1', [victim.id])).toHaveLength(
+      1,
+    );
+    // Nor can A approve a role grant the puppet requests for a third identity.
+    const third = await createUser(app, 'novice', [], { realClock: true });
+    const g3 = await setRoles(p, third.id, {
+      roles: ['novice', 'risk_officer'],
+      reason: 'more operations staff',
+    }).expect(202);
+    const denied3 = await approve(adminA, g3.body.requestId).expect(403);
+    expect(denied3.body.error).toBe('approver_not_independent');
+    expect(await rolesOf(third.id)).toEqual(['novice']);
+  });
+
   it('self-grants are refused, including adding a role to yourself', async () => {
     const r = await setRoles(adminA, adminA.id, {
       roles: ['novice', 'admin', 'risk_officer'],

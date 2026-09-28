@@ -57,6 +57,39 @@ describe('IRTC R4-02 · approver independence', () => {
     expect(approverIndependenceIssue(fresh, A, APPROVER_ROLES, now, 0)).toBeNull();
   });
 
+  it('IRTC re-verify R1-02/R4-02: refuses a decider who granted or approved a role of the requester (reverse direction)', () => {
+    const D = 'decider';
+    const deciderGrants = [
+      { role: 'admin' as const, grantedBy: null, approvedBy: null, grantedAt: new Date(0) },
+    ];
+    // The requester's admin role was requested by the decider (a second admin approved it once).
+    expect(
+      approverIndependenceIssue(deciderGrants, A, APPROVER_ROLES, now, 0, {
+        deciderId: D,
+        requesterGrants: [{ role: 'admin', grantedBy: D, approvedBy: 'x', grantedAt: new Date(0) }],
+      }),
+    ).toBe('requester_granted_by_decider');
+    // ... or approved by the decider.
+    expect(
+      approverIndependenceIssue(deciderGrants, A, APPROVER_ROLES, now, 0, {
+        deciderId: D,
+        requesterGrants: [
+          { role: 'trader', grantedBy: 'x', approvedBy: D, grantedAt: new Date(0) },
+        ],
+      }),
+    ).toBe('requester_granted_by_decider');
+    // Unrelated requester rows (self-service or granted by others) keep the decider independent.
+    expect(
+      approverIndependenceIssue(deciderGrants, A, APPROVER_ROLES, now, 0, {
+        deciderId: D,
+        requesterGrants: [
+          { role: 'trader', grantedBy: null, approvedBy: null, grantedAt: new Date(0) },
+          { role: 'admin', grantedBy: 'x', approvedBy: 'y', grantedAt: new Date(0) },
+        ],
+      }),
+    ).toBeNull();
+  });
+
   it('role grants are decided by admins only', () => {
     expect(
       approverIndependenceIssue(
