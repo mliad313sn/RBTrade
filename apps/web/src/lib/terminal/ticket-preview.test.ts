@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { orderResultText } from './format';
-import { inputKey, previewSummary, requestKey, SettledAnnouncer } from './ticket-preview';
+import {
+  confirmHoldDescription,
+  inputKey,
+  previewSummary,
+  requestKey,
+  SettledAnnouncer,
+} from './ticket-preview';
 
 describe('ticket preview announcements (IRTC R5-05)', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -88,5 +94,14 @@ describe('order result text (IRTC R5-07)', () => {
     expect(
       orderResultText({ ...o, status: 'accepted', avgFillPrice: null }, { qty: 0, price: 5 }),
     ).toBe('Order accepted: buy 900,000 EURUSD.');
+  });
+});
+
+describe('IRTC re-verify RV-02: the hold-to-place description says why confirmation is needed', () => {
+  it('names the server reasons, not always the threshold', () => {
+    expect(confirmHoldDescription(['No stop loss: the loss on this order is not capped.'])).toBe(
+      'Market order. Confirmation needed: No stop loss: the loss on this order is not capped.',
+    );
+    expect(confirmHoldDescription([])).toBe('Market order. Review the figures before placing it.');
   });
 });

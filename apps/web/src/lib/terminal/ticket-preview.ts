@@ -76,3 +76,14 @@ export class SettledAnnouncer {
     this.pendingKey = null;
   }
 }
+
+/**
+ * Accessible description of the hold-to-place button (IRTC re-verify RV-02): it states the server's
+ * reasons for asking (threshold, no stop loss, …). It used to say "above your confirmation
+ * threshold" for every market order, including small orders confirmed only for a missing stop.
+ */
+export function confirmHoldDescription(reasons: readonly string[]): string {
+  return reasons.length
+    ? `Market order. Confirmation needed: ${reasons.join(' ')}`
+    : 'Market order. Review the figures before placing it.';
+}

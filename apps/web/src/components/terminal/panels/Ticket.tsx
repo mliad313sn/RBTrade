@@ -39,6 +39,7 @@ import { api } from '@/lib/api-browser';
 import { formatQty, orderResultText } from '@/lib/terminal/format';
 import { useTerminal } from '@/lib/terminal/store';
 import {
+  confirmHoldDescription,
   inputKey as makeInputKey,
   previewSummary,
   requestKey,
@@ -1159,7 +1160,7 @@ export function TicketPanel() {
               holdMs={MARKET_HOLD_MS}
               onConfirm={() => confirm && void place(confirm.body)}
               disabled={busy}
-              description="Market order above your confirmation threshold."
+              description={confirmHoldDescription(cp?.confirmation.reasons ?? [])}
               confirmTitle={`Place this market order now: ${String(cBody?.side)} ${cQty} ${displayName}?`}
               data-testid="confirm-hold"
             >
