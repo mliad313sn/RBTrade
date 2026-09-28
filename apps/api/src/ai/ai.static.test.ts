@@ -177,7 +177,17 @@ describe('copilot code cannot reach execution paths (static)', () => {
       );
       expect(src, name).not.toMatch(/as\s+unknown\s+as|as\s+any\b/);
       expect(src, name).not.toMatch(/this\.\w+\s*\[/);
+      // IRTC re-verification: no reflective calls (Reflect.get(this.accounts, 'update' + 'Settings')).
+      expect(src, name).not.toMatch(
+        /\bReflect\s*\.|\bObject\s*\.\s*getOwnProperty|\.(?:call|apply|bind)\s*\(/,
+      );
     }
+    // ... and read-ports never hands an injected service out as a value (aliasing evades the call list).
+    const ports = readFileSync(join(AI_DIR, 'read-ports.ts'), 'utf8').replace(
+      /constructor\([\s\S]*?\)\s*\{\}/,
+      '',
+    );
+    expect(ports).not.toMatch(/this\.(accounts|oms|robots|strategies|backtests)\b(?!\.\w+\()/);
   });
 
   it('read-ports.ts only calls read functions (and the pure validator)', () => {
